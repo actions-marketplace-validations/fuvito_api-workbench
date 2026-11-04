@@ -15,6 +15,10 @@ import {
   SelectEnvironment as WailsSelectEnvironment,
   GetActiveEnvironment as WailsGetActiveEnvironment,
 } from '@wailsjs/go/main/WorkspaceService'
+import {
+  ImportOpenAPISpec as WailsImportOpenAPISpec,
+  ImportOpenAPISpecFromPath as WailsImportOpenAPISpecFromPath,
+} from '@wailsjs/go/main/OpenAPIService'
 
 // ---- Shared I/O types ----
 
@@ -161,4 +165,32 @@ export async function getActiveEnvironment(): Promise<EnvInfo | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsGetActiveEnvironment()
   return result as unknown as EnvInfo | null
+}
+
+// ---- OpenAPI import ----
+
+export interface ImportedRequest {
+  operationId: string
+  summary: string
+  method: string
+  url: string
+  savedPath: string
+  tags?: string[]
+}
+
+export interface ImportResult {
+  specTitle: string
+  specVersion: string
+  imported: ImportedRequest[]
+  error?: string
+}
+
+export async function importOpenAPISpec(baseURL = ''): Promise<ImportResult> {
+  const result = await WailsImportOpenAPISpec(baseURL)
+  return result as unknown as ImportResult
+}
+
+export async function importOpenAPISpecFromPath(path: string, baseURL = ''): Promise<ImportResult> {
+  const result = await WailsImportOpenAPISpecFromPath(path, baseURL)
+  return result as unknown as ImportResult
 }

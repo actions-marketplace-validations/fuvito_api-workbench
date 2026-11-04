@@ -1,0 +1,216 @@
+// Example server for end-to-end testing of EndpointDesk.
+// Run: go run ./examples/server
+// Listens on :8080 and prints all available endpoints on startup.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+type User struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"createdAt"`
+}
+
+var (
+	mu      sync.Mutex
+	users   = []User{
+		{ID: 1, Name: "Alice Smith", Email: "alice@example.com", CreatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Name: "Bob Jones", Email: "bob@example.com", CreatedAt: "2026-01-02T00:00:00Z"},
+	}
+	nextID  = 3
+	validToken = "demo-token-12345"
+)
+
+func main() {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/auth/login", handleLogin)
+	mux.HandleFunc("/users", handleUsers)
+	mux.HandleFunc("/users/", handleUser)
+	mux.HandleFunc("/protected", handleProtected)
+	mux.HandleFunc("/health", handleHealth)
+
+	fmt.Println("EndpointDesk example server")
+	fmt.Println("Listening on http://localhost:8080")
+	fmt.Println()
+	fmt.Println("  POST   /auth/login           { \"username\": \"admin\", \"password\": \"secret\" }")
+	fmt.Println("  GET    /health")
+	fmt.Println("  GET    /users")
+	fmt.Println("  POST   /users                { \"name\": \"...\", \"email\": \"...\" }")
+	fmt.Println("  GET    /users/:id")
+	fmt.Println("  PUT    /users/:id            { \"name\": \"...\", \"email\": \"...\" }")
+	fmt.Println("  DELETE /users/:id")
+	fmt.Println("  GET    /protected            requires Authorization: Bearer demo-token-12345")
+	fmt.Println()
+
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		fmt.Println("server error:", err)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
+}
+
+func errJSON(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "ok",
+		"time":   time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var body struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		errJSON(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if body.Username != "admin" || body.Password != "secret" {
+		errJSON(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"token":   validToken,
+		"message": "Login successful",
+	})
+}
+
+func handleProtected(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	auth := r.Header.Get("Authorization")
+	if auth != "Bearer "+validToken {
+		errJSON(w, http.StatusUnauthorized, "missing or invalid token")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Access granted",
+		"user":    "admin",
+	})
+}
+
+func handleUsers(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		mu.Lock()
+		defer mu.Unlock()
+		writeJSON(w, http.StatusOK, users)
+
+	case http.MethodPost:
+		var body struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errJSON(w, http.StatusBadRequest, "invalid JSON")
+			return
+		}
+		if body.Name == "" || body.Email == "" {
+			errJSON(w, http.StatusUnprocessableEntity, "name and email are required")
+			return
+		}
+		mu.Lock()
+		u := User{
+			ID:        nextID,
+			Name:      body.Name,
+			Email:     body.Email,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		}
+		users = append(users, u)
+		nextID++
+		mu.Unlock()
+		writeJSON(w, http.StatusCreated, u)
+
+	default:
+		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func handleUser(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/users/")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id < 1 {
+		errJSON(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	idx := -1
+	for i, u := range users {
+		if u.ID == id {
+			idx = i
+			break
+		}
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		if idx == -1 {
+			errJSON(w, http.StatusNotFound, "user not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, users[idx])
+
+	case http.MethodPut:
+		if idx == -1 {
+			errJSON(w, http.StatusNotFound, "user not found")
+			return
+		}
+		var body struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errJSON(w, http.StatusBadRequest, "invalid JSON")
+			return
+		}
+		if body.Name != "" {
+			users[idx].Name = body.Name
+		}
+		if body.Email != "" {
+			users[idx].Email = body.Email
+		}
+		writeJSON(w, http.StatusOK, users[idx])
+
+	case http.MethodDelete:
+		if idx == -1 {
+			errJSON(w, http.StatusNotFound, "user not found")
+			return
+		}
+		users = append(users[:idx], users[idx+1:]...)
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}

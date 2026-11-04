@@ -1,0 +1,7 @@
+schemaVersion: "1"
+name: List users
+method: GET
+url: "{{baseUrl}}/users"
+auth:
+  type: bearer
+  token: "{{token}}"

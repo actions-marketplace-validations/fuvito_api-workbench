@@ -9,6 +9,7 @@ import (
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
 )
 
 // Evaluator checks domain.Assertions against domain.Responses.
@@ -28,8 +29,7 @@ func (e *Evaluator) Evaluate(a domain.Assertion, resp *domain.Response) domain.A
 	case domain.AssertionJSONPath:
 		res.Actual, res.Passed, res.Message = evalJSONPath(a, resp)
 	case domain.AssertionSchema:
-		res.Passed = false
-		res.Message = "schema assertions require Phase 4 (OpenAPI integration)"
+		res.Actual, res.Passed, res.Message = evalSchema(a, resp)
 	default:
 		res.Passed = false
 		res.Message = fmt.Sprintf("unknown assertion type %q", a.Type)
@@ -85,6 +85,64 @@ func evalJSONPath(a domain.Assertion, resp *domain.Response) (actual string, pas
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
 	return
+}
+
+func evalSchema(a domain.Assertion, resp *domain.Response) (actual string, passed bool, msg string) {
+	if a.Schema == "" {
+		return "", false, "schema assertion requires a schema value"
+	}
+	body := resp.BodyString()
+	if body == "" {
+		return "", false, "response body is empty"
+	}
+
+	// Parse the inline schema string as an OpenAPI spec fragment.
+	// We wrap it in a minimal spec so kin-openapi can validate it.
+	specYAML := []byte(`
+openapi: "3.0.3"
+info:
+  title: inline
+  version: "1"
+paths:
+  /validate:
+    get:
+      operationId: validate
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: ` + inlineSchemaYAML(a.Schema) + `
+          description: ok
+`)
+	spec, err := openapi.ParseBytes(specYAML, "yaml")
+	if err != nil {
+		return "", false, fmt.Sprintf("invalid schema: %v", err)
+	}
+
+	fakeResp := &domain.Response{
+		StatusCode: resp.StatusCode,
+		Headers:    []domain.Header{{Name: "Content-Type", Value: "application/json"}},
+		Body:       resp.Body,
+	}
+
+	errs := openapi.ValidateResponse(spec, "validate", fakeResp)
+	if len(errs) == 0 {
+		return body, true, ""
+	}
+	msgs := make([]string, len(errs))
+	for i, e := range errs {
+		msgs[i] = e.Error()
+	}
+	return body, false, strings.Join(msgs, "; ")
+}
+
+func inlineSchemaYAML(s string) string {
+	// If schema looks like JSON, convert to inline YAML representation.
+	// For simple cases we just embed as a JSON block scalar.
+	if strings.TrimSpace(s)[0] == '{' {
+		return "|\n          " + strings.ReplaceAll(strings.TrimSpace(s), "\n", "\n          ")
+	}
+	return s
 }
 
 // ---- comparison engine ----

@@ -4,6 +4,7 @@ import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
+  importOpenAPISpec,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
   type EnvInfo, type RequestFileIO,
 } from '@/lib/bridge'
@@ -107,6 +108,8 @@ type SidebarProps = {
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
+  onImportOpenAPI: () => void
+  importing?: boolean
 }
 
 function Sidebar({
@@ -114,6 +117,7 @@ function Sidebar({
   workspacePath, fileTree, history,
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onSelectHistory,
+  onImportOpenAPI, importing,
 }: SidebarProps) {
   return (
     <aside className="w-56 shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)]">
@@ -144,6 +148,8 @@ function Sidebar({
             onOpenWorkspace={onOpenWorkspace}
             onNewWorkspace={onNewWorkspace}
             onSelectFile={onSelectFile}
+            onImportOpenAPI={onImportOpenAPI}
+            importing={importing}
           />
         )}
 
@@ -457,6 +463,7 @@ export default function App() {
   const [environments, setEnvironments] = useState<EnvInfo[]>([])
   const [activeEnv, setActiveEnv] = useState<EnvInfo | null>(null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('workspace')
+  const [importing, setImporting] = useState(false)
 
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([])
@@ -591,6 +598,24 @@ export default function App() {
     setUrl(entry.url)
   }
 
+  // ---- OpenAPI import ----
+
+  async function handleImportOpenAPI() {
+    setImporting(true)
+    try {
+      const result = await importOpenAPISpec()
+      if (result.error) {
+        console.error('import error:', result.error)
+      } else {
+        await refreshWorkspace()
+      }
+    } catch (err) {
+      console.error('import failed:', err)
+    } finally {
+      setImporting(false)
+    }
+  }
+
   // ---- URL paste param extraction ----
 
   function handleUrlPaste(raw: string) {
@@ -655,6 +680,8 @@ export default function App() {
         onNewWorkspace={handleNewWorkspace}
         onSelectFile={handleSelectFile}
         onSelectHistory={handleSelectHistory}
+        onImportOpenAPI={handleImportOpenAPI}
+        importing={importing}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">

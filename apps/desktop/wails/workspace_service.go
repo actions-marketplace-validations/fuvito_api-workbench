@@ -57,11 +57,7 @@ func saveConfig(cfg workspaceConfig) {
 	if err != nil {
 		return
 	}
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, data, 0600); err != nil {
-		return
-	}
-	_ = os.Rename(tmp, p) // atomic replace
+	_ = atomicWrite(p, data)
 }
 
 // ---- Wails-serializable I/O types ----
@@ -276,12 +272,7 @@ func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Atomic write
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0644); err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := atomicWrite(path, data); err != nil {
 		return "", err
 	}
 	return path, nil

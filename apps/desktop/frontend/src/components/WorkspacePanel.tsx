@@ -66,6 +66,8 @@ type WorkspacePanelProps = {
   onOpenWorkspace: () => void
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
+  onImportOpenAPI: () => void
+  importing?: boolean
 }
 
 export function WorkspacePanel({
@@ -74,6 +76,8 @@ export function WorkspacePanel({
   onOpenWorkspace,
   onNewWorkspace,
   onSelectFile,
+  onImportOpenAPI,
+  importing,
 }: WorkspacePanelProps) {
   const folderName = workspacePath
     ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
@@ -87,14 +91,25 @@ export function WorkspacePanel({
             <span className="text-[10px] font-mono text-[var(--color-muted-foreground)] truncate" title={workspacePath}>
               {folderName}
             </span>
-            <button
-              type="button"
-              onClick={onOpenWorkspace}
-              className="shrink-0 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              title="Change workspace"
-            >
-              ⌁
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={onImportOpenAPI}
+                disabled={importing}
+                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-40"
+                title="Import OpenAPI spec"
+              >
+                {importing ? '…' : '⇡'}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenWorkspace}
+                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                title="Change workspace"
+              >
+                ⌁
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-auto py-1">
             {fileTree.length === 0 ? (
