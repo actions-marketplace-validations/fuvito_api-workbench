@@ -2,6 +2,7 @@
 // Uses plain interfaces for ergonomic object creation at call sites.
 // The generated wailsjs classes use 'namespace' (not erasable syntax in TS7),
 // so all Wails imports are isolated here.
+import { SetHasDirtyTabs as WailsSetHasDirtyTabs } from '@wailsjs/go/main/App'
 import { Execute as WailsExecute, GetHistory as WailsGetHistory } from '@wailsjs/go/main/RequestService'
 import {
   OpenWorkspace as WailsOpenWorkspace,
@@ -113,6 +114,12 @@ export interface RequestFileIO {
   auth?: AuthPayload
   timeoutMs?: number
   filePath?: string
+}
+
+// ---- App lifecycle ----
+
+export async function setHasDirtyTabs(dirty: boolean): Promise<void> {
+  await WailsSetHasDirtyTabs(dirty)
 }
 
 // ---- Request execution ----

@@ -5,7 +5,7 @@ import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
-  loadRequest, saveRequest, openRequest, deleteRequest,
+  loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
@@ -722,6 +722,12 @@ export default function App() {
       applySettings(s)
     }).catch(() => {})
   }, [refreshWorkspace, refreshHistory])
+
+  // Keep Go side informed so OnBeforeClose can guard unsaved changes.
+  const hasAnyDirtyTab = tabs.some(t => isTabDirty(t))
+  useEffect(() => {
+    setHasDirtyTabs(hasAnyDirtyTab).catch(() => {})
+  }, [hasAnyDirtyTab])
 
   // ---- Resize ----
 

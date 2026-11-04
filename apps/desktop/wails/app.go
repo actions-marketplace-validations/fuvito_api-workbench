@@ -1,6 +1,10 @@
 package main
 
-import "context"
+import (
+	"context"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+)
 
 type App struct {
 	ctx              context.Context
@@ -8,6 +12,7 @@ type App struct {
 	requestService   *RequestService
 	openapiService   *OpenAPIService
 	settingsService  *SettingsService
+	hasDirtyTabs     bool
 }
 
 func NewApp() *App {
@@ -33,4 +38,28 @@ func (a *App) startup(ctx context.Context) {
 
 func (a *App) shutdown(_ context.Context) {
 	a.requestService.close()
+}
+
+// SetHasDirtyTabs is called by the frontend whenever the overall dirty state changes.
+func (a *App) SetHasDirtyTabs(dirty bool) {
+	a.hasDirtyTabs = dirty
+}
+
+// beforeClose is registered as OnBeforeClose; returns true to cancel the close.
+func (a *App) beforeClose(ctx context.Context) bool {
+	if !a.hasDirtyTabs {
+		return false
+	}
+	result, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+		Type:          runtime.QuestionDialog,
+		Title:         "Unsaved changes",
+		Message:       "You have unsaved changes that will be lost. Exit anyway?",
+		Buttons:       []string{"Exit", "Cancel"},
+		DefaultButton: "Cancel",
+		CancelButton:  "Cancel",
+	})
+	if err != nil {
+		return false // allow close if dialog fails
+	}
+	return result != "Exit"
 }
