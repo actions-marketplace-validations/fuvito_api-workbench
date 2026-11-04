@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { FolderOpen, Save, FilePlus, Settings, Pencil } from 'lucide-react'
 import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
@@ -18,6 +18,32 @@ import { BodyEditor } from '@/components/BodyEditor'
 import { AuthEditor } from '@/components/AuthEditor'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
 import type { KVPair, BodyState, AuthState } from '@/types'
+
+// ---- Dirty-state helpers ----
+
+function computeStateKey(
+  method: string,
+  url: string,
+  queryParams: KVPair[],
+  headers: KVPair[],
+  body: BodyState,
+  auth: AuthState,
+  name: string | null,
+): string {
+  return JSON.stringify({
+    method,
+    url: url.trim(),
+    name,
+    params: queryParams
+      .filter(p => p.name.trim())
+      .map(p => ({ name: p.name.trim(), value: p.value, enabled: p.enabled })),
+    headers: headers
+      .filter(h => h.name.trim())
+      .map(h => ({ name: h.name.trim(), value: h.value, enabled: h.enabled })),
+    body,
+    auth,
+  })
+}
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
 type HttpMethod = typeof HTTP_METHODS[number]
@@ -114,6 +140,8 @@ type SidebarProps = {
   onSelectHistory: (entry: HistoryEntry) => void
   onImportOpenAPI: () => void
   importing?: boolean
+  activeFilePath?: string
+  isDirty?: boolean
 }
 
 function Sidebar({
@@ -122,6 +150,7 @@ function Sidebar({
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onSelectHistory,
   onImportOpenAPI, importing,
+  activeFilePath, isDirty,
 }: SidebarProps) {
   return (
     <aside className="w-56 shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)]">
@@ -154,6 +183,8 @@ function Sidebar({
             onSelectFile={onSelectFile}
             onImportOpenAPI={onImportOpenAPI}
             importing={importing}
+            activeFilePath={activeFilePath}
+            isDirty={isDirty}
           />
         )}
 
@@ -566,6 +597,16 @@ export default function App() {
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [savedKey, setSavedKey] = useState<string>(() =>
+    computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null),
+  )
+  const [pendingAction, setPendingAction] = useState<{ fn: () => void } | null>(null)
+
+  const currentKey = useMemo(
+    () => computeStateKey(method, url, queryParams, headers, body, auth, currentRequestName),
+    [method, url, queryParams, headers, body, auth, currentRequestName],
+  )
+  const isDirty = currentKey !== savedKey
 
   // ---- init ----
 
@@ -625,7 +666,7 @@ export default function App() {
     }
   }
 
-  async function handleSelectFile(path: string) {
+  async function doSelectFile(path: string) {
     try {
       const r = await loadRequest(path)
       if (!r) return
@@ -639,12 +680,19 @@ export default function App() {
       setResponse(null)
       setCurrentRequestName(r.name || null)
       setCurrentFilePath(path)
+      setSavedKey(computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null))
+      setSaveError(null)
     } catch (err) {
       console.error('load request:', err)
     }
   }
 
-  async function handleOpenRequest() {
+  function handleSelectFile(path: string) {
+    if (isDirty) setPendingAction({ fn: () => doSelectFile(path) })
+    else doSelectFile(path)
+  }
+
+  async function doOpenRequest() {
     try {
       const r = await openRequest()
       if (!r) return
@@ -658,12 +706,19 @@ export default function App() {
       setResponse(null)
       setCurrentRequestName(r.name || null)
       setCurrentFilePath(r.filePath || null)
+      setSavedKey(computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null))
+      setSaveError(null)
     } catch (err) {
       console.error('open request:', err)
     }
   }
 
-  function handleNewRequest() {
+  function handleOpenRequest() {
+    if (isDirty) setPendingAction({ fn: () => doOpenRequest() })
+    else doOpenRequest()
+  }
+
+  function doNewRequest() {
     setMethod('GET')
     setUrl('')
     setQueryParams([])
@@ -675,9 +730,15 @@ export default function App() {
     setCurrentFilePath(null)
     setEditingName(false)
     setSaveError(null)
+    setSavedKey(computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null))
   }
 
-  async function handleSaveRequest() {
+  function handleNewRequest() {
+    if (isDirty) setPendingAction({ fn: () => doNewRequest() })
+    else doNewRequest()
+  }
+
+  async function handleSaveRequest(): Promise<boolean> {
     setSaveError(null)
     const name = currentRequestName?.trim() ||
       url.trim().split('/').filter(Boolean).pop() ||
@@ -698,10 +759,14 @@ export default function App() {
       if (savedPath) {
         setCurrentRequestName(name)
         setCurrentFilePath(savedPath)
+        setSavedKey(computeStateKey(method, url, queryParams, headers, body, auth, name))
         await refreshWorkspace()
+        return true
       }
+      return false
     } catch (err) {
       setSaveError(String(err).replace(/^Error: /, ''))
+      return false
     }
   }
 
@@ -721,11 +786,22 @@ export default function App() {
 
   // ---- history actions ----
 
-  function handleSelectHistory(entry: HistoryEntry) {
+  function doSelectHistory(entry: HistoryEntry) {
     if ((HTTP_METHODS as readonly string[]).includes(entry.method)) {
       setMethod(entry.method as HttpMethod)
     }
     setUrl(entry.url)
+    setCurrentFilePath(null)
+    setCurrentRequestName(null)
+    setSavedKey(computeStateKey(
+      (HTTP_METHODS as readonly string[]).includes(entry.method) ? entry.method as HttpMethod : 'GET',
+      entry.url, [], [], { type: 'none', content: '' }, { type: 'none' }, null,
+    ))
+  }
+
+  function handleSelectHistory(entry: HistoryEntry) {
+    if (isDirty) setPendingAction({ fn: () => doSelectHistory(entry) })
+    else doSelectHistory(entry)
   }
 
   // ---- Settings ----
@@ -854,6 +930,55 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       <MenuBar menus={menus} />
+      {/* Unsaved-changes confirmation */}
+      {pendingAction && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          onClick={() => setPendingAction(null)}
+        >
+          <div
+            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--color-foreground)]">Unsaved changes</h3>
+              <p className="text-xs text-[var(--color-muted-foreground)] mt-1">
+                <span className="font-medium text-[var(--color-foreground)]">
+                  {currentRequestName ?? 'This request'}
+                </span>{' '}
+                has unsaved changes. Save before continuing?
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingAction(null)}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPendingAction(null); pendingAction.fn() }}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await handleSaveRequest()
+                  if (ok) { setPendingAction(null); pendingAction.fn() }
+                }}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity"
+              >
+                Save & Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
       {showSettings && (
         <SettingsPanel
@@ -895,12 +1020,20 @@ export default function App() {
         onSelectHistory={handleSelectHistory}
         onImportOpenAPI={handleImportOpenAPI}
         importing={importing}
+        activeFilePath={currentFilePath ?? undefined}
+        isDirty={isDirty}
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {isDirty && (
+              <span
+                className="shrink-0 w-2 h-2 rounded-full bg-amber-400"
+                title="Unsaved changes"
+              />
+            )}
             {currentRequestName !== null && (
               <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[method])}>
                 {method}

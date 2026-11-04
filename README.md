@@ -87,6 +87,61 @@ Open the desktop app → open a workspace → click **Import OpenAPI** in the wo
 
 ---
 
+## How Workspaces Work
+
+EndpointDesk organises requests as **plain YAML files on disk** — not in a proprietary binary format, not in a database. This means your collection is fully version-controllable with git, diffable in any editor, and portable across machines.
+
+### Folder structure
+
+```
+my-workspace/
+├── environments/
+│   ├── local.yaml          # Environment variables for local development
+│   └── staging.yaml
+└── requests/
+    ├── health-check.yaml   # Individual request files
+    ├── auth/
+    │   ├── login.yaml
+    │   └── refresh-token.yaml
+    └── users/
+        ├── list-users.yaml
+        └── create-user.yaml
+```
+
+- `environments/` — variable sets (base URL, auth tokens, etc.). Select the active environment from the top bar.
+- `requests/` — one YAML file per request; subdirectories are folders in the sidebar tree.
+
+### Name = filename
+
+**The request's name is its filename.** When you save a request named `List Users`, it writes to `list-users.yaml`. Renaming the request (click the name in the header, type a new name, Ctrl+S) renames the file automatically — no separate "Save As" dialog, no filename-vs-name mismatch.
+
+Uniqueness is enforced at save time: two requests in the same folder cannot share a name, because they would map to the same file. If a conflict is detected, an error is shown inline in the header and no file is written.
+
+### Dirty state
+
+An **amber dot** appears in the header whenever the current request has unsaved changes. The same dot appears on the file in the workspace sidebar. Navigating away (opening another file, clicking New Request, switching history) triggers a confirmation dialog with three choices: **Save & Continue**, **Discard**, or **Cancel**.
+
+### File format
+
+Each request file is human-readable YAML:
+
+```yaml
+schemaVersion: "1"
+name: List Users
+method: GET
+url: "{{baseUrl}}/users"
+headers:
+  - name: Accept
+    value: application/json
+queryParams:
+  - name: page
+    value: "1"
+```
+
+You can edit these files directly in any text editor. `{{variable}}` references are resolved against the active environment at request time.
+
+---
+
 ## Development
 
 ### Run all Go tests

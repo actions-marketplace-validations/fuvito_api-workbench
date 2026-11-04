@@ -7,9 +7,11 @@ type TreeNodeProps = {
   node: FileNode
   depth: number
   onSelect: (path: string) => void
+  activeFilePath?: string
+  isDirty?: boolean
 }
 
-function TreeNode({ node, depth, onSelect }: TreeNodeProps) {
+function TreeNode({ node, depth, onSelect, activeFilePath, isDirty }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(true)
   const indent = depth * 12
 
@@ -35,12 +37,20 @@ function TreeNode({ node, depth, onSelect }: TreeNodeProps) {
           <span className="truncate">{node.name}</span>
         </button>
         {expanded && node.children?.map(child => (
-          <TreeNode key={child.path} node={child} depth={depth + 1} onSelect={onSelect} />
+          <TreeNode
+            key={child.path}
+            node={child}
+            depth={depth + 1}
+            onSelect={onSelect}
+            activeFilePath={activeFilePath}
+            isDirty={isDirty}
+          />
         ))}
       </div>
     )
   }
 
+  const isActive = node.path === activeFilePath
   const displayName = node.name.replace(/\.(yaml|yml|json)$/i, '')
 
   return (
@@ -48,14 +58,18 @@ function TreeNode({ node, depth, onSelect }: TreeNodeProps) {
       type="button"
       onClick={() => onSelect(node.path)}
       className={cn(
-        'w-full flex items-center gap-1.5 px-2 py-0.5 text-left',
-        'text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]',
-        'hover:bg-[var(--color-muted)] transition-colors',
+        'w-full flex items-center gap-1.5 py-0.5 text-left text-xs transition-colors',
+        isActive
+          ? 'bg-[var(--color-muted)] text-[var(--color-foreground)] border-l-2 border-[var(--color-accent)]'
+          : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] border-l-2 border-transparent',
       )}
-      style={{ paddingLeft: `${8 + indent + 15}px` }}
+      style={{ paddingLeft: `${6 + indent + 15}px` }}
     >
       <FileText size={11} className="shrink-0" />
-      <span className="truncate" title={node.name}>{displayName}</span>
+      <span className="truncate flex-1" title={node.name}>{displayName}</span>
+      {isActive && isDirty && (
+        <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400 mr-2" title="Unsaved changes" />
+      )}
     </button>
   )
 }
@@ -68,6 +82,8 @@ type WorkspacePanelProps = {
   onSelectFile: (path: string) => void
   onImportOpenAPI: () => void
   importing?: boolean
+  activeFilePath?: string
+  isDirty?: boolean
 }
 
 export function WorkspacePanel({
@@ -78,6 +94,8 @@ export function WorkspacePanel({
   onSelectFile,
   onImportOpenAPI,
   importing,
+  activeFilePath,
+  isDirty,
 }: WorkspacePanelProps) {
   const folderName = workspacePath
     ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
@@ -118,7 +136,14 @@ export function WorkspacePanel({
               </p>
             ) : (
               fileTree.map(node => (
-                <TreeNode key={node.path} node={node} depth={0} onSelect={onSelectFile} />
+                <TreeNode
+                  key={node.path}
+                  node={node}
+                  depth={0}
+                  onSelect={onSelectFile}
+                  activeFilePath={activeFilePath}
+                  isDirty={isDirty}
+                />
               ))
             )}
           </div>
