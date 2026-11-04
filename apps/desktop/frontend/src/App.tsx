@@ -6,6 +6,7 @@ import { TabBar } from '@/components/TabBar'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
+  createFolder, deleteFolder,
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
@@ -140,6 +141,9 @@ type SidebarProps = {
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
   onDeleteFile: (path: string) => void
+  onDeleteFolder: (path: string) => void
+  onNewRequestInFolder: (folderPath: string) => void
+  onCreateFolder: (parentPath: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
   onImportOpenAPI: () => void
   importing?: boolean
@@ -152,7 +156,8 @@ function Sidebar({
   tab, onTabChange,
   workspacePath, fileTree, history,
   onOpenWorkspace, onNewWorkspace,
-  onSelectFile, onDeleteFile, onSelectHistory,
+  onSelectFile, onDeleteFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
+  onSelectHistory,
   onImportOpenAPI, importing,
   activeFilePath, isDirty,
 }: SidebarProps) {
@@ -189,6 +194,9 @@ function Sidebar({
             onNewWorkspace={onNewWorkspace}
             onSelectFile={onSelectFile}
             onDeleteFile={onDeleteFile}
+            onDeleteFolder={onDeleteFolder}
+            onNewRequestInFolder={onNewRequestInFolder}
+            onCreateFolder={onCreateFolder}
             onImportOpenAPI={onImportOpenAPI}
             importing={importing}
             activeFilePath={activeFilePath}
@@ -580,6 +588,7 @@ type TabState = {
   auth: AuthState
   name: string | null
   filePath: string | null
+  targetDir: string | null
   savedKey: string
   response: ResponseData | null
   loading: boolean
@@ -587,7 +596,7 @@ type TabState = {
   editingName: boolean
 }
 
-function createBlankTab(): TabState {
+function createBlankTab(targetDir: string | null = null): TabState {
   const savedKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null)
   return {
     id: crypto.randomUUID(),
@@ -599,6 +608,7 @@ function createBlankTab(): TabState {
     auth: { type: 'none' },
     name: null,
     filePath: null,
+    targetDir,
     savedKey,
     response: null,
     loading: false,
@@ -647,6 +657,9 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
   const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
+  const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
+  const [newFolderDialog, setNewFolderDialog] = useState<{ parentPath: string; parentLabel: string } | null>(null)
+  const [newFolderName, setNewFolderName] = useState('')
 
   // --- Derived ---
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
@@ -672,6 +685,7 @@ export default function App() {
       ...state,
       name: r.name || null,
       filePath: path,
+      targetDir: null,
       savedKey,
       response: null,
       loading: false,
@@ -890,6 +904,7 @@ export default function App() {
         body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
         auth: authStateToPayload(tab.auth) ?? undefined,
         filePath: tab.filePath ?? '',
+        targetDir: tab.targetDir ?? '',
       }
       const savedPath = await saveRequest(req)
       if (savedPath) {
@@ -942,6 +957,7 @@ export default function App() {
       auth: { type: 'none' },
       name: null,
       filePath: null,
+      targetDir: null,
       savedKey,
       response: null,
       loading: false,
@@ -1040,6 +1056,50 @@ export default function App() {
     } catch (err) {
       console.error('delete request:', err)
     }
+  }
+
+  // ---- Folder operations ----
+
+  function handleCreateFolder(parentPath: string) {
+    const parentLabel = parentPath
+      ? parentPath.replace(/\\/g, '/').split('/').pop() ?? 'requests'
+      : 'requests'
+    setNewFolderDialog({ parentPath, parentLabel })
+    setNewFolderName('')
+  }
+
+  async function confirmCreateFolder() {
+    if (!newFolderDialog || !newFolderName.trim()) return
+    try {
+      await createFolder(newFolderDialog.parentPath, newFolderName.trim())
+      setNewFolderDialog(null)
+      setNewFolderName('')
+      await refreshWorkspace()
+    } catch (err) {
+      // Show error inline in the dialog by keeping it open
+      console.error('create folder:', err)
+    }
+  }
+
+  function handleDeleteFolder(path: string) {
+    setDeletingFolderPath(path)
+  }
+
+  async function confirmDeleteFolder() {
+    if (!deletingFolderPath) return
+    const path = deletingFolderPath
+    setDeletingFolderPath(null)
+    try {
+      await deleteFolder(path)
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('delete folder:', err)
+    }
+  }
+
+  function handleNewRequestInFolder(folderPath: string) {
+    const tab = createBlankTab(folderPath)
+    setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
   }
 
   // ---- URL paste param extraction ----
@@ -1174,6 +1234,99 @@ export default function App() {
         </div>
       )}
 
+      {/* New folder dialog */}
+      {newFolderDialog && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          onClick={() => setNewFolderDialog(null)}
+        >
+          <div
+            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--color-foreground)]">New folder</h3>
+              <p className="text-xs text-[var(--color-muted-foreground)] mt-0.5">
+                Inside <span className="font-medium text-[var(--color-foreground)] font-mono">{newFolderDialog.parentLabel}</span>
+              </p>
+            </div>
+            <input
+              autoFocus
+              type="text"
+              value={newFolderName}
+              onChange={e => setNewFolderName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') confirmCreateFolder()
+                if (e.key === 'Escape') setNewFolderDialog(null)
+              }}
+              placeholder="folder-name"
+              className={cn(
+                'w-full text-xs rounded px-3 py-1.5 bg-[var(--color-muted)]',
+                'border border-[var(--color-border)] outline-none focus:border-[var(--color-accent)]',
+                'text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]',
+              )}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setNewFolderDialog(null)}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmCreateFolder}
+                disabled={!newFolderName.trim()}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete folder confirmation */}
+      {deletingFolderPath && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          onClick={() => setDeletingFolderPath(null)}
+        >
+          <div
+            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--color-foreground)]">Delete folder</h3>
+              <p className="text-xs text-[var(--color-muted-foreground)] mt-1">
+                Delete empty folder{' '}
+                <span className="font-medium text-[var(--color-foreground)] font-mono">
+                  {deletingFolderPath.replace(/\\/g, '/').split('/').pop()}
+                </span>
+                ? This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeletingFolderPath(null)}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteFolder}
+                className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Close-dirty-tab confirmation */}
       {closingTab && (
         <div
@@ -1261,6 +1414,9 @@ export default function App() {
           onNewWorkspace={handleNewWorkspace}
           onSelectFile={handleSelectFile}
           onDeleteFile={handleDeleteFile}
+          onDeleteFolder={handleDeleteFolder}
+          onNewRequestInFolder={handleNewRequestInFolder}
+          onCreateFolder={handleCreateFolder}
           onSelectHistory={handleSelectHistory}
           onImportOpenAPI={handleImportOpenAPI}
           importing={importing}

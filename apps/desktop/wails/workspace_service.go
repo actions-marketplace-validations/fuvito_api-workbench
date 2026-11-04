@@ -99,6 +99,8 @@ type RequestFileIO struct {
 	TimeoutMs     int64           `json:"timeoutMs,omitempty"`
 	// FilePath is the on-disk path of the loaded file; not persisted to YAML.
 	FilePath      string          `json:"filePath,omitempty"`
+	// TargetDir overrides the save directory for new (unsaved) requests.
+	TargetDir     string          `json:"targetDir,omitempty"`
 }
 
 // ---- WorkspaceService ----
@@ -260,6 +262,11 @@ func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
 	var targetDir string
 	if req.FilePath != "" {
 		targetDir = filepath.Dir(req.FilePath)
+	} else if req.TargetDir != "" {
+		targetDir = req.TargetDir
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			return "", err
+		}
 	} else {
 		if w.workspacePath == "" {
 			return "", fmt.Errorf("no workspace open — open or create a workspace first")
@@ -360,6 +367,56 @@ func (w *WorkspaceService) SaveEnvironment(env EnvironmentIO) (*EnvironmentInfoI
 		w.activeEnv = domEnv
 	}
 	return &EnvironmentInfoIO{Name: env.Name, Path: path}, nil
+}
+
+// CreateFolder creates a new subdirectory for organising requests.
+// If parentPath is empty, the folder is created under {workspace}/requests/.
+func (w *WorkspaceService) CreateFolder(parentPath, name string) (string, error) {
+	if parentPath == "" {
+		if w.workspacePath == "" {
+			return "", fmt.Errorf("no workspace open — open or create a workspace first")
+		}
+		parentPath = filepath.Join(w.workspacePath, "requests")
+	}
+	if w.workspacePath != "" {
+		rel, err := filepath.Rel(w.workspacePath, parentPath)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", fmt.Errorf("path is outside the current workspace")
+		}
+	}
+	dirName := sanitizeDirName(name)
+	if dirName == "" {
+		return "", fmt.Errorf("invalid folder name")
+	}
+	newPath := filepath.Join(parentPath, dirName)
+	if _, err := os.Stat(newPath); err == nil {
+		return "", fmt.Errorf("a folder named %q already exists here", name)
+	}
+	if err := os.MkdirAll(newPath, 0755); err != nil {
+		return "", fmt.Errorf("creating folder: %w", err)
+	}
+	return newPath, nil
+}
+
+// DeleteFolder removes an empty folder from the workspace.
+// Hidden files (e.g. .DS_Store) are ignored when checking emptiness.
+func (w *WorkspaceService) DeleteFolder(path string) error {
+	if w.workspacePath != "" {
+		rel, err := filepath.Rel(w.workspacePath, path)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("path is outside the current workspace")
+		}
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("reading directory: %w", err)
+	}
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), ".") {
+			return fmt.Errorf("folder is not empty")
+		}
+	}
+	return os.RemoveAll(path)
 }
 
 // DeleteRequest removes a request file from disk.
@@ -466,9 +523,7 @@ func buildFileTree(root, dir string, skipEnvDir bool) ([]FileNodeIO, error) {
 			if err != nil {
 				continue
 			}
-			if len(children) > 0 {
-				nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: true, Children: children})
-			}
+			nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: true, Children: children})
 		} else if isRequestFile(path) {
 			nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: false})
 		}

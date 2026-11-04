@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen, FolderSymlink, Upload, Trash2 } from 'lucide-react'
+import {
+  ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
+  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
 
@@ -8,35 +11,75 @@ type TreeNodeProps = {
   depth: number
   onSelect: (path: string) => void
   onDelete?: (path: string) => void
+  onDeleteFolder?: (path: string) => void
+  onNewRequestInFolder?: (folderPath: string) => void
+  onCreateFolder?: (parentPath: string) => void
   activeFilePath?: string
   isDirty?: boolean
 }
 
-function TreeNode({ node, depth, onSelect, onDelete, activeFilePath, isDirty }: TreeNodeProps) {
+function TreeNode({
+  node, depth,
+  onSelect, onDelete, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
+  activeFilePath, isDirty,
+}: TreeNodeProps) {
   const [expanded, setExpanded] = useState(true)
   const indent = depth * 12
 
   if (node.isDir) {
+    const isEmpty = !node.children || node.children.length === 0
     return (
       <div>
-        <button
-          type="button"
-          onClick={() => setExpanded(e => !e)}
-          className={cn(
-            'w-full flex items-center gap-1 px-2 py-0.5 text-left',
-            'text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]',
-            'hover:bg-[var(--color-muted)] transition-colors',
-          )}
+        <div
+          className="group flex items-center hover:bg-[var(--color-muted)] transition-colors"
           style={{ paddingLeft: `${8 + indent}px` }}
         >
-          <span className="shrink-0 text-[var(--color-muted-foreground)]">
-            {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-          </span>
-          <span className="shrink-0 text-[var(--color-muted-foreground)]">
-            {expanded ? <FolderOpen size={12} /> : <Folder size={12} />}
-          </span>
-          <span className="truncate">{node.name}</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="flex items-center gap-1 flex-1 min-w-0 py-0.5 text-left text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
+          >
+            <span className="shrink-0">
+              {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+            </span>
+            <span className="shrink-0">
+              {expanded ? <FolderOpen size={12} /> : <Folder size={12} />}
+            </span>
+            <span className="truncate">{node.name}</span>
+          </button>
+          <div className="flex items-center gap-0.5 mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {onNewRequestInFolder && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onNewRequestInFolder(node.path) }}
+                title="New request in this folder"
+                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              >
+                <FilePlus size={10} />
+              </button>
+            )}
+            {onCreateFolder && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onCreateFolder(node.path) }}
+                title="New subfolder"
+                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+              >
+                <FolderPlus size={10} />
+              </button>
+            )}
+            {isEmpty && onDeleteFolder && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onDeleteFolder(node.path) }}
+                title="Delete folder"
+                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-red-400"
+              >
+                <Trash2 size={10} />
+              </button>
+            )}
+          </div>
+        </div>
         {expanded && node.children?.map(child => (
           <TreeNode
             key={child.path}
@@ -44,6 +87,9 @@ function TreeNode({ node, depth, onSelect, onDelete, activeFilePath, isDirty }: 
             depth={depth + 1}
             onSelect={onSelect}
             onDelete={onDelete}
+            onDeleteFolder={onDeleteFolder}
+            onNewRequestInFolder={onNewRequestInFolder}
+            onCreateFolder={onCreateFolder}
             activeFilePath={activeFilePath}
             isDirty={isDirty}
           />
@@ -97,6 +143,9 @@ type WorkspacePanelProps = {
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
   onDeleteFile?: (path: string) => void
+  onDeleteFolder?: (path: string) => void
+  onNewRequestInFolder?: (folderPath: string) => void
+  onCreateFolder?: (parentPath: string) => void
   onImportOpenAPI: () => void
   importing?: boolean
   activeFilePath?: string
@@ -110,6 +159,9 @@ export function WorkspacePanel({
   onNewWorkspace,
   onSelectFile,
   onDeleteFile,
+  onDeleteFolder,
+  onNewRequestInFolder,
+  onCreateFolder,
   onImportOpenAPI,
   importing,
   activeFilePath,
@@ -128,6 +180,16 @@ export function WorkspacePanel({
               {folderName}
             </span>
             <div className="flex items-center gap-1 shrink-0">
+              {onCreateFolder && (
+                <button
+                  type="button"
+                  onClick={() => onCreateFolder('')}
+                  className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                  title="New folder"
+                >
+                  <FolderPlus size={12} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onImportOpenAPI}
@@ -160,6 +222,9 @@ export function WorkspacePanel({
                   depth={0}
                   onSelect={onSelectFile}
                   onDelete={onDeleteFile}
+                  onDeleteFolder={onDeleteFolder}
+                  onNewRequestInFolder={onNewRequestInFolder}
+                  onCreateFolder={onCreateFolder}
                   activeFilePath={activeFilePath}
                   isDirty={isDirty}
                 />

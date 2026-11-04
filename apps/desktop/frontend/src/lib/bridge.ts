@@ -19,6 +19,8 @@ import {
   SaveEnvironment as WailsSaveEnvironment,
   DeleteEnvironment as WailsDeleteEnvironment,
   DeleteRequest as WailsDeleteRequest,
+  CreateFolder as WailsCreateFolder,
+  DeleteFolder as WailsDeleteFolder,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -114,6 +116,7 @@ export interface RequestFileIO {
   auth?: AuthPayload
   timeoutMs?: number
   filePath?: string
+  targetDir?: string
 }
 
 // ---- App lifecycle ----
@@ -230,6 +233,15 @@ export async function deleteEnvironment(path: string): Promise<void> {
 
 export async function deleteRequest(path: string): Promise<void> {
   await WailsDeleteRequest(path)
+}
+
+export async function createFolder(parentPath: string, name: string): Promise<string> {
+  const result = await WailsCreateFolder(parentPath, name)
+  return result as unknown as string
+}
+
+export async function deleteFolder(path: string): Promise<void> {
+  await WailsDeleteFolder(path)
 }
 
 // ---- OpenAPI import ----
