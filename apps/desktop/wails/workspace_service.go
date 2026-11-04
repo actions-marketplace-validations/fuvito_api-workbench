@@ -362,6 +362,24 @@ func (w *WorkspaceService) SaveEnvironment(env EnvironmentIO) (*EnvironmentInfoI
 	return &EnvironmentInfoIO{Name: env.Name, Path: path}, nil
 }
 
+// DeleteRequest removes a request file from disk.
+func (w *WorkspaceService) DeleteRequest(path string) error {
+	if path == "" {
+		return fmt.Errorf("path is required")
+	}
+	// Safety: only allow deletion of files within the workspace.
+	if w.workspacePath != "" {
+		rel, err := filepath.Rel(w.workspacePath, path)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("path is outside the current workspace")
+		}
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("deleting %s: %w", path, err)
+	}
+	return nil
+}
+
 // DeleteEnvironment removes an environment file.
 // If it was the active environment, the active selection is cleared.
 func (w *WorkspaceService) DeleteEnvironment(path string) error {

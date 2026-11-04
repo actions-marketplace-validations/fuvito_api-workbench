@@ -5,7 +5,7 @@ import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
-  loadRequest, saveRequest, openRequest,
+  loadRequest, saveRequest, openRequest, deleteRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
@@ -139,6 +139,7 @@ type SidebarProps = {
   onOpenWorkspace: () => void
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
+  onDeleteFile: (path: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
   onImportOpenAPI: () => void
   importing?: boolean
@@ -151,7 +152,7 @@ function Sidebar({
   tab, onTabChange,
   workspacePath, fileTree, history,
   onOpenWorkspace, onNewWorkspace,
-  onSelectFile, onSelectHistory,
+  onSelectFile, onDeleteFile, onSelectHistory,
   onImportOpenAPI, importing,
   activeFilePath, isDirty,
 }: SidebarProps) {
@@ -187,6 +188,7 @@ function Sidebar({
             onOpenWorkspace={onOpenWorkspace}
             onNewWorkspace={onNewWorkspace}
             onSelectFile={onSelectFile}
+            onDeleteFile={onDeleteFile}
             onImportOpenAPI={onImportOpenAPI}
             importing={importing}
             activeFilePath={activeFilePath}
@@ -644,6 +646,7 @@ export default function App() {
   const [importing, setImporting] = useState(false)
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
+  const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
 
   // --- Derived ---
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
@@ -998,6 +1001,41 @@ export default function App() {
     }
   }
 
+  // ---- Delete request file ----
+
+  function handleDeleteFile(path: string) {
+    setDeletingFilePath(path)
+  }
+
+  async function confirmDeleteFile() {
+    if (!deletingFilePath) return
+    const path = deletingFilePath
+    setDeletingFilePath(null)
+    try {
+      await deleteRequest(path)
+      // Close any open tab with this file path (no dirty-save prompt — file is gone)
+      setTabsState(prev => {
+        const remaining = prev.tabs.filter(t => t.filePath !== path)
+        if (remaining.length === prev.tabs.length) {
+          // No tab had this file open, just refresh workspace below
+          return prev
+        }
+        if (remaining.length === 0) {
+          const blank = createBlankTab()
+          return { tabs: [blank], activeTabId: blank.id }
+        }
+        const activeStillExists = remaining.some(t => t.id === prev.activeTabId)
+        return {
+          tabs: remaining,
+          activeTabId: activeStillExists ? prev.activeTabId : remaining[remaining.length - 1].id,
+        }
+      })
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('delete request:', err)
+    }
+  }
+
   // ---- URL paste param extraction ----
 
   function handleUrlPaste(raw: string) {
@@ -1090,6 +1128,46 @@ export default function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       <MenuBar menus={menus} />
 
+      {/* Delete request confirmation */}
+      {deletingFilePath && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          onClick={() => setDeletingFilePath(null)}
+        >
+          <div
+            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--color-foreground)]">Delete request</h3>
+              <p className="text-xs text-[var(--color-muted-foreground)] mt-1">
+                This will permanently delete{' '}
+                <span className="font-medium text-[var(--color-foreground)] font-mono">
+                  {deletingFilePath.replace(/\\/g, '/').split('/').pop()}
+                </span>{' '}
+                from disk. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeletingFilePath(null)}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteFile}
+                className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Close-dirty-tab confirmation */}
       {closingTab && (
         <div
@@ -1176,6 +1254,7 @@ export default function App() {
           onOpenWorkspace={handleOpenWorkspace}
           onNewWorkspace={handleNewWorkspace}
           onSelectFile={handleSelectFile}
+          onDeleteFile={handleDeleteFile}
           onSelectHistory={handleSelectHistory}
           onImportOpenAPI={handleImportOpenAPI}
           importing={importing}

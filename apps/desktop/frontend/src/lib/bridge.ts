@@ -17,6 +17,7 @@ import {
   GetEnvironment as WailsGetEnvironment,
   SaveEnvironment as WailsSaveEnvironment,
   DeleteEnvironment as WailsDeleteEnvironment,
+  DeleteRequest as WailsDeleteRequest,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -218,6 +219,10 @@ export async function saveEnvironment(env: EnvironmentIO): Promise<EnvInfo> {
 
 export async function deleteEnvironment(path: string): Promise<void> {
   await WailsDeleteEnvironment(path)
+}
+
+export async function deleteRequest(path: string): Promise<void> {
+  await WailsDeleteRequest(path)
 }
 
 // ---- OpenAPI import ----
