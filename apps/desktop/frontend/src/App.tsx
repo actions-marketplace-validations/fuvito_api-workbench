@@ -657,6 +657,7 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
   const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
+  const [showAbout, setShowAbout] = useState(false)
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
   const [newFolderDialog, setNewFolderDialog] = useState<{ parentPath: string; parentLabel: string } | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
@@ -1174,6 +1175,12 @@ export default function App() {
         { kind: 'action', label: 'Settings…', onClick: () => setShowSettings(true) },
       ],
     },
+    {
+      label: 'Help',
+      items: [
+        { kind: 'action', label: 'About EndpointDesk', onClick: () => setShowAbout(true) },
+      ],
+    },
   ]
 
   // ---- Tab info for TabBar ----
@@ -1228,6 +1235,57 @@ export default function App() {
                 className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* About dialog */}
+      {showAbout && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+          onClick={() => setShowAbout(false)}
+        >
+          <div
+            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-6 w-96 shadow-2xl flex flex-col gap-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-bold text-[var(--color-foreground)] tracking-tight">EndpointDesk</h2>
+              <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.1.0 — Public MVP</p>
+            </div>
+
+            <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed">
+              API Contract Validation and Spec Conformance Testing — with a full API development workbench.
+              Local-first, open-source, and git-native.
+            </p>
+
+            <div className="flex flex-col gap-1">
+              {[
+                ['Runtime',   'Go 1.26 + Wails v2'],
+                ['Frontend',  'React 19 · TypeScript 7 · Vite 8'],
+                ['UI',        'Tailwind CSS v4 · shadcn/ui'],
+                ['Storage',   'YAML / JSON · SQLite history'],
+                ['License',   'MIT'],
+              ].map(([label, value]) => (
+                <div key={label} className="flex gap-3 text-xs">
+                  <span className="w-20 shrink-0 text-[var(--color-muted-foreground)]">{label}</span>
+                  <span className="text-[var(--color-foreground)] font-mono">{value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center pt-1 border-t border-[var(--color-border)]">
+              <span className="text-[10px] text-[var(--color-muted-foreground)]">
+                © {new Date().getFullYear()} Fuat Yazar
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAbout(false)}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
