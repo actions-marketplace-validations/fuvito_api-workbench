@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { FolderOpen, Save, FilePlus, Settings, Pencil } from 'lucide-react'
+import { MenuBar } from '@/components/MenuBar'
+import type { MenuDef } from '@/components/MenuBar'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest,
@@ -559,6 +561,9 @@ export default function App() {
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([])
 
+  // Current request identity
+  const [currentRequestName, setCurrentRequestName] = useState<string | null>(null)
+
   // ---- init ----
 
   const refreshWorkspace = useCallback(async () => {
@@ -629,6 +634,7 @@ export default function App() {
       setBody(state.body)
       setAuth(state.auth)
       setResponse(null)
+      setCurrentRequestName(r.name || null)
     } catch (err) {
       console.error('load request:', err)
     }
@@ -646,9 +652,21 @@ export default function App() {
       setBody(state.body)
       setAuth(state.auth)
       setResponse(null)
+      setCurrentRequestName(r.name || null)
     } catch (err) {
       console.error('open request:', err)
     }
+  }
+
+  function handleNewRequest() {
+    setMethod('GET')
+    setUrl('')
+    setQueryParams([])
+    setHeaders([])
+    setBody({ type: 'none', content: '' })
+    setAuth({ type: 'none' })
+    setResponse(null)
+    setCurrentRequestName(null)
   }
 
   async function handleSaveRequest() {
@@ -664,7 +682,10 @@ export default function App() {
         auth: authStateToPayload(auth) ?? undefined,
       }
       const path = await saveRequest(req)
-      if (path) await refreshWorkspace()
+      if (path) {
+        setCurrentRequestName(req.name)
+        await refreshWorkspace()
+      }
     } catch (err) {
       console.error('save request:', err)
     }
@@ -705,6 +726,11 @@ export default function App() {
       root.classList.add('dark')
       root.classList.remove('light')
     }
+  }
+
+  async function handleToggleTheme() {
+    const next = { ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' }
+    await handleSaveSettings(next)
   }
 
   async function handleSaveSettings(s: AppSettings) {
@@ -787,8 +813,34 @@ export default function App() {
 
   // ---- render ----
 
+  const menus: MenuDef[] = [
+    {
+      label: 'File',
+      items: [
+        { kind: 'action', label: 'New Request',       shortcut: 'Ctrl+N', onClick: handleNewRequest },
+        { kind: 'action', label: 'Open Request…',     shortcut: 'Ctrl+O', onClick: handleOpenRequest },
+        { kind: 'action', label: 'Save Request',      shortcut: 'Ctrl+S', onClick: handleSaveRequest },
+        { kind: 'separator' },
+        { kind: 'action', label: 'Import OpenAPI Spec…', onClick: handleImportOpenAPI, disabled: !workspacePath },
+        { kind: 'separator' },
+        { kind: 'action', label: 'Open Workspace…',   onClick: handleOpenWorkspace },
+        { kind: 'action', label: 'New Workspace…',    onClick: handleNewWorkspace },
+      ],
+    },
+    {
+      label: 'View',
+      items: [
+        { kind: 'action', label: settings.theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme', onClick: handleToggleTheme },
+        { kind: 'separator' },
+        { kind: 'action', label: 'Settings…', onClick: () => setShowSettings(true) },
+      ],
+    },
+  ]
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex flex-col h-screen w-screen overflow-hidden">
+      <MenuBar menus={menus} />
+      <div className="flex flex-1 overflow-hidden">
       {showSettings && (
         <SettingsPanel
           settings={settings}
@@ -834,9 +886,20 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
-          <span className="text-xs font-semibold text-[var(--color-muted-foreground)] tracking-wide">
-            EndpointDesk
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {currentRequestName ? (
+              <>
+                <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[method])}>
+                  {method}
+                </span>
+                <span className="text-xs font-medium text-[var(--color-foreground)] truncate">
+                  {currentRequestName}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-[var(--color-muted-foreground)]">New Request</span>
+            )}
+          </div>
 
           <div className="ml-auto flex items-center gap-2">
             {/* Toolbar buttons */}
@@ -858,7 +921,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => { setMethod('GET'); setUrl(''); setQueryParams([]); setHeaders([]); setBody({ type: 'none', content: '' }); setAuth({ type: 'none' }); setResponse(null) }}
+              onClick={handleNewRequest}
               title="New request"
               className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
@@ -937,6 +1000,7 @@ export default function App() {
           </div>
         </div>
       </main>
+      </div>
     </div>
   )
 }
