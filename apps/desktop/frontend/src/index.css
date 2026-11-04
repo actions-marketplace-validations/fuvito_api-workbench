@@ -14,6 +14,15 @@
   --font-size-code: 13px;
 }
 
+/* JSON syntax highlighting token colors (dark theme defaults) */
+:root {
+  --color-json-key:     oklch(0.75 0.14 237);
+  --color-json-string:  oklch(0.72 0.17 142);
+  --color-json-number:  oklch(0.80 0.16 70);
+  --color-json-literal: oklch(0.70 0.14 303);
+  --color-json-punct:   var(--color-muted-foreground);
+}
+
 /* Light theme overrides */
 :root.light {
   --color-background: oklch(0.97 0.002 285);
@@ -26,6 +35,11 @@
   --color-accent: oklch(0.44 0.19 264);
   /* Darker destructive for light background */
   --color-destructive: oklch(0.46 0.20 27);
+  /* JSON highlighting — darker for light backgrounds */
+  --color-json-key:     oklch(0.40 0.17 237);
+  --color-json-string:  oklch(0.40 0.17 142);
+  --color-json-number:  oklch(0.50 0.15 70);
+  --color-json-literal: oklch(0.38 0.16 303);
 }
 
 *,

@@ -400,6 +400,44 @@ function TimingBar({ timing, total }: { timing: ResponseData['timing']; total: n
   )
 }
 
+// ---- JSON syntax highlighting ----
+
+function highlightJSON(json: string): React.ReactNode {
+  const nodes: React.ReactNode[] = []
+  // Order matters: key (string + lookahead colon) must come before plain string
+  const re = /("(?:[^"\\]|\\.)*")(?=\s*:)|("(?:[^"\\]|\\.)*")|([-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([{}\[\],:])/g
+  let last = 0
+  let i = 0
+  for (const m of json.matchAll(re)) {
+    if (m.index > last) nodes.push(json.slice(last, m.index))
+    if      (m[1]) nodes.push(<span key={i++} style={{ color: 'var(--color-json-key)' }}>{m[1]}</span>)
+    else if (m[2]) nodes.push(<span key={i++} style={{ color: 'var(--color-json-string)' }}>{m[2]}</span>)
+    else if (m[3]) nodes.push(<span key={i++} style={{ color: 'var(--color-json-number)' }}>{m[3]}</span>)
+    else if (m[4]) nodes.push(<span key={i++} style={{ color: 'var(--color-json-literal)' }}>{m[4]}</span>)
+    else if (m[5]) nodes.push(<span key={i++} style={{ color: 'var(--color-json-punct)' }}>{m[5]}</span>)
+    last = m.index + m[0].length
+  }
+  if (last < json.length) nodes.push(json.slice(last))
+  return nodes
+}
+
+function JsonBody({ body }: { body: string }) {
+  const trimmed = body.trim()
+  const looksLikeJson = trimmed.startsWith('{') || trimmed.startsWith('[')
+  let isJson = false
+  if (looksLikeJson) try { JSON.parse(body); isJson = true } catch { /* plain text */ }
+
+  const content = isJson && body.length < 500_000
+    ? highlightJSON(prettyBody(body))
+    : prettyBody(body)
+
+  return (
+    <pre className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed" style={{ color: 'var(--color-foreground)' }}>
+      {content}
+    </pre>
+  )
+}
+
 // ---- Response viewer ----
 
 type ResponseViewerProps = {
@@ -470,9 +508,7 @@ function ResponseViewer({ response, loading }: ResponseViewerProps) {
           </div>
         )}
         {!loading && response && !response.error && activeTab === 'Body' && (
-          <pre className="text-xs font-mono text-[var(--color-foreground)] whitespace-pre-wrap break-all leading-relaxed">
-            {prettyBody(response.body)}
-          </pre>
+          <JsonBody body={response.body} />
         )}
         {!loading && response && !response.error && activeTab === 'Headers' && (
           <table className="w-full text-xs font-mono">
