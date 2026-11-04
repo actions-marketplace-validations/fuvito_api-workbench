@@ -1299,20 +1299,29 @@ export default function App() {
           onClick={() => setShowAbout(false)}
         >
           <div
-            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-6 w-96 shadow-2xl flex flex-col gap-5"
+            className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl shadow-2xl flex flex-col w-[480px]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex flex-col gap-1">
-              <h2 className="text-base font-bold text-[var(--color-foreground)] tracking-tight">EndpointDesk</h2>
-              <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.1.0 — Public MVP</p>
+            {/* Header band with icon */}
+            <div className="flex flex-col items-center gap-4 px-8 pt-8 pb-6 border-b border-[var(--color-border)]">
+              <img
+                src="/appicon.png"
+                alt="EndpointDesk icon"
+                className="w-24 h-24 rounded-2xl shadow-lg select-none"
+                draggable={false}
+              />
+              <div className="flex flex-col items-center gap-1">
+                <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">EndpointDesk</h2>
+                <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.1.0 — Public MVP</p>
+              </div>
+              <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
+                API Contract Validation and Spec Conformance Testing — with a full API development workbench.
+                Local-first, open-source, and git-native.
+              </p>
             </div>
 
-            <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed">
-              API Contract Validation and Spec Conformance Testing — with a full API development workbench.
-              Local-first, open-source, and git-native.
-            </p>
-
-            <div className="flex flex-col gap-1">
+            {/* Details */}
+            <div className="px-8 py-5 flex flex-col gap-2">
               {[
                 ['Runtime',   'Go 1.26 + Wails v2'],
                 ['Frontend',  'React 19 · TypeScript 7 · Vite 8'],
@@ -1327,14 +1336,15 @@ export default function App() {
               ))}
             </div>
 
-            <div className="flex justify-between items-center pt-1 border-t border-[var(--color-border)]">
+            {/* Footer */}
+            <div className="flex justify-between items-center px-8 py-4 border-t border-[var(--color-border)]">
               <span className="text-[10px] text-[var(--color-muted-foreground)]">
                 © {new Date().getFullYear()} Fuat Yazar
               </span>
               <button
                 type="button"
                 onClick={() => setShowAbout(false)}
-                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+                className="px-4 py-1.5 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
               >
                 Close
               </button>
