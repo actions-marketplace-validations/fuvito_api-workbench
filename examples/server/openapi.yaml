@@ -1,9 +1,9 @@
 openapi: "3.0.3"
 info:
-  title: EndpointDesk Example API
+  title: ApiDesk Example API
   version: "1.0.0"
   description: >
-    A simple users API used to demonstrate EndpointDesk features:
+    A simple users API used to demonstrate ApiDesk features:
     request execution, variable extraction, assertion evaluation,
     and OpenAPI spec import.
 

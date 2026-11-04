@@ -127,7 +127,7 @@ First end-to-end milestone
 This proves the most important architectural assumption before we invest in scenario editing, OpenAPI, and advanced UI.
 6. Recommended initial repository organization
    I would use a monorepo, but keep the Go core as a separately testable module.
-   endpointdesk/
+   apidesk/
    │
    ├── apps/
    │   ├── desktop/

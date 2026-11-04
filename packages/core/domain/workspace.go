@@ -1,6 +1,6 @@
 package domain
 
-// Workspace marks a directory as an EndpointDesk project.
+// Workspace marks a directory as an ApiDesk project.
 // Collections, scenarios, and environments are discovered by scanning the workspace directory.
 // The workspace file itself carries only identity metadata.
 type Workspace struct {

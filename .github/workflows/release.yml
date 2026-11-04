@@ -44,8 +44,8 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: endpointdesk-windows-amd64
-          path: apps/desktop/wails/build/bin/endpointdesk.exe
+          name: apidesk-windows-amd64
+          path: apps/desktop/wails/build/bin/apidesk.exe
 
   release-macos:
     name: Desktop — macOS
@@ -85,13 +85,13 @@ jobs:
 
       - name: Rename artifacts
         run: |
-          mv apps/desktop/wails/build/bin/endpointdesk.app apps/desktop/wails/build/bin/endpointdesk-arm64.app || true
-          cp apps/desktop/wails/build/bin/endpointdesk-arm64.app apps/desktop/wails/build/bin/endpointdesk-amd64.app || true
+          mv apps/desktop/wails/build/bin/apidesk.app apps/desktop/wails/build/bin/apidesk-arm64.app || true
+          cp apps/desktop/wails/build/bin/apidesk-arm64.app apps/desktop/wails/build/bin/apidesk-amd64.app || true
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: endpointdesk-macos
+          name: apidesk-macos
           path: apps/desktop/wails/build/bin/
 
   release-linux:
@@ -134,8 +134,8 @@ jobs:
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: endpointdesk-linux-amd64
-          path: apps/desktop/wails/build/bin/endpointdesk
+          name: apidesk-linux-amd64
+          path: apps/desktop/wails/build/bin/apidesk
 
   cli-binaries:
     name: CLI — all platforms
@@ -167,14 +167,14 @@ jobs:
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
             go build -ldflags="-X main.version=${{ github.ref_name }}" \
-            -o endpointdesk-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} ./...
+            -o apidesk-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} ./...
         working-directory: apps/cli
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: endpointdesk-cli-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: apps/cli/endpointdesk-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+          name: apidesk-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: apps/cli/apidesk-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
 
   publish:
     name: Publish GitHub Release
@@ -191,14 +191,14 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: EndpointDesk ${{ github.ref_name }}
+          name: ApiDesk ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: |
-            dist/endpointdesk-windows-amd64/endpointdesk.exe
-            dist/endpointdesk-linux-amd64/endpointdesk
-            dist/endpointdesk-cli-windows-amd64/endpointdesk-windows-amd64.exe
-            dist/endpointdesk-cli-darwin-arm64/endpointdesk-darwin-arm64
-            dist/endpointdesk-cli-darwin-amd64/endpointdesk-darwin-amd64
-            dist/endpointdesk-cli-linux-amd64/endpointdesk-linux-amd64
+            dist/apidesk-windows-amd64/apidesk.exe
+            dist/apidesk-linux-amd64/apidesk
+            dist/apidesk-cli-windows-amd64/apidesk-windows-amd64.exe
+            dist/apidesk-cli-darwin-arm64/apidesk-darwin-arm64
+            dist/apidesk-cli-darwin-amd64/apidesk-darwin-amd64
+            dist/apidesk-cli-linux-amd64/apidesk-linux-amd64

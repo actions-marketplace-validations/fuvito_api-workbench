@@ -1,4 +1,4 @@
-# EndpointDesk User Guide
+# ApiDesk User Guide
 
 ## Table of Contents
 
@@ -16,11 +16,11 @@
 
 ## 1. Opening or creating a workspace
 
-A **workspace** is an ordinary folder on your filesystem. EndpointDesk reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
+A **workspace** is an ordinary folder on your filesystem. ApiDesk reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
 
 **To open an existing workspace:** File → Open Workspace… (or the folder icon in the sidebar header).
 
-**To create a new workspace:** File → New Workspace… then pick an empty folder. EndpointDesk creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
+**To create a new workspace:** File → New Workspace… then pick an empty folder. ApiDesk creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
 
 The last-used workspace is remembered between sessions.
 
@@ -159,7 +159,7 @@ Click the **History** tab in the sidebar to see your last 100 requests. Clicking
 1. Open or create a workspace.
 2. Click the **Import OpenAPI** button (upload icon) in the workspace panel header, or use File → Import OpenAPI Spec….
 3. Select a `.yaml` or `.json` OpenAPI 3.0/3.1 file.
-4. EndpointDesk generates one request file per operation, placed in `requests/{spec-title}/`.
+4. ApiDesk generates one request file per operation, placed in `requests/{spec-title}/`.
 
 Path parameters become `{{paramName}}` placeholders. POST/PUT/PATCH operations get a JSON body stub based on the request schema. Operations with security requirements get an `Authorization: Bearer {{token}}` header hint.
 

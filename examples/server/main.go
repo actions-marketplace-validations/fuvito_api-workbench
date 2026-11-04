@@ -1,4 +1,4 @@
-// Example server for end-to-end testing of EndpointDesk.
+// Example server for end-to-end testing of ApiDesk.
 // Run: go run ./examples/server
 // Listens on :8080 and prints all available endpoints on startup.
 package main
@@ -39,7 +39,7 @@ func main() {
 	mux.HandleFunc("/protected", handleProtected)
 	mux.HandleFunc("/health", handleHealth)
 
-	fmt.Println("EndpointDesk example server")
+	fmt.Println("ApiDesk example server")
 	fmt.Println("Listening on http://localhost:8080")
 	fmt.Println()
 	fmt.Println("  POST   /auth/login           { \"username\": \"admin\", \"password\": \"secret\" }")

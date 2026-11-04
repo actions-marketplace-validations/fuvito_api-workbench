@@ -296,7 +296,7 @@ Initial proposed project layout:
 ```text
 project/
 ├── cmd/
-│   └── endpointdesk/
+│   └── apidesk/
 │       └── main.go
 │
 ├── internal/

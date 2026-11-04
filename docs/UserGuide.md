@@ -1,4 +1,4 @@
-# EndpointDesk — User Guide
+# ApiDesk — User Guide
 
 **Version:** pre-MVP (Phases 0–3 complete)  
 **Last updated:** 2026-11-03
@@ -7,7 +7,7 @@
 
 ## Table of Contents
 
-1. [What is EndpointDesk](#1-what-is-endpointdesk)
+1. [What is ApiDesk](#1-what-is-apidesk)
 2. [Installing for development](#2-installing-for-development)
 3. [Running the application](#3-running-the-application)
 4. [The request editor](#4-the-request-editor)
@@ -25,9 +25,9 @@
 
 ---
 
-## 1. What is EndpointDesk
+## 1. What is ApiDesk
 
-EndpointDesk is an open-source, local-first API development and testing workbench. Its primary purpose is **API Contract Validation** and **Spec Conformance Testing**: verifying that your APIs actually honour the contracts they declare — OpenAPI specifications, response schemas, and assertion-based rules — and proving that in a repeatable, automatable way.
+ApiDesk is an open-source, local-first API development and testing workbench. Its primary purpose is **API Contract Validation** and **Spec Conformance Testing**: verifying that your APIs actually honour the contracts they declare — OpenAPI specifications, response schemas, and assertion-based rules — and proving that in a repeatable, automatable way.
 
 It is also a full API client. You can explore endpoints interactively, build collections, manage environments, and run multi-step scenarios. But unlike general-purpose API clients, every feature is designed to support the testing and validation use case.
 
@@ -115,9 +115,9 @@ wails build
 ```
 
 The binary is written to:
-- **Windows:** `apps/desktop/wails/build/bin/endpointdesk.exe`
-- **macOS:** `apps/desktop/wails/build/bin/endpointdesk`
-- **Linux:** `apps/desktop/wails/build/bin/endpointdesk`
+- **Windows:** `apps/desktop/wails/build/bin/apidesk.exe`
+- **macOS:** `apps/desktop/wails/build/bin/apidesk`
+- **Linux:** `apps/desktop/wails/build/bin/apidesk`
 
 ### Running Go tests
 
@@ -605,7 +605,7 @@ The CLI uses the same Go execution engine as the desktop application. Build it o
 
 ```bash
 cd apps/cli
-go build -o endpointdesk .
+go build -o apidesk .
 ```
 
 Or run directly without building:
@@ -614,14 +614,14 @@ Or run directly without building:
 go run ./apps/cli run <scenario-file>
 ```
 
-### `endpointdesk run`
+### `apidesk run`
 
 Executes a scenario file and prints results.
 
 ```bash
-endpointdesk run ./scenarios/create-and-retrieve.yaml
-endpointdesk run ./scenarios/create-and-retrieve.yaml --env ./environments/dev.yaml
-endpointdesk run ./scenarios/create-and-retrieve.yaml --format json
+apidesk run ./scenarios/create-and-retrieve.yaml
+apidesk run ./scenarios/create-and-retrieve.yaml --env ./environments/dev.yaml
+apidesk run ./scenarios/create-and-retrieve.yaml --format json
 ```
 
 | Flag | Default | Description |
@@ -658,7 +658,7 @@ PASSED  2 passed, 0 failed, 0 skipped  (3/3 assertions passed)  55ms
 Use `--format json` to get a machine-readable report suitable for CI tooling:
 
 ```bash
-endpointdesk run ./scenarios/flow.yaml --env ./environments/ci.yaml --format json
+apidesk run ./scenarios/flow.yaml --env ./environments/ci.yaml --format json
 ```
 
 ```json
@@ -707,15 +707,15 @@ jobs:
         with:
           go-version: "1.26"
 
-      - name: Build EndpointDesk CLI
-        run: go build -o endpointdesk ./apps/cli
+      - name: Build ApiDesk CLI
+        run: go build -o apidesk ./apps/cli
 
       - name: Run contract tests
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          ./endpointdesk run ./scenarios/create-and-retrieve.yaml \
+          ./apidesk run ./scenarios/create-and-retrieve.yaml \
             --env ./environments/ci.yaml \
             --format json > test-results.json
 ```
@@ -779,4 +779,4 @@ The frontend may have failed to compile. Check the terminal for Vite or TypeScri
 
 ---
 
-*EndpointDesk is in active development. This guide is updated with each completed phase.*
+*ApiDesk is in active development. This guide is updated with each completed phase.*

@@ -27,7 +27,7 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(home, ".endpointdesk")
+	dir := filepath.Join(home, ".apidesk")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}

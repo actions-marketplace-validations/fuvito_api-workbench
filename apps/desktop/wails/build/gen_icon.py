@@ -1,4 +1,4 @@
-"""Generate appicon.png and windows/icon.ico for EndpointDesk."""
+"""Generate appicon.png and windows/icon.ico for ApiDesk."""
 import os
 from PIL import Image, ImageDraw
 
@@ -23,17 +23,17 @@ def draw_icon(size: int) -> Image.Image:
             return
         d.rounded_rectangle([x0, y0, x1, y1], radius=rr, fill=color)
 
-    # E glyph: blue stem, white bars
-    rect(40, 56,  14, 144, ACCENT)  # blue stem
-    rect(40, 56,  76,  14, FG)      # top bar
-    rect(40, 121, 58,  14, FG)      # mid bar (shorter)
-    rect(40, 186, 76,  14, FG)      # bottom bar
+    # A glyph: white sides + mid crossbar, blue top cap (drawn last to overlay)
+    rect(42,  56, 14, 144, FG)     # left bar
+    rect(100, 56, 14, 144, FG)     # right bar
+    rect(42,  121, 72, 14, FG)     # mid crossbar
+    rect(42,  56,  72, 14, ACCENT) # blue top cap
 
-    # D glyph: white stem/bars, blue right bar
-    rect(140, 56,  14, 144, FG)     # stem
-    rect(140, 56,  76,  14, FG)     # top bar
-    rect(140, 186, 76,  14, FG)     # bottom bar
-    rect(202, 56,  14, 144, ACCENT) # blue right bar
+    # D glyph: white letterform, blue right bar
+    rect(138, 56,  14, 144, FG)    # stem
+    rect(138, 56,  76,  14, FG)    # top bar
+    rect(138, 186, 76,  14, FG)    # bottom bar
+    rect(200, 56,  14, 144, ACCENT) # blue right bar
 
     return img
 

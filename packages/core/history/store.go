@@ -35,7 +35,7 @@ func DefaultPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("locating home directory: %w", err)
 	}
-	dir := filepath.Join(home, ".endpointdesk")
+	dir := filepath.Join(home, ".apidesk")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", fmt.Errorf("creating data directory: %w", err)
 	}

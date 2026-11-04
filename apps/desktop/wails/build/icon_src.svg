@@ -2,15 +2,15 @@
   <!-- Background -->
   <rect width="256" height="256" rx="52" fill="#09090b"/>
 
-  <!-- E glyph: blue stem, white bars -->
-  <rect x="40" y="56" width="14" height="144" rx="3" fill="#3b82f6"/>
-  <rect x="40" y="56" width="76" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="40" y="121" width="58" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="40" y="186" width="76" height="14" rx="3" fill="#f4f4f5"/>
+  <!-- A glyph: white sides + mid crossbar, blue top cap -->
+  <rect x="42" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
+  <rect x="100" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
+  <rect x="42" y="121" width="72" height="14" rx="3" fill="#f4f4f5"/>
+  <rect x="42" y="56" width="72" height="14" rx="3" fill="#3b82f6"/>
 
-  <!-- D glyph: white stem/bars, blue right bar -->
-  <rect x="140" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
-  <rect x="140" y="56" width="76" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="140" y="186" width="76" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="202" y="56" width="14" height="144" rx="3" fill="#3b82f6"/>
+  <!-- D glyph: white letterform, blue right bar -->
+  <rect x="138" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
+  <rect x="138" y="56" width="76" height="14" rx="3" fill="#f4f4f5"/>
+  <rect x="138" y="186" width="76" height="14" rx="3" fill="#f4f4f5"/>
+  <rect x="200" y="56" width="14" height="144" rx="3" fill="#3b82f6"/>
 </svg>
