@@ -14,13 +14,16 @@ type SettingsPanelProps = {
   settings: AppSettings
   onSave: (s: AppSettings) => void
   onClose: () => void
+  onPreview?: (s: AppSettings) => void
 }
 
-export function SettingsPanel({ settings, onSave, onClose }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, onClose, onPreview }: SettingsPanelProps) {
   const [local, setLocal] = useState<AppSettings>({ ...settings })
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
-    setLocal(prev => ({ ...prev, [key]: value }))
+    const updated = { ...local, [key]: value }
+    setLocal(updated)
+    onPreview?.(updated)
   }
 
   function handleSave() {

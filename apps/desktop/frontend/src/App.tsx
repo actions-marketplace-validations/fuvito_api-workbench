@@ -757,7 +757,8 @@ export default function App() {
         <SettingsPanel
           settings={settings}
           onSave={handleSaveSettings}
-          onClose={() => setShowSettings(false)}
+          onPreview={applySettings}
+          onClose={() => { applySettings(settings); setShowSettings(false) }}
         />
       )}
       {showEnvEditor && (
