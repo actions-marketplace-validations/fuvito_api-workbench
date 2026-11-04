@@ -4,7 +4,7 @@
 
 EndpointDesk is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
 
-> **Status:** Early development. Phase 0 (engineering foundation) is complete. The core HTTP executor, domain models, variable resolver, and desktop shell are working. See the [roadmap](#roadmap) for what is coming next.
+> **Status:** Phases 0–3 complete. The desktop app, full HTTP client, workspace management, and scenario engine + CLI are all working. See the [roadmap](#roadmap) for what is coming next.
 
 ---
 
@@ -28,7 +28,7 @@ Most API tools focus on exploration. EndpointDesk focuses on **contract verifica
 | Desktop | Wails v2 |
 | Frontend | React 19 + TypeScript 7 + Vite 8 |
 | UI | Tailwind CSS v4 + shadcn/ui |
-| CLI | Cobra (Phase 3) |
+| CLI | Cobra |
 | Project files | YAML + JSON |
 | API specification | OpenAPI 3.0 / 3.1 |
 | History | SQLite |
@@ -64,6 +64,13 @@ wails dev
 ```
 
 The application opens automatically. Type a URL in the request bar and press **Send** or **Enter**.
+
+### Run the CLI
+
+```bash
+cd apps/cli
+go run . run ./examples/scenario.yaml --env ./examples/local.yaml
+```
 
 ---
 
@@ -130,9 +137,9 @@ The GUI and CLI must never implement their own HTTP execution, assertion, or sce
 | Phase | Focus | Status |
 |---|---|---|
 | 0 | Engineering foundation — monorepo, Wails app, domain models, HTTP executor | **Complete** |
-| 1 | HTTP execution hardening — all body types, auth, error handling, history | Planned |
-| 2 | Workspace and API client — collections, environments, request editor | Planned |
-| 3 | Scenario engine + CLI — multi-step flows, variable extraction, assertions, CI reports | Planned |
+| 1 | HTTP execution — all body types, auth, error handling, request history | **Complete** |
+| 2 | Workspace and API client — collections, environments, restart-safe config | **Complete** |
+| 3 | Scenario engine + CLI — multi-step flows, variable extraction, assertions, text/JSON reports | **Complete** |
 | 4 | OpenAPI integration — import specs, generate collections, validate responses | Planned |
 | 5 | Public MVP — cross-platform packaging, docs, examples, GitHub Actions | Planned |
 

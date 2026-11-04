@@ -1,6 +1,6 @@
 # EndpointDesk — User Guide
 
-**Version:** pre-MVP (Phase 0 complete)  
+**Version:** pre-MVP (Phases 0–3 complete)  
 **Last updated:** 2026-11-03
 
 ---
@@ -145,19 +145,17 @@ The request editor is on the left side of the main panel.
 ```
 
 - **Method selector** — choose from GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.
-- **URL field** — enter the full URL. Supports `{{variable}}` references (see [Variable interpolation](#7-variable-interpolation)). Press **Enter** to send.
+- **URL field** — enter the full URL. Supports `{{variable}}` references (see [Variable interpolation](#7-variable-interpolation)). Press **Enter** to send. Pasting a URL that includes a query string (e.g. `?page=1&limit=20`) automatically strips the query string from the URL field and populates the Params tab.
 - **Send button** — sends the request. Disabled if the URL is empty or a request is in progress.
 
 ### Tabs
 
 | Tab | Purpose |
 |---|---|
-| **Params** | Query parameters appended to the URL. |
+| **Params** | Query parameters appended to the URL. Toggle rows on/off with the checkbox. |
 | **Headers** | Request headers (key/value pairs). |
-| **Body** | Request body — JSON, raw text, form URL-encoded, or multipart. |
+| **Body** | Request body — JSON, raw text, or form URL-encoded. |
 | **Auth** | Authentication — Bearer token, Basic credentials, or API Key. |
-
-> **Phase 0 note:** The tabs display placeholder text. Full editors for each tab are implemented in Phase 2 (Workspace and API client).
 
 ### Request body types
 
@@ -212,7 +210,7 @@ If the request fails before a response is received (network error, DNS failure, 
 
 ## 6. Project file format
 
-> **Phase 0 note:** File saving and loading through the UI is implemented in Phase 2. The format is defined and the Go serialization layer is built in Phase 2 as well. This section documents the target format so you can prepare project files now.
+All project definitions are saved and loaded through the UI (Open / Save toolbar buttons) or by clicking files in the Workspace panel. Files can also be authored by hand and opened directly.
 
 All project definitions are saved as YAML (default) or JSON. Every file carries a `schemaVersion` field. Version 1 is the current schema.
 
@@ -470,7 +468,7 @@ Environments let you switch between configurations (local, dev, staging, product
 
 ### Switching environments
 
-> UI environment switching is implemented in Phase 2. Currently, environments are selected programmatically or via the CLI `--env` flag (Phase 3).
+The environment selector appears in the top bar whenever a workspace contains environment files. Selecting an environment applies its variables immediately — the next request will use the new values without restarting the app. The active environment is persisted across restarts.
 
 ### Environment file location
 
@@ -505,7 +503,7 @@ environments/local.example.yaml
 
 Collections organise requests into a named, hierarchical structure. They are stored as a single YAML or JSON file, or as a directory tree where each file is one request.
 
-> Collection management UI (create, rename, drag-and-drop) is implemented in Phase 2.
+The Workspace sidebar shows all request files in a collapsible tree. Click any file to load it into the request editor. The Open Workspace and New Workspace buttons appear when no workspace is set.
 
 ### Directory-based collections
 
@@ -595,61 +593,99 @@ assertions:
     expected: application/json
 ```
 
-> **Phase 0 note:** Assertion evaluation is implemented in Phase 2. The types are fully defined in the domain model now.
+Assertion evaluation is fully implemented for `status`, `header`, and `jsonpath` types. `schema` assertions are reserved for Phase 4 (OpenAPI integration).
 
 ---
 
 ## 12. CLI usage
 
-> The CLI is implemented in Phase 3. This section documents the planned interface.
+The CLI uses the same Go execution engine as the desktop application. Build it once and use it in any terminal or CI pipeline.
 
-The CLI uses the same Go execution engine as the desktop application. All behaviour is identical.
-
-### Planned commands
+### Build
 
 ```bash
-# Execute a single request
-endpointdesk request run ./collections/get-customer.yaml --env ./environments/dev.yaml
-
-# Run an entire collection
-endpointdesk collection run ./collections/customer-api/ --env ./environments/dev.yaml
-
-# Run a scenario
-endpointdesk scenario run ./scenarios/create-and-retrieve.yaml --env ./environments/dev.yaml
-
-# Import an OpenAPI specification (Phase 4)
-endpointdesk import openapi ./openapi.yaml --out ./collections/
-
-# Validate an OpenAPI specification (Phase 4)
-endpointdesk validate ./openapi.yaml
-
-# Print version
-endpointdesk version
+cd apps/cli
+go build -o endpointdesk .
 ```
+
+Or run directly without building:
+
+```bash
+go run ./apps/cli run <scenario-file>
+```
+
+### `endpointdesk run`
+
+Executes a scenario file and prints results.
+
+```bash
+endpointdesk run ./scenarios/create-and-retrieve.yaml
+endpointdesk run ./scenarios/create-and-retrieve.yaml --env ./environments/dev.yaml
+endpointdesk run ./scenarios/create-and-retrieve.yaml --format json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--env`, `-e` | (none) | Path to an environment file (YAML or JSON). |
+| `--format`, `-f` | `text` | Output format: `text` (human-readable) or `json` (machine-readable). |
 
 ### Exit codes
 
 | Code | Meaning |
 |---|---|
-| `0` | All requests and assertions passed. |
+| `0` | All steps passed all assertions. |
 | `1` | One or more assertions failed. |
-| `2` | A network or configuration error occurred. |
+| `2` | A network, parse, or configuration error occurred. |
 
-### Report formats
+### Text output example
+
+```
+Scenario: Create and retrieve customer
+          Verifies the full create → fetch workflow
+
+  PASS  Create customer  201  43ms
+         ✓ status eq 201
+         → customerId = "42"
+  PASS  Retrieve customer  200  12ms
+         ✓ status eq 200
+         ✓ jsonpath $.name eq Alice
+
+PASSED  2 passed, 0 failed, 0 skipped  (3/3 assertions passed)  55ms
+```
+
+### JSON output
+
+Use `--format json` to get a machine-readable report suitable for CI tooling:
 
 ```bash
-# JSON report
-endpointdesk scenario run ./scenarios/flow.yaml --report json --out ./report.json
+endpointdesk run ./scenarios/flow.yaml --env ./environments/ci.yaml --format json
+```
 
-# JUnit XML (compatible with GitHub Actions, Jenkins, GitLab CI)
-endpointdesk scenario run ./scenarios/flow.yaml --report junit --out ./report.xml
+```json
+{
+  "scenario": "Create and retrieve customer",
+  "passed": true,
+  "durationMs": 55,
+  "steps": [
+    {
+      "name": "Create customer",
+      "passed": true,
+      "statusCode": 201,
+      "durationMs": 43,
+      "extracted": { "customerId": "42" },
+      "assertions": [
+        { "type": "status", "operator": "eq", "expected": "201", "actual": "201", "passed": true }
+      ]
+    }
+  ]
+}
 ```
 
 ---
 
 ## 13. CI/CD integration
 
-> Phase 3 delivers CLI and report generation. This section documents the planned GitHub Actions workflow.
+The CLI produces a machine-readable JSON report suitable for any CI system.
 
 ### GitHub Actions example
 
@@ -667,28 +703,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download EndpointDesk CLI
-        run: |
-          curl -sSL https://github.com/fuvito/api-workbench/releases/latest/download/endpointdesk-linux-amd64.tar.gz \
-            | tar -xz -C /usr/local/bin
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Build EndpointDesk CLI
+        run: go build -o endpointdesk ./apps/cli
 
       - name: Run contract tests
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          endpointdesk scenario run ./scenarios/ \
+          ./endpointdesk run ./scenarios/create-and-retrieve.yaml \
             --env ./environments/ci.yaml \
-            --report junit \
-            --out ./test-results.xml
-
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Contract Test Results
-          path: test-results.xml
-          reporter: java-junit
+            --format json > test-results.json
 ```
 
 ### CI environment file
@@ -717,8 +746,6 @@ Secrets are injected from environment variables at runtime. No secrets appear in
 | Shortcut | Action |
 |---|---|
 | `Enter` (URL field focused) | Send the current request |
-
-> Additional shortcuts (new request, switch environments, navigate collections) are implemented in Phase 2.
 
 ---
 
