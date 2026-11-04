@@ -21,6 +21,8 @@ import {
   DeleteRequest as WailsDeleteRequest,
   CreateFolder as WailsCreateFolder,
   DeleteFolder as WailsDeleteFolder,
+  RenameFolder as WailsRenameFolder,
+  RenameRequest as WailsRenameRequest,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -242,6 +244,16 @@ export async function createFolder(parentPath: string, name: string): Promise<st
 
 export async function deleteFolder(path: string): Promise<void> {
   await WailsDeleteFolder(path)
+}
+
+export async function renameFolder(path: string, newName: string): Promise<string> {
+  const result = await WailsRenameFolder(path, newName)
+  return result as unknown as string
+}
+
+export async function renameRequest(path: string, newName: string): Promise<string> {
+  const result = await WailsRenameRequest(path, newName)
+  return result as unknown as string
 }
 
 // ---- OpenAPI import ----

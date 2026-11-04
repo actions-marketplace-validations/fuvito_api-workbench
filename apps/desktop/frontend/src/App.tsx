@@ -6,7 +6,7 @@ import { TabBar } from '@/components/TabBar'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
-  createFolder, deleteFolder,
+  createFolder, deleteFolder, renameFolder, renameRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
@@ -144,6 +144,8 @@ type SidebarProps = {
   onDeleteFolder: (path: string) => void
   onNewRequestInFolder: (folderPath: string) => void
   onCreateFolder: (parentPath: string) => void
+  onRenameFile: (path: string, newName: string) => void
+  onRenameFolder: (path: string, newName: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
   onImportOpenAPI: () => void
   importing?: boolean
@@ -157,6 +159,7 @@ function Sidebar({
   workspacePath, fileTree, history,
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onDeleteFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
+  onRenameFile, onRenameFolder,
   onSelectHistory,
   onImportOpenAPI, importing,
   activeFilePath, isDirty,
@@ -197,6 +200,8 @@ function Sidebar({
             onDeleteFolder={onDeleteFolder}
             onNewRequestInFolder={onNewRequestInFolder}
             onCreateFolder={onCreateFolder}
+            onRenameFile={onRenameFile}
+            onRenameFolder={onRenameFolder}
             onImportOpenAPI={onImportOpenAPI}
             importing={importing}
             activeFilePath={activeFilePath}
@@ -1103,6 +1108,52 @@ export default function App() {
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
   }
 
+  // ---- Rename operations ----
+
+  function rebasePath(oldBase: string, newBase: string, p: string | null): string | null {
+    if (!p) return p
+    if (p === oldBase) return newBase
+    if (p.startsWith(oldBase + '\\') || p.startsWith(oldBase + '/')) return newBase + p.slice(oldBase.length)
+    return p
+  }
+
+  async function handleRenameFile(path: string, newName: string) {
+    try {
+      const newPath = await renameRequest(path, newName)
+      if (!newPath) return
+      setTabsState(prev => ({
+        ...prev,
+        tabs: prev.tabs.map(t => {
+          if (t.filePath !== path) return t
+          const savedKey = computeStateKey(t.method, t.url, t.queryParams, t.headers, t.body, t.auth, newName)
+          return { ...t, name: newName, filePath: newPath, savedKey }
+        }),
+      }))
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('rename request:', err)
+    }
+  }
+
+  async function handleRenameFolder(path: string, newName: string) {
+    try {
+      const newPath = await renameFolder(path, newName)
+      if (!newPath) return
+      setTabsState(prev => ({
+        ...prev,
+        tabs: prev.tabs.map(t => {
+          const fp = rebasePath(path, newPath, t.filePath)
+          const td = rebasePath(path, newPath, t.targetDir)
+          if (fp === t.filePath && td === t.targetDir) return t
+          return { ...t, filePath: fp, targetDir: td }
+        }),
+      }))
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('rename folder:', err)
+    }
+  }
+
   // ---- URL paste param extraction ----
 
   function handleUrlPaste(raw: string) {
@@ -1475,6 +1526,8 @@ export default function App() {
           onDeleteFolder={handleDeleteFolder}
           onNewRequestInFolder={handleNewRequestInFolder}
           onCreateFolder={handleCreateFolder}
+          onRenameFile={handleRenameFile}
+          onRenameFolder={handleRenameFolder}
           onSelectHistory={handleSelectHistory}
           onImportOpenAPI={handleImportOpenAPI}
           importing={importing}

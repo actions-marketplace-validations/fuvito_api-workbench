@@ -376,7 +376,7 @@ func (w *WorkspaceService) CreateFolder(parentPath, name string) (string, error)
 		if w.workspacePath == "" {
 			return "", fmt.Errorf("no workspace open — open or create a workspace first")
 		}
-		parentPath = filepath.Join(w.workspacePath, "requests")
+		parentPath = w.workspacePath
 	}
 	if w.workspacePath != "" {
 		rel, err := filepath.Rel(w.workspacePath, parentPath)
@@ -417,6 +417,82 @@ func (w *WorkspaceService) DeleteFolder(path string) error {
 		}
 	}
 	return os.RemoveAll(path)
+}
+
+// RenameFolder renames a workspace folder.
+// Returns the new path.
+func (w *WorkspaceService) RenameFolder(path, newName string) (string, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return "", fmt.Errorf("name cannot be empty")
+	}
+	if w.workspacePath != "" {
+		rel, err := filepath.Rel(w.workspacePath, path)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", fmt.Errorf("path is outside the current workspace")
+		}
+	}
+	dirName := sanitizeDirName(newName)
+	if dirName == "" {
+		return "", fmt.Errorf("invalid folder name")
+	}
+	newPath := filepath.Join(filepath.Dir(path), dirName)
+	if newPath == path {
+		return path, nil
+	}
+	if _, err := os.Stat(newPath); err == nil {
+		return "", fmt.Errorf("a folder named %q already exists here", newName)
+	}
+	if err := os.Rename(path, newPath); err != nil {
+		return "", fmt.Errorf("renaming folder: %w", err)
+	}
+	return newPath, nil
+}
+
+// RenameRequest renames a request file, updating the name field inside the YAML.
+// Returns the new file path.
+func (w *WorkspaceService) RenameRequest(path, newName string) (string, error) {
+	newName = strings.TrimSpace(newName)
+	if newName == "" {
+		return "", fmt.Errorf("name cannot be empty")
+	}
+	if w.workspacePath != "" {
+		rel, err := filepath.Rel(w.workspacePath, path)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", fmt.Errorf("path is outside the current workspace")
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w", path, err)
+	}
+	req, err := serialization.ParseRequestFile(data, filepath.Base(path))
+	if err != nil {
+		return "", fmt.Errorf("parsing %s: %w", path, err)
+	}
+	req.Name = newName
+
+	slug := sanitizeDirName(newName)
+	if slug == "" {
+		slug = "request"
+	}
+	newPath := filepath.Join(filepath.Dir(path), slug+".yaml")
+	if newPath != path {
+		if _, err := os.Stat(newPath); err == nil {
+			return "", fmt.Errorf("a request named %q already exists in this folder", newName)
+		}
+	}
+	newData, err := serialization.WriteRequest(req, "yaml")
+	if err != nil {
+		return "", err
+	}
+	if err := atomicWrite(newPath, newData); err != nil {
+		return "", err
+	}
+	if newPath != path {
+		_ = os.Remove(path)
+	}
+	return newPath, nil
 }
 
 // DeleteRequest removes a request file from disk.

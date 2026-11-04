@@ -1,10 +1,54 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
   FolderSymlink, FolderPlus, FilePlus, Upload, Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
+
+// ---- Inline rename input ----
+
+function RenameInput({
+  initialValue,
+  onConfirm,
+  onCancel,
+}: {
+  initialValue: string
+  onConfirm: (v: string) => void
+  onCancel: () => void
+}) {
+  const [value, setValue] = useState(initialValue)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    ref.current?.select()
+  }, [])
+
+  return (
+    <input
+      ref={ref}
+      autoFocus
+      value={value}
+      onChange={e => setValue(e.target.value)}
+      onKeyDown={e => {
+        e.stopPropagation()
+        if (e.key === 'Enter' && value.trim()) { onConfirm(value.trim()); return }
+        if (e.key === 'Escape') onCancel()
+      }}
+      onBlur={() => {
+        if (value.trim() && value.trim() !== initialValue) onConfirm(value.trim())
+        else onCancel()
+      }}
+      onClick={e => e.stopPropagation()}
+      className={cn(
+        'flex-1 min-w-0 bg-transparent outline-none text-xs',
+        'border-b border-[var(--color-accent)] text-[var(--color-foreground)]',
+      )}
+    />
+  )
+}
+
+// ---- Tree node ----
 
 type TreeNodeProps = {
   node: FileNode
@@ -14,6 +58,8 @@ type TreeNodeProps = {
   onDeleteFolder?: (path: string) => void
   onNewRequestInFolder?: (folderPath: string) => void
   onCreateFolder?: (parentPath: string) => void
+  onRenameFile?: (path: string, newName: string) => void
+  onRenameFolder?: (path: string, newName: string) => void
   activeFilePath?: string
   isDirty?: boolean
 }
@@ -21,9 +67,11 @@ type TreeNodeProps = {
 function TreeNode({
   node, depth,
   onSelect, onDelete, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
+  onRenameFile, onRenameFolder,
   activeFilePath, isDirty,
 }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(true)
+  const [renaming, setRenaming] = useState(false)
   const indent = depth * 12
 
   if (node.isDir) {
@@ -37,7 +85,7 @@ function TreeNode({
           <button
             type="button"
             onClick={() => setExpanded(e => !e)}
-            className="flex items-center gap-1 flex-1 min-w-0 py-0.5 text-left text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
+            className="flex items-center gap-1 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
           >
             <span className="shrink-0">
               {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
@@ -45,40 +93,58 @@ function TreeNode({
             <span className="shrink-0">
               {expanded ? <FolderOpen size={12} /> : <Folder size={12} />}
             </span>
-            <span className="truncate">{node.name}</span>
           </button>
-          <div className="flex items-center gap-0.5 mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            {onNewRequestInFolder && (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); onNewRequestInFolder(node.path) }}
-                title="New request in this folder"
-                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+          <div className="flex-1 min-w-0 flex items-center py-0.5 mr-1">
+            {renaming ? (
+              <RenameInput
+                initialValue={node.name}
+                onConfirm={v => { onRenameFolder?.(node.path, v); setRenaming(false) }}
+                onCancel={() => setRenaming(false)}
+              />
+            ) : (
+              <span
+                className="truncate text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] cursor-default select-none"
+                onDoubleClick={() => setRenaming(true)}
+                title="Double-click to rename"
               >
-                <FilePlus size={10} />
-              </button>
-            )}
-            {onCreateFolder && (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); onCreateFolder(node.path) }}
-                title="New subfolder"
-                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-              >
-                <FolderPlus size={10} />
-              </button>
-            )}
-            {isEmpty && onDeleteFolder && (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); onDeleteFolder(node.path) }}
-                title="Delete folder"
-                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-red-400"
-              >
-                <Trash2 size={10} />
-              </button>
+                {node.name}
+              </span>
             )}
           </div>
+          {!renaming && (
+            <div className="flex items-center gap-0.5 mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              {onNewRequestInFolder && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); onNewRequestInFolder(node.path) }}
+                  title="New request in this folder"
+                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                >
+                  <FilePlus size={10} />
+                </button>
+              )}
+              {onCreateFolder && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); onCreateFolder(node.path) }}
+                  title="New subfolder"
+                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                >
+                  <FolderPlus size={10} />
+                </button>
+              )}
+              {isEmpty && onDeleteFolder && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); onDeleteFolder(node.path) }}
+                  title="Delete folder"
+                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-red-400"
+                >
+                  <Trash2 size={10} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {expanded && node.children?.map(child => (
           <TreeNode
@@ -90,6 +156,8 @@ function TreeNode({
             onDeleteFolder={onDeleteFolder}
             onNewRequestInFolder={onNewRequestInFolder}
             onCreateFolder={onCreateFolder}
+            onRenameFile={onRenameFile}
+            onRenameFolder={onRenameFolder}
             activeFilePath={activeFilePath}
             isDirty={isDirty}
           />
@@ -111,18 +179,32 @@ function TreeNode({
       )}
       style={{ paddingLeft: `${6 + indent + 15}px` }}
     >
-      <button
-        type="button"
-        onClick={() => onSelect(node.path)}
-        className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
-      >
-        <FileText size={11} className="shrink-0" />
-        <span className="truncate flex-1" title={node.name}>{displayName}</span>
-        {isActive && isDirty && (
-          <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
-        )}
-      </button>
-      {onDelete && (
+      <FileText size={11} className="shrink-0" />
+      {renaming ? (
+        <RenameInput
+          initialValue={displayName}
+          onConfirm={v => { onRenameFile?.(node.path, v); setRenaming(false) }}
+          onCancel={() => setRenaming(false)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => onSelect(node.path)}
+          className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+        >
+          <span
+            className="truncate flex-1"
+            title={node.name}
+            onDoubleClick={e => { e.stopPropagation(); setRenaming(true) }}
+          >
+            {displayName}
+          </span>
+          {isActive && isDirty && (
+            <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
+          )}
+        </button>
+      )}
+      {!renaming && onDelete && (
         <button
           type="button"
           onClick={e => { e.stopPropagation(); onDelete(node.path) }}
@@ -136,6 +218,8 @@ function TreeNode({
   )
 }
 
+// ---- Panel ----
+
 type WorkspacePanelProps = {
   workspacePath: string
   fileTree: FileNode[]
@@ -146,6 +230,8 @@ type WorkspacePanelProps = {
   onDeleteFolder?: (path: string) => void
   onNewRequestInFolder?: (folderPath: string) => void
   onCreateFolder?: (parentPath: string) => void
+  onRenameFile?: (path: string, newName: string) => void
+  onRenameFolder?: (path: string, newName: string) => void
   onImportOpenAPI: () => void
   importing?: boolean
   activeFilePath?: string
@@ -162,6 +248,8 @@ export function WorkspacePanel({
   onDeleteFolder,
   onNewRequestInFolder,
   onCreateFolder,
+  onRenameFile,
+  onRenameFolder,
   onImportOpenAPI,
   importing,
   activeFilePath,
@@ -225,6 +313,8 @@ export function WorkspacePanel({
                   onDeleteFolder={onDeleteFolder}
                   onNewRequestInFolder={onNewRequestInFolder}
                   onCreateFolder={onCreateFolder}
+                  onRenameFile={onRenameFile}
+                  onRenameFolder={onRenameFolder}
                   activeFilePath={activeFilePath}
                   isDirty={isDirty}
                 />
