@@ -23,20 +23,17 @@ def draw_icon(size: int) -> Image.Image:
             return
         d.rounded_rectangle([x0, y0, x1, y1], radius=rr, fill=color)
 
-    # Accent bar on left
-    rect(32, 68, 6, 120, ACCENT)
+    # E glyph: blue stem, white bars
+    rect(40, 56,  14, 144, ACCENT)  # blue stem
+    rect(40, 56,  76,  14, FG)      # top bar
+    rect(40, 121, 58,  14, FG)      # mid bar (shorter)
+    rect(40, 186, 76,  14, FG)      # bottom bar
 
-    # E glyph
-    rect(52, 68,  72, 14, FG)   # top bar
-    rect(52, 121, 56, 14, FG)   # mid bar
-    rect(52, 174, 72, 14, FG)   # bottom bar
-    rect(52, 68,  14, 120, FG)  # vertical stem
-
-    # D glyph
-    rect(148, 68,  14, 120, FG)   # stem
-    rect(148, 68,  52, 14, FG)    # top bar
-    rect(148, 174, 52, 14, FG)    # bottom bar
-    rect(186, 68,  14, 120, ACCENT)  # right accent bar
+    # D glyph: white stem/bars, blue right bar
+    rect(140, 56,  14, 144, FG)     # stem
+    rect(140, 56,  76,  14, FG)     # top bar
+    rect(140, 186, 76,  14, FG)     # bottom bar
+    rect(202, 56,  14, 144, ACCENT) # blue right bar
 
     return img
 
