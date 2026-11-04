@@ -563,7 +563,9 @@ export default function App() {
 
   // Current request identity
   const [currentRequestName, setCurrentRequestName] = useState<string | null>(null)
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null)
   const [editingName, setEditingName] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // ---- init ----
 
@@ -636,6 +638,7 @@ export default function App() {
       setAuth(state.auth)
       setResponse(null)
       setCurrentRequestName(r.name || null)
+      setCurrentFilePath(path)
     } catch (err) {
       console.error('load request:', err)
     }
@@ -654,6 +657,7 @@ export default function App() {
       setAuth(state.auth)
       setResponse(null)
       setCurrentRequestName(r.name || null)
+      setCurrentFilePath(r.filePath || null)
     } catch (err) {
       console.error('open request:', err)
     }
@@ -668,28 +672,36 @@ export default function App() {
     setAuth({ type: 'none' })
     setResponse(null)
     setCurrentRequestName(null)
+    setCurrentFilePath(null)
     setEditingName(false)
+    setSaveError(null)
   }
 
   async function handleSaveRequest() {
+    setSaveError(null)
+    const name = currentRequestName?.trim() ||
+      url.trim().split('/').filter(Boolean).pop() ||
+      'request'
     try {
       const req: RequestFileIO = {
         schemaVersion: '1',
-        name: url.trim().split('/').pop() ?? 'request',
+        name,
         method,
         url: url.trim(),
         headers: headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
         queryParams: queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
         body: body.type === 'none' ? undefined : { type: body.type, content: body.content },
         auth: authStateToPayload(auth) ?? undefined,
+        filePath: currentFilePath ?? '',
       }
-      const path = await saveRequest(req)
-      if (path) {
-        setCurrentRequestName(req.name)
+      const savedPath = await saveRequest(req)
+      if (savedPath) {
+        setCurrentRequestName(name)
+        setCurrentFilePath(savedPath)
         await refreshWorkspace()
       }
     } catch (err) {
-      console.error('save request:', err)
+      setSaveError(String(err).replace(/^Error: /, ''))
     }
   }
 
@@ -888,7 +900,7 @@ export default function App() {
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {currentRequestName !== null && (
               <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[method])}>
                 {method}
@@ -916,7 +928,7 @@ export default function App() {
             ) : currentRequestName !== null ? (
               <button
                 type="button"
-                onClick={() => setEditingName(true)}
+                onClick={() => { setEditingName(true); setSaveError(null) }}
                 title="Click to rename"
                 className="text-xs font-medium text-[var(--color-foreground)] hover:text-[var(--color-accent)] truncate transition-colors text-left"
               >
@@ -932,9 +944,14 @@ export default function App() {
                 New Request
               </button>
             )}
+            {saveError && (
+              <span className="text-label text-[var(--color-destructive)] truncate ml-1">
+                {saveError}
+              </span>
+            )}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 shrink-0">
             {/* Toolbar buttons */}
             <button
               type="button"

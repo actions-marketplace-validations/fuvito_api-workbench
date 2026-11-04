@@ -97,6 +97,8 @@ type RequestFileIO struct {
 	Body          *BodyIO         `json:"body,omitempty"`
 	Auth          *AuthIO         `json:"auth,omitempty"`
 	TimeoutMs     int64           `json:"timeoutMs,omitempty"`
+	// FilePath is the on-disk path of the loaded file; not persisted to YAML.
+	FilePath      string          `json:"filePath,omitempty"`
 }
 
 // ---- WorkspaceService ----
@@ -236,58 +238,62 @@ func (w *WorkspaceService) LoadRequest(path string) (*RequestFileIO, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
-	return domainToRequestFileIO(req), nil
+	out := domainToRequestFileIO(req)
+	out.FilePath = path
+	return out, nil
 }
 
-// SaveRequest writes the current request to a file chosen via a save dialog.
-// Returns the path that was saved.
+// SaveRequest writes the request to disk without a dialog.
+// The target path is derived from req.Name: {dir}/{slug}.yaml.
+// If req.FilePath is set (file already exists), the directory is preserved and
+// the file is renamed when the name slug changes. Returns the saved path.
 func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
-	defaultDir := w.workspacePath
-	if defaultDir == "" {
-		defaultDir, _ = os.UserHomeDir()
-	}
-	name := req.Name
+	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		name = "request"
 	}
-	// sanitize name for a filename
-	name = strings.Map(func(r rune) rune {
-		if strings.ContainsRune(`<>:"/\|?*`, r) {
-			return '-'
-		}
-		return r
-	}, name)
-
-	path, err := runtime.SaveFileDialog(w.ctx, runtime.SaveDialogOptions{
-		Title:           "Save Request",
-		DefaultDirectory: defaultDir,
-		DefaultFilename: name + ".yaml",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "YAML (*.yaml, *.yml)", Pattern: "*.yaml;*.yml"},
-			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
-		},
-	})
-	if err != nil {
-		return "", err
+	slug := sanitizeDirName(name)
+	if slug == "" {
+		slug = "request"
 	}
-	if path == "" {
-		return "", nil // user cancelled
+
+	var targetDir string
+	if req.FilePath != "" {
+		targetDir = filepath.Dir(req.FilePath)
+	} else {
+		if w.workspacePath == "" {
+			return "", fmt.Errorf("no workspace open — open or create a workspace first")
+		}
+		targetDir = filepath.Join(w.workspacePath, "requests")
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			return "", err
+		}
+	}
+
+	targetPath := filepath.Join(targetDir, slug+".yaml")
+
+	// Conflict: target exists and is a different file from the one we loaded.
+	if targetPath != req.FilePath {
+		if _, err := os.Stat(targetPath); err == nil {
+			return "", fmt.Errorf("a request named %q already exists in this folder — rename it first", name)
+		}
 	}
 
 	domReq := requestFileIOToDomain(req)
-	ext := strings.TrimPrefix(filepath.Ext(path), ".")
-	if ext == "" {
-		ext = "yaml"
-		path += ".yaml"
-	}
-	data, err := serialization.WriteRequest(domReq, ext)
+	data, err := serialization.WriteRequest(domReq, "yaml")
 	if err != nil {
 		return "", err
 	}
-	if err := atomicWrite(path, data); err != nil {
+	if err := atomicWrite(targetPath, data); err != nil {
 		return "", err
 	}
-	return path, nil
+
+	// Name changed → delete the old file after the new one is written.
+	if req.FilePath != "" && req.FilePath != targetPath {
+		_ = os.Remove(req.FilePath)
+	}
+
+	return targetPath, nil
 }
 
 // GetEnvironment loads a full environment (including variable values) for editing.

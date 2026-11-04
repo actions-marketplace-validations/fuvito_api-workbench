@@ -111,6 +111,7 @@ export interface RequestFileIO {
   body?: { type: string; content: string }
   auth?: AuthPayload
   timeoutMs?: number
+  filePath?: string
 }
 
 // ---- Request execution ----
