@@ -203,6 +203,7 @@ type RequestEditorProps = {
   auth: AuthState
   onMethodChange: (m: HttpMethod) => void
   onUrlChange: (u: string) => void
+  onUrlPaste: (pastedUrl: string) => void
   onQueryParamsChange: (p: KVPair[]) => void
   onHeadersChange: (h: KVPair[]) => void
   onBodyChange: (b: BodyState) => void
@@ -213,7 +214,7 @@ type RequestEditorProps = {
 function RequestEditor({
   method, url, loading,
   queryParams, headers, body, auth,
-  onMethodChange, onUrlChange,
+  onMethodChange, onUrlChange, onUrlPaste,
   onQueryParamsChange, onHeadersChange, onBodyChange, onAuthChange,
   onSend,
 }: RequestEditorProps) {
@@ -256,6 +257,13 @@ function RequestEditor({
           value={url}
           onChange={e => onUrlChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={e => {
+            const text = e.clipboardData.getData('text')
+            if (text.includes('?')) {
+              e.preventDefault()
+              onUrlPaste(text)
+            }
+          }}
           placeholder="https://api.example.com/endpoint"
           className={cn(
             'flex-1 bg-[var(--color-muted)] text-xs font-mono rounded px-3 py-1',
@@ -583,6 +591,31 @@ export default function App() {
     setUrl(entry.url)
   }
 
+  // ---- URL paste param extraction ----
+
+  function handleUrlPaste(raw: string) {
+    try {
+      const qIdx = raw.indexOf('?')
+      const baseUrl = raw.slice(0, qIdx)
+      const search = raw.slice(qIdx + 1)
+      const parsed = new URLSearchParams(search)
+      const extracted: KVPair[] = []
+      parsed.forEach((value, name) => {
+        extracted.push({ id: crypto.randomUUID(), name, value, enabled: true })
+      })
+      setUrl(baseUrl)
+      if (extracted.length > 0) {
+        setQueryParams(prev => {
+          const names = new Set(extracted.map(p => p.name.toLowerCase()))
+          const kept = prev.filter(p => !names.has(p.name.toLowerCase()))
+          return [...kept, ...extracted]
+        })
+      }
+    } catch {
+      setUrl(raw)
+    }
+  }
+
   // ---- request execution ----
 
   async function handleSend() {
@@ -697,6 +730,7 @@ export default function App() {
               auth={auth}
               onMethodChange={setMethod}
               onUrlChange={setUrl}
+              onUrlPaste={handleUrlPaste}
               onQueryParamsChange={setQueryParams}
               onHeadersChange={setHeaders}
               onBodyChange={setBody}

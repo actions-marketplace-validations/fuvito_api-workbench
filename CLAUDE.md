@@ -122,7 +122,7 @@ This layout may be refined after the first working vertical slice — do not ove
 | 4 | OpenAPI integration | Import spec, generate collections, validate responses |
 | 5 | Public MVP | Cross-platform builds, docs, examples, GitHub Actions CI |
 
-**Current phase: 2 (complete)**
+**Current phase: 3 (complete)**
 
 MVP definition: A developer can import an OpenAPI specification, explore and execute generated requests in the desktop application, create a multi-step scenario, save it as YAML or JSON, and execute the same scenario through the CLI and GitHub Actions.
 
@@ -236,6 +236,17 @@ Do not implement or stub any of these without explicit user direction.
 - `packages/core/variables/resolver.go` — `Resolver` with `Interpolate(string)` and `InterpolateRequest(*Request) *Request`. Env variables loaded at construction; runtime variables (`Set`) override. Unresolved `{{refs}}` left unchanged. Original request never mutated.
 - `packages/core/variables/resolver_test.go` — 4 tests including whitespace trimming, runtime override, full request interpolation (URL, headers, query params, Bearer token), nil env. All pass.
 - Total: 27 tests passing across core, domain, executor, variables.
+
+### 2026-11-03 — Phase 3: Scenario engine + CLI
+
+- **`packages/core/assertions/evaluator.go`** — `Evaluator` with `Evaluate(Assertion, Response) AssertionResult` and `EvaluateAll`. Supports: status (eq/ne/gt/lt with numeric coercion), header (case-insensitive, all 6 operators), jsonpath (PaesslerAG/jsonpath, value-to-string comparison). Schema assertions return "requires Phase 4" message. 13 tests; all pass.
+- **`packages/core/scenario/runner.go`** — `Runner` executes all steps sequentially. `StepResult` captures request, response, assertion results, extracted variables, pass/skip/error state. `FailPolicy` semantics: `stop`/`""` (default) skips remaining steps; `continue` keeps going; `skip` skips this step if prev failed. Variable extraction feeds `resolver.Set()` so subsequent steps see extracted values. `Result.Counts()` and `AssertionCounts()` for reporting. 6 tests; all pass.
+- **`packages/core/serialization/scenario.go`** — `ScenarioFile`, `StepFile`, `AssertionFile`, `ExtractionFile` DTOs with YAML/JSON tags. `ParseScenario` / `ParseScenarioFile` / `WriteScenario`. Handles inline requests and `requestRef` paths. 3 new tests added to `serialization_test.go` (parse YAML, round-trip, requestRef); all pass.
+- **`packages/core/reporting/report.go`** — `Text(result)` (plain ASCII, CI-safe) and `JSON(result) ([]byte, error)`. `assertionLabel` formats human-readable assertion descriptions (`status eq 200`, `header Content-Type contains json`, `jsonpath $.name eq Alice`). `JSONReport` / `JSONStep` / `JSONAssertion` structs for machine-readable output.
+- **`apps/cli/main.go`** — Cobra CLI. `endpointdesk run <scenario-file> [--env <env-file>] [--format text|json]`. Exit code 0 = all pass, 1 = assertion failures, 2 = execution/parse error. Reads scenario and env files, runs via `scenario.Runner`, outputs `reporting.Text` or `reporting.JSON`.
+- **`apps/cli/go.mod`** — added `replace github.com/fuvito/api-workbench/packages/core => ../../packages/core`; added `PaesslerAG/jsonpath`, `yaml.v3` as indirect deps.
+- **UI: URL param extraction on paste** — pasting a URL containing `?` (e.g. `https://api.example.com/items?page=1&limit=20`) automatically strips the query string from the URL field and merges the extracted params into the Params tab. Same-named existing params are replaced; new ones are appended. No change to typing behavior.
+- **Phase 3 acceptance criteria met**: multi-step scenarios run end-to-end; variable extraction propagates between steps; assertions evaluated with 6 operators; scenarios saved/loaded as YAML or JSON; `endpointdesk run` CLI command with text/JSON output and proper exit codes; 44+ Go tests all pass.
 
 ### 2026-11-03 — Phase 2: Workspace + API client
 

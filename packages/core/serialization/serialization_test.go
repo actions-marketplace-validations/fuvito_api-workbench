@@ -121,6 +121,145 @@ func TestWriteRequest_RoundTrip(t *testing.T) {
 	}
 }
 
+const yamlScenario = `
+schemaVersion: "1"
+name: User flow
+description: Create and retrieve a user
+steps:
+  - name: Create user
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      body:
+        type: json
+        content: '{"name":"Alice"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "201"
+    extractions:
+      - name: userId
+        source: jsonpath
+        path: "$.id"
+  - name: Get user
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/{{userId}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Alice"
+    failPolicy: continue
+`
+
+func TestParseScenario_YAML(t *testing.T) {
+	s, err := serialization.ParseScenario([]byte(yamlScenario), "yaml")
+	if err != nil {
+		t.Fatalf("ParseScenario: %v", err)
+	}
+	if s.Name != "User flow" {
+		t.Errorf("name: got %q", s.Name)
+	}
+	if s.Description != "Create and retrieve a user" {
+		t.Errorf("description: got %q", s.Description)
+	}
+	if len(s.Steps) != 2 {
+		t.Fatalf("steps: got %d", len(s.Steps))
+	}
+
+	step0 := s.Steps[0]
+	if step0.Name != "Create user" {
+		t.Errorf("step0 name: %q", step0.Name)
+	}
+	if step0.Request == nil || step0.Request.Method != domain.MethodPOST {
+		t.Errorf("step0 request method: %+v", step0.Request)
+	}
+	if len(step0.Assertions) != 1 || step0.Assertions[0].Type != domain.AssertionStatus {
+		t.Errorf("step0 assertions: %+v", step0.Assertions)
+	}
+	if len(step0.Extractions) != 1 || step0.Extractions[0].Name != "userId" {
+		t.Errorf("step0 extractions: %+v", step0.Extractions)
+	}
+
+	step1 := s.Steps[1]
+	if step1.FailPolicy != domain.FailPolicyContinue {
+		t.Errorf("step1 failPolicy: %q", step1.FailPolicy)
+	}
+	if len(step1.Assertions) != 2 {
+		t.Errorf("step1 assertions count: %d", len(step1.Assertions))
+	}
+}
+
+func TestWriteScenario_RoundTrip(t *testing.T) {
+	original := &domain.Scenario{
+		SchemaVersion: "1",
+		Name:          "Round trip",
+		Steps: []domain.ScenarioStep{
+			{
+				Name: "Step A",
+				Request: &domain.Request{
+					Method: domain.MethodGET,
+					URL:    "https://example.com",
+				},
+				Assertions: []domain.Assertion{
+					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
+				},
+				FailPolicy: domain.FailPolicyContinue,
+			},
+		},
+	}
+
+	data, err := serialization.WriteScenario(original, "yaml")
+	if err != nil {
+		t.Fatalf("WriteScenario: %v", err)
+	}
+
+	restored, err := serialization.ParseScenario(data, "yaml")
+	if err != nil {
+		t.Fatalf("ParseScenario after write: %v", err)
+	}
+	if restored.Name != original.Name {
+		t.Errorf("name: %q != %q", restored.Name, original.Name)
+	}
+	if len(restored.Steps) != 1 {
+		t.Fatalf("steps: %d", len(restored.Steps))
+	}
+	if restored.Steps[0].FailPolicy != domain.FailPolicyContinue {
+		t.Errorf("failPolicy: %q", restored.Steps[0].FailPolicy)
+	}
+	if restored.Steps[0].Request == nil || restored.Steps[0].Request.Method != domain.MethodGET {
+		t.Errorf("request: %+v", restored.Steps[0].Request)
+	}
+}
+
+func TestParseScenario_WithRequestRef(t *testing.T) {
+	yaml := `
+schemaVersion: "1"
+name: Ref scenario
+steps:
+  - name: Reuse request
+    requestRef: "requests/create-user.yaml"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "201"
+`
+	s, err := serialization.ParseScenario([]byte(yaml), "yaml")
+	if err != nil {
+		t.Fatalf("ParseScenario: %v", err)
+	}
+	if s.Steps[0].RequestRef != "requests/create-user.yaml" {
+		t.Errorf("requestRef: got %q", s.Steps[0].RequestRef)
+	}
+	if s.Steps[0].Request != nil {
+		t.Errorf("expected no inline request when requestRef is set")
+	}
+}
+
 const yamlEnv = `
 schemaVersion: "1"
 name: Local Dev
