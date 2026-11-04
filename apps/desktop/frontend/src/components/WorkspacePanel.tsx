@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react'
+import { ChevronRight, ChevronDown, FileText, Folder, FolderOpen, FolderSymlink, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
 
@@ -88,7 +88,7 @@ export function WorkspacePanel({
       {workspacePath ? (
         <>
           <div className="px-2 py-1.5 border-b border-[var(--color-border)] flex items-center gap-1 justify-between">
-            <span className="text-[10px] font-mono text-[var(--color-muted-foreground)] truncate" title={workspacePath}>
+            <span className="text-label font-mono text-[var(--color-muted-foreground)] truncate" title={workspacePath}>
               {folderName}
             </span>
             <div className="flex items-center gap-1 shrink-0">
@@ -96,18 +96,18 @@ export function WorkspacePanel({
                 type="button"
                 onClick={onImportOpenAPI}
                 disabled={importing}
-                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-40"
+                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-40"
                 title="Import OpenAPI spec"
               >
-                {importing ? '…' : '⇡'}
+                {importing ? <span className="text-label">…</span> : <Upload size={12} />}
               </button>
               <button
                 type="button"
                 onClick={onOpenWorkspace}
-                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-                title="Change workspace"
+                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                title="Switch workspace folder"
               >
-                ⌁
+                <FolderSymlink size={12} />
               </button>
             </div>
           </div>

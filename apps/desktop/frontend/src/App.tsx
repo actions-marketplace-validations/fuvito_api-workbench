@@ -390,8 +390,8 @@ function TimingBar({ timing, total }: { timing: ResponseData['timing']; total: n
       </div>
       <div className="flex gap-3 flex-wrap">
         {segments.map(s => (
-          <span key={s.label} className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)]">
-            <span className={cn('inline-block w-2 h-2 rounded-sm', s.color)} />
+          <span key={s.label} className="flex items-center gap-1 text-label text-[var(--color-muted-foreground)]">
+            <span className={cn('inline-block rounded-sm shrink-0', s.color)} style={{ width: 'calc(var(--font-size-code) * 0.8)', height: 'calc(var(--font-size-code) * 0.8)' }} />
             {s.label} {s.ms}ms
           </span>
         ))}

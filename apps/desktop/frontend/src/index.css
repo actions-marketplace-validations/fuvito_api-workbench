@@ -70,6 +70,19 @@ body {
   font-size: var(--font-size-code);
 }
 
+/* Proportional small label — 80% of the main font size.
+   Use instead of text-[10px] wherever labels should scale with settings. */
+.text-label {
+  font-size: calc(var(--font-size-code) * 0.8);
+}
+
+/* Scale UI icons (Lucide SVGs) with font size.
+   SVG presentation attributes have zero specificity so plain CSS wins. */
+button svg, a svg {
+  width:  calc(var(--font-size-code) * 1.1);
+  height: calc(var(--font-size-code) * 1.1);
+}
+
 /* Light theme: Tailwind 400 variants are too light on white — remap to 700. */
 :root.light .text-emerald-400 { color: oklch(0.47 0.14 162); }
 :root.light .text-blue-400    { color: oklch(0.44 0.17 264); }
