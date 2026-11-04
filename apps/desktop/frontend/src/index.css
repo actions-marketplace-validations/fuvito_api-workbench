@@ -17,11 +17,15 @@
 /* Light theme overrides */
 :root.light {
   --color-background: oklch(0.97 0.002 285);
-  --color-foreground: oklch(0.15 0.005 285);
-  --color-muted: oklch(0.92 0.003 285);
-  --color-muted-foreground: oklch(0.48 0.01 285);
-  --color-border: oklch(0.82 0.005 285);
+  --color-foreground: oklch(0.12 0.005 285);
+  --color-muted: oklch(0.91 0.003 285);
+  --color-muted-foreground: oklch(0.42 0.01 285);
+  --color-border: oklch(0.80 0.005 285);
   --color-card: oklch(1 0 0);
+  /* Darker accent so white-text buttons and active indicators are readable */
+  --color-accent: oklch(0.44 0.19 264);
+  /* Darker destructive for light background */
+  --color-destructive: oklch(0.46 0.20 27);
 }
 
 *,
@@ -45,3 +49,25 @@ body {
   height: 100vh;
   width: 100vw;
 }
+
+/* Scale the dominant text size with the user's font-size setting.
+   Plain CSS after @import cascades above Tailwind's named layers. */
+.text-xs {
+  font-size: var(--font-size-code);
+}
+
+/* Light theme: Tailwind 400 variants are too light on white — remap to 700. */
+:root.light .text-emerald-400 { color: oklch(0.47 0.14 162); }
+:root.light .text-blue-400    { color: oklch(0.44 0.17 264); }
+:root.light .text-amber-400   { color: oklch(0.55 0.14 56);  }
+:root.light .text-orange-400  { color: oklch(0.53 0.17 36);  }
+:root.light .text-red-400     { color: oklch(0.49 0.17 22);  }
+:root.light .text-purple-400  { color: oklch(0.42 0.21 309); }
+:root.light .text-cyan-400    { color: oklch(0.52 0.11 207); }
+
+/* Timing bar segments stay vivid in both themes */
+:root.light .bg-purple-500 { background-color: oklch(0.47 0.21 309); }
+:root.light .bg-blue-500   { background-color: oklch(0.45 0.18 264); }
+:root.light .bg-yellow-500 { background-color: oklch(0.60 0.17 86);  }
+:root.light .bg-emerald-500{ background-color: oklch(0.49 0.14 162); }
+:root.light .bg-cyan-500   { background-color: oklch(0.53 0.12 207); }
