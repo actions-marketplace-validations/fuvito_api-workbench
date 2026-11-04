@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  core:
+    name: Core — test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Test core
+        run: go test ./...
+        working-directory: packages/core
+
+  cli-build:
+    name: CLI — build
+    runs-on: ubuntu-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Build CLI
+        run: go build ./...
+        working-directory: apps/cli
+
+  desktop-build:
+    name: Desktop — build
+    runs-on: ubuntu-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: apps/desktop/frontend/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Install frontend deps
+        run: pnpm install
+        working-directory: apps/desktop/frontend
+
+      - name: Build frontend
+        run: pnpm build
+        working-directory: apps/desktop/frontend
+
+      - name: Build desktop Go
+        run: go build ./...
+        working-directory: apps/desktop/wails

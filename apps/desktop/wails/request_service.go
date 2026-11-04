@@ -1,0 +1,236 @@
+package main
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/executor"
+	"github.com/fuvito/api-workbench/packages/core/history"
+	"github.com/fuvito/api-workbench/packages/core/variables"
+)
+
+// ---- Wails-serializable I/O types ----
+
+type HeaderIO struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type QueryParamIO struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type BodyIO struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+}
+
+type AuthIO struct {
+	Type     string `json:"type"`
+	Token    string `json:"token"`    // bearer
+	Username string `json:"username"` // basic
+	Password string `json:"password"` // basic
+	Key      string `json:"key"`      // apikey
+	Value    string `json:"value"`    // apikey
+	Location string `json:"location"` // apikey: header|query
+}
+
+type RequestInput struct {
+	Method      string         `json:"method"`
+	URL         string         `json:"url"`
+	Headers     []HeaderIO     `json:"headers"`
+	QueryParams []QueryParamIO `json:"queryParams"`
+	Body        *BodyIO        `json:"body"`
+	Auth        *AuthIO        `json:"auth"`
+	TimeoutMs   int64          `json:"timeoutMs"` // 0 means use executor default
+}
+
+type ResponseOutput struct {
+	StatusCode int        `json:"statusCode"`
+	Status     string     `json:"status"`
+	Headers    []HeaderIO `json:"headers"`
+	Body       string     `json:"body"`
+	DurationMs int64      `json:"durationMs"`
+	Size       int64      `json:"size"`
+	Error      string     `json:"error,omitempty"`
+}
+
+type HistoryEntryIO struct {
+	ID         int64  `json:"id"`
+	ExecutedAt string `json:"executedAt"`
+	Method     string `json:"method"`
+	URL        string `json:"url"`
+	StatusCode int    `json:"statusCode"`
+	StatusText string `json:"statusText"`
+	DurationMs int64  `json:"durationMs"`
+	SizeBytes  int64  `json:"sizeBytes"`
+}
+
+// ---- Service ----
+
+type RequestService struct {
+	ctx       context.Context
+	exec      *executor.Executor
+	store     *history.Store
+	workspace *WorkspaceService // may be nil; provides active environment for variable resolution
+}
+
+func NewRequestService(ws *WorkspaceService) *RequestService {
+	store, err := openHistory()
+	if err != nil {
+		log.Printf("history store unavailable: %v", err)
+	}
+	return &RequestService{
+		ctx:       context.Background(),
+		exec:      executor.New(executor.Options{}),
+		store:     store,
+		workspace: ws,
+	}
+}
+
+func openHistory() (*history.Store, error) {
+	path, err := history.DefaultPath()
+	if err != nil {
+		return nil, err
+	}
+	return history.Open(path)
+}
+
+func (s *RequestService) setContext(ctx context.Context) {
+	s.ctx = ctx
+}
+
+func (s *RequestService) close() {
+	if s.store != nil {
+		s.store.Close()
+	}
+}
+
+// Execute is the Wails-bound method called by the frontend.
+// Network errors and validation failures are returned in ResponseOutput.Error
+// rather than as Go errors, so the frontend always receives a consistent type.
+func (s *RequestService) Execute(input RequestInput) ResponseOutput {
+	req, err := inputToDomain(input)
+	if err != nil {
+		return ResponseOutput{Error: err.Error()}
+	}
+
+	var env *domain.Environment
+	if s.workspace != nil {
+		env = s.workspace.ActiveEnvironment()
+	}
+	resolver := variables.NewResolver(env)
+	resolved := resolver.InterpolateRequest(req)
+
+	resp, err := s.exec.Execute(s.ctx, resolved)
+	if err != nil {
+		return ResponseOutput{Error: err.Error()}
+	}
+
+	out := domainToOutput(resp)
+	s.recordHistory(input, out)
+	return out
+}
+
+// GetHistory returns the most recent history entries (up to 100).
+func (s *RequestService) GetHistory() []HistoryEntryIO {
+	if s.store == nil {
+		return nil
+	}
+	entries, err := s.store.Recent(100)
+	if err != nil {
+		log.Printf("reading history: %v", err)
+		return nil
+	}
+	out := make([]HistoryEntryIO, len(entries))
+	for i, e := range entries {
+		out[i] = HistoryEntryIO{
+			ID:         e.ID,
+			ExecutedAt: e.ExecutedAt.Format(time.RFC3339),
+			Method:     e.Method,
+			URL:        e.URL,
+			StatusCode: e.StatusCode,
+			StatusText: e.StatusText,
+			DurationMs: e.DurationMs,
+			SizeBytes:  e.SizeBytes,
+		}
+	}
+	return out
+}
+
+func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {
+	if s.store == nil || out.Error != "" {
+		return
+	}
+	if _, err := s.store.Record(input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size); err != nil {
+		log.Printf("writing history: %v", err)
+	}
+}
+
+// ---- mapping helpers ----
+
+func inputToDomain(in RequestInput) (*domain.Request, error) {
+	req := &domain.Request{
+		Method: domain.HTTPMethod(in.Method),
+		URL:    in.URL,
+	}
+
+	for _, h := range in.Headers {
+		req.Headers = append(req.Headers, domain.Header{Name: h.Name, Value: h.Value})
+	}
+	for _, p := range in.QueryParams {
+		req.QueryParams = append(req.QueryParams, domain.QueryParam{Name: p.Name, Value: p.Value})
+	}
+	if in.Body != nil {
+		req.Body = &domain.RequestBody{
+			Type:    domain.BodyType(in.Body.Type),
+			Content: in.Body.Content,
+		}
+	}
+	if in.Auth != nil {
+		req.Auth = inputAuthToDomain(in.Auth)
+	}
+	if in.TimeoutMs > 0 {
+		req.Timeout = time.Duration(in.TimeoutMs) * time.Millisecond
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+func inputAuthToDomain(a *AuthIO) *domain.Auth {
+	auth := &domain.Auth{Type: domain.AuthType(a.Type)}
+	switch auth.Type {
+	case domain.AuthBearer:
+		auth.Bearer = &domain.BearerAuth{Token: a.Token}
+	case domain.AuthBasic:
+		auth.Basic = &domain.BasicAuth{Username: a.Username, Password: a.Password}
+	case domain.AuthAPIKey:
+		auth.APIKey = &domain.APIKeyAuth{
+			Key:      a.Key,
+			Value:    a.Value,
+			Location: domain.APIKeyLocation(a.Location),
+		}
+	}
+	return auth
+}
+
+func domainToOutput(r *domain.Response) ResponseOutput {
+	headers := make([]HeaderIO, 0, len(r.Headers))
+	for _, h := range r.Headers {
+		headers = append(headers, HeaderIO{Name: h.Name, Value: h.Value})
+	}
+	return ResponseOutput{
+		StatusCode: r.StatusCode,
+		Status:     r.Status,
+		Headers:    headers,
+		Body:       r.BodyString(),
+		DurationMs: r.Duration.Milliseconds(),
+		Size:       r.Size,
+	}
+}

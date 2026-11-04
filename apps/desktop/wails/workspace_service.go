@@ -1,0 +1,496 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/serialization"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+// ---- Config persistence ----
+
+type workspaceConfig struct {
+	WorkspacePath string `json:"workspacePath"`
+	ActiveEnvPath string `json:"activeEnvPath"`
+}
+
+func configPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(home, ".endpointdesk")
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "config.json"), nil
+}
+
+func loadConfig() workspaceConfig {
+	p, err := configPath()
+	if err != nil {
+		return workspaceConfig{}
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return workspaceConfig{}
+	}
+	var cfg workspaceConfig
+	_ = json.Unmarshal(data, &cfg)
+	return cfg
+}
+
+func saveConfig(cfg workspaceConfig) {
+	p, err := configPath()
+	if err != nil {
+		return
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := p + ".tmp"
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, p) // atomic replace
+}
+
+// ---- Wails-serializable I/O types ----
+
+type FileNodeIO struct {
+	Name     string       `json:"name"`
+	Path     string       `json:"path"`
+	IsDir    bool         `json:"isDir"`
+	Children []FileNodeIO `json:"children,omitempty"`
+}
+
+type EnvironmentInfoIO struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+type RequestFileIO struct {
+	SchemaVersion string          `json:"schemaVersion"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description,omitempty"`
+	Method        string          `json:"method"`
+	URL           string          `json:"url"`
+	Headers       []HeaderIO      `json:"headers,omitempty"`
+	QueryParams   []QueryParamIO  `json:"queryParams,omitempty"`
+	Body          *BodyIO         `json:"body,omitempty"`
+	Auth          *AuthIO         `json:"auth,omitempty"`
+	TimeoutMs     int64           `json:"timeoutMs,omitempty"`
+}
+
+// ---- WorkspaceService ----
+
+type WorkspaceService struct {
+	ctx           context.Context
+	workspacePath string
+	activeEnvPath string
+	activeEnv     *domain.Environment
+}
+
+func NewWorkspaceService() *WorkspaceService {
+	cfg := loadConfig()
+	ws := &WorkspaceService{
+		ctx:           context.Background(),
+		workspacePath: cfg.WorkspacePath,
+		activeEnvPath: cfg.ActiveEnvPath,
+	}
+	if cfg.ActiveEnvPath != "" {
+		if env, err := ws.loadEnvFile(cfg.ActiveEnvPath); err == nil {
+			ws.activeEnv = env
+		}
+	}
+	return ws
+}
+
+func (w *WorkspaceService) setContext(ctx context.Context) {
+	w.ctx = ctx
+}
+
+func (w *WorkspaceService) ActiveEnvironment() *domain.Environment {
+	return w.activeEnv
+}
+
+// ---- Wails-bound methods ----
+
+// OpenWorkspace opens a directory picker dialog and sets the workspace.
+func (w *WorkspaceService) OpenWorkspace() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(w.ctx, runtime.OpenDialogOptions{
+		Title: "Open Workspace Folder",
+	})
+	if err != nil {
+		return "", err
+	}
+	if dir == "" {
+		return w.workspacePath, nil // user cancelled
+	}
+	w.workspacePath = dir
+	w.persistConfig()
+	return dir, nil
+}
+
+// GetWorkspacePath returns the current workspace directory path.
+func (w *WorkspaceService) GetWorkspacePath() string {
+	return w.workspacePath
+}
+
+// ListRequests returns the workspace file tree limited to request files (.yaml/.yml/.json).
+func (w *WorkspaceService) ListRequests() []FileNodeIO {
+	if w.workspacePath == "" {
+		return nil
+	}
+	nodes, err := buildFileTree(w.workspacePath, w.workspacePath, true)
+	if err != nil {
+		log.Printf("listing requests: %v", err)
+		return nil
+	}
+	return nodes
+}
+
+// ListEnvironments returns all environment files found in workspacePath/environments/.
+func (w *WorkspaceService) ListEnvironments() []EnvironmentInfoIO {
+	if w.workspacePath == "" {
+		return nil
+	}
+	envDir := filepath.Join(w.workspacePath, "environments")
+	entries, err := os.ReadDir(envDir)
+	if err != nil {
+		return nil
+	}
+
+	var result []EnvironmentInfoIO
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !isDataFile(name) {
+			continue
+		}
+		path := filepath.Join(envDir, name)
+		displayName := strings.TrimSuffix(name, filepath.Ext(name))
+		// Try to read the declared name from the file
+		if data, err := os.ReadFile(path); err == nil {
+			if env, err := serialization.ParseEnvironmentFile(data, name); err == nil && env.Name != "" {
+				displayName = env.Name
+			}
+		}
+		result = append(result, EnvironmentInfoIO{Name: displayName, Path: path})
+	}
+	return result
+}
+
+// SelectEnvironment sets the active environment by file path.
+func (w *WorkspaceService) SelectEnvironment(path string) error {
+	if path == "" {
+		w.activeEnv = nil
+		w.activeEnvPath = ""
+		w.persistConfig()
+		return nil
+	}
+	env, err := w.loadEnvFile(path)
+	if err != nil {
+		return err
+	}
+	w.activeEnv = env
+	w.activeEnvPath = path
+	w.persistConfig()
+	return nil
+}
+
+// GetActiveEnvironment returns info about the currently selected environment (or nil).
+func (w *WorkspaceService) GetActiveEnvironment() *EnvironmentInfoIO {
+	if w.activeEnv == nil {
+		return nil
+	}
+	return &EnvironmentInfoIO{Name: w.activeEnv.Name, Path: w.activeEnvPath}
+}
+
+// LoadRequest reads a request file and returns a RequestFileIO the UI can populate into the editor.
+func (w *WorkspaceService) LoadRequest(path string) (*RequestFileIO, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	req, err := serialization.ParseRequestFile(data, filepath.Base(path))
+	if err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", path, err)
+	}
+	return domainToRequestFileIO(req), nil
+}
+
+// SaveRequest writes the current request to a file chosen via a save dialog.
+// Returns the path that was saved.
+func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
+	defaultDir := w.workspacePath
+	if defaultDir == "" {
+		defaultDir, _ = os.UserHomeDir()
+	}
+	name := req.Name
+	if name == "" {
+		name = "request"
+	}
+	// sanitize name for a filename
+	name = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(`<>:"/\|?*`, r) {
+			return '-'
+		}
+		return r
+	}, name)
+
+	path, err := runtime.SaveFileDialog(w.ctx, runtime.SaveDialogOptions{
+		Title:           "Save Request",
+		DefaultDirectory: defaultDir,
+		DefaultFilename: name + ".yaml",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "YAML (*.yaml, *.yml)", Pattern: "*.yaml;*.yml"},
+			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // user cancelled
+	}
+
+	domReq := requestFileIOToDomain(req)
+	ext := strings.TrimPrefix(filepath.Ext(path), ".")
+	if ext == "" {
+		ext = "yaml"
+		path += ".yaml"
+	}
+	data, err := serialization.WriteRequest(domReq, ext)
+	if err != nil {
+		return "", err
+	}
+	// Atomic write
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// OpenRequest opens a file picker and loads a request file.
+func (w *WorkspaceService) OpenRequest() (*RequestFileIO, error) {
+	defaultDir := w.workspacePath
+	if defaultDir == "" {
+		defaultDir, _ = os.UserHomeDir()
+	}
+	path, err := runtime.OpenFileDialog(w.ctx, runtime.OpenDialogOptions{
+		Title:           "Open Request",
+		DefaultDirectory: defaultDir,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Request files (*.yaml, *.yml, *.json)", Pattern: "*.yaml;*.yml;*.json"},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, nil // user cancelled
+	}
+	return w.LoadRequest(path)
+}
+
+// ---- helpers ----
+
+func (w *WorkspaceService) persistConfig() {
+	saveConfig(workspaceConfig{
+		WorkspacePath: w.workspacePath,
+		ActiveEnvPath: w.activeEnvPath,
+	})
+}
+
+func (w *WorkspaceService) loadEnvFile(path string) (*domain.Environment, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	return serialization.ParseEnvironmentFile(data, filepath.Base(path))
+}
+
+func isDataFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	return ext == ".yaml" || ext == ".yml" || ext == ".json"
+}
+
+func isRequestFile(path string) bool {
+	// Quick heuristic: if it's a data file we treat it as a potential request.
+	// A full parse happens only when the user loads it.
+	return isDataFile(filepath.Base(path))
+}
+
+func buildFileTree(root, dir string, skipEnvDir bool) ([]FileNodeIO, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []FileNodeIO
+	for _, e := range entries {
+		name := e.Name()
+		// Skip hidden files/dirs and the environments directory at root level
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		if e.IsDir() {
+			if skipEnvDir && path == filepath.Join(root, "environments") {
+				continue
+			}
+			children, err := buildFileTree(root, path, false)
+			if err != nil {
+				continue
+			}
+			if len(children) > 0 {
+				nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: true, Children: children})
+			}
+		} else if isRequestFile(path) {
+			nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: false})
+		}
+	}
+	return nodes, nil
+}
+
+func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
+	out := &RequestFileIO{
+		SchemaVersion: req.SchemaVersion,
+		Name:          req.Name,
+		Description:   req.Description,
+		Method:        string(req.Method),
+		URL:           req.URL,
+	}
+	for _, h := range req.Headers {
+		out.Headers = append(out.Headers, HeaderIO{Name: h.Name, Value: h.Value})
+	}
+	for _, p := range req.QueryParams {
+		out.QueryParams = append(out.QueryParams, QueryParamIO{Name: p.Name, Value: p.Value})
+	}
+	if req.Body != nil {
+		out.Body = &BodyIO{Type: string(req.Body.Type), Content: req.Body.Content}
+	}
+	if req.Auth != nil {
+		af := &AuthIO{Type: string(req.Auth.Type)}
+		if req.Auth.Bearer != nil {
+			af.Token = req.Auth.Bearer.Token
+		}
+		if req.Auth.Basic != nil {
+			af.Username = req.Auth.Basic.Username
+			af.Password = req.Auth.Basic.Password
+		}
+		if req.Auth.APIKey != nil {
+			af.Key = req.Auth.APIKey.Key
+			af.Value = req.Auth.APIKey.Value
+			af.Location = string(req.Auth.APIKey.Location)
+		}
+		out.Auth = af
+	}
+	if req.Timeout > 0 {
+		out.TimeoutMs = req.Timeout.Milliseconds()
+	}
+	return out
+}
+
+func requestFileIOToDomain(r RequestFileIO) *domain.Request {
+	req := &domain.Request{
+		Name:        r.Name,
+		Description: r.Description,
+		Method:      domain.HTTPMethod(r.Method),
+		URL:         r.URL,
+	}
+	for _, h := range r.Headers {
+		req.Headers = append(req.Headers, domain.Header{Name: h.Name, Value: h.Value})
+	}
+	for _, p := range r.QueryParams {
+		req.QueryParams = append(req.QueryParams, domain.QueryParam{Name: p.Name, Value: p.Value})
+	}
+	if r.Body != nil {
+		req.Body = &domain.RequestBody{Type: domain.BodyType(r.Body.Type), Content: r.Body.Content}
+	}
+	return req
+}
+
+// CreateExampleWorkspace creates an example workspace structure in the given directory.
+// Called once when the user creates a new workspace.
+func createExampleWorkspace(dir string) error {
+	for _, sub := range []string{"environments", "requests"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0755); err != nil {
+			return err
+		}
+	}
+
+	env := `schemaVersion: "1"
+name: Local Dev
+variables:
+  - name: baseUrl
+    value: http://localhost:8080
+  - name: authToken
+    value: ""
+    secret: true
+`
+	req := `schemaVersion: "1"
+name: Health Check
+method: GET
+url: "{{baseUrl}}/health"
+headers:
+  - name: Accept
+    value: application/json
+`
+	writeFile := func(path, content string) error {
+		f, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.WriteString(f, content)
+		return err
+	}
+
+	if err := writeFile(filepath.Join(dir, "environments", "local.yaml"), env); err != nil {
+		return err
+	}
+	if err := writeFile(filepath.Join(dir, "requests", "health-check.yaml"), req); err != nil {
+		return err
+	}
+	return nil
+}
+
+// NewWorkspace opens a dialog to pick or create a directory and initialises workspace structure.
+func (w *WorkspaceService) NewWorkspace() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(w.ctx, runtime.OpenDialogOptions{
+		Title: "Choose Workspace Folder (new or existing)",
+	})
+	if err != nil {
+		return "", err
+	}
+	if dir == "" {
+		return w.workspacePath, nil
+	}
+	// Create example structure only if directory is empty
+	entries, _ := os.ReadDir(dir)
+	if len(entries) == 0 {
+		if err := createExampleWorkspace(dir); err != nil {
+			log.Printf("creating example workspace: %v", err)
+		}
+	}
+	w.workspacePath = dir
+	w.persistConfig()
+	return dir, nil
+}

@@ -1,0 +1,14 @@
+{
+  "name": "endpointdesk",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter desktop dev",
+    "build": "pnpm --filter desktop build",
+    "test": "pnpm --filter desktop test"
+  }
+}
