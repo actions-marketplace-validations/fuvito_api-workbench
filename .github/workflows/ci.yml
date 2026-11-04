@@ -19,7 +19,7 @@ jobs:
           cache: true
 
       - name: Test core
-        run: go test ./...
+        run: go test -v ./...
         working-directory: packages/core
 
   cli-build:

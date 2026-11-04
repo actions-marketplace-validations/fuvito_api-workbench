@@ -1,0 +1,163 @@
+import { useState } from 'react'
+import { X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+export interface AppSettings {
+  theme: string
+  fontSize: number
+  defaultTimeoutMs: number
+  proxyUrl: string
+  tlsSkipVerify: boolean
+}
+
+type SettingsPanelProps = {
+  settings: AppSettings
+  onSave: (s: AppSettings) => void
+  onClose: () => void
+}
+
+export function SettingsPanel({ settings, onSave, onClose }: SettingsPanelProps) {
+  const [local, setLocal] = useState<AppSettings>({ ...settings })
+
+  function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    setLocal(prev => ({ ...prev, [key]: value }))
+  }
+
+  function handleSave() {
+    onSave(local)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className={cn(
+        'w-[460px] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)]',
+        'shadow-2xl flex flex-col',
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
+          <span className="text-sm font-semibold text-[var(--color-foreground)]">Settings</span>
+          <button type="button" onClick={onClose} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-col gap-5 p-5 overflow-auto">
+          {/* Appearance */}
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Appearance</h3>
+            <div className="flex flex-col gap-3">
+
+              <Row label="Theme">
+                <select
+                  value={local.theme}
+                  onChange={e => set('theme', e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
+                </select>
+              </Row>
+
+              <Row label={`Font size — ${local.fontSize}px`}>
+                <input
+                  type="range"
+                  min={10} max={24} step={1}
+                  value={local.fontSize}
+                  onChange={e => set('fontSize', Number(e.target.value))}
+                  className="w-full accent-[var(--color-accent)]"
+                />
+              </Row>
+
+            </div>
+          </section>
+
+          {/* Network */}
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Network</h3>
+            <div className="flex flex-col gap-3">
+
+              <Row label="Default timeout (ms)">
+                <input
+                  type="number"
+                  min={0}
+                  value={local.defaultTimeoutMs}
+                  onChange={e => set('defaultTimeoutMs', Number(e.target.value))}
+                  className={inputCls}
+                  placeholder="30000"
+                />
+              </Row>
+
+              <Row label="Proxy URL">
+                <input
+                  type="text"
+                  value={local.proxyUrl}
+                  onChange={e => set('proxyUrl', e.target.value)}
+                  placeholder="http://proxy.example.com:8080"
+                  className={inputCls}
+                />
+              </Row>
+
+              <Row label="Skip TLS verification">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={local.tlsSkipVerify}
+                    onChange={e => set('tlsSkipVerify', e.target.checked)}
+                    className="accent-[var(--color-accent)]"
+                  />
+                  <span className="text-xs text-[var(--color-muted-foreground)]">
+                    Allow self-signed / invalid certificates
+                  </span>
+                </label>
+              </Row>
+
+            </div>
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--color-border)]">
+          <button
+            type="button"
+            onClick={onClose}
+            className={cn(
+              'text-xs rounded px-4 py-1.5',
+              'bg-[var(--color-muted)] text-[var(--color-foreground)] border border-[var(--color-border)]',
+              'hover:bg-[var(--color-border)] transition-colors',
+            )}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className={cn(
+              'text-xs rounded px-4 py-1.5 font-semibold',
+              'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity',
+            )}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const inputCls = cn(
+  'w-full bg-[var(--color-muted)] text-xs rounded px-2 py-1',
+  'border border-[var(--color-border)] outline-none',
+  'focus:border-[var(--color-accent)] text-[var(--color-foreground)]',
+  'placeholder:text-[var(--color-muted-foreground)]',
+)
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-40 shrink-0 text-xs text-[var(--color-muted-foreground)]">{label}</span>
+      <div className="flex-1">{children}</div>
+    </div>
+  )
+}

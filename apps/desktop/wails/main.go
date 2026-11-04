@@ -32,6 +32,7 @@ func main() {
 			app.requestService,
 			app.workspaceService,
 			app.openapiService,
+			app.settingsService,
 		},
 	})
 	if err != nil {

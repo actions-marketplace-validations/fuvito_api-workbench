@@ -3,9 +3,13 @@ package executor
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
+	"net/url"
+	"sync"
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -28,6 +32,8 @@ type Executor struct {
 type Options struct {
 	DefaultTimeout time.Duration
 	MaxBodySize    int64
+	ProxyURL       string
+	TLSSkipVerify  bool
 }
 
 func New(opts Options) *Executor {
@@ -39,8 +45,18 @@ func New(opts Options) *Executor {
 	if maxBody == 0 {
 		maxBody = defaultMaxBodySize
 	}
+
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: opts.TLSSkipVerify}, //nolint:gosec
+	}
+	if opts.ProxyURL != "" {
+		if u, err := url.Parse(opts.ProxyURL); err == nil {
+			transport.Proxy = http.ProxyURL(u)
+		}
+	}
+
 	return &Executor{
-		client:         &http.Client{},
+		client:         &http.Client{Transport: transport},
 		defaultTimeout: timeout,
 		maxBodySize:    maxBody,
 	}
@@ -66,6 +82,10 @@ func (e *Executor) Execute(ctx context.Context, req *domain.Request) (*domain.Re
 		return nil, fmt.Errorf("building request: %w", err)
 	}
 
+	tc := &timingCollector{}
+	tracedCtx := httptrace.WithClientTrace(httpReq.Context(), tc.trace())
+	httpReq = httpReq.WithContext(tracedCtx)
+
 	start := time.Now()
 	httpResp, err := e.client.Do(httpReq)
 	if err != nil {
@@ -73,7 +93,72 @@ func (e *Executor) Execute(ctx context.Context, req *domain.Request) (*domain.Re
 	}
 	defer httpResp.Body.Close()
 
-	return buildResponse(httpResp, time.Since(start), e.maxBodySize)
+	transferStart := time.Now()
+	resp, err := buildResponse(httpResp, time.Since(start), e.maxBodySize)
+	if err != nil {
+		return nil, err
+	}
+	timing := tc.build(start)
+	timing.TransferMs = ms(time.Since(transferStart))
+	resp.Timing = timing
+	return resp, nil
+}
+
+// timingCollector records httptrace timestamps and converts them to domain.Timing.
+type timingCollector struct {
+	mu              sync.Mutex
+	dnsStart        time.Time
+	dnsDone         time.Time
+	connectStart    time.Time
+	connectDone     time.Time
+	tlsStart        time.Time
+	tlsDone         time.Time
+	wroteRequest    time.Time
+	firstByte       time.Time
+}
+
+func (tc *timingCollector) trace() *httptrace.ClientTrace {
+	return &httptrace.ClientTrace{
+		DNSStart:             func(_ httptrace.DNSStartInfo) { tc.mu.Lock(); tc.dnsStart = time.Now(); tc.mu.Unlock() },
+		DNSDone:              func(_ httptrace.DNSDoneInfo) { tc.mu.Lock(); tc.dnsDone = time.Now(); tc.mu.Unlock() },
+		ConnectStart:         func(_, _ string) { tc.mu.Lock(); tc.connectStart = time.Now(); tc.mu.Unlock() },
+		ConnectDone:          func(_, _ string, _ error) { tc.mu.Lock(); tc.connectDone = time.Now(); tc.mu.Unlock() },
+		TLSHandshakeStart:    func() { tc.mu.Lock(); tc.tlsStart = time.Now(); tc.mu.Unlock() },
+		TLSHandshakeDone:     func(_ tls.ConnectionState, _ error) { tc.mu.Lock(); tc.tlsDone = time.Now(); tc.mu.Unlock() },
+		WroteRequest:         func(_ httptrace.WroteRequestInfo) { tc.mu.Lock(); tc.wroteRequest = time.Now(); tc.mu.Unlock() },
+		GotFirstResponseByte: func() { tc.mu.Lock(); tc.firstByte = time.Now(); tc.mu.Unlock() },
+	}
+}
+
+func ms(d time.Duration) int64 {
+	if d < 0 {
+		return 0
+	}
+	return d.Milliseconds()
+}
+
+func (tc *timingCollector) build(start time.Time) domain.Timing {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+
+	t := domain.Timing{}
+	if !tc.dnsStart.IsZero() && !tc.dnsDone.IsZero() {
+		t.DNSMs = ms(tc.dnsDone.Sub(tc.dnsStart))
+	}
+	if !tc.connectStart.IsZero() && !tc.connectDone.IsZero() {
+		t.ConnectMs = ms(tc.connectDone.Sub(tc.connectStart))
+	}
+	if !tc.tlsStart.IsZero() && !tc.tlsDone.IsZero() {
+		t.TLSMs = ms(tc.tlsDone.Sub(tc.tlsStart))
+	}
+	ref := tc.wroteRequest
+	if ref.IsZero() {
+		ref = start
+	}
+	if !tc.firstByte.IsZero() {
+		t.TTFBMs = ms(tc.firstByte.Sub(ref))
+	}
+	return t
 }
 
 func buildHTTPRequest(ctx context.Context, req *domain.Request) (*http.Request, error) {

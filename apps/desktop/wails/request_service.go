@@ -48,6 +48,14 @@ type RequestInput struct {
 	TimeoutMs   int64          `json:"timeoutMs"` // 0 means use executor default
 }
 
+type TimingIO struct {
+	DNSMs      int64 `json:"dnsMs"`
+	ConnectMs  int64 `json:"connectMs"`
+	TLSMs      int64 `json:"tlsMs"`
+	TTFBMs     int64 `json:"ttfbMs"`
+	TransferMs int64 `json:"transferMs"`
+}
+
 type ResponseOutput struct {
 	StatusCode int        `json:"statusCode"`
 	Status     string     `json:"status"`
@@ -55,6 +63,7 @@ type ResponseOutput struct {
 	Body       string     `json:"body"`
 	DurationMs int64      `json:"durationMs"`
 	Size       int64      `json:"size"`
+	Timing     TimingIO   `json:"timing"`
 	Error      string     `json:"error,omitempty"`
 }
 
@@ -75,20 +84,37 @@ type RequestService struct {
 	ctx       context.Context
 	exec      *executor.Executor
 	store     *history.Store
-	workspace *WorkspaceService // may be nil; provides active environment for variable resolution
+	workspace *WorkspaceService
+	settings  *SettingsService
 }
 
-func NewRequestService(ws *WorkspaceService) *RequestService {
+func NewRequestService(ws *WorkspaceService, ss *SettingsService) *RequestService {
 	store, err := openHistory()
 	if err != nil {
 		log.Printf("history store unavailable: %v", err)
 	}
 	return &RequestService{
 		ctx:       context.Background(),
-		exec:      executor.New(executor.Options{}),
+		exec:      buildExecutor(ss),
 		store:     store,
 		workspace: ws,
+		settings:  ss,
 	}
+}
+
+func buildExecutor(ss *SettingsService) *executor.Executor {
+	if ss == nil {
+		return executor.New(executor.Options{})
+	}
+	cfg := ss.GetSettings()
+	opts := executor.Options{
+		TLSSkipVerify: cfg.TLSSkipVerify,
+		ProxyURL:      cfg.ProxyURL,
+	}
+	if cfg.DefaultTimeoutMs > 0 {
+		opts.DefaultTimeout = time.Duration(cfg.DefaultTimeoutMs) * time.Millisecond
+	}
+	return executor.New(opts)
 }
 
 func openHistory() (*history.Store, error) {
@@ -101,6 +127,11 @@ func openHistory() (*history.Store, error) {
 
 func (s *RequestService) setContext(ctx context.Context) {
 	s.ctx = ctx
+}
+
+// RebuildExecutor recreates the HTTP client with fresh settings (called after SaveSettings).
+func (s *RequestService) RebuildExecutor() {
+	s.exec = buildExecutor(s.settings)
 }
 
 func (s *RequestService) close() {
@@ -232,5 +263,12 @@ func domainToOutput(r *domain.Response) ResponseOutput {
 		Body:       r.BodyString(),
 		DurationMs: r.Duration.Milliseconds(),
 		Size:       r.Size,
+		Timing: TimingIO{
+			DNSMs:      r.Timing.DNSMs,
+			ConnectMs:  r.Timing.ConnectMs,
+			TLSMs:      r.Timing.TLSMs,
+			TTFBMs:     r.Timing.TTFBMs,
+			TransferMs: r.Timing.TransferMs,
+		},
 	}
 }

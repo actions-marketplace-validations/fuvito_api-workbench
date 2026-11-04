@@ -122,7 +122,7 @@ This layout may be refined after the first working vertical slice — do not ove
 | 4 | OpenAPI integration | Import spec, generate collections, validate responses |
 | 5 | Public MVP | Cross-platform builds, docs, examples, GitHub Actions CI |
 
-**Current phase: 3 (complete)**
+**Current phase: 5 (complete — public MVP)**
 
 MVP definition: A developer can import an OpenAPI specification, explore and execute generated requests in the desktop application, create a multi-step scenario, save it as YAML or JSON, and execute the same scenario through the CLI and GitHub Actions.
 
@@ -296,3 +296,30 @@ Do not implement or stub any of these without explicit user direction.
 - Updated `vite.config.ts` — `@wailsjs` resolve alias pointing to `wailsjs/` directory.
 - `src/App.tsx` — fully wired: method selector, URL input (Enter key submits), Send button → `executeRequest` → response panel (status badge, duration, size, pretty-printed JSON body, headers table, error state, loading state).
 - **Phase 0 acceptance criteria met**: desktop app builds and launches; Go core callable from UI through Wails IPC; CI workflow validates core tests, CLI build, and desktop build. Run `wails dev` from `apps/desktop/wails/` to launch the full app.
+
+### 2026-11-03 — Phase 4: OpenAPI integration
+
+- **`packages/core/openapi/parser.go`** — `Spec` wraps `openapi3.T` from `github.com/getkin/kin-openapi v0.152.0`. `ParseBytes(data, format)` and `ParseFile(path)` for YAML/JSON input. `Info()` returns title + version. `GeneratedRequest` carries `domain.Request` plus `OperationID`, `Summary`, `Tags`. `GenerateRequests(s, baseURL)` iterates all paths/operations, substitutes `{{paramName}}` path placeholders, adds query params, sets `Authorization: Bearer {{token}}` hint for secured operations, and generates a JSON body stub for POST/PUT/PATCH with a schema body.
+- **`packages/core/openapi/validator.go`** — `ValidateResponse(s, operationID, resp)` and `ValidateResponseByPath(s, method, path, statusCode, resp)` return `[]ValidationError`. Uses `kin-openapi` `ResponseValidationInput` pipeline. Schema assertions in `assertions/evaluator.go` now call this directly.
+- **`packages/core/openapi/openapi_test.go`** — 9 tests all passing: parse valid/invalid spec, generate count, baseURL injection, path params, JSON body stub, response pass, response fail (missing field), unknown operation.
+- **`packages/core/assertions/evaluator.go`** — schema assertion case now fully implemented via `openapi.ParseBytes` + `openapi.ValidateResponse`.
+- **`examples/server/main.go`** — standalone Go HTTP server (users CRUD, login, protected, health). Pre-seeded with Alice (id=1) and Bob (id=2); `nextID=3`. Auth: POST `/auth/login` with `admin`/`secret` returns `demo-token-12345`. `examples/server/go.mod` created; `go.work` updated.
+- **`examples/server/openapi.yaml`** — OpenAPI 3.0.3 spec with 8 operations and full response schemas.
+- **`examples/scenarios/user-lifecycle.yaml`** — 4-step scenario (Login → Create user → Fetch user → Delete user); all 9 assertions verified against the example server.
+- **`apps/desktop/wails/openapi_service.go`** — `OpenAPIService` with `ImportOpenAPISpec(baseURL)` (file dialog) and `ImportOpenAPISpecFromPath(path, baseURL)`. Saves one YAML request file per operation under `workspace/requests/<spec-title>/`. Sanitises directory and file names.
+- **`apps/desktop/wails/helpers.go`** — shared `atomicWrite(path, data)` helper used by workspace, settings, and OpenAPI services.
+- **UI: Import OpenAPI button** — `WorkspacePanel` gains an ⇡ button (shown when workspace is open); calls `importOpenAPISpec`; shows spinner while importing; reloads workspace tree on completion.
+- **`bridge.ts`** — `ImportedRequest`, `ImportResult` types; `importOpenAPISpec` and `importOpenAPISpecFromPath` functions.
+- All Go tests pass. `wails build` succeeds.
+- **Phase 4 acceptance criteria met**: import OpenAPI spec from file, generate request files for all operations with path-param placeholders and body stubs, validate responses against schema, schema assertions wired into the assertion evaluator.
+
+### 2026-11-03 — Phase 5: Public MVP
+
+- **API timing breakdown** — `domain.Timing` struct (`DNSMs`, `ConnectMs`, `TLSMs`, `TTFBMs`, `TransferMs`, `TotalMs()`). `executor.go` attaches `net/http/httptrace.ClientTrace` to the request context; timestamps captured at DNS start/done, connect done, TLS done, first-byte, body read complete. `TimingIO` added to `ResponseOutput` in Wails service. `TimingBar` React component renders a 5-segment stacked bar (DNS=purple, Connect=blue, TLS=yellow, TTFB=emerald, Transfer=cyan) in the response panel.
+- **TLS skip-verify and proxy support** — `executor.Options` gains `ProxyURL string` and `TLSSkipVerify bool`. `New()` builds an `http.Transport` with `crypto/tls.Config{InsecureSkipVerify: ...}` and `http.ProxyFromEnvironment` / `url.Parse` proxy. `RebuildExecutor()` on `RequestService` re-creates the transport when settings change.
+- **Settings** — `domain.Settings` (`Theme`, `FontSize`, `DefaultTimeoutMs`, `ProxyURL`, `TLSSkipVerify`), `DefaultSettings()`. `SettingsService` persists to `~/.endpointdesk/settings.json` via `atomicWrite`; `load()` fills zero values with defaults; `onSave func()` callback triggers executor rebuild. `GetSettings`, `SaveSettings`, `ResetSettings` Wails-bound methods. `app.go` wires `ss.onSave = rs.RebuildExecutor`.
+- **Settings UI** — `SettingsPanel` React component: modal overlay, Appearance section (theme select, font-size range), Network section (timeout, proxy URL, TLS skip checkbox). Gear icon in top bar → `setShowSettings(true)`. Settings loaded on mount via `getSettings()`.
+- **Theme + font-size** — `applySettings(s)` sets `--font-size-code` CSS variable and toggles `document.documentElement.classList` between `dark` and `light`. `:root.light` block in `index.css` overrides all colour tokens for the light theme.
+- **CI** — `.github/workflows/ci.yml` updated to `go test -v`.
+- **Release workflow** — `.github/workflows/release.yml` triggers on `v*` tags. Four jobs: `release-windows` (windows-latest, `wails build -platform windows/amd64`), `release-macos` (macos-latest, arm64 + amd64), `release-linux` (ubuntu-latest, installs `libgtk-3-dev libwebkit2gtk-4.0-dev`), `cli-binaries` (matrix: win/mac/linux × amd64 + darwin/arm64). Final `publish` job downloads all artifacts and creates a GitHub Release via `softprops/action-gh-release@v2`; pre-release flag set automatically for tags containing `-`.
+- **Phase 5 / MVP acceptance criteria met**: developer can import an OpenAPI spec, execute generated requests with timing breakdown, configure app settings (theme, font size, timeout, proxy, TLS), create and run multi-step scenarios through the desktop app and CLI, and ship cross-platform binaries via GitHub Actions on tag push.

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FolderOpen, Save, FilePlus } from 'lucide-react'
+import { FolderOpen, Save, FilePlus, Settings } from 'lucide-react'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
-  importOpenAPISpec,
+  importOpenAPISpec, getSettings, saveSettings,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
-  type EnvInfo, type RequestFileIO,
+  type EnvInfo, type RequestFileIO, type AppSettings,
 } from '@/lib/bridge'
+import { SettingsPanel } from '@/components/SettingsPanel'
 import { cn } from '@/lib/utils'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
 import { BodyEditor } from '@/components/BodyEditor'
@@ -354,6 +355,50 @@ function RequestEditor({
   )
 }
 
+// ---- Timing bar ----
+
+type TimingSegment = { label: string; ms: number; color: string }
+
+function TimingBar({ timing, total }: { timing: ResponseData['timing']; total: number }) {
+  if (!timing || total === 0) return null
+
+  const segments: TimingSegment[] = [
+    { label: 'DNS',      ms: timing.dnsMs,      color: 'bg-purple-500' },
+    { label: 'Connect',  ms: timing.connectMs,  color: 'bg-blue-500' },
+    { label: 'TLS',      ms: timing.tlsMs,      color: 'bg-yellow-500' },
+    { label: 'TTFB',     ms: timing.ttfbMs,     color: 'bg-emerald-500' },
+    { label: 'Transfer', ms: timing.transferMs, color: 'bg-cyan-500' },
+  ].filter(s => s.ms > 0)
+
+  if (segments.length === 0) return null
+
+  const sum = segments.reduce((a, s) => a + s.ms, 0)
+  const scale = sum > 0 ? total / sum : 1
+
+  return (
+    <div className="w-full mt-1.5 flex flex-col gap-0.5">
+      <div className="flex h-2 rounded overflow-hidden gap-px">
+        {segments.map(s => (
+          <div
+            key={s.label}
+            title={`${s.label}: ${s.ms}ms`}
+            className={cn('h-full', s.color)}
+            style={{ width: `${Math.max((s.ms / (total || sum)) * 100 * scale, 1)}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex gap-3 flex-wrap">
+        {segments.map(s => (
+          <span key={s.label} className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)]">
+            <span className={cn('inline-block w-2 h-2 rounded-sm', s.color)} />
+            {s.label} {s.ms}ms
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ---- Response viewer ----
 
 type ResponseViewerProps = {
@@ -384,6 +429,7 @@ function ResponseViewer({ response, loading }: ResponseViewerProps) {
         ) : (
           <span className="text-xs text-[var(--color-muted-foreground)]">Response</span>
         )}
+        {response?.timing && !response.error && <TimingBar timing={response.timing} total={response.durationMs} />}
       </div>
 
       {/* Tabs */}
@@ -457,6 +503,10 @@ export default function App() {
   const [body, setBody] = useState<BodyState>({ type: 'none', content: '' })
   const [auth, setAuth] = useState<AuthState>({ type: 'none' })
 
+  // Settings state
+  const [settings, setSettings] = useState<AppSettings>({ theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false })
+  const [showSettings, setShowSettings] = useState(false)
+
   // Workspace state
   const [workspacePath, setWorkspacePath] = useState<string>('')
   const [fileTree, setFileTree] = useState<FileNode[]>([])
@@ -494,6 +544,10 @@ export default function App() {
   useEffect(() => {
     refreshWorkspace()
     refreshHistory()
+    getSettings().then(s => {
+      setSettings(s)
+      applySettings(s)
+    }).catch(() => {})
   }, [refreshWorkspace, refreshHistory])
 
   // ---- workspace actions ----
@@ -598,6 +652,30 @@ export default function App() {
     setUrl(entry.url)
   }
 
+  // ---- Settings ----
+
+  function applySettings(s: AppSettings) {
+    const root = document.documentElement
+    root.style.setProperty('--font-size-code', `${s.fontSize}px`)
+    if (s.theme === 'light') {
+      root.classList.add('light')
+      root.classList.remove('dark')
+    } else {
+      root.classList.add('dark')
+      root.classList.remove('light')
+    }
+  }
+
+  async function handleSaveSettings(s: AppSettings) {
+    try {
+      const saved = await saveSettings(s)
+      setSettings(saved)
+      applySettings(saved)
+    } catch (err) {
+      console.error('save settings:', err)
+    }
+  }
+
   // ---- OpenAPI import ----
 
   async function handleImportOpenAPI() {
@@ -659,7 +737,7 @@ export default function App() {
       })
       setResponse(result)
     } catch (err) {
-      setResponse({ statusCode: 0, status: '', headers: [], body: '', durationMs: 0, size: 0, error: String(err) })
+      setResponse({ statusCode: 0, status: '', headers: [], body: '', durationMs: 0, size: 0, timing: { dnsMs: 0, connectMs: 0, tlsMs: 0, ttfbMs: 0, transferMs: 0 }, error: String(err) })
     } finally {
       setLoading(false)
       refreshHistory()
@@ -670,6 +748,13 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onSave={handleSaveSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
       <Sidebar
         tab={sidebarTab}
         onTabChange={setSidebarTab}
@@ -716,6 +801,15 @@ export default function App() {
               className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
               <FilePlus size={13} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+              className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+            >
+              <Settings size={13} />
             </button>
 
             {/* Separator */}

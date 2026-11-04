@@ -4,7 +4,7 @@
 
 EndpointDesk is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
 
-> **Status:** Phases 0–3 complete. The desktop app, full HTTP client, workspace management, and scenario engine + CLI are all working. See the [roadmap](#roadmap) for what is coming next.
+> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working.
 
 ---
 
@@ -65,12 +65,25 @@ wails dev
 
 The application opens automatically. Type a URL in the request bar and press **Send** or **Enter**.
 
-### Run the CLI
+### Run the example server locally
+
+```bash
+# In a separate terminal
+cd examples/server
+go run .
+# Listening on :8080 — includes /health, /users CRUD, /auth/login, /protected
+```
+
+### Run a scenario with the CLI
 
 ```bash
 cd apps/cli
-go run . run ./examples/scenario.yaml --env ./examples/local.yaml
+go run . run ../../examples/scenarios/user-lifecycle.yaml --env ../../examples/server/local.yaml
 ```
+
+### Import an OpenAPI spec
+
+Open the desktop app → open a workspace → click **Import OpenAPI** in the workspace panel → select `examples/server/openapi.yaml`. All operations are saved as individual request files and appear in the workspace tree.
 
 ---
 
@@ -105,23 +118,31 @@ api-workbench/
 ├── apps/
 │   ├── desktop/
 │   │   ├── frontend/       # React + TypeScript + Vite (pnpm workspace)
-│   │   └── wails/          # Wails app, Go bindings, RequestService
-│   └── cli/                # Cobra CLI (Phase 3)
+│   │   └── wails/          # Wails app, Go services (request, workspace, openapi, settings)
+│   └── cli/                # Cobra CLI — endpointdesk run
 │
 ├── packages/
 │   └── core/               # Shared Go execution engine
-│       ├── domain/         # Canonical domain types (Request, Response, Assertion…)
-│       ├── executor/       # net/http executor — the only place HTTP I/O happens
+│       ├── domain/         # Canonical domain types (Request, Response, Assertion, Settings…)
+│       ├── executor/       # net/http executor with httptrace timing breakdown
 │       ├── variables/      # {{variable}} interpolation and runtime resolver
-│       ├── assertions/     # Assertion evaluation (Phase 2)
-│       ├── scenario/       # Scenario runner (Phase 3)
-│       ├── openapi/        # OpenAPI 3.0 / 3.1 parser (Phase 4)
-│       └── …               # environment, serialization, reporting, history
+│       ├── assertions/     # Assertion evaluation (status, header, jsonpath, schema)
+│       ├── scenario/       # Multi-step scenario runner with FailPolicy and variable extraction
+│       ├── openapi/        # OpenAPI 3.0/3.1 parser, request generator, response validator
+│       ├── serialization/  # YAML/JSON round-trip for requests, environments, scenarios
+│       ├── reporting/      # Text and JSON report output for CLI
+│       └── history/        # SQLite-backed request history (credentials never stored)
+│
+├── examples/
+│   ├── server/             # Local Go HTTP server for end-to-end testing
+│   │   └── openapi.yaml    # OpenAPI 3.0.3 spec for the example server
+│   └── scenarios/          # Sample scenarios (user-lifecycle.yaml)
 │
 ├── docs/                   # Architecture and product documentation
-├── examples/               # Example project files
-├── scripts/
-├── go.work                 # Go workspace (ties core + cli + desktop)
+├── .github/workflows/
+│   ├── ci.yml              # Push/PR: core tests → CLI build → desktop build
+│   └── release.yml         # Tag push: cross-platform builds → GitHub Release
+├── go.work                 # Go workspace (ties core + cli + desktop + examples/server)
 ├── pnpm-workspace.yaml
 └── CLAUDE.md               # Engineering rules and changelog
 ```
@@ -140,10 +161,10 @@ The GUI and CLI must never implement their own HTTP execution, assertion, or sce
 | 1 | HTTP execution — all body types, auth, error handling, request history | **Complete** |
 | 2 | Workspace and API client — collections, environments, restart-safe config | **Complete** |
 | 3 | Scenario engine + CLI — multi-step flows, variable extraction, assertions, text/JSON reports | **Complete** |
-| 4 | OpenAPI integration — import specs, generate collections, validate responses | Planned |
-| 5 | Public MVP — cross-platform packaging, docs, examples, GitHub Actions | Planned |
+| 4 | OpenAPI integration — import specs, generate collections, validate responses | **Complete** |
+| 5 | Public MVP — settings, timing breakdown, cross-platform release workflow, examples | **Complete** |
 
-**MVP definition:** a developer can import an OpenAPI specification, explore and execute generated requests in the desktop app, create a multi-step scenario, save it as YAML or JSON, and run it through the CLI and GitHub Actions.
+**MVP complete.** A developer can import an OpenAPI specification, explore and execute generated requests in the desktop app, inspect detailed timing breakdowns (DNS / Connect / TLS / TTFB / Transfer), create a multi-step scenario, save it as YAML or JSON, and run it through the CLI and GitHub Actions.
 
 ---
 

@@ -19,6 +19,11 @@ import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
   ImportOpenAPISpecFromPath as WailsImportOpenAPISpecFromPath,
 } from '@wailsjs/go/main/OpenAPIService'
+import {
+  GetSettings as WailsGetSettings,
+  SaveSettings as WailsSaveSettings,
+  ResetSettings as WailsResetSettings,
+} from '@wailsjs/go/main/SettingsService'
 
 // ---- Shared I/O types ----
 
@@ -42,6 +47,14 @@ export interface RequestPayload {
   timeoutMs: number
 }
 
+export interface TimingData {
+  dnsMs: number
+  connectMs: number
+  tlsMs: number
+  ttfbMs: number
+  transferMs: number
+}
+
 export interface ResponseData {
   statusCode: number
   status: string
@@ -49,7 +62,16 @@ export interface ResponseData {
   body: string
   durationMs: number
   size: number
+  timing: TimingData
   error?: string
+}
+
+export interface AppSettings {
+  theme: string
+  fontSize: number
+  defaultTimeoutMs: number
+  proxyUrl: string
+  tlsSkipVerify: boolean
 }
 
 export interface HistoryEntry {
@@ -193,4 +215,21 @@ export async function importOpenAPISpec(baseURL = ''): Promise<ImportResult> {
 export async function importOpenAPISpecFromPath(path: string, baseURL = ''): Promise<ImportResult> {
   const result = await WailsImportOpenAPISpecFromPath(path, baseURL)
   return result as unknown as ImportResult
+}
+
+// ---- Settings ----
+
+export async function getSettings(): Promise<AppSettings> {
+  const result = await WailsGetSettings()
+  return result as unknown as AppSettings
+}
+
+export async function saveSettings(s: AppSettings): Promise<AppSettings> {
+  const result = await WailsSaveSettings(s as unknown as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+  return result as unknown as AppSettings
+}
+
+export async function resetSettings(): Promise<AppSettings> {
+  const result = await WailsResetSettings()
+  return result as unknown as AppSettings
 }

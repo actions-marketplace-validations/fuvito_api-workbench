@@ -11,6 +11,17 @@
   --color-destructive: oklch(0.60 0.22 27);
   --color-card: oklch(0.13 0.004 285);
   --radius: 0.375rem;
+  --font-size-code: 13px;
+}
+
+/* Light theme overrides */
+:root.light {
+  --color-background: oklch(0.97 0.002 285);
+  --color-foreground: oklch(0.15 0.005 285);
+  --color-muted: oklch(0.92 0.003 285);
+  --color-muted-foreground: oklch(0.48 0.01 285);
+  --color-border: oklch(0.82 0.005 285);
+  --color-card: oklch(1 0 0);
 }
 
 *,
@@ -24,7 +35,7 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-  font-size: 13px;
+  font-size: var(--font-size-code, 13px);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
