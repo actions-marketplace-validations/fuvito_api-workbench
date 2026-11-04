@@ -74,6 +74,18 @@ type EnvironmentInfoIO struct {
 	Path string `json:"path"`
 }
 
+type EnvironmentVariableIO struct {
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Secret bool   `json:"secret"`
+}
+
+type EnvironmentIO struct {
+	Path      string                  `json:"path"`
+	Name      string                  `json:"name"`
+	Variables []EnvironmentVariableIO `json:"variables"`
+}
+
 type RequestFileIO struct {
 	SchemaVersion string          `json:"schemaVersion"`
 	Name          string          `json:"name"`
@@ -276,6 +288,86 @@ func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// GetEnvironment loads a full environment (including variable values) for editing.
+func (w *WorkspaceService) GetEnvironment(path string) (*EnvironmentIO, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+	env, err := serialization.ParseEnvironmentFile(data, filepath.Base(path))
+	if err != nil {
+		return nil, err
+	}
+	out := &EnvironmentIO{Path: path, Name: env.Name}
+	for _, v := range env.Variables {
+		out.Variables = append(out.Variables, EnvironmentVariableIO{Name: v.Name, Value: v.Value, Secret: v.Secret})
+	}
+	return out, nil
+}
+
+// SaveEnvironment creates or updates an environment file.
+// If env.Path is empty, a new file is created in the workspace environments directory.
+func (w *WorkspaceService) SaveEnvironment(env EnvironmentIO) (*EnvironmentInfoIO, error) {
+	path := env.Path
+	if path == "" {
+		if w.workspacePath == "" {
+			return nil, fmt.Errorf("no workspace open — open or create a workspace first")
+		}
+		envDir := filepath.Join(w.workspacePath, "environments")
+		if err := os.MkdirAll(envDir, 0755); err != nil {
+			return nil, err
+		}
+		name := sanitizeFilename(env.Name)
+		if name == "" {
+			name = "environment"
+		}
+		path = filepath.Join(envDir, name+".yaml")
+	}
+
+	domEnv := &domain.Environment{
+		SchemaVersion: domain.CurrentSchemaVersion,
+		Name:          env.Name,
+	}
+	for _, v := range env.Variables {
+		domEnv.Variables = append(domEnv.Variables, domain.EnvironmentVariable{
+			Name:   v.Name,
+			Value:  v.Value,
+			Secret: v.Secret,
+		})
+	}
+
+	ext := strings.TrimPrefix(filepath.Ext(path), ".")
+	if ext == "" {
+		ext = "yaml"
+		path += ".yaml"
+	}
+	data, err := serialization.WriteEnvironment(domEnv, ext)
+	if err != nil {
+		return nil, err
+	}
+	if err := atomicWrite(path, data); err != nil {
+		return nil, err
+	}
+	if path == w.activeEnvPath {
+		w.activeEnv = domEnv
+	}
+	return &EnvironmentInfoIO{Name: env.Name, Path: path}, nil
+}
+
+// DeleteEnvironment removes an environment file.
+// If it was the active environment, the active selection is cleared.
+func (w *WorkspaceService) DeleteEnvironment(path string) error {
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("deleting %s: %w", path, err)
+	}
+	if path == w.activeEnvPath {
+		w.activeEnv = nil
+		w.activeEnvPath = ""
+		w.persistConfig()
+	}
+	return nil
 }
 
 // OpenRequest opens a file picker and loads a request file.

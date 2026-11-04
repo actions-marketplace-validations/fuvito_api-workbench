@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FolderOpen, Save, FilePlus, Settings } from 'lucide-react'
+import { FolderOpen, Save, FilePlus, Settings, Pencil } from 'lucide-react'
 import {
   executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest,
@@ -9,6 +9,7 @@ import {
   type EnvInfo, type RequestFileIO, type AppSettings,
 } from '@/lib/bridge'
 import { SettingsPanel } from '@/components/SettingsPanel'
+import { EnvironmentEditor } from '@/components/EnvironmentEditor'
 import { cn } from '@/lib/utils'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
 import { BodyEditor } from '@/components/BodyEditor'
@@ -507,6 +508,10 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({ theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false })
   const [showSettings, setShowSettings] = useState(false)
 
+  // Environment editor state
+  const [showEnvEditor, setShowEnvEditor] = useState(false)
+  const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
+
   // Workspace state
   const [workspacePath, setWorkspacePath] = useState<string>('')
   const [fileTree, setFileTree] = useState<FileNode[]>([])
@@ -755,6 +760,26 @@ export default function App() {
           onClose={() => setShowSettings(false)}
         />
       )}
+      {showEnvEditor && (
+        <EnvironmentEditor
+          envPath={editingEnvPath}
+          workspacePath={workspacePath}
+          onClose={() => setShowEnvEditor(false)}
+          onSaved={async saved => {
+            setShowEnvEditor(false)
+            await refreshWorkspace()
+            // Auto-select the saved environment
+            try {
+              await selectEnvironment(saved.path)
+            } catch { /* best-effort */ }
+            await refreshWorkspace()
+          }}
+          onDeleted={async () => {
+            setShowEnvEditor(false)
+            await refreshWorkspace()
+          }}
+        />
+      )}
       <Sidebar
         tab={sidebarTab}
         onTabChange={setSidebarTab}
@@ -817,7 +842,7 @@ export default function App() {
               <div className="w-px h-4 bg-[var(--color-border)]" />
             )}
 
-            {/* Environment selector */}
+            {/* Environment selector + edit */}
             {environments.length > 0 && (
               <select
                 value={activeEnv?.path ?? ''}
@@ -834,6 +859,17 @@ export default function App() {
                   <option key={env.path} value={env.path}>{env.name}</option>
                 ))}
               </select>
+            )}
+            {/* Edit active env / new env button */}
+            {workspacePath && (
+              <button
+                type="button"
+                onClick={() => { setEditingEnvPath(activeEnv?.path ?? null); setShowEnvEditor(true) }}
+                title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'New environment'}
+                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              >
+                <Pencil size={13} />
+              </button>
             )}
           </div>
         </header>

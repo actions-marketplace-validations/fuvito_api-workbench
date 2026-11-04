@@ -14,6 +14,9 @@ import {
   ListEnvironments as WailsListEnvironments,
   SelectEnvironment as WailsSelectEnvironment,
   GetActiveEnvironment as WailsGetActiveEnvironment,
+  GetEnvironment as WailsGetEnvironment,
+  SaveEnvironment as WailsSaveEnvironment,
+  DeleteEnvironment as WailsDeleteEnvironment,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -187,6 +190,33 @@ export async function getActiveEnvironment(): Promise<EnvInfo | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsGetActiveEnvironment()
   return result as unknown as EnvInfo | null
+}
+
+export interface EnvironmentVariable {
+  name: string
+  value: string
+  secret: boolean
+}
+
+export interface EnvironmentIO {
+  path: string
+  name: string
+  variables: EnvironmentVariable[]
+}
+
+export async function getEnvironment(path: string): Promise<EnvironmentIO> {
+  const result = await WailsGetEnvironment(path)
+  return result as unknown as EnvironmentIO
+}
+
+export async function saveEnvironment(env: EnvironmentIO): Promise<EnvInfo> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await WailsSaveEnvironment(env as any)
+  return result as unknown as EnvInfo
+}
+
+export async function deleteEnvironment(path: string): Promise<void> {
+  await WailsDeleteEnvironment(path)
 }
 
 // ---- OpenAPI import ----
