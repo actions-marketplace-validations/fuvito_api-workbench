@@ -563,6 +563,7 @@ export default function App() {
 
   // Current request identity
   const [currentRequestName, setCurrentRequestName] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState(false)
 
   // ---- init ----
 
@@ -667,6 +668,7 @@ export default function App() {
     setAuth({ type: 'none' })
     setResponse(null)
     setCurrentRequestName(null)
+    setEditingName(false)
   }
 
   async function handleSaveRequest() {
@@ -887,17 +889,48 @@ export default function App() {
         {/* Top bar */}
         <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
           <div className="flex items-center gap-1.5 min-w-0">
-            {currentRequestName ? (
-              <>
-                <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[method])}>
-                  {method}
-                </span>
-                <span className="text-xs font-medium text-[var(--color-foreground)] truncate">
-                  {currentRequestName}
-                </span>
-              </>
+            {currentRequestName !== null && (
+              <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[method])}>
+                {method}
+              </span>
+            )}
+            {editingName ? (
+              <input
+                autoFocus
+                type="text"
+                value={currentRequestName ?? ''}
+                onChange={e => setCurrentRequestName(e.target.value)}
+                onBlur={() => setEditingName(false)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === 'Escape') {
+                    if (!currentRequestName?.trim()) setCurrentRequestName(null)
+                    setEditingName(false)
+                  }
+                }}
+                className={cn(
+                  'text-xs font-medium bg-transparent outline-none',
+                  'border-b border-[var(--color-accent)]',
+                  'text-[var(--color-foreground)] w-40',
+                )}
+              />
+            ) : currentRequestName !== null ? (
+              <button
+                type="button"
+                onClick={() => setEditingName(true)}
+                title="Click to rename"
+                className="text-xs font-medium text-[var(--color-foreground)] hover:text-[var(--color-accent)] truncate transition-colors text-left"
+              >
+                {currentRequestName}
+              </button>
             ) : (
-              <span className="text-xs text-[var(--color-muted-foreground)]">New Request</span>
+              <button
+                type="button"
+                onClick={() => { setCurrentRequestName(''); setEditingName(true) }}
+                title="Click to name this request"
+                className="text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              >
+                New Request
+              </button>
             )}
           </div>
 
