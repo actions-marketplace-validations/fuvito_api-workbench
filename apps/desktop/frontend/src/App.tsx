@@ -4,7 +4,7 @@ import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
 import {
-  executeRequest, getHistory, openWorkspace, newWorkspace, getWorkspacePath, listRequests,
+  executeRequest, getHistory, openWorkspace, newWorkspace, closeWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
   createFolder, deleteFolder, renameFolder, renameRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
@@ -307,6 +307,36 @@ export default function App() {
       }
     } catch (err) {
       console.error('new workspace:', err)
+    }
+  }
+
+  async function handleCloseWorkspace() {
+    try {
+      const path = workspacePath
+      await closeWorkspace()
+      setWorkspacePath('')
+      setFileTree([])
+      setEnvironments([])
+      setActiveEnv(null)
+      if (path) {
+        setTabsState(prev => {
+          const sep = path.endsWith('/') || path.endsWith('\\') ? '' : '/'
+          const prefix = path + sep
+          const remaining = prev.tabs.filter(t => !t.filePath?.startsWith(prefix))
+          if (remaining.length === prev.tabs.length) return prev
+          if (remaining.length === 0) {
+            const blank = createBlankTab()
+            return { tabs: [blank], activeTabId: blank.id }
+          }
+          const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
+          return {
+            tabs: remaining,
+            activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
+          }
+        })
+      }
+    } catch (err) {
+      console.error('close workspace:', err)
     }
   }
 
@@ -750,6 +780,7 @@ export default function App() {
         { kind: 'separator' },
         { kind: 'action', label: 'Open Workspace…',   onClick: handleOpenWorkspace },
         { kind: 'action', label: 'New Workspace…',    onClick: handleNewWorkspace },
+        { kind: 'action', label: 'Close Workspace',   onClick: handleCloseWorkspace, disabled: !workspacePath },
       ],
     },
     {

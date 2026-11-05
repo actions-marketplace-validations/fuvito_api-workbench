@@ -173,6 +173,14 @@ func (w *WorkspaceService) GetWorkspacePath() string {
 	return w.workspacePath
 }
 
+// CloseWorkspace clears the current workspace and persists the change.
+func (w *WorkspaceService) CloseWorkspace() {
+	w.workspacePath = ""
+	w.activeEnvPath = ""
+	w.activeEnv = nil
+	w.persistConfig()
+}
+
 // ListRequests returns the workspace file tree limited to request files (.yaml/.yml/.json).
 func (w *WorkspaceService) ListRequests() []FileNodeIO {
 	if w.workspacePath == "" {

@@ -7,6 +7,7 @@ import { Execute as WailsExecute, GetHistory as WailsGetHistory } from '@wailsjs
 import {
   OpenWorkspace as WailsOpenWorkspace,
   NewWorkspace as WailsNewWorkspace,
+  CloseWorkspace as WailsCloseWorkspace,
   GetWorkspacePath as WailsGetWorkspacePath,
   ListRequests as WailsListRequests,
   LoadRequest as WailsLoadRequest,
@@ -163,6 +164,10 @@ export async function newWorkspace(): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsNewWorkspace()
   return result as unknown as string
+}
+
+export async function closeWorkspace(): Promise<void> {
+  await WailsCloseWorkspace()
 }
 
 export async function getWorkspacePath(): Promise<string> {
