@@ -105,7 +105,7 @@ export default function App() {
         queryParams: activeTab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
         body: activeTab.body.type === 'none' ? undefined : { type: activeTab.body.type, content: activeTab.body.content },
         auth: authStateToPayload(activeTab.auth),
-        timeoutMs: 0,
+        timeoutMs: activeTab.timeoutMs,
       })
       updateTab(tabId, { response: result })
       const filePath = tabsStateRef.current.tabs.find(t => t.id === tabId)?.filePath
@@ -407,6 +407,9 @@ export default function App() {
                 onHeadersChange={h => updateTab(activeTabId, { headers: h })}
                 onBodyChange={b => updateTab(activeTabId, { body: b })}
                 onAuthChange={a => updateTab(activeTabId, { auth: a })}
+                timeoutMs={activeTab.timeoutMs}
+                onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
+                envVarMap={workspace.envVarMap}
                 onSend={handleSend}
                 onCancel={handleCancel}
               />

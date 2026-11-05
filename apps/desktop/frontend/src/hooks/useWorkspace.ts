@@ -3,7 +3,7 @@ import {
   openWorkspace, newWorkspace, closeWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest, deleteRequest,
   createFolder, deleteFolder, renameFolder, renameRequest,
-  listEnvironments, selectEnvironment, getActiveEnvironment,
+  listEnvironments, selectEnvironment, getActiveEnvironment, getEnvironment,
   importOpenAPISpec, importOpenAPISpecFromURL,
   getHistory, clearHistory,
 } from '@/lib/bridge'
@@ -23,6 +23,7 @@ export function useWorkspace(deps: {
   const [fileTree, setFileTree] = useState<FileNode[]>([])
   const [environments, setEnvironments] = useState<EnvInfo[]>([])
   const [activeEnv, setActiveEnv] = useState<EnvInfo | null>(null)
+  const [envVarMap, setEnvVarMap] = useState<Record<string, string>>({})
   const [importing, setImporting] = useState(false)
   const [history, setHistory] = useState<HistoryEntry[]>([])
 
@@ -36,6 +37,16 @@ export function useWorkspace(deps: {
   const [importFromURLInput, setImportFromURLInput] = useState('')
   const [importFromURLError, setImportFromURLError] = useState('')
 
+  async function loadEnvVars(envPath: string | undefined) {
+    if (!envPath) { setEnvVarMap({}); return }
+    try {
+      const env = await getEnvironment(envPath)
+      const map: Record<string, string> = {}
+      for (const v of env.variables) map[v.name] = v.value
+      setEnvVarMap(map)
+    } catch { setEnvVarMap({}) }
+  }
+
   const refreshWorkspace = useCallback(async () => {
     try {
       const [path, tree, envs, activeE] = await Promise.all([
@@ -48,8 +59,9 @@ export function useWorkspace(deps: {
       setFileTree(tree ?? [])
       setEnvironments(envs ?? [])
       setActiveEnv(activeE)
+      await loadEnvVars(activeE?.path)
     } catch { /* best-effort */ }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshHistory = useCallback(async () => {
     try { setHistory(await getHistory()) } catch { /* best-effort */ }
@@ -87,6 +99,7 @@ export function useWorkspace(deps: {
       setFileTree([])
       setEnvironments([])
       setActiveEnv(null)
+      setEnvVarMap({})
       if (path) {
         setTabsState(prev => {
           const norm = (p: string) => p.replace(/\\/g, '/')
@@ -148,6 +161,7 @@ export function useWorkspace(deps: {
       setEnvironments(envs ?? [])
       const active = path ? envs.find(e => e.path === path) ?? null : null
       setActiveEnv(active)
+      await loadEnvVars(active?.path)
     } catch (err) {
       console.error('select environment:', err)
     }
@@ -324,7 +338,7 @@ export function useWorkspace(deps: {
   }
 
   return {
-    workspacePath, fileTree, environments, activeEnv, importing, history,
+    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history,
     refreshWorkspace, refreshHistory,
     handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace,
     handleSelectFile, handleOpenRequest, handleEnvChange,

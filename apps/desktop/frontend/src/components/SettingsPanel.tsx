@@ -18,9 +18,17 @@ type SettingsPanelProps = {
   onPreview?: (s: AppSettings) => void
 }
 
+const DEFAULTS: AppSettings = {
+  theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false,
+}
+
 export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }: SettingsPanelProps) {
   const [local, setLocal] = useState<AppSettings>({ ...settings })
   const [proxyError, setProxyError] = useState('')
+
+  function isChanged<K extends keyof AppSettings>(key: K): boolean {
+    return local[key] !== DEFAULTS[key]
+  }
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     const updated = { ...local, [key]: value }
@@ -63,7 +71,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
             <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Appearance</h3>
             <div className="flex flex-col gap-3">
 
-              <Row label="Theme">
+              <Row label="Theme" changed={isChanged('theme')}>
                 <select
                   value={local.theme}
                   onChange={e => set('theme', e.target.value)}
@@ -74,7 +82,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                 </select>
               </Row>
 
-              <Row label={`Font size — ${local.fontSize}px`}>
+              <Row label={`Font size — ${local.fontSize}px`} changed={isChanged('fontSize')}>
                 <input
                   type="range"
                   min={10} max={24} step={1}
@@ -92,7 +100,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
             <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Network</h3>
             <div className="flex flex-col gap-3">
 
-              <Row label="Default timeout (ms)">
+              <Row label="Default timeout (ms)" changed={isChanged('defaultTimeoutMs')}>
                 <input
                   type="number"
                   min={0}
@@ -103,7 +111,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                 />
               </Row>
 
-              <Row label="Proxy URL">
+              <Row label="Proxy URL" changed={isChanged('proxyUrl')}>
                 <div className="flex flex-col gap-1">
                   <input
                     type="text"
@@ -118,7 +126,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                 </div>
               </Row>
 
-              <Row label="Skip TLS verification">
+              <Row label="Skip TLS verification" changed={isChanged('tlsSkipVerify')}>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -184,10 +192,15 @@ const inputCls = cn(
   'placeholder:text-[var(--color-muted-foreground)]',
 )
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children, changed }: { label: string; children: React.ReactNode; changed?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-40 shrink-0 text-xs text-[var(--color-muted-foreground)]">{label}</span>
+      <div className="w-40 shrink-0 flex items-center gap-1.5">
+        <span className={cn('text-xs', changed ? 'text-[var(--color-foreground)]' : 'text-[var(--color-muted-foreground)]')}>
+          {label}
+        </span>
+        {changed && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" title="Modified from default" />}
+      </div>
       <div className="flex-1">{children}</div>
     </div>
   )

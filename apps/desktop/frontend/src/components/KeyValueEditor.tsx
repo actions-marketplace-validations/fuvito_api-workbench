@@ -49,7 +49,16 @@ export function KeyValueEditor({
       )}
       {pairs.length > 0 && (
         <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="w-4 shrink-0" />
+          <input
+            type="checkbox"
+            title="Toggle all"
+            checked={pairs.every(p => p.enabled)}
+            ref={el => {
+              if (el) el.indeterminate = pairs.some(p => p.enabled) && !pairs.every(p => p.enabled)
+            }}
+            onChange={e => onChange(pairs.map(p => ({ ...p, enabled: e.target.checked })))}
+            className="shrink-0 accent-[var(--color-accent)] w-3.5 h-3.5"
+          />
           <span className="flex-1 text-[10px] text-[var(--color-muted-foreground)] uppercase tracking-widest font-semibold">
             {keyPlaceholder}
           </span>

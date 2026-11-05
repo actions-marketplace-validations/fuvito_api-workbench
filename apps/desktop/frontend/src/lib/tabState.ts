@@ -10,6 +10,7 @@ export type TabState = {
   headers: KVPair[]
   body: BodyState
   auth: AuthState
+  timeoutMs: number
   name: string | null
   filePath: string | null
   targetDir: string | null
@@ -29,11 +30,13 @@ export function computeStateKey(
   body: BodyState,
   auth: AuthState,
   name: string | null,
+  timeoutMs = 0,
 ): string {
   return JSON.stringify({
     method,
     url: url.trim(),
     name,
+    timeoutMs,
     params: queryParams
       .filter(p => p.name.trim())
       .map(p => ({ name: p.name.trim(), value: p.value, enabled: p.enabled })),
@@ -46,7 +49,7 @@ export function computeStateKey(
 }
 
 export function createBlankTab(targetDir: string | null = null): TabState {
-  const savedKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null)
+  const savedKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
   return {
     id: crypto.randomUUID(),
     method: 'GET',
@@ -55,6 +58,7 @@ export function createBlankTab(targetDir: string | null = null): TabState {
     headers: [],
     body: { type: 'none', content: '' },
     auth: { type: 'none' },
+    timeoutMs: 0,
     name: null,
     filePath: null,
     targetDir,
@@ -68,7 +72,7 @@ export function createBlankTab(targetDir: string | null = null): TabState {
 }
 
 export function isTabDirty(tab: TabState): boolean {
-  return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name) !== tab.savedKey
+  return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs) !== tab.savedKey
 }
 
 export function isBlankTab(tab: TabState): boolean {

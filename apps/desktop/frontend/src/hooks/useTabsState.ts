@@ -97,10 +97,12 @@ export function useTabsState(deps: {
 
   function openFileAsTab(r: RequestFileIO, path: string): string {
     const state = requestFileIOToState(r)
-    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null)
+    const timeoutMs = r.timeoutMs ?? 0
+    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null, timeoutMs)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       ...state,
+      timeoutMs,
       name: r.name || null,
       filePath: path,
       targetDir: null,
@@ -153,6 +155,7 @@ export function useTabsState(deps: {
       queryParams: tab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
       body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
       auth: authStateToPayload(tab.auth) ?? undefined,
+      timeoutMs: tab.timeoutMs || undefined,
       filePath: overrideFilePath ?? tab.filePath ?? '',
       targetDir: tab.targetDir ?? '',
     }
@@ -167,7 +170,7 @@ export function useTabsState(deps: {
       const req = tabToRequestFileIO(tab)
       const savedPath = await saveRequest(req)
       if (savedPath) {
-        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name, tab.timeoutMs)
         updateTab(tabId, { name, filePath: savedPath, savedKey })
         await refreshWorkspaceRef.current?.()
         return true
@@ -196,7 +199,7 @@ export function useTabsState(deps: {
       const req = tabToRequestFileIO(tab, '')
       const savedPath = await saveRequest(req)
       if (savedPath) {
-        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name, tab.timeoutMs)
         updateTab(currentActiveId, { name, filePath: savedPath, savedKey })
         await refreshWorkspaceRef.current?.()
         return true
@@ -220,6 +223,7 @@ export function useTabsState(deps: {
       headers: [],
       body: { type: 'none', content: '' },
       auth: { type: 'none' },
+      timeoutMs: 0,
       name: null,
       filePath: null,
       targetDir: null,

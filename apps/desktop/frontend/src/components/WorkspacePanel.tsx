@@ -85,6 +85,8 @@ type TreeNodeProps = {
   renamingPath?: string | null
   onRenameEnd?: () => void
   onContextMenu?: (e: React.MouseEvent, node: FileNode) => void
+  collapsedPaths: Set<string>
+  onToggleCollapse: (path: string) => void
 }
 
 function TreeNode({
@@ -93,9 +95,10 @@ function TreeNode({
   onRenameFile, onRenameFolder,
   activeFilePath, dirtyFilePaths,
   renamingPath, onRenameEnd, onContextMenu,
+  collapsedPaths, onToggleCollapse,
 }: TreeNodeProps) {
   const [localRenaming, setLocalRenaming] = useState(false)
-  const [expanded, setExpanded] = useState(true)
+  const expanded = !collapsedPaths.has(node.path)
   const indent = depth * 12
 
   const isRenaming = localRenaming || renamingPath === node.path
@@ -116,7 +119,7 @@ function TreeNode({
         >
           <button
             type="button"
-            onClick={() => setExpanded(e => !e)}
+            onClick={() => onToggleCollapse(node.path)}
             className="flex items-center gap-1 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
           >
             <span className="shrink-0">
@@ -196,6 +199,8 @@ function TreeNode({
             renamingPath={renamingPath}
             onRenameEnd={onRenameEnd}
             onContextMenu={onContextMenu}
+            collapsedPaths={collapsedPaths}
+            onToggleCollapse={onToggleCollapse}
           />
         ))}
       </div>
@@ -315,6 +320,15 @@ export function WorkspacePanel({
     : null
   const [searchQuery, setSearchQuery] = useState('')
   const filteredTree = filterTree(fileTree, searchQuery)
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
+
+  function handleToggleCollapse(path: string) {
+    setCollapsedPaths(prev => {
+      const next = new Set(prev)
+      next.has(path) ? next.delete(path) : next.add(path)
+      return next
+    })
+  }
 
   // ---- Context menu ----
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
@@ -467,6 +481,8 @@ export function WorkspacePanel({
                   renamingPath={renamingPath}
                   onRenameEnd={() => setRenamingPath(null)}
                   onContextMenu={handleContextMenu}
+                  collapsedPaths={collapsedPaths}
+                  onToggleCollapse={handleToggleCollapse}
                 />
               ))
             )}

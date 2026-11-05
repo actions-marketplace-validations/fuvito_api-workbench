@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Trash2, Lock } from 'lucide-react'
+import { X, Eye, EyeOff, Trash2, Lock, CopyPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEnvironment, saveEnvironment, deleteEnvironment } from '@/lib/bridge'
 import type { EnvInfo } from '@/lib/bridge'
@@ -78,6 +78,23 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
       const saved = await saveEnvironment({
         path: envPath ?? '',
         name: name.trim(),
+        variables: variables.map(({ name: n, value, secret }) => ({ name: n, value, secret })),
+      })
+      onSaved(saved)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDuplicate() {
+    setSaving(true)
+    setError('')
+    try {
+      const saved = await saveEnvironment({
+        path: '',
+        name: name.trim() + ' Copy',
         variables: variables.map(({ name: n, value, secret }) => ({ name: n, value, secret })),
       })
       onSaved(saved)
@@ -234,9 +251,25 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
           {!isNew && (
             <button
               type="button"
+              onClick={handleDuplicate}
+              disabled={saving || loading}
+              title="Duplicate this environment"
+              className={cn(
+                'text-xs rounded px-3 py-1.5 mr-auto flex items-center gap-1.5 transition-colors',
+                'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] border border-[var(--color-border)]',
+                'disabled:opacity-40',
+              )}
+            >
+              <CopyPlus size={11} />
+              Duplicate
+            </button>
+          )}
+          {!isNew && (
+            <button
+              type="button"
               onClick={handleDelete}
               className={cn(
-                'text-xs rounded px-3 py-1.5 mr-auto transition-colors',
+                'text-xs rounded px-3 py-1.5 transition-colors',
                 confirmDelete
                   ? 'bg-[var(--color-destructive)] text-white'
                   : 'text-[var(--color-destructive)] hover:bg-[var(--color-destructive)] hover:text-white border border-[var(--color-destructive)]',

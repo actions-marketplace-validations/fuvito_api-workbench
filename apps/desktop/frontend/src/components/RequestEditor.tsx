@@ -77,6 +77,8 @@ export type RequestEditorProps = {
   headers: KVPair[]
   body: BodyState
   auth: AuthState
+  timeoutMs: number
+  envVarMap?: Record<string, string>
   onMethodChange: (m: HttpMethod) => void
   onUrlChange: (u: string) => void
   onUrlPaste: (pastedUrl: string) => void
@@ -84,18 +86,23 @@ export type RequestEditorProps = {
   onHeadersChange: (h: KVPair[]) => void
   onBodyChange: (b: BodyState) => void
   onAuthChange: (a: AuthState) => void
+  onTimeoutChange: (ms: number) => void
   onSend: () => void
   onCancel?: () => void
 }
 
 export function RequestEditor({
   method, url, loading,
-  queryParams, headers, body, auth,
+  queryParams, headers, body, auth, timeoutMs, envVarMap,
   onMethodChange, onUrlChange, onUrlPaste,
   onQueryParamsChange, onHeadersChange, onBodyChange, onAuthChange,
-  onSend, onCancel,
+  onTimeoutChange, onSend, onCancel,
 }: RequestEditorProps) {
   const [activeTab, setActiveTab] = useState<RequestEditorTab>('Params')
+
+  const urlVarNames = [...new Set(
+    [...url.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1])
+  )]
 
   const activeParamCount = queryParams.filter(p => p.enabled && p.name).length
   const activeHeaderCount = headers.filter(h => h.enabled && h.name).length
@@ -150,6 +157,24 @@ export function RequestEditor({
           )}
         />
 
+        <div className="flex items-center gap-1 shrink-0" title="Per-request timeout — 0 uses the global default from Settings">
+          <input
+            type="number"
+            min={0}
+            step={1000}
+            value={timeoutMs || ''}
+            onChange={e => onTimeoutChange(e.target.value === '' ? 0 : Number(e.target.value))}
+            placeholder="0"
+            className={cn(
+              'w-16 text-xs rounded px-2 py-1 text-right',
+              'bg-[var(--color-muted)] border border-[var(--color-border)] outline-none',
+              'focus:border-[var(--color-accent)] text-[var(--color-foreground)]',
+              'placeholder:text-[var(--color-muted-foreground)]',
+            )}
+          />
+          <span className="text-[10px] text-[var(--color-muted-foreground)]">ms</span>
+        </div>
+
         {loading ? (
           <button
             type="button"
@@ -173,6 +198,28 @@ export function RequestEditor({
           </button>
         )}
       </div>
+
+      {/* Variable resolution bar */}
+      {envVarMap && urlVarNames.length > 0 && (
+        <div className="flex items-center gap-3 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-muted)] flex-wrap">
+          {urlVarNames.map(name => {
+            const resolved = envVarMap[name]
+            const missing = resolved === undefined
+            return (
+              <span
+                key={name}
+                className={cn(
+                  'text-[10px] font-mono',
+                  missing ? 'text-amber-400' : 'text-[var(--color-muted-foreground)]',
+                )}
+                title={missing ? 'Variable not found in active environment' : resolved || '(empty string)'}
+              >
+                {missing ? `⚠ ${name}` : <>{name}<span className="opacity-50"> = </span>{resolved || <em>empty</em>}</>}
+              </span>
+            )
+          })}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-[var(--color-border)] px-3 shrink-0">
