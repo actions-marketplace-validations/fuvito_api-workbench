@@ -715,6 +715,10 @@ headers:
 		return err
 	}
 
+	// Gitignore all environment files so secrets are never accidentally committed.
+	if err := writeFile(filepath.Join(dir, "environments", ".gitignore"), "*\n"); err != nil {
+		return err
+	}
 	if err := writeFile(filepath.Join(dir, "environments", "local.yaml"), env); err != nil {
 		return err
 	}

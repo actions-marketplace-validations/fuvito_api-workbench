@@ -137,7 +137,7 @@ func findFreePort(start int) (int, error) {
 }
 
 func extractDemoWorkspace(dstDir string, port int) error {
-	return fs.WalkDir(demoWorkspaceFS, "demo_workspace", func(path string, entry fs.DirEntry, err error) error {
+	if err := fs.WalkDir(demoWorkspaceFS, "demo_workspace", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -156,5 +156,10 @@ func extractDemoWorkspace(dstDir string, port int) error {
 		content := strings.ReplaceAll(string(data), "DEMO_PORT", fmt.Sprintf("%d", port))
 
 		return os.WriteFile(dst, []byte(content), 0644)
-	})
+	}); err != nil {
+		return err
+	}
+
+	// Protect environment files from accidental git commits in the temp dir.
+	return os.WriteFile(filepath.Join(dstDir, "environments", ".gitignore"), []byte("*\n"), 0644)
 }
