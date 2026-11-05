@@ -219,7 +219,7 @@ function highlightSearch(text: string, query: string, activeIdx: number): React.
     if (idx === -1) { nodes.push(text.slice(pos)); break }
     if (idx > pos) nodes.push(text.slice(pos, idx))
     nodes.push(
-      <mark key={matchIdx} className={cn('rounded-sm', matchIdx === activeIdx ? 'bg-orange-400 text-black' : 'bg-yellow-300/60 text-inherit')}>
+      <mark key={matchIdx} data-match={String(matchIdx)} className={cn('rounded-sm', matchIdx === activeIdx ? 'bg-orange-400 text-black' : 'bg-yellow-300/60 text-inherit')}>
         {text.slice(idx, idx + q.length)}
       </mark>
     )
@@ -372,6 +372,13 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
 
   // Reset search when response changes
   useEffect(() => { closeSearch() }, [response, closeSearch])
+
+  // Scroll the active match into view whenever it changes
+  useEffect(() => {
+    if (!searchQuery || !contentRef.current) return
+    const el = contentRef.current.querySelector<HTMLElement>(`mark[data-match="${activeMatch}"]`)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [activeMatch, searchQuery])
 
   function stepMatch(dir: 1 | -1) {
     if (!matchCount) return
