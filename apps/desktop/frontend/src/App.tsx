@@ -9,6 +9,7 @@ import {
   createFolder, deleteFolder, renameFolder, renameRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
+  startDemo, stopDemo,
   type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
   type EnvInfo, type RequestFileIO, type AppSettings,
 } from '@/lib/bridge'
@@ -65,6 +66,9 @@ export default function App() {
   const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
   const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
   const [showAbout, setShowAbout] = useState(false)
+  const [demoRunning, setDemoRunning] = useState(false)
+  const [demoPort, setDemoPort] = useState(0)
+  const [demoStarting, setDemoStarting] = useState(false)
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
   const [newFolderDialog, setNewFolderDialog] = useState<{ parentPath: string; parentLabel: string } | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
@@ -612,6 +616,41 @@ export default function App() {
     }
   }
 
+  // ---- Demo server ----
+
+  async function handleStartDemo() {
+    if (demoRunning || demoStarting) return
+    setDemoStarting(true)
+    try {
+      const result = await startDemo()
+      if (result.error) {
+        console.error('demo start failed:', result.error)
+        return
+      }
+      setDemoRunning(true)
+      setDemoPort(result.port)
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('demo start error:', err)
+    } finally {
+      setDemoStarting(false)
+    }
+  }
+
+  async function handleStopDemo() {
+    try {
+      await stopDemo()
+      setDemoRunning(false)
+      setDemoPort(0)
+      setWorkspacePath('')
+      setFileTree([])
+      setEnvironments([])
+      setActiveEnv(null)
+    } catch (err) {
+      console.error('demo stop error:', err)
+    }
+  }
+
   // ---- Menus ----
 
   const menus: MenuDef[] = [
@@ -639,6 +678,13 @@ export default function App() {
     {
       label: 'Help',
       items: [
+        {
+          kind: 'action',
+          label: demoStarting ? 'Starting Demo…' : demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
+          onClick: demoRunning ? handleStopDemo : handleStartDemo,
+          disabled: demoStarting,
+        },
+        { kind: 'separator' },
         { kind: 'action', label: 'About ApiDesk', onClick: () => setShowAbout(true) },
       ],
     },
@@ -901,6 +947,24 @@ export default function App() {
                 >
                   <Pencil size={13} />
                 </button>
+              )}
+
+              {demoRunning && (
+                <>
+                  <div className="w-px h-4 bg-[var(--color-border)]" />
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <span className="text-emerald-400 font-mono">Demo :{demoPort}</span>
+                    <button
+                      type="button"
+                      onClick={handleStopDemo}
+                      title="Stop demo server"
+                      className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors leading-none"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </header>

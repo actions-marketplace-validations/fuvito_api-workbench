@@ -1,0 +1,9 @@
+schemaVersion: "1"
+name: List Users
+method: GET
+url: "{{baseUrl}}/users"
+queryParams:
+  - name: page
+    value: "1"
+  - name: limit
+    value: "10"

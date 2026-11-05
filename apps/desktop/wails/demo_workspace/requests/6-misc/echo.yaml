@@ -1,0 +1,18 @@
+schemaVersion: "1"
+name: Echo
+method: POST
+url: "{{baseUrl}}/echo"
+queryParams:
+  - name: debug
+    value: "true"
+headers:
+  - name: X-Custom-Header
+    value: hello-from-apidesk
+body:
+  type: json
+  content: |
+    {
+      "message": "This request is reflected back to you",
+      "variables": "{{baseUrl}}",
+      "timestamp": "see it in the response"
+    }

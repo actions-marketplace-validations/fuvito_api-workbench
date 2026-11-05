@@ -1,0 +1,4 @@
+schemaVersion: "1"
+name: Get User
+method: GET
+url: "{{baseUrl}}/users/{{userId}}"

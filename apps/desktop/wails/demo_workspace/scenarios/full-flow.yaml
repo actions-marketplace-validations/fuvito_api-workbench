@@ -1,0 +1,97 @@
+schemaVersion: "1"
+name: Full Auth and User Flow
+description: Login, create a user, fetch it back, verify the data, then delete it.
+
+steps:
+  - name: Login
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"admin","password":"secret"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.token"
+        operator: ne
+        expected: ""
+    extractions:
+      - name: authToken
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - name: Create user
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
+      body:
+        type: json
+        content: '{"name":"Grace Hopper","email":"grace@example.com","role":"developer"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "201"
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Grace Hopper"
+      - type: jsonpath
+        path: "$.id"
+        operator: gt
+        expected: "0"
+    extractions:
+      - name: newUserId
+        source: jsonpath
+        path: "$.id"
+    failPolicy: stop
+
+  - name: Fetch user
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/{{newUserId}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Grace Hopper"
+      - type: jsonpath
+        path: "$.email"
+        operator: eq
+        expected: "grace@example.com"
+    failPolicy: continue
+
+  - name: Update user
+    request:
+      method: PUT
+      url: "{{baseUrl}}/users/{{newUserId}}"
+      body:
+        type: json
+        content: '{"role":"senior-developer"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.role"
+        operator: eq
+        expected: "senior-developer"
+    failPolicy: continue
+
+  - name: Delete user
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/users/{{newUserId}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "204"

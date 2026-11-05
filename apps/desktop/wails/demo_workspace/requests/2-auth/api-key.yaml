@@ -1,0 +1,9 @@
+schemaVersion: "1"
+name: API Key Auth
+method: GET
+url: "{{baseUrl}}/auth/apikey"
+auth:
+  type: apikey
+  key: X-Api-Key
+  value: "{{apiKey}}"
+  location: header

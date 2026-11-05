@@ -1,0 +1,12 @@
+schemaVersion: "1"
+name: Create User
+method: POST
+url: "{{baseUrl}}/users"
+body:
+  type: json
+  content: |
+    {
+      "name": "Frank Castle",
+      "email": "frank@example.com",
+      "role": "developer"
+    }

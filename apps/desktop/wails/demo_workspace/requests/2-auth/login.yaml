@@ -1,0 +1,11 @@
+schemaVersion: "1"
+name: Login
+method: POST
+url: "{{baseUrl}}/auth/login"
+body:
+  type: json
+  content: |
+    {
+      "username": "admin",
+      "password": "secret"
+    }

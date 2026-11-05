@@ -12,6 +12,7 @@ type App struct {
 	requestService   *RequestService
 	openapiService   *OpenAPIService
 	settingsService  *SettingsService
+	demoService      *DemoService
 	hasDirtyTabs     bool
 }
 
@@ -25,6 +26,7 @@ func NewApp() *App {
 		requestService:   rs,
 		openapiService:   NewOpenAPIService(ws),
 		settingsService:  ss,
+		demoService:      NewDemoService(ws),
 	}
 }
 
@@ -34,10 +36,12 @@ func (a *App) startup(ctx context.Context) {
 	a.requestService.setContext(ctx)
 	a.openapiService.setContext(ctx)
 	a.settingsService.setContext(ctx)
+	a.demoService.setContext(ctx)
 }
 
 func (a *App) shutdown(_ context.Context) {
 	a.requestService.close()
+	a.demoService.StopDemo()
 }
 
 // SetHasDirtyTabs is called by the frontend whenever the overall dirty state changes.

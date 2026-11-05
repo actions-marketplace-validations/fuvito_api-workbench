@@ -135,6 +135,20 @@ func (w *WorkspaceService) ActiveEnvironment() *domain.Environment {
 	return w.activeEnv
 }
 
+// openWorkspaceDirect sets the workspace path directly without a dialog.
+// It also auto-selects the environments/local.yaml if present.
+// Does not persist to config (temp demo workspace should not pollute saved state).
+func (w *WorkspaceService) openWorkspaceDirect(path string) {
+	w.workspacePath = path
+	envPath := filepath.Join(path, "environments", "local.yaml")
+	if _, err := os.Stat(envPath); err == nil {
+		w.activeEnvPath = envPath
+		if env, err := w.loadEnvFile(envPath); err == nil {
+			w.activeEnv = env
+		}
+	}
+}
+
 // ---- Wails-bound methods ----
 
 // OpenWorkspace opens a directory picker dialog and sets the workspace.

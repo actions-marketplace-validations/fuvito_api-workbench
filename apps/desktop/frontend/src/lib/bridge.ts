@@ -33,6 +33,12 @@ import {
   SaveSettings as WailsSaveSettings,
   ResetSettings as WailsResetSettings,
 } from '@wailsjs/go/main/SettingsService'
+import {
+  StartDemo as WailsStartDemo,
+  StopDemo as WailsStopDemo,
+  IsRunning as WailsIsDemoRunning,
+  GetPort as WailsGetDemoPort,
+} from '@wailsjs/go/main/DemoService'
 
 // ---- Shared I/O types ----
 
@@ -299,4 +305,31 @@ export async function saveSettings(s: AppSettings): Promise<AppSettings> {
 export async function resetSettings(): Promise<AppSettings> {
   const result = await WailsResetSettings()
   return result as unknown as AppSettings
+}
+
+// ---- Demo server ----
+
+export interface DemoResult {
+  workspacePath: string
+  port: number
+  error?: string
+}
+
+export async function startDemo(): Promise<DemoResult> {
+  const result = await WailsStartDemo()
+  return result as unknown as DemoResult
+}
+
+export async function stopDemo(): Promise<void> {
+  await WailsStopDemo()
+}
+
+export async function isDemoRunning(): Promise<boolean> {
+  const result = await WailsIsDemoRunning()
+  return result as unknown as boolean
+}
+
+export async function getDemoPort(): Promise<number> {
+  const result = await WailsGetDemoPort()
+  return result as unknown as number
 }

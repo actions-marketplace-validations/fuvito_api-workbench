@@ -1,0 +1,7 @@
+schemaVersion: "1"
+name: Get Profile
+method: GET
+url: "{{baseUrl}}/auth/profile"
+auth:
+  type: bearer
+  token: "{{authToken}}"

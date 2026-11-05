@@ -1,0 +1,9 @@
+schemaVersion: "1"
+name: List Posts
+method: GET
+url: "{{baseUrl}}/posts"
+queryParams:
+  - name: page
+    value: "1"
+  - name: limit
+    value: "5"

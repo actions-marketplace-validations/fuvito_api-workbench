@@ -1,0 +1,11 @@
+schemaVersion: "1"
+name: Update User
+method: PUT
+url: "{{baseUrl}}/users/{{userId}}"
+body:
+  type: json
+  content: |
+    {
+      "name": "Alice Smith-Updated",
+      "role": "senior-developer"
+    }

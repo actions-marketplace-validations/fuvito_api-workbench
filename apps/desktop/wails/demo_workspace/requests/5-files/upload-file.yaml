@@ -1,0 +1,12 @@
+schemaVersion: "1"
+name: Upload File
+method: POST
+url: "{{baseUrl}}/files/upload"
+body:
+  type: json
+  content: |
+    {
+      "filename": "report.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 204800
+    }

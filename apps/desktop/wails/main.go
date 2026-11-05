@@ -34,6 +34,7 @@ func main() {
 			app.workspaceService,
 			app.openapiService,
 			app.settingsService,
+			app.demoService,
 		},
 	})
 	if err != nil {

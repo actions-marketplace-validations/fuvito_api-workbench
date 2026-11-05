@@ -1,0 +1,15 @@
+schemaVersion: "1"
+name: local
+variables:
+  - name: baseUrl
+    value: "http://localhost:DEMO_PORT"
+  - name: authToken
+    value: ""
+  - name: apiKey
+    value: "demo-key-12345"
+  - name: basicUser
+    value: "demo"
+  - name: basicPass
+    value: "demo"
+  - name: userId
+    value: "1"

@@ -1,0 +1,8 @@
+schemaVersion: "1"
+name: Basic Auth
+method: GET
+url: "{{baseUrl}}/auth/basic"
+auth:
+  type: basic
+  username: "{{basicUser}}"
+  password: "{{basicPass}}"
