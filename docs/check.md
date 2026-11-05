@@ -1,0 +1,38 @@
+# ApiDesk — Audit Checklist
+
+## 🐛 Bugs
+
+- [x] **Close Workspace doesn't close tabs on Windows** — path prefix check used `/` separator but Windows paths use `\`. Fixed: normalize both sides to forward slashes before comparing.
+- [x] **`Ctrl+O` shortcut shown in File menu but never fired** — keyboard handler was missing the `o` case. Fixed.
+- [ ] **Stopping demo server loses your previous workspace** — `workspacePath` is cleared to `''` unconditionally on stop. If a workspace was open before the demo, it's gone. Should restore the previously persisted config.
+- [ ] **Dirty-tab dot in sidebar only reflects the active tab** — `isDirty` passed to `WorkspacePanel` is always `isTabDirty(activeTab)`. Other open/dirty tabs show no dot next to their file. Fix: pass a `Set<string>` of dirty file paths.
+- [ ] **Switching body type clears content silently** — accidentally clicking Raw when you have a JSON body written loses the content with no undo or confirmation.
+- [ ] **Status code 0 (network error) looks ambiguous** — shows `0` in the status bar with no colour; could be confused with a real response.
+
+## 🔍 Missing / Expected Features
+
+- [ ] **No way to cancel an in-flight request** — once Send is hit, there is no Cancel button.
+- [ ] **History entries only restore method + URL** — headers, auth, body, and query params from the original request are not stored or restored. At minimum add a tooltip clarifying this.
+- [ ] **No way to clear history** — the list grows unbounded. Add a "Clear history" button to the history tab.
+- [ ] **Form URL-encoded body is a plain textarea** — should be a `KeyValueEditor` row editor like Params and Headers.
+- [ ] **No multipart/form-data body type** — file uploads are impossible from the UI despite the demo server supporting them.
+- [ ] **Variable value tooltip / preview** — hovering `{{baseUrl}}` in the URL bar should show what it resolves to from the active environment.
+- [ ] **No "Copy response body" button** — add a copy icon next to the search icon in the response status bar.
+- [ ] **No "View raw" toggle in response** — response is always pretty-printed; a Raw toggle is useful for inspecting exact bytes.
+- [ ] **No per-request timeout override** — only a global default; no way to override for a single slow endpoint.
+- [ ] **No search / filter in the workspace file tree** — large collections (e.g. after OpenAPI import) become hard to navigate.
+- [ ] **OpenAPI import only from file, not from URL** — common case is a live server's `/openapi.json`.
+- [ ] **No drag-and-drop in the file tree** — can't move a request between folders.
+
+## ⚠️ Inconsistencies / Polish
+
+- [ ] **Snippet auto-copy silently overwrites clipboard** — clipboard is replaced the moment the snippet dialog opens. Should show a clear "copied" indicator or wait for the button click.
+- [ ] **Environment editor pencil tooltip is misleading** — when no env is active the tooltip reads "New environment" but it looks like an edit button. Should clearly read "Create environment".
+- [ ] **Bearer / API-key tokens are plain text** — visible on shared screens. Should use `type="password"` with a reveal toggle, matching the env editor's secret field.
+- [ ] **`Ctrl+Enter` fires even when the find bar input is focused** — the global shortcut does not check whether a text input inside ResponseViewer has focus.
+- [ ] **`Ctrl+Enter` to send is undiscoverable** — implemented but not shown anywhere in the UI (tooltip, menu, or shortcuts reference).
+- [ ] **No "Save As" option** — `Ctrl+S` saves in-place; no way to save a copy to a new location without duplicating first.
+- [ ] **Dirty-tab close button always hidden until hover** — tabs with unsaved changes should always show the close button (or the amber dot should double as a close trigger) so users know they can close them.
+- [ ] **Deleting a non-empty folder silently fails** — delete button appears only for empty folders, but if the folder becomes non-empty after the hover renders the Go call fails silently with no error shown.
+- [ ] **Demo port pill is not interactive** — `Demo :8080` in the toolbar is purely informational; clicking it to copy the base URL or open a browser tab would be a nice touch.
+- [ ] **No "Reset to defaults" button in Settings** — Go side has `ResetSettings` wired but the Settings panel has no Reset button.

@@ -205,6 +205,7 @@ export default function App() {
 
   const saveTabByIdRef = useRef<((id: string) => Promise<boolean>) | null>(null)
   const handleSendRef = useRef<(() => void) | null>(null)
+  const handleOpenRequestRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -223,6 +224,10 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         handleSendRef.current?.()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault()
+        handleOpenRequestRef.current?.()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -320,9 +325,9 @@ export default function App() {
       setActiveEnv(null)
       if (path) {
         setTabsState(prev => {
-          const sep = path.endsWith('/') || path.endsWith('\\') ? '' : '/'
-          const prefix = path + sep
-          const remaining = prev.tabs.filter(t => !t.filePath?.startsWith(prefix))
+          const norm = (p: string) => p.replace(/\\/g, '/')
+          const prefix = norm(path).replace(/\/?$/, '/')
+          const remaining = prev.tabs.filter(t => !norm(t.filePath ?? '').startsWith(prefix))
           if (remaining.length === prev.tabs.length) return prev
           if (remaining.length === 0) {
             const blank = createBlankTab()
@@ -368,6 +373,8 @@ export default function App() {
       console.error('open request:', err)
     }
   }
+
+  handleOpenRequestRef.current = handleOpenRequest
 
   function handleNewRequest() {
     handleNewTab()

@@ -1,28 +1,117 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
 import type { ResponseData } from '@/lib/bridge'
 
 // ---- Timing bar ----
 
-type TimingSegment = { label: string; ms: number; color: string }
+type TimingSegment = { label: string; ms: number; color: string; barColor: string }
 
-function TimingBar({ timing, total }: { timing: ResponseData['timing']; total: number }) {
+const TIMING_SEGMENTS: Array<{ key: keyof NonNullable<ResponseData['timing']>; label: string; color: string; barColor: string }> = [
+  { key: 'dnsMs',      label: 'DNS',      color: 'bg-purple-500',  barColor: 'bg-purple-500' },
+  { key: 'connectMs',  label: 'Connect',  color: 'bg-blue-500',    barColor: 'bg-blue-500'   },
+  { key: 'tlsMs',      label: 'TLS',      color: 'bg-yellow-500',  barColor: 'bg-yellow-500' },
+  { key: 'ttfbMs',     label: 'TTFB',     color: 'bg-emerald-500', barColor: 'bg-emerald-500'},
+  { key: 'transferMs', label: 'Transfer', color: 'bg-cyan-500',    barColor: 'bg-cyan-500'   },
+]
+
+function buildSegments(timing: NonNullable<ResponseData['timing']>): TimingSegment[] {
+  return TIMING_SEGMENTS
+    .map(({ key, label, color, barColor }) => ({ label, ms: timing[key], color, barColor }))
+    .filter(s => s.ms > 0)
+}
+
+// ---- Timing detail dialog ----
+
+function TimingDialog({ timing, total, onClose }: {
+  timing: NonNullable<ResponseData['timing']>
+  total: number
+  onClose: () => void
+}) {
+  const segments = buildSegments(timing)
+  const sum = segments.reduce((a, s) => a + s.ms, 0)
+  const denom = Math.max(sum, 1)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl shadow-2xl w-[480px] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)]">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-[var(--color-muted-foreground)]" />
+            <span className="text-sm font-semibold text-[var(--color-foreground)]">Request Timing</span>
+          </div>
+          <button type="button" onClick={onClose} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Rows */}
+        <div className="flex flex-col gap-3 p-5">
+          {segments.map(s => {
+            const pct = (s.ms / denom) * 100
+            return (
+              <div key={s.label} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={cn('inline-block w-2.5 h-2.5 rounded-sm shrink-0', s.color)} />
+                    <span className="font-medium text-[var(--color-foreground)] w-14">{s.label}</span>
+                  </div>
+                  <div className="flex items-center gap-4 font-mono text-[var(--color-muted-foreground)]">
+                    <span className="w-16 text-right">{s.ms} ms</span>
+                    <span className="w-12 text-right">{pct.toFixed(1)}%</span>
+                  </div>
+                </div>
+                <div className="h-2 w-full rounded bg-[var(--color-muted)] overflow-hidden">
+                  <div
+                    className={cn('h-full rounded transition-all', s.barColor)}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Divider + total */}
+          <div className="border-t border-[var(--color-border)] pt-3 flex items-center justify-between text-xs font-mono">
+            <span className="text-[var(--color-muted-foreground)] font-sans font-semibold uppercase tracking-wider text-[10px]">Total</span>
+            <div className="flex items-center gap-4 text-[var(--color-foreground)] font-semibold">
+              <span className="w-16 text-right">{total} ms</span>
+              <span className="w-12 text-right text-[var(--color-muted-foreground)]">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---- Timing bar (mini, clickable) ----
+
+function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing']; total: number; onClick: () => void }) {
   if (!timing || total === 0) return null
-  const segments: TimingSegment[] = [
-    { label: 'DNS',      ms: timing.dnsMs,      color: 'bg-purple-500' },
-    { label: 'Connect',  ms: timing.connectMs,  color: 'bg-blue-500' },
-    { label: 'TLS',      ms: timing.tlsMs,      color: 'bg-yellow-500' },
-    { label: 'TTFB',     ms: timing.ttfbMs,     color: 'bg-emerald-500' },
-    { label: 'Transfer', ms: timing.transferMs, color: 'bg-cyan-500' },
-  ].filter(s => s.ms > 0)
+  const segments = buildSegments(timing)
   if (segments.length === 0) return null
   const sum = segments.reduce((a, s) => a + s.ms, 0)
   const scale = sum > 0 ? total / sum : 1
   return (
-    <div className="w-full mt-1.5 flex flex-col gap-0.5">
-      <div className="flex h-2 rounded overflow-hidden gap-px">
+    <button
+      type="button"
+      onClick={onClick}
+      title="Click to view timing breakdown"
+      className="w-full mt-1.5 flex flex-col gap-0.5 group cursor-pointer"
+    >
+      <div className="flex h-2 rounded overflow-hidden gap-px group-hover:opacity-80 transition-opacity">
         {segments.map(s => (
           <div key={s.label} title={`${s.label}: ${s.ms}ms`} className={cn('h-full', s.color)}
             style={{ width: `${Math.max((s.ms / (total || sum)) * 100 * scale, 1)}%` }} />
@@ -36,7 +125,7 @@ function TimingBar({ timing, total }: { timing: ResponseData['timing']; total: n
           </span>
         ))}
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -200,6 +289,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMatch, setActiveMatch] = useState(0)
+  const [showTimingDialog, setShowTimingDialog] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -263,7 +353,12 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
         ) : (
           <span className="text-xs text-[var(--color-muted-foreground)]">Response</span>
         )}
-        {response?.timing && !response.error && <TimingBar timing={response.timing} total={response.durationMs} />}
+        {response?.timing && !response.error && (
+          <TimingBar timing={response.timing} total={response.durationMs} onClick={() => setShowTimingDialog(true)} />
+        )}
+        {showTimingDialog && response?.timing && (
+          <TimingDialog timing={response.timing} total={response.durationMs} onClose={() => setShowTimingDialog(false)} />
+        )}
         {cachedAt && !loading && (
           <span className="shrink-0 text-[10px] text-[var(--color-muted-foreground)] italic" title={new Date(cachedAt).toLocaleString()}>
             Last run {timeAgo(cachedAt)}
