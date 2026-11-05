@@ -16,6 +16,7 @@ export type SidebarProps = {
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
   onDeleteFile: (path: string) => void
+  onDuplicateFile: (path: string) => void
   onDeleteFolder: (path: string) => void
   onNewRequestInFolder: (folderPath: string) => void
   onCreateFolder: (parentPath: string) => void
@@ -33,7 +34,7 @@ export function Sidebar({
   tab, onTabChange,
   workspacePath, fileTree, history,
   onOpenWorkspace, onNewWorkspace,
-  onSelectFile, onDeleteFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
+  onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder,
   onSelectHistory,
   onImportOpenAPI, importing,
@@ -72,6 +73,7 @@ export function Sidebar({
             onNewWorkspace={onNewWorkspace}
             onSelectFile={onSelectFile}
             onDeleteFile={onDeleteFile}
+            onDuplicateFile={onDuplicateFile}
             onDeleteFolder={onDeleteFolder}
             onNewRequestInFolder={onNewRequestInFolder}
             onCreateFolder={onCreateFolder}

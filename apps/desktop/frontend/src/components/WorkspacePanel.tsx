@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
-  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2,
+  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
@@ -55,6 +55,7 @@ type TreeNodeProps = {
   depth: number
   onSelect: (path: string) => void
   onDelete?: (path: string) => void
+  onDuplicateFile?: (path: string) => void
   onDeleteFolder?: (path: string) => void
   onNewRequestInFolder?: (folderPath: string) => void
   onCreateFolder?: (parentPath: string) => void
@@ -66,7 +67,7 @@ type TreeNodeProps = {
 
 function TreeNode({
   node, depth,
-  onSelect, onDelete, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
+  onSelect, onDelete, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder,
   activeFilePath, isDirty,
 }: TreeNodeProps) {
@@ -153,6 +154,7 @@ function TreeNode({
             depth={depth + 1}
             onSelect={onSelect}
             onDelete={onDelete}
+            onDuplicateFile={onDuplicateFile}
             onDeleteFolder={onDeleteFolder}
             onNewRequestInFolder={onNewRequestInFolder}
             onCreateFolder={onCreateFolder}
@@ -204,15 +206,29 @@ function TreeNode({
           )}
         </button>
       )}
-      {!renaming && onDelete && (
-        <button
-          type="button"
-          onClick={e => { e.stopPropagation(); onDelete(node.path) }}
-          title="Delete request"
-          className="shrink-0 mr-1 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-muted-foreground)] hover:text-red-400"
-        >
-          <Trash2 size={10} />
-        </button>
+      {!renaming && (onDuplicateFile || onDelete) && (
+        <div className="flex items-center mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {onDuplicateFile && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onDuplicateFile(node.path) }}
+              title="Duplicate request"
+              className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            >
+              <CopyPlus size={10} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onDelete(node.path) }}
+              title="Delete request"
+              className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-red-400"
+            >
+              <Trash2 size={10} />
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -227,6 +243,7 @@ type WorkspacePanelProps = {
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
   onDeleteFile?: (path: string) => void
+  onDuplicateFile?: (path: string) => void
   onDeleteFolder?: (path: string) => void
   onNewRequestInFolder?: (folderPath: string) => void
   onCreateFolder?: (parentPath: string) => void
@@ -245,6 +262,7 @@ export function WorkspacePanel({
   onNewWorkspace,
   onSelectFile,
   onDeleteFile,
+  onDuplicateFile,
   onDeleteFolder,
   onNewRequestInFolder,
   onCreateFolder,
@@ -310,6 +328,7 @@ export function WorkspacePanel({
                   depth={0}
                   onSelect={onSelectFile}
                   onDelete={onDeleteFile}
+                  onDuplicateFile={onDuplicateFile}
                   onDeleteFolder={onDeleteFolder}
                   onNewRequestInFolder={onNewRequestInFolder}
                   onCreateFolder={onCreateFolder}

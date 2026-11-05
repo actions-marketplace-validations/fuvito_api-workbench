@@ -448,6 +448,20 @@ export default function App() {
     }
   }
 
+  // ---- Duplicate request file ----
+
+  async function handleDuplicateFile(path: string) {
+    try {
+      const req = await loadRequest(path)
+      const lastSep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+      const targetDir = lastSep !== -1 ? path.slice(0, lastSep) : ''
+      await saveRequest({ ...req, name: (req.name || 'request') + ' Copy', filePath: '', targetDir })
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('duplicate request:', err)
+    }
+  }
+
   // ---- Delete request file ----
 
   function handleDeleteFile(path: string) {
@@ -783,6 +797,7 @@ export default function App() {
           onNewWorkspace={handleNewWorkspace}
           onSelectFile={handleSelectFile}
           onDeleteFile={handleDeleteFile}
+          onDuplicateFile={handleDuplicateFile}
           onDeleteFolder={handleDeleteFolder}
           onNewRequestInFolder={handleNewRequestInFolder}
           onCreateFolder={handleCreateFolder}
