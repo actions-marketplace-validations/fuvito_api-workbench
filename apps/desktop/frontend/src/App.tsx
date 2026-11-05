@@ -10,7 +10,7 @@ import {
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
   startDemo, stopDemo,
-  type ResponseData, type AuthPayload, type HistoryEntry, type FileNode,
+  type HistoryEntry, type FileNode,
   type EnvInfo, type RequestFileIO, type AppSettings,
 } from '@/lib/bridge'
 import { SettingsPanel } from '@/components/SettingsPanel'
