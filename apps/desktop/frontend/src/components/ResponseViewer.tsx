@@ -249,6 +249,12 @@ function BodyContent({ body, headers, search, activeMatch, raw }: {
   const displayBody = raw ? body : prettyBody(body)
   const fmt = detectFormat(body, ct)
 
+  const lines = displayBody.split('\n')
+  // Don't count a trailing empty entry from a trailing newline as an extra line
+  const lineCount = lines.length > 1 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+  const showLineNumbers = lineCount > 1
+  const gutterWidth = `${String(lineCount).length + 1}ch`
+
   let highlighted: React.ReactNode
   if (!search) {
     if (!raw && fmt === 'json' && body.length < 500_000) highlighted = highlightJSON(displayBody)
@@ -258,10 +264,30 @@ function BodyContent({ body, headers, search, activeMatch, raw }: {
     highlighted = highlightSearch(displayBody, search, activeMatch)
   }
 
+  if (!showLineNumbers) {
+    return (
+      <pre className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed" style={{ color: 'var(--color-foreground)' }}>
+        {highlighted}
+      </pre>
+    )
+  }
+
   return (
-    <pre className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed" style={{ color: 'var(--color-foreground)' }}>
-      {highlighted}
-    </pre>
+    <div className="flex min-w-0">
+      <pre
+        aria-hidden
+        className="text-xs font-mono leading-relaxed select-none shrink-0 text-right pr-3 border-r border-[var(--color-border)] mr-3 whitespace-pre"
+        style={{ color: 'var(--color-muted-foreground)', minWidth: gutterWidth }}
+      >
+        {Array.from({ length: lineCount }, (_, i) => i + 1).join('\n')}
+      </pre>
+      <pre
+        className="text-xs font-mono whitespace-pre leading-relaxed flex-1 min-w-0 overflow-x-auto"
+        style={{ color: 'var(--color-foreground)' }}
+      >
+        {highlighted}
+      </pre>
+    </div>
   )
 }
 
