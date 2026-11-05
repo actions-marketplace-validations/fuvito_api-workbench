@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
-  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X,
+  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X, RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
@@ -285,6 +285,7 @@ type WorkspacePanelProps = {
   onRenameFile?: (path: string, newName: string) => void
   onRenameFolder?: (path: string, newName: string) => void
   onImportOpenAPI: () => void
+  onRefresh?: () => void
   importing?: boolean
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
@@ -304,6 +305,7 @@ export function WorkspacePanel({
   onRenameFile,
   onRenameFolder,
   onImportOpenAPI,
+  onRefresh,
   importing,
   activeFilePath,
   dirtyFilePaths,
@@ -388,6 +390,16 @@ export function WorkspacePanel({
               >
                 {importing ? <span className="text-label">…</span> : <Upload size={12} />}
               </button>
+              {onRefresh && (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                  title="Refresh file tree"
+                >
+                  <RefreshCw size={12} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onOpenWorkspace}

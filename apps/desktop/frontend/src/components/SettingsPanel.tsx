@@ -20,14 +20,24 @@ type SettingsPanelProps = {
 
 export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }: SettingsPanelProps) {
   const [local, setLocal] = useState<AppSettings>({ ...settings })
+  const [proxyError, setProxyError] = useState('')
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     const updated = { ...local, [key]: value }
     setLocal(updated)
+    if (key === 'proxyUrl') setProxyError('')
     onPreview?.(updated)
   }
 
   function handleSave() {
+    if (local.proxyUrl.trim()) {
+      try {
+        new URL(local.proxyUrl.trim())
+      } catch {
+        setProxyError('Enter a valid URL, e.g. http://proxy.example.com:8080')
+        return
+      }
+    }
     onSave(local)
     onClose()
   }
@@ -94,13 +104,18 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
               </Row>
 
               <Row label="Proxy URL">
-                <input
-                  type="text"
-                  value={local.proxyUrl}
-                  onChange={e => set('proxyUrl', e.target.value)}
-                  placeholder="http://proxy.example.com:8080"
-                  className={inputCls}
-                />
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="text"
+                    value={local.proxyUrl}
+                    onChange={e => set('proxyUrl', e.target.value)}
+                    placeholder="http://proxy.example.com:8080"
+                    className={cn(inputCls, proxyError && 'border-red-500')}
+                  />
+                  {proxyError && (
+                    <span className="text-[10px] text-red-400">{proxyError}</span>
+                  )}
+                </div>
               </Row>
 
               <Row label="Skip TLS verification">

@@ -104,7 +104,11 @@ function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing'];
   const segments = buildSegments(timing)
   if (segments.length === 0) return null
   const sum = segments.reduce((a, s) => a + s.ms, 0)
-  const scale = sum > 0 ? total / sum : 1
+  // Compute proportional widths then enforce a 1% minimum, then re-normalise so the bar always fills exactly 100%.
+  const raw = segments.map(s => (s.ms / (sum || 1)) * 100)
+  const withMin = raw.map(w => Math.max(w, 1))
+  const inflated = withMin.reduce((a, b) => a + b, 0)
+  const widths = withMin.map(w => (w / inflated) * 100)
   return (
     <button
       type="button"
@@ -113,9 +117,9 @@ function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing'];
       className="w-full mt-1.5 flex flex-col gap-0.5 group cursor-pointer"
     >
       <div className="flex h-2 rounded overflow-hidden gap-px group-hover:opacity-80 transition-opacity">
-        {segments.map(s => (
+        {segments.map((s, i) => (
           <div key={s.label} title={`${s.label}: ${s.ms}ms`} className={cn('h-full', s.color)}
-            style={{ width: `${Math.max((s.ms / (total || sum)) * 100 * scale, 1)}%` }} />
+            style={{ width: `${widths[i]}%` }} />
         ))}
       </div>
       <div className="flex gap-3 flex-wrap">
@@ -326,9 +330,9 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
   const bodyText = response && !response.error ? (rawMode ? response.body : prettyBody(response.body)) : ''
 
   async function handleCopy() {
-    if (!response?.body) return
+    if (!bodyText) return
     try {
-      await navigator.clipboard.writeText(response.body)
+      await navigator.clipboard.writeText(bodyText)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch { /* ignore */ }

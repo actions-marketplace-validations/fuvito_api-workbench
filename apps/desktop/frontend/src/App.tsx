@@ -1016,6 +1016,7 @@ export default function App() {
           onSelectHistory={handleSelectHistory}
           onClearHistory={handleClearHistory}
           onImportOpenAPI={handleImportOpenAPI}
+          onRefresh={refreshWorkspace}
           importing={importing}
           activeFilePath={activeTab.filePath ?? undefined}
           dirtyFilePaths={new Set(tabs.filter(t => t.filePath && isTabDirty(t)).map(t => t.filePath!))}
