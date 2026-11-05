@@ -68,6 +68,12 @@ func newDemoMux() http.Handler {
 
 	mux.HandleFunc("/files/upload", withCount(handleDemoUpload))
 
+	mux.HandleFunc("/feed", withCount(handleDemoFeed))
+	mux.HandleFunc("/sitemap.xml", withCount(handleDemoSitemap))
+	mux.HandleFunc("/data.xml", withCount(handleDemoDataXML))
+	mux.HandleFunc("/page", withCount(handleDemoHTMLPage))
+	mux.HandleFunc("/report.html", withCount(handleDemoHTMLReport))
+
 	return corsMiddleware(mux)
 }
 
@@ -141,6 +147,11 @@ func handleDemoHealth(w http.ResponseWriter, r *http.Request) {
 			"DELETE /users/{id}",
 			"GET  /posts?page=1&limit=10",
 			"POST /files/upload",
+			"GET  /feed           (Atom XML)",
+			"GET  /sitemap.xml    (XML sitemap)",
+			"GET  /data.xml       (structured XML)",
+			"GET  /page           (HTML page)",
+			"GET  /report.html    (HTML table report)",
 		},
 	})
 }
@@ -569,4 +580,265 @@ func handleDemoUpload(w http.ResponseWriter, r *http.Request) {
 		"url":         fmt.Sprintf("/files/%s", body.Filename),
 		"message":     "Simulated upload — send multipart/form-data for a real file upload",
 	})
+}
+
+// ---- XML / HTML format handlers ----
+
+func handleDemoFeed(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	now := time.Now().UTC()
+	w.Header().Set("Content-Type", "application/atom+xml; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>ApiDesk Demo Feed</title>
+  <subtitle>Sample Atom feed for testing XML response handling</subtitle>
+  <link href="http://localhost/feed" rel="self"/>
+  <id>urn:uuid:demo-feed-apiDesk</id>
+  <updated>%s</updated>
+  <author>
+    <name>ApiDesk Demo Server</name>
+    <email>demo@apidesk.dev</email>
+  </author>
+  <entry>
+    <id>urn:uuid:entry-001</id>
+    <title>Getting Started with ApiDesk</title>
+    <link href="http://localhost/posts/1"/>
+    <updated>%s</updated>
+    <summary>Learn how to import OpenAPI specs, run requests, and build multi-step scenarios.</summary>
+    <category term="tutorial" scheme="http://localhost/categories"/>
+    <content type="html">&lt;p&gt;ApiDesk is an &lt;strong&gt;open-source&lt;/strong&gt; API contract testing platform.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <id>urn:uuid:entry-002</id>
+    <title>Contract Validation Deep Dive</title>
+    <link href="http://localhost/posts/2"/>
+    <updated>2026-10-15T09:00:00Z</updated>
+    <summary>How ApiDesk validates API responses against OpenAPI 3.1 schemas automatically.</summary>
+    <category term="api-testing" scheme="http://localhost/categories"/>
+    <content type="text">ApiDesk supports both OpenAPI 3.0 and 3.1 for schema-based response validation.</content>
+  </entry>
+  <entry>
+    <id>urn:uuid:entry-003</id>
+    <title>CLI Integration for CI/CD</title>
+    <link href="http://localhost/posts/3"/>
+    <updated>2026-09-20T14:30:00Z</updated>
+    <summary>Run your API scenarios in GitHub Actions with apidesk run and proper exit codes.</summary>
+    <category term="devops" scheme="http://localhost/categories"/>
+    <content type="text">Exit code 0 = all pass, 1 = assertion failures, 2 = execution errors.</content>
+  </entry>
+</feed>
+`, now.Format(time.RFC3339), now.Format(time.RFC3339))
+}
+
+func handleDemoSitemap(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	now := time.Now().UTC().Format("2006-01-02")
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+          http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+  <url>
+    <loc>http://localhost/</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>http://localhost/users</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>http://localhost/posts</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>http://localhost/feed</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>http://localhost/page</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>
+`, now, now, now, now, now)
+}
+
+func handleDemoDataXML(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	demoMu.Lock()
+	users := make([]demoUser, len(demoUsers))
+	copy(users, demoUsers)
+	demoMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
+<users xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="users.xsd"
+       count="%d"
+       generated="%s">
+`, len(users), time.Now().UTC().Format(time.RFC3339))
+	for _, u := range users {
+		fmt.Fprintf(w, `  <user id="%d" role="%s">
+    <name>%s</name>
+    <email>%s</email>
+    <createdAt>%s</createdAt>
+  </user>
+`, u.ID, u.Role, u.Name, u.Email, u.CreatedAt)
+	}
+	fmt.Fprint(w, `</users>
+`)
+}
+
+func handleDemoHTMLPage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	demoMu.Lock()
+	userCount := len(demoUsers)
+	demoMu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ApiDesk Demo — Welcome</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { color: #7c3aed; }
+    nav a { margin-right: 1rem; color: #2563eb; text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .85em; font-weight: 600; }
+    .ok { background: #d1fae5; color: #065f46; }
+    .info { background: #dbeafe; color: #1e40af; }
+    footer { margin-top: 3rem; font-size: .8em; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ApiDesk Demo Server</h1>
+    <nav>
+      <a href="/health">Health</a>
+      <a href="/users">Users</a>
+      <a href="/posts">Posts</a>
+      <a href="/feed">Atom Feed</a>
+      <a href="/sitemap.xml">Sitemap</a>
+      <a href="/data.xml">XML Data</a>
+      <a href="/report.html">Report</a>
+    </nav>
+  </header>
+  <main>
+    <p>This server demonstrates <strong>multiple response formats</strong> for testing ApiDesk's response viewer.</p>
+    <ul>
+      <li>Status: <span class="badge ok">Running</span></li>
+      <li>Users in store: <span class="badge info">%d</span></li>
+      <li>Requests served: <span class="badge info">%d</span></li>
+      <li>Started: <code>%s</code></li>
+    </ul>
+    <h2>Format Examples</h2>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%%">
+      <thead style="background:#f3f4f6">
+        <tr><th>Endpoint</th><th>Content-Type</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><a href="/feed">/feed</a></td><td>application/atom+xml</td><td>Atom syndication feed</td></tr>
+        <tr><td><a href="/sitemap.xml">/sitemap.xml</a></td><td>application/xml</td><td>XML sitemap (sitemaps.org schema)</td></tr>
+        <tr><td><a href="/data.xml">/data.xml</a></td><td>application/xml</td><td>Users as structured XML with attributes</td></tr>
+        <tr><td><a href="/page">/page</a></td><td>text/html</td><td>This HTML page</td></tr>
+        <tr><td><a href="/report.html">/report.html</a></td><td>text/html</td><td>HTML table report</td></tr>
+      </tbody>
+    </table>
+    <h2>Try a curl command</h2>
+    <pre style="background:#f9fafb;padding:1rem;border-radius:6px;overflow-x:auto">curl http://localhost:%d/feed
+curl http://localhost:%d/data.xml
+curl -H "Accept: text/html" http://localhost:%d/report.html</pre>
+  </main>
+  <footer>ApiDesk Demo Server &mdash; generated at %s</footer>
+</body>
+</html>
+`, userCount, demoReqCount.Load(), demoStartedAt.UTC().Format(time.RFC3339),
+		0, 0, 0, time.Now().UTC().Format(time.RFC3339))
+}
+
+func handleDemoHTMLReport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	demoMu.Lock()
+	users := make([]demoUser, len(demoUsers))
+	copy(users, demoUsers)
+	demoMu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>User Report — ApiDesk Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 1.5rem; color: #111; }
+    h1 { font-size: 1.25rem; color: #374151; }
+    table { border-collapse: collapse; width: 100%%; font-size: .9rem; }
+    th { background: #1e1b4b; color: #fff; padding: 8px 12px; text-align: left; }
+    td { padding: 7px 12px; border-bottom: 1px solid #e5e7eb; }
+    tr:hover td { background: #f5f3ff; }
+    .role-admin { color: #7c3aed; font-weight: 600; }
+    .role-developer { color: #2563eb; }
+    .role-designer { color: #db2777; }
+    .role-manager { color: #d97706; }
+    .role-viewer { color: #6b7280; }
+    .meta { margin-top: 1rem; font-size: .8rem; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <h1>User Report</h1>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Created</th></tr>
+    </thead>
+    <tbody>
+`)
+	for _, u := range users {
+		fmt.Fprintf(w, `      <tr>
+        <td>%d</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td><span class="role-%s">%s</span></td>
+        <td>%s</td>
+      </tr>
+`, u.ID, u.Name, u.Email, u.Role, u.Role, u.CreatedAt)
+	}
+	fmt.Fprintf(w, `    </tbody>
+  </table>
+  <p class="meta">%d user(s) &mdash; generated at %s &mdash; ApiDesk Demo Server</p>
+</body>
+</html>
+`, len(users), time.Now().UTC().Format(time.RFC3339))
 }

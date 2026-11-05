@@ -1,0 +1,7 @@
+schemaVersion: "1"
+name: Atom Feed (XML)
+method: GET
+url: "{{baseUrl}}/feed"
+headers:
+  - name: Accept
+    value: application/atom+xml
