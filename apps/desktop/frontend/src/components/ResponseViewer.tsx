@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, X, Clock, Copy, Check, AlignLeft, Code2 } from 'lucide-react'
+import { Search, X, Clock, Copy, Check, AlignLeft, Code2, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
+import { openInSystemViewer } from '@/lib/bridge'
 import type { ResponseData } from '@/lib/bridge'
 
 // ---- Timing bar ----
@@ -332,6 +333,16 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
       setTimeout(() => setCopied(false), 1500)
     } catch { /* ignore */ }
   }
+
+  const bodyFormat = response && !response.error
+    ? detectFormat(response.body, response.headers.find(h => h.name.toLowerCase() === 'content-type')?.value)
+    : null
+
+  async function handleOpenExternal() {
+    if (!response?.body || !bodyFormat) return
+    const displayBody = rawMode ? response.body : prettyBody(response.body)
+    await openInSystemViewer(displayBody, bodyFormat)
+  }
   const matchCount = countMatches(bodyText, searchQuery)
 
   const openSearch = useCallback(() => {
@@ -402,6 +413,14 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
               className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
               {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenExternal}
+              title="Open in system viewer"
+              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+            >
+              <ExternalLink size={12} />
             </button>
           </>
         ) : response?.error ? (

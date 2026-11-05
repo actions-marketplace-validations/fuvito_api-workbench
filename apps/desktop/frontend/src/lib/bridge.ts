@@ -31,6 +31,7 @@ import {
   RenameRequest as WailsRenameRequest,
   SaveResponseCache as WailsSaveResponseCache,
   LoadResponseCache as WailsLoadResponseCache,
+  OpenInSystemViewer as WailsOpenInSystemViewer,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -369,6 +370,11 @@ export interface ResponseCacheData extends ResponseData {
 export async function saveResponseCache(reqPath: string, response: ResponseData): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await WailsSaveResponseCache(reqPath, response as any)
+}
+
+export async function openInSystemViewer(content: string, format: string): Promise<string> {
+  const result = await WailsOpenInSystemViewer(content, format)
+  return result as unknown as string
 }
 
 export async function loadResponseCache(reqPath: string): Promise<ResponseCacheData | null> {
