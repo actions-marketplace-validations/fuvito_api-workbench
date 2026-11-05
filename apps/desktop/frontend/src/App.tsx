@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { FolderOpen, Save, FilePlus, Settings, Pencil } from 'lucide-react'
+import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus, Code2 } from 'lucide-react'
 import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
@@ -251,6 +251,216 @@ function Sidebar({
   )
 }
 
+// ---- Variable highlighting URL input ----
+
+function renderVarTokens(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = []
+  const re = /(\{\{[^}]*\}\})/g
+  let last = 0, i = 0
+  for (const m of text.matchAll(re)) {
+    if (m.index! > last) nodes.push(<span key={`t${i++}`}>{text.slice(last, m.index)}</span>)
+    nodes.push(<span key={`v${i++}`} style={{ color: 'var(--color-accent)' }}>{m[0]}</span>)
+    last = m.index! + m[0].length
+  }
+  if (last < text.length) nodes.push(<span key={`t${i++}`}>{text.slice(last)}</span>)
+  return nodes
+}
+
+function HighlightedInput({
+  value, onChange, onKeyDown, onPaste, placeholder, className,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
+  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void
+  placeholder?: string
+  className?: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const mirrorRef = useRef<HTMLDivElement>(null)
+  const hasVars = /\{\{/.test(value)
+
+  function syncScroll() {
+    if (mirrorRef.current && inputRef.current) {
+      mirrorRef.current.scrollLeft = inputRef.current.scrollLeft
+    }
+  }
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => { onChange(e.target.value); syncScroll() }}
+        onKeyDown={onKeyDown}
+        onPaste={onPaste}
+        onScroll={syncScroll}
+        placeholder={placeholder}
+        className={cn(className, 'w-full', hasVars && 'text-transparent placeholder:text-transparent')}
+        style={hasVars ? { caretColor: 'var(--color-foreground)' } : undefined}
+      />
+      {hasVars && (
+        <div
+          ref={mirrorRef}
+          aria-hidden
+          className="absolute inset-0 flex items-center pointer-events-none overflow-hidden px-3 text-xs font-mono"
+        >
+          {renderVarTokens(value)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- Code snippet generators ----
+
+function buildCurl(tab: TabState): string {
+  const parts: string[] = [`curl -X ${tab.method}`]
+
+  let url = tab.url.trim()
+  const qp = [...tab.queryParams.filter(p => p.enabled && p.name.trim())]
+  if (tab.auth.type === 'apikey' && tab.auth.location === 'query') {
+    qp.push({ id: '', name: tab.auth.key, value: tab.auth.value, enabled: true })
+  }
+  if (qp.length) {
+    url += (url.includes('?') ? '&' : '?') +
+      qp.map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value)}`).join('&')
+  }
+  parts.push(`"${url}"`)
+
+  if (tab.auth.type === 'bearer') parts.push(`-H "Authorization: Bearer ${tab.auth.token}"`)
+  else if (tab.auth.type === 'basic') parts.push(`--user "${tab.auth.username}:${tab.auth.password}"`)
+  else if (tab.auth.type === 'apikey' && tab.auth.location === 'header') parts.push(`-H "${tab.auth.key}: ${tab.auth.value}"`)
+
+  for (const h of tab.headers.filter(h => h.enabled && h.name.trim())) {
+    parts.push(`-H "${h.name}: ${h.value.replace(/"/g, '\\"')}"`)
+  }
+
+  if (tab.body.type !== 'none' && tab.body.content.trim()) {
+    const ct = tab.body.type === 'json' ? 'application/json'
+              : tab.body.type === 'form-urlencoded' ? 'application/x-www-form-urlencoded'
+              : 'text/plain'
+    parts.push(`-H "Content-Type: ${ct}"`)
+    parts.push(`--data '${tab.body.content.replace(/'/g, "'\\''")}'`)
+  }
+
+  return parts.join(' \\\n  ')
+}
+
+function buildFetch(tab: TabState): string {
+  const headers: Record<string, string> = {}
+  for (const h of tab.headers.filter(h => h.enabled && h.name.trim())) headers[h.name] = h.value
+  if (tab.auth.type === 'bearer') headers['Authorization'] = `Bearer ${tab.auth.token}`
+  else if (tab.auth.type === 'basic') headers['Authorization'] = `Basic ${btoa(`${tab.auth.username}:${tab.auth.password}`)}`
+  else if (tab.auth.type === 'apikey' && tab.auth.location === 'header') headers[tab.auth.key] = tab.auth.value
+  if (tab.body.type === 'json') headers['Content-Type'] = 'application/json'
+  else if (tab.body.type === 'form-urlencoded') headers['Content-Type'] = 'application/x-www-form-urlencoded'
+
+  let url = tab.url.trim()
+  const qp = [...tab.queryParams.filter(p => p.enabled && p.name.trim())]
+  if (tab.auth.type === 'apikey' && tab.auth.location === 'query') {
+    qp.push({ id: '', name: tab.auth.key, value: tab.auth.value, enabled: true })
+  }
+  if (qp.length) {
+    url += (url.includes('?') ? '&' : '?') +
+      qp.map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value)}`).join('&')
+  }
+
+  const opts: string[] = [`  method: '${tab.method}'`]
+  if (Object.keys(headers).length) {
+    const hLines = Object.entries(headers).map(([k, v]) => `    '${k}': '${v.replace(/'/g, "\\'")}'`).join(',\n')
+    opts.push(`  headers: {\n${hLines}\n  }`)
+  }
+  if (tab.body.type !== 'none' && tab.body.content.trim()) opts.push(`  body: ${JSON.stringify(tab.body.content)}`)
+
+  return `const response = await fetch('${url}', {\n${opts.join(',\n')}\n});\nconst data = await response.json();`
+}
+
+function buildPython(tab: TabState): string {
+  const headers: Record<string, string> = {}
+  for (const h of tab.headers.filter(h => h.enabled && h.name.trim())) headers[h.name] = h.value
+  if (tab.auth.type === 'bearer') headers['Authorization'] = `Bearer ${tab.auth.token}`
+  else if (tab.auth.type === 'apikey' && tab.auth.location === 'header') headers[tab.auth.key] = tab.auth.value
+  if (tab.body.type === 'json') headers['Content-Type'] = 'application/json'
+
+  const params: Record<string, string> = {}
+  for (const p of tab.queryParams.filter(p => p.enabled && p.name.trim())) params[p.name] = p.value
+  if (tab.auth.type === 'apikey' && tab.auth.location === 'query') params[tab.auth.key] = tab.auth.value
+
+  const args: string[] = [`    '${tab.url.trim()}'`]
+  if (Object.keys(headers).length) args.push(`    headers=${JSON.stringify(headers, null, 4).replace(/\n/g, '\n    ')}`)
+  if (Object.keys(params).length) args.push(`    params=${JSON.stringify(params, null, 4).replace(/\n/g, '\n    ')}`)
+  if (tab.body.type !== 'none' && tab.body.content.trim()) {
+    args.push(tab.body.type === 'json' ? `    json=${tab.body.content}` : `    data=${JSON.stringify(tab.body.content)}`)
+  }
+  if (tab.auth.type === 'basic') args.push(`    auth=('${tab.auth.username}', '${tab.auth.password}')`)
+
+  return `import requests\n\nresponse = requests.${tab.method.toLowerCase()}(\n${args.join(',\n')}\n)\nresponse.raise_for_status()\ndata = response.json()`
+}
+
+// ---- Snippet button ----
+
+type SnippetFormat = 'curl' | 'fetch' | 'python'
+const SNIPPET_FORMATS: Array<{ key: SnippetFormat; label: string }> = [
+  { key: 'curl',   label: 'curl' },
+  { key: 'fetch',  label: 'JavaScript · fetch' },
+  { key: 'python', label: 'Python · requests' },
+]
+
+function SnippetButton({ tab }: { tab: TabState }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState<SnippetFormat | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  async function copy(fmt: SnippetFormat) {
+    const snippet = fmt === 'curl' ? buildCurl(tab) : fmt === 'fetch' ? buildFetch(tab) : buildPython(tab)
+    await navigator.clipboard.writeText(snippet)
+    setCopied(fmt)
+    setTimeout(() => { setCopied(null); setOpen(false) }, 1400)
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        title="Copy as code snippet"
+        className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+      >
+        <Code2 size={13} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-xl py-1 min-w-[200px]">
+          {SNIPPET_FORMATS.map(f => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => copy(f.key)}
+              className={cn(
+                'w-full text-left px-3 py-1.5 text-xs flex items-center justify-between gap-4 transition-colors',
+                'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
+              )}
+            >
+              <span>{f.label}</span>
+              {copied === f.key && <span className="text-emerald-400 text-[10px] shrink-0 font-medium">Copied!</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---- Request editor ----
 
 type RequestEditorTab = 'Params' | 'Headers' | 'Body' | 'Auth'
@@ -314,10 +524,9 @@ function RequestEditor({
           ))}
         </select>
 
-        <input
-          type="text"
+        <HighlightedInput
           value={url}
-          onChange={e => onUrlChange(e.target.value)}
+          onChange={onUrlChange}
           onKeyDown={handleKeyDown}
           onPaste={e => {
             const text = e.clipboardData.getData('text')
@@ -328,7 +537,7 @@ function RequestEditor({
           }}
           placeholder="https://api.example.com/endpoint"
           className={cn(
-            'flex-1 bg-[var(--color-muted)] text-xs font-mono rounded px-3 py-1',
+            'bg-[var(--color-muted)] text-xs font-mono rounded px-3 py-1',
             'border border-[var(--color-border)] outline-none',
             'focus:border-[var(--color-accent)]',
             'placeholder:text-[var(--color-muted-foreground)]',
@@ -936,6 +1145,24 @@ export default function App() {
   function handleNewTab() {
     const tab = createBlankTab()
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
+  }
+
+  function handleDuplicateTab() {
+    const { tabs, activeTabId } = tabsStateRef.current
+    const tab = tabs.find(t => t.id === activeTabId)
+    if (!tab) return
+    const newTab: TabState = {
+      ...tab,
+      id: crypto.randomUUID(),
+      filePath: null,
+      name: tab.name ? `${tab.name} copy` : null,
+      savedKey: '',
+      response: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
   }
 
   function handleSelectTab(id: string) {
@@ -1724,6 +1951,15 @@ export default function App() {
               >
                 <FilePlus size={13} />
               </button>
+              <button
+                type="button"
+                onClick={handleDuplicateTab}
+                title="Duplicate tab"
+                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              >
+                <CopyPlus size={13} />
+              </button>
+              <SnippetButton tab={activeTab} />
               <button
                 type="button"
                 onClick={() => setShowSettings(true)}
