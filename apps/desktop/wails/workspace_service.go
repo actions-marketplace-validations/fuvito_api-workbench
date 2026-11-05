@@ -521,7 +521,7 @@ func (w *WorkspaceService) DeleteRequest(path string) error {
 			return fmt.Errorf("path is outside the current workspace")
 		}
 	}
-	if err := os.Remove(path); err != nil {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("deleting %s: %w", path, err)
 	}
 	return nil
@@ -530,7 +530,7 @@ func (w *WorkspaceService) DeleteRequest(path string) error {
 // DeleteEnvironment removes an environment file.
 // If it was the active environment, the active selection is cleared.
 func (w *WorkspaceService) DeleteEnvironment(path string) error {
-	if err := os.Remove(path); err != nil {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("deleting %s: %w", path, err)
 	}
 	if path == w.activeEnvPath {
