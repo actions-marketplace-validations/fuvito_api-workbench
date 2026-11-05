@@ -25,6 +25,7 @@ export type SidebarProps = {
   onSelectHistory: (entry: HistoryEntry) => void
   onClearHistory: () => void
   onImportOpenAPI: () => void
+  onRefresh?: () => void
   importing?: boolean
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
@@ -38,7 +39,7 @@ export function Sidebar({
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder,
   onSelectHistory, onClearHistory,
-  onImportOpenAPI, importing,
+  onImportOpenAPI, onRefresh, importing,
   activeFilePath, dirtyFilePaths,
 }: SidebarProps) {
   return (
@@ -81,6 +82,7 @@ export function Sidebar({
             onRenameFile={onRenameFile}
             onRenameFolder={onRenameFolder}
             onImportOpenAPI={onImportOpenAPI}
+            onRefresh={onRefresh}
             importing={importing}
             activeFilePath={activeFilePath}
             dirtyFilePaths={dirtyFilePaths}
