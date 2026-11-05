@@ -5,6 +5,8 @@ import {main} from '../models';
 
 export function ActiveEnvironment():Promise<domain.Environment>;
 
+export function CloseWorkspace():Promise<void>;
+
 export function CreateFolder(arg1:string,arg2:string):Promise<string>;
 
 export function DeleteEnvironment(arg1:string):Promise<void>;

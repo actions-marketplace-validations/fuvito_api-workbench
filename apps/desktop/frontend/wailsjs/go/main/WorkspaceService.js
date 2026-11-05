@@ -6,6 +6,10 @@ export function ActiveEnvironment() {
   return window['go']['main']['WorkspaceService']['ActiveEnvironment']();
 }
 
+export function CloseWorkspace() {
+  return window['go']['main']['WorkspaceService']['CloseWorkspace']();
+}
+
 export function CreateFolder(arg1, arg2) {
   return window['go']['main']['WorkspaceService']['CreateFolder'](arg1, arg2);
 }
