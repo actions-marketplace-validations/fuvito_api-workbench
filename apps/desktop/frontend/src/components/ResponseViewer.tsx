@@ -334,7 +334,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
     try {
       await navigator.clipboard.writeText(bodyText)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setTimeout(() => setCopied(false), 2500)
     } catch { /* ignore */ }
   }
 
@@ -439,7 +439,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
         ) : (
           <span className="text-xs text-[var(--color-muted-foreground)]">Response</span>
         )}
-        {response?.timing && !response.error && (
+        {response?.timing && (
           <TimingBar timing={response.timing} total={response.durationMs} onClick={() => setShowTimingDialog(true)} />
         )}
         {showTimingDialog && response?.timing && (

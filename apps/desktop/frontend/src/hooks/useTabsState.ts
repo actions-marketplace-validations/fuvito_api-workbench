@@ -1,0 +1,264 @@
+import { useState, useRef, useEffect } from 'react'
+import { saveRequest, loadResponseCache, setHasDirtyTabs } from '@/lib/bridge'
+import type { RequestFileIO } from '@/lib/bridge'
+import { computeStateKey, createBlankTab, isTabDirty, isBlankTab } from '@/lib/tabState'
+import type { TabState } from '@/lib/tabState'
+import { authStateToPayload, requestFileIOToState, HTTP_METHODS } from '@/lib/httpUtils'
+import type { HttpMethod } from '@/lib/httpUtils'
+import type { HistoryEntry } from '@/lib/bridge'
+
+export type TabsStateTuple = { tabs: TabState[]; activeTabId: string }
+
+export function useTabsState(deps: {
+  refreshWorkspaceRef: React.RefObject<() => Promise<void>>
+}) {
+  const { refreshWorkspaceRef } = deps
+
+  const [{ tabs, activeTabId }, setTabsState] = useState<TabsStateTuple>(() => {
+    const tab = createBlankTab()
+    return { tabs: [tab], activeTabId: tab.id }
+  })
+
+  const tabsStateRef = useRef<TabsStateTuple>({ tabs, activeTabId })
+  tabsStateRef.current = { tabs, activeTabId }
+
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
+
+  const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
+
+  const hasAnyDirtyTab = tabs.some(t => isTabDirty(t))
+  useEffect(() => {
+    setHasDirtyTabs(hasAnyDirtyTab).catch(() => {})
+  }, [hasAnyDirtyTab])
+
+  function updateTab(id: string, patch: Partial<TabState>) {
+    setTabsState(prev => ({
+      ...prev,
+      tabs: prev.tabs.map(t => t.id === id ? { ...t, ...patch } : t),
+    }))
+  }
+
+  function switchTo(id: string) {
+    setTabsState(prev => ({ ...prev, activeTabId: id }))
+  }
+
+  function removeTab(id: string) {
+    setTabsState(prev => {
+      if (prev.tabs.length === 1) {
+        const blank = createBlankTab()
+        return { tabs: [{ ...blank, id: prev.tabs[0].id }], activeTabId: prev.tabs[0].id }
+      }
+      const idx = prev.tabs.findIndex(t => t.id === id)
+      const remaining = prev.tabs.filter(t => t.id !== id)
+      const newActiveId = prev.activeTabId === id
+        ? (remaining[Math.min(idx, remaining.length - 1)]?.id ?? remaining[0].id)
+        : prev.activeTabId
+      return { tabs: remaining, activeTabId: newActiveId }
+    })
+  }
+
+  function handleNewTab() {
+    const tab = createBlankTab()
+    setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
+  }
+
+  function handleDuplicateTab() {
+    const { tabs: currentTabs, activeTabId: currentActiveId } = tabsStateRef.current
+    const tab = currentTabs.find(t => t.id === currentActiveId)
+    if (!tab) return
+    const newTab: TabState = {
+      ...tab,
+      id: crypto.randomUUID(),
+      filePath: null,
+      name: tab.name ? `${tab.name} copy` : null,
+      savedKey: '',
+      response: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
+  }
+
+  function handleSelectTab(id: string) {
+    switchTo(id)
+  }
+
+  function handleCloseTab(id: string) {
+    const { tabs: currentTabs } = tabsStateRef.current
+    const tab = currentTabs.find(t => t.id === id)
+    if (!tab) return
+    if (isTabDirty(tab)) {
+      setClosingDirtyTabId(id)
+    } else {
+      removeTab(id)
+    }
+  }
+
+  function openFileAsTab(r: RequestFileIO, path: string): string {
+    const state = requestFileIOToState(r)
+    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null)
+    const newTab: TabState = {
+      id: crypto.randomUUID(),
+      ...state,
+      name: r.name || null,
+      filePath: path,
+      targetDir: null,
+      savedKey,
+      response: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    let resolvedId = newTab.id
+    setTabsState(prev => {
+      const active = prev.tabs.find(t => t.id === prev.activeTabId)
+      if (active && isBlankTab(active)) {
+        resolvedId = prev.activeTabId
+        return {
+          tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
+          activeTabId: prev.activeTabId,
+        }
+      }
+      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+    })
+    return resolvedId
+  }
+
+  async function loadCacheIntoTab(tabId: string, path: string) {
+    try {
+      const cached = await loadResponseCache(path)
+      if (!cached) return
+      const { cachedAt, ...response } = cached
+      setTabsState(prev => ({
+        ...prev,
+        tabs: prev.tabs.map(t =>
+          t.id === tabId && t.response === null
+            ? { ...t, response, responseCachedAt: cachedAt }
+            : t,
+        ),
+      }))
+    } catch { /* cache miss is not an error */ }
+  }
+
+  function tabToRequestFileIO(tab: TabState, overrideFilePath?: string): RequestFileIO {
+    const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
+    return {
+      schemaVersion: '1',
+      name,
+      method: tab.method,
+      url: tab.url.trim(),
+      headers: tab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
+      queryParams: tab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
+      body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
+      auth: authStateToPayload(tab.auth) ?? undefined,
+      filePath: overrideFilePath ?? tab.filePath ?? '',
+      targetDir: tab.targetDir ?? '',
+    }
+  }
+
+  async function saveTabById(tabId: string): Promise<boolean> {
+    const tab = tabsStateRef.current.tabs.find(t => t.id === tabId)
+    if (!tab) return false
+    updateTab(tabId, { saveError: null })
+    const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
+    try {
+      const req = tabToRequestFileIO(tab)
+      const savedPath = await saveRequest(req)
+      if (savedPath) {
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
+        updateTab(tabId, { name, filePath: savedPath, savedKey })
+        await refreshWorkspaceRef.current?.()
+        return true
+      }
+      return false
+    } catch (err) {
+      updateTab(tabId, { saveError: String(err).replace(/^Error: /, '') })
+      return false
+    }
+  }
+
+  const saveTabByIdRef = useRef(saveTabById)
+  saveTabByIdRef.current = saveTabById
+
+  async function handleSaveRequest(): Promise<boolean> {
+    return saveTabById(tabsStateRef.current.activeTabId)
+  }
+
+  async function handleSaveAsRequest(): Promise<boolean> {
+    const { activeTabId: currentActiveId } = tabsStateRef.current
+    const tab = tabsStateRef.current.tabs.find(t => t.id === currentActiveId)
+    if (!tab) return false
+    updateTab(currentActiveId, { saveError: null })
+    const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
+    try {
+      const req = tabToRequestFileIO(tab, '')
+      const savedPath = await saveRequest(req)
+      if (savedPath) {
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
+        updateTab(currentActiveId, { name, filePath: savedPath, savedKey })
+        await refreshWorkspaceRef.current?.()
+        return true
+      }
+      return false
+    } catch (err) {
+      updateTab(currentActiveId, { saveError: String(err).replace(/^Error: /, '') })
+      return false
+    }
+  }
+
+  function handleSelectHistory(entry: HistoryEntry) {
+    const method = (HTTP_METHODS as readonly string[]).includes(entry.method)
+      ? entry.method as HttpMethod : 'GET'
+    const savedKey = computeStateKey(method, entry.url, [], [], { type: 'none', content: '' }, { type: 'none' }, null)
+    const newTab: TabState = {
+      id: crypto.randomUUID(),
+      method,
+      url: entry.url,
+      queryParams: [],
+      headers: [],
+      body: { type: 'none', content: '' },
+      auth: { type: 'none' },
+      name: null,
+      filePath: null,
+      targetDir: null,
+      savedKey,
+      response: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => {
+      const active = prev.tabs.find(t => t.id === prev.activeTabId)
+      if (active && isBlankTab(active)) {
+        return {
+          tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
+          activeTabId: prev.activeTabId,
+        }
+      }
+      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+    })
+  }
+
+  function handleNewRequestInFolder(folderPath: string) {
+    const tab = createBlankTab(folderPath)
+    setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
+  }
+
+  const dirtyFilePaths = new Set(tabs.filter(t => t.filePath && isTabDirty(t)).map(t => t.filePath!))
+
+  return {
+    tabs, activeTabId, activeTab,
+    setTabsState, tabsStateRef,
+    updateTab, switchTo, removeTab,
+    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab,
+    openFileAsTab, loadCacheIntoTab,
+    saveTabById, saveTabByIdRef,
+    handleSaveRequest, handleSaveAsRequest,
+    handleSelectHistory, handleNewRequestInFolder,
+    closingDirtyTabId, setClosingDirtyTabId,
+    dirtyFilePaths,
+  }
+}

@@ -148,7 +148,7 @@ export function SnippetButton({ tab }: { tab: TabState }) {
 
             {/* Code */}
             <div className="flex-1 overflow-auto p-4 min-h-0">
-              <pre className="text-xs font-mono leading-relaxed text-[var(--color-foreground)] whitespace-pre-wrap break-words">
+              <pre className="font-mono leading-relaxed text-[var(--color-foreground)] whitespace-pre-wrap break-words" style={{ fontSize: 'var(--font-size-code)' }}>
                 <HighlightedCode code={snippet} lang={format} />
               </pre>
             </div>

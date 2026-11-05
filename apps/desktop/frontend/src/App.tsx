@@ -1,27 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
-import {
-  executeRequest, getHistory, cancelRequest, clearHistory,
-  openWorkspace, newWorkspace, closeWorkspace, getWorkspacePath, listRequests,
-  loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
-  createFolder, deleteFolder, renameFolder, renameRequest,
-  listEnvironments, selectEnvironment, getActiveEnvironment,
-  importOpenAPISpec, importOpenAPISpecFromURL, getSettings, saveSettings, resetSettings,
-  startDemo, stopDemo, saveResponseCache, loadResponseCache,
-  type HistoryEntry, type FileNode,
-  type EnvInfo, type RequestFileIO, type AppSettings,
-} from '@/lib/bridge'
+import { AppToolbar } from '@/components/AppToolbar'
 import { SettingsPanel } from '@/components/SettingsPanel'
 import { EnvironmentEditor } from '@/components/EnvironmentEditor'
-import { cn } from '@/lib/utils'
 import { RequestEditor } from '@/components/RequestEditor'
 import { ResponseViewer } from '@/components/ResponseViewer'
 import { Sidebar } from '@/components/Sidebar'
 import type { SidebarTab } from '@/components/Sidebar'
-import { SnippetButton } from '@/components/SnippetButton'
 import { AboutDialog } from '@/components/AboutDialog'
 import {
   DeleteRequestDialog,
@@ -30,158 +17,54 @@ import {
   CloseDirtyTabDialog,
   ImportFromURLDialog,
 } from '@/components/ConfirmDialogs'
-import {
-  HTTP_METHODS, METHOD_COLOR, authStateToPayload, requestFileIOToState,
-} from '@/lib/httpUtils'
-import type { HttpMethod } from '@/lib/httpUtils'
+import { useTabsState } from '@/hooks/useTabsState'
+import { useWorkspace } from '@/hooks/useWorkspace'
+import { useSettings } from '@/hooks/useSettings'
+import { useDemo } from '@/hooks/useDemo'
+import { executeRequest, cancelRequest, saveResponseCache, selectEnvironment } from '@/lib/bridge'
+import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
-import { computeStateKey, createBlankTab, isTabDirty, isBlankTab } from '@/lib/tabState'
-import type { TabState } from '@/lib/tabState'
+import { isTabDirty } from '@/lib/tabState'
+import { cn } from '@/lib/utils'
 import type { KVPair } from '@/types'
 
 export default function App() {
-  // --- Tabs ---
-  const [{ tabs, activeTabId }, setTabsState] = useState(() => {
-    const tab = createBlankTab()
-    return { tabs: [tab] as TabState[], activeTabId: tab.id }
+  // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
+  const refreshWorkspaceRef = useRef<() => Promise<void>>(async () => {})
+
+  const tabs = useTabsState({ refreshWorkspaceRef })
+  const workspace = useWorkspace({
+    setTabsState: tabs.setTabsState,
+    tabsStateRef: tabs.tabsStateRef,
+    openFileAsTab: tabs.openFileAsTab,
+    loadCacheIntoTab: tabs.loadCacheIntoTab,
+  })
+  const settings = useSettings()
+  const demo = useDemo({
+    refreshWorkspace: workspace.refreshWorkspace,
+    setTabsState: tabs.setTabsState,
   })
 
-  const tabsStateRef = useRef({ tabs, activeTabId })
-  tabsStateRef.current = { tabs, activeTabId }
+  // Wire cross-dependency after both hooks are initialized
+  refreshWorkspaceRef.current = workspace.refreshWorkspace
 
-  // --- Resize state ---
+  // Local UI state
   const [sidebarWidth, setSidebarWidth] = useState(224)
   const [responseWidth, setResponseWidth] = useState(0)
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
-
-  // --- Global UI state ---
-  const [settings, setSettings] = useState<AppSettings>({ theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false })
-  const [showSettings, setShowSettings] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('workspace')
+  const [showAbout, setShowAbout] = useState(false)
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
-  const [workspacePath, setWorkspacePath] = useState<string>('')
-  const [fileTree, setFileTree] = useState<FileNode[]>([])
-  const [environments, setEnvironments] = useState<EnvInfo[]>([])
-  const [activeEnv, setActiveEnv] = useState<EnvInfo | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('workspace')
-  const [importing, setImporting] = useState(false)
-  const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
-  const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
-  const [showAbout, setShowAbout] = useState(false)
-  const [demoRunning, setDemoRunning] = useState(false)
-  const [demoPort, setDemoPort] = useState(0)
-  const [demoStarting, setDemoStarting] = useState(false)
-  const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
-  const [newFolderDialog, setNewFolderDialog] = useState<{ parentPath: string; parentLabel: string } | null>(null)
-  const [newFolderName, setNewFolderName] = useState('')
-  const [newFolderError, setNewFolderError] = useState('')
-  const [importFromURLDialog, setImportFromURLDialog] = useState(false)
-  const [importFromURLInput, setImportFromURLInput] = useState('')
-  const [importFromURLError, setImportFromURLError] = useState('')
 
-  // --- Derived ---
-  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
-
-  // --- Tab helpers ---
-
-  function updateTab(id: string, patch: Partial<TabState>) {
-    setTabsState(prev => ({
-      ...prev,
-      tabs: prev.tabs.map(t => t.id === id ? { ...t, ...patch } : t),
-    }))
-  }
-
-  function switchTo(id: string) {
-    setTabsState(prev => ({ ...prev, activeTabId: id }))
-  }
-
-  function openFileAsTab(r: RequestFileIO, path: string): string {
-    const state = requestFileIOToState(r)
-    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null)
-    const newTab: TabState = {
-      id: crypto.randomUUID(),
-      ...state,
-      name: r.name || null,
-      filePath: path,
-      targetDir: null,
-      savedKey,
-      response: null,
-      responseCachedAt: null,
-      loading: false,
-      saveError: null,
-      editingName: false,
-    }
-    let resolvedId = newTab.id
-    setTabsState(prev => {
-      const active = prev.tabs.find(t => t.id === prev.activeTabId)
-      if (active && isBlankTab(active)) {
-        resolvedId = prev.activeTabId
-        return {
-          tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
-          activeTabId: prev.activeTabId,
-        }
-      }
-      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
-    })
-    return resolvedId
-  }
-
-  async function loadCacheIntoTab(tabId: string, path: string) {
-    try {
-      const cached = await loadResponseCache(path)
-      if (!cached) return
-      const { cachedAt, ...response } = cached
-      setTabsState(prev => ({
-        ...prev,
-        tabs: prev.tabs.map(t =>
-          t.id === tabId && t.response === null
-            ? { ...t, response, responseCachedAt: cachedAt }
-            : t,
-        ),
-      }))
-    } catch { /* cache miss is not an error */ }
-  }
-
-  // ---- Init ----
-
-  const refreshWorkspace = useCallback(async () => {
-    try {
-      const [path, tree, envs, activeE] = await Promise.all([
-        getWorkspacePath() as Promise<string>,
-        listRequests(),
-        listEnvironments(),
-        getActiveEnvironment(),
-      ])
-      setWorkspacePath(path ?? '')
-      setFileTree(tree ?? [])
-      setEnvironments(envs ?? [])
-      setActiveEnv(activeE)
-    } catch {
-      // best-effort
-    }
-  }, [])
-
-  const refreshHistory = useCallback(async () => {
-    try { setHistory(await getHistory()) } catch { /* best-effort */ }
-  }, [])
-
+  // Init
   useEffect(() => {
-    refreshWorkspace()
-    refreshHistory()
-    getSettings().then(s => {
-      setSettings(s)
-      applySettings(s)
-    }).catch(() => {})
-  }, [refreshWorkspace, refreshHistory])
+    workspace.refreshWorkspace()
+    workspace.refreshHistory()
+    settings.loadSettings()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasAnyDirtyTab = tabs.some(t => isTabDirty(t))
-  useEffect(() => {
-    setHasDirtyTabs(hasAnyDirtyTab).catch(() => {})
-  }, [hasAnyDirtyTab])
-
-  // ---- Resize ----
-
+  // Resize
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       if (draggingRef.current === 'sidebar') {
@@ -206,582 +89,11 @@ export default function App() {
     }
   }, [])
 
-  // ---- Keyboard shortcuts ----
-
-  const saveTabByIdRef = useRef<((id: string) => Promise<boolean>) | null>(null)
+  // Request execution
   const handleSendRef = useRef<(() => void) | null>(null)
-  const handleOpenRequestRef = useRef<(() => void) | null>(null)
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        saveTabByIdRef.current?.(tabsStateRef.current.activeTabId)
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault()
-        handleNewTab()
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
-        e.preventDefault()
-        handleCloseTab(tabsStateRef.current.activeTabId)
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        const el = document.activeElement
-        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
-        e.preventDefault()
-        handleSendRef.current?.()
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-        e.preventDefault()
-        handleOpenRequestRef.current?.()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, []) // registered once; reads from refs
-
-  // ---- Tab operations ----
-
-  function handleNewTab() {
-    const tab = createBlankTab()
-    setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
-  }
-
-  function handleDuplicateTab() {
-    const { tabs: currentTabs, activeTabId: currentActiveId } = tabsStateRef.current
-    const tab = currentTabs.find(t => t.id === currentActiveId)
-    if (!tab) return
-    const newTab: TabState = {
-      ...tab,
-      id: crypto.randomUUID(),
-      filePath: null,
-      name: tab.name ? `${tab.name} copy` : null,
-      savedKey: '',
-      response: null,
-      loading: false,
-      saveError: null,
-      editingName: false,
-    }
-    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
-  }
-
-  function handleSelectTab(id: string) {
-    switchTo(id)
-  }
-
-  function handleCloseTab(id: string) {
-    const { tabs: currentTabs } = tabsStateRef.current
-    const tab = currentTabs.find(t => t.id === id)
-    if (!tab) return
-    if (isTabDirty(tab)) {
-      setClosingDirtyTabId(id)
-    } else {
-      removeTab(id)
-    }
-  }
-
-  function removeTab(id: string) {
-    setTabsState(prev => {
-      if (prev.tabs.length === 1) {
-        const blank = createBlankTab()
-        return { tabs: [{ ...blank, id: prev.tabs[0].id }], activeTabId: prev.tabs[0].id }
-      }
-      const idx = prev.tabs.findIndex(t => t.id === id)
-      const remaining = prev.tabs.filter(t => t.id !== id)
-      const newActiveId = prev.activeTabId === id
-        ? (remaining[Math.min(idx, remaining.length - 1)]?.id ?? remaining[0].id)
-        : prev.activeTabId
-      return { tabs: remaining, activeTabId: newActiveId }
-    })
-  }
-
-  // ---- Workspace operations ----
-
-  async function handleOpenWorkspace() {
-    try {
-      const path = await openWorkspace()
-      if (path) {
-        setWorkspacePath(path)
-        await refreshWorkspace()
-      }
-    } catch (err) {
-      console.error('open workspace:', err)
-    }
-  }
-
-  async function handleNewWorkspace() {
-    try {
-      const path = await newWorkspace()
-      if (path) {
-        setWorkspacePath(path)
-        await refreshWorkspace()
-      }
-    } catch (err) {
-      console.error('new workspace:', err)
-    }
-  }
-
-  async function handleCloseWorkspace() {
-    try {
-      const path = workspacePath
-      await closeWorkspace()
-      setWorkspacePath('')
-      setFileTree([])
-      setEnvironments([])
-      setActiveEnv(null)
-      if (path) {
-        setTabsState(prev => {
-          const norm = (p: string) => p.replace(/\\/g, '/')
-          const prefix = norm(path).replace(/\/?$/, '/')
-          const remaining = prev.tabs.filter(t => !norm(t.filePath ?? '').startsWith(prefix))
-          if (remaining.length === prev.tabs.length) return prev
-          if (remaining.length === 0) {
-            const blank = createBlankTab()
-            return { tabs: [blank], activeTabId: blank.id }
-          }
-          const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
-          return {
-            tabs: remaining,
-            activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
-          }
-        })
-      }
-    } catch (err) {
-      console.error('close workspace:', err)
-    }
-  }
-
-  async function handleSelectFile(path: string) {
-    const existing = tabsStateRef.current.tabs.find(t => t.filePath === path)
-    if (existing) {
-      switchTo(existing.id)
-      return
-    }
-    try {
-      const r = await loadRequest(path)
-      if (!r) return
-      const tabId = openFileAsTab(r, path)
-      loadCacheIntoTab(tabId, path)
-    } catch (err) {
-      console.error('load request:', err)
-    }
-  }
-
-  async function handleOpenRequest() {
-    try {
-      const r = await openRequest()
-      if (!r || !r.filePath) return
-      const existing = tabsStateRef.current.tabs.find(t => t.filePath === r.filePath)
-      if (existing) { switchTo(existing.id); return }
-      const tabId = openFileAsTab(r, r.filePath)
-      loadCacheIntoTab(tabId, r.filePath)
-    } catch (err) {
-      console.error('open request:', err)
-    }
-  }
-
-  handleOpenRequestRef.current = handleOpenRequest
-
-  function handleNewRequest() {
-    handleNewTab()
-  }
-
-  async function saveTabById(tabId: string): Promise<boolean> {
-    const tab = tabsStateRef.current.tabs.find(t => t.id === tabId)
-    if (!tab) return false
-    updateTab(tabId, { saveError: null })
-    const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
-    try {
-      const req: RequestFileIO = {
-        schemaVersion: '1',
-        name,
-        method: tab.method,
-        url: tab.url.trim(),
-        headers: tab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
-        queryParams: tab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
-        body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
-        auth: authStateToPayload(tab.auth) ?? undefined,
-        filePath: tab.filePath ?? '',
-        targetDir: tab.targetDir ?? '',
-      }
-      const savedPath = await saveRequest(req)
-      if (savedPath) {
-        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
-        updateTab(tabId, { name, filePath: savedPath, savedKey })
-        await refreshWorkspace()
-        return true
-      }
-      return false
-    } catch (err) {
-      updateTab(tabId, { saveError: String(err).replace(/^Error: /, '') })
-      return false
-    }
-  }
-
-  saveTabByIdRef.current = saveTabById
-
-  async function handleSaveRequest(): Promise<boolean> {
-    return saveTabById(activeTabId)
-  }
-
-  async function handleSaveAsRequest(): Promise<boolean> {
-    const tab = tabsStateRef.current.tabs.find(t => t.id === activeTabId)
-    if (!tab) return false
-    updateTab(activeTabId, { saveError: null })
-    const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
-    try {
-      const req: RequestFileIO = {
-        schemaVersion: '1',
-        name,
-        method: tab.method,
-        url: tab.url.trim(),
-        headers: tab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
-        queryParams: tab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
-        body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
-        auth: authStateToPayload(tab.auth) ?? undefined,
-        filePath: '',
-        targetDir: tab.targetDir ?? '',
-      }
-      const savedPath = await saveRequest(req)
-      if (savedPath) {
-        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
-        updateTab(activeTabId, { name, filePath: savedPath, savedKey })
-        await refreshWorkspace()
-        return true
-      }
-      return false
-    } catch (err) {
-      updateTab(activeTabId, { saveError: String(err).replace(/^Error: /, '') })
-      return false
-    }
-  }
-
-  // ---- Environment operations ----
-
-  async function handleEnvChange(path: string) {
-    try {
-      await selectEnvironment(path)
-      const envs = await listEnvironments()
-      setEnvironments(envs ?? [])
-      const active = path ? envs.find(e => e.path === path) ?? null : null
-      setActiveEnv(active)
-    } catch (err) {
-      console.error('select environment:', err)
-    }
-  }
-
-  // ---- History ----
-
-  function handleSelectHistory(entry: HistoryEntry) {
-    const method = (HTTP_METHODS as readonly string[]).includes(entry.method)
-      ? entry.method as HttpMethod : 'GET'
-    const savedKey = computeStateKey(method, entry.url, [], [], { type: 'none', content: '' }, { type: 'none' }, null)
-    const newTab: TabState = {
-      id: crypto.randomUUID(),
-      method,
-      url: entry.url,
-      queryParams: [],
-      headers: [],
-      body: { type: 'none', content: '' },
-      auth: { type: 'none' },
-      name: null,
-      filePath: null,
-      targetDir: null,
-      savedKey,
-      response: null,
-      responseCachedAt: null,
-      loading: false,
-      saveError: null,
-      editingName: false,
-    }
-    setTabsState(prev => {
-      const active = prev.tabs.find(t => t.id === prev.activeTabId)
-      if (active && isBlankTab(active)) {
-        return {
-          tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
-          activeTabId: prev.activeTabId,
-        }
-      }
-      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
-    })
-  }
-
-  // ---- Settings ----
-
-  function applySettings(s: AppSettings) {
-    const root = document.documentElement
-    root.style.setProperty('--font-size-code', `${s.fontSize}px`)
-    if (s.theme === 'light') {
-      root.classList.add('light')
-      root.classList.remove('dark')
-    } else {
-      root.classList.add('dark')
-      root.classList.remove('light')
-    }
-  }
-
-  async function handleToggleTheme() {
-    const next = { ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' }
-    await handleSaveSettings(next as AppSettings)
-  }
-
-  async function handleSaveSettings(s: AppSettings) {
-    try {
-      const saved = await saveSettings(s)
-      setSettings(saved)
-      applySettings(saved)
-    } catch (err) {
-      console.error('save settings:', err)
-    }
-  }
-
-  async function handleResetSettings() {
-    try {
-      const defaults = await resetSettings()
-      setSettings(defaults)
-      applySettings(defaults)
-      setShowSettings(false)
-    } catch (err) {
-      console.error('reset settings:', err)
-    }
-  }
-
-  // ---- OpenAPI import ----
-
-  async function handleImportOpenAPI() {
-    setImporting(true)
-    try {
-      const result = await importOpenAPISpec()
-      if (result.error) {
-        console.error('import error:', result.error)
-      } else {
-        await refreshWorkspace()
-      }
-    } catch (err) {
-      console.error('import failed:', err)
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  async function handleImportFromURL() {
-    const url = importFromURLInput.trim()
-    if (!url) return
-    setImportFromURLDialog(false)
-    setImporting(true)
-    setImportFromURLError('')
-    try {
-      const result = await importOpenAPISpecFromURL(url)
-      if (result.error) {
-        setImportFromURLError(result.error)
-        setImportFromURLDialog(true)
-      } else {
-        setImportFromURLInput('')
-        await refreshWorkspace()
-      }
-    } catch (err) {
-      console.error('import from URL failed:', err)
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  // ---- Cancel in-flight request ----
-
-  function handleCancel() {
-    cancelRequest().catch(() => {})
-  }
-
-  // ---- Clear history ----
-
-  async function handleClearHistory() {
-    try {
-      await clearHistory()
-      setHistory([])
-    } catch (err) {
-      console.error('clear history:', err)
-    }
-  }
-
-  // ---- Duplicate request file ----
-
-  async function handleDuplicateFile(path: string) {
-    try {
-      const req = await loadRequest(path)
-      const lastSep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-      const targetDir = lastSep !== -1 ? path.slice(0, lastSep) : ''
-      await saveRequest({ ...req, name: (req.name || 'request') + ' Copy', filePath: '', targetDir })
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('duplicate request:', err)
-    }
-  }
-
-  // ---- Delete request file ----
-
-  function handleDeleteFile(path: string) {
-    setDeletingFilePath(path)
-  }
-
-  async function confirmDeleteFile() {
-    if (!deletingFilePath) return
-    const path = deletingFilePath
-    setDeletingFilePath(null)
-    try {
-      await deleteRequest(path)
-      setTabsState(prev => {
-        const remaining = prev.tabs.filter(t => t.filePath !== path)
-        if (remaining.length === prev.tabs.length) return prev
-        if (remaining.length === 0) {
-          const blank = createBlankTab()
-          return { tabs: [blank], activeTabId: blank.id }
-        }
-        const activeStillExists = remaining.some(t => t.id === prev.activeTabId)
-        return {
-          tabs: remaining,
-          activeTabId: activeStillExists ? prev.activeTabId : remaining[remaining.length - 1].id,
-        }
-      })
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('delete request:', err)
-    }
-  }
-
-  // ---- Folder operations ----
-
-  function handleCreateFolder(parentPath: string) {
-    const parentLabel = parentPath
-      ? parentPath.replace(/\\/g, '/').split('/').pop() ?? 'requests'
-      : 'requests'
-    setNewFolderDialog({ parentPath, parentLabel })
-    setNewFolderName('')
-    setNewFolderError('')
-  }
-
-  async function confirmCreateFolder() {
-    if (!newFolderDialog || !newFolderName.trim()) return
-    try {
-      await createFolder(newFolderDialog.parentPath, newFolderName.trim())
-      setNewFolderDialog(null)
-      setNewFolderName('')
-      setNewFolderError('')
-      await refreshWorkspace()
-    } catch (err) {
-      setNewFolderError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  function handleDeleteFolder(path: string) {
-    setDeletingFolderPath(path)
-  }
-
-  async function confirmDeleteFolder() {
-    if (!deletingFolderPath) return
-    const path = deletingFolderPath
-    setDeletingFolderPath(null)
-    try {
-      await deleteFolder(path)
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('delete folder:', err)
-    }
-  }
-
-  function handleNewRequestInFolder(folderPath: string) {
-    const tab = createBlankTab(folderPath)
-    setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
-  }
-
-  // ---- Rename operations ----
-
-  function rebasePath(oldBase: string, newBase: string, p: string | null): string | null {
-    if (!p) return p
-    if (p === oldBase) return newBase
-    if (p.startsWith(oldBase + '\\') || p.startsWith(oldBase + '/')) return newBase + p.slice(oldBase.length)
-    return p
-  }
-
-  async function handleRenameFile(path: string, newName: string) {
-    try {
-      const newPath = await renameRequest(path, newName)
-      if (!newPath) return
-      setTabsState(prev => ({
-        ...prev,
-        tabs: prev.tabs.map(t => {
-          if (t.filePath !== path) return t
-          const savedKey = computeStateKey(t.method, t.url, t.queryParams, t.headers, t.body, t.auth, newName)
-          return { ...t, name: newName, filePath: newPath, savedKey }
-        }),
-      }))
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('rename request:', err)
-    }
-  }
-
-  async function handleRenameFolder(path: string, newName: string) {
-    try {
-      const newPath = await renameFolder(path, newName)
-      if (!newPath) return
-      setTabsState(prev => ({
-        ...prev,
-        tabs: prev.tabs.map(t => {
-          const fp = rebasePath(path, newPath, t.filePath)
-          const td = rebasePath(path, newPath, t.targetDir)
-          if (fp === t.filePath && td === t.targetDir) return t
-          return { ...t, filePath: fp, targetDir: td }
-        }),
-      }))
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('rename folder:', err)
-    }
-  }
-
-  // ---- URL paste: curl import or query-param extraction ----
-
-  function handleUrlPaste(raw: string) {
-    try {
-      // curl import
-      const curlResult = parseCurl(raw)
-      if (curlResult) {
-        updateTab(activeTabId, {
-          method: curlResult.method,
-          url: curlResult.url,
-          queryParams: curlResult.queryParams,
-          headers: curlResult.headers,
-          body: curlResult.body,
-          auth: curlResult.auth,
-        })
-        return
-      }
-
-      // Strip query params from pasted URL
-      const qIdx = raw.indexOf('?')
-      if (qIdx === -1) return
-      const baseUrl = raw.slice(0, qIdx)
-      const search = raw.slice(qIdx + 1)
-      const parsed = new URLSearchParams(search)
-      const extracted: KVPair[] = []
-      parsed.forEach((value, name) => {
-        extracted.push({ id: crypto.randomUUID(), name, value, enabled: true })
-      })
-      updateTab(activeTabId, { url: baseUrl })
-      if (extracted.length > 0) {
-        const names = new Set(extracted.map(p => p.name.toLowerCase()))
-        const kept = activeTab.queryParams.filter(p => !names.has(p.name.toLowerCase()))
-        updateTab(activeTabId, { queryParams: [...kept, ...extracted] })
-      }
-    } catch {
-      updateTab(activeTabId, { url: raw })
-    }
-  }
-
-  // ---- Request execution ----
 
   async function handleSend() {
+    const { activeTab, activeTabId, updateTab, tabsStateRef } = tabs
     if (!activeTab.url.trim() || activeTab.loading) return
     const tabId = activeTabId
     updateTab(tabId, { loading: true, response: null, responseCachedAt: null })
@@ -804,87 +116,106 @@ export default function App() {
       updateTab(tabId, { response: { statusCode: 0, status: '', headers: [], body: '', durationMs: 0, size: 0, timing: { dnsMs: 0, connectMs: 0, tlsMs: 0, ttfbMs: 0, transferMs: 0 }, error: String(err) } })
     } finally {
       updateTab(tabId, { loading: false })
-      refreshHistory()
+      workspace.refreshHistory()
     }
   }
 
   handleSendRef.current = handleSend
 
-  // ---- Demo server ----
+  function handleCancel() {
+    cancelRequest().catch(() => {})
+  }
 
-  async function handleStartDemo() {
-    if (demoRunning || demoStarting) return
-    setDemoStarting(true)
+  function handleUrlPaste(raw: string) {
+    const { activeTabId, activeTab, updateTab } = tabs
     try {
-      const result = await startDemo()
-      if (result.error) {
-        console.error('demo start failed:', result.error)
+      const curlResult = parseCurl(raw)
+      if (curlResult) {
+        updateTab(activeTabId, {
+          method: curlResult.method,
+          url: curlResult.url,
+          queryParams: curlResult.queryParams,
+          headers: curlResult.headers,
+          body: curlResult.body,
+          auth: curlResult.auth,
+        })
         return
       }
-      setDemoRunning(true)
-      setDemoPort(result.port)
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('demo start error:', err)
-    } finally {
-      setDemoStarting(false)
-    }
-  }
-
-  async function handleStopDemo() {
-    try {
-      const port = demoPort
-      await stopDemo()
-      setDemoRunning(false)
-      setDemoPort(0)
-      // Close demo tabs, then restore the previous workspace state from Go.
-      if (port > 0) {
-        setTabsState(prev => {
-          const prefix = `http://localhost:${port}`
-          const remaining = prev.tabs.filter(t => !t.url.startsWith(prefix))
-          if (remaining.length === prev.tabs.length) return prev
-          if (remaining.length === 0) {
-            const blank = createBlankTab()
-            return { tabs: [blank], activeTabId: blank.id }
-          }
-          const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
-          return {
-            tabs: remaining,
-            activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
-          }
-        })
+      const qIdx = raw.indexOf('?')
+      if (qIdx === -1) return
+      const baseUrl = raw.slice(0, qIdx)
+      const search = raw.slice(qIdx + 1)
+      const parsed = new URLSearchParams(search)
+      const extracted: KVPair[] = []
+      parsed.forEach((value, name) => {
+        extracted.push({ id: crypto.randomUUID(), name, value, enabled: true })
+      })
+      updateTab(activeTabId, { url: baseUrl })
+      if (extracted.length > 0) {
+        const names = new Set(extracted.map(p => p.name.toLowerCase()))
+        const kept = activeTab.queryParams.filter(p => !names.has(p.name.toLowerCase()))
+        updateTab(activeTabId, { queryParams: [...kept, ...extracted] })
       }
-      await refreshWorkspace()
-    } catch (err) {
-      console.error('demo stop error:', err)
+    } catch {
+      updateTab(activeTabId, { url: raw, saveError: 'Could not extract params from pasted URL' })
+      setTimeout(() => updateTab(activeTabId, { saveError: null }), 3000)
     }
   }
 
-  // ---- Menus ----
+  // Keyboard shortcuts — registered once, reads from refs
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        tabs.saveTabByIdRef.current(tabs.tabsStateRef.current.activeTabId)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        tabs.handleNewTab()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
+        e.preventDefault()
+        tabs.handleCloseTab(tabs.tabsStateRef.current.activeTabId)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const el = document.activeElement
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+        e.preventDefault()
+        handleSendRef.current?.()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault()
+        workspace.handleOpenRequest()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Menus
   const menus: MenuDef[] = [
     {
       label: 'File',
       items: [
-        { kind: 'action', label: 'New Tab',           shortcut: 'Ctrl+N', onClick: handleNewTab },
-        { kind: 'action', label: 'Open Request…',     shortcut: 'Ctrl+O', onClick: handleOpenRequest },
-        { kind: 'action', label: 'Save Request',      shortcut: 'Ctrl+S', onClick: handleSaveRequest },
-        { kind: 'action', label: 'Save As…',                             onClick: handleSaveAsRequest },
+        { kind: 'action', label: 'New Tab',                  shortcut: 'Ctrl+N', onClick: tabs.handleNewTab },
+        { kind: 'action', label: 'Open Request…',            shortcut: 'Ctrl+O', onClick: workspace.handleOpenRequest },
+        { kind: 'action', label: 'Save Request',             shortcut: 'Ctrl+S', onClick: tabs.handleSaveRequest },
+        { kind: 'action', label: 'Save As…',                                     onClick: tabs.handleSaveAsRequest },
         { kind: 'separator' },
-        { kind: 'action', label: 'Import OpenAPI Spec…', onClick: handleImportOpenAPI, disabled: !workspacePath },
-        { kind: 'action', label: 'Import OpenAPI from URL…', onClick: () => { setImportFromURLInput(''); setImportFromURLError(''); setImportFromURLDialog(true) }, disabled: !workspacePath },
+        { kind: 'action', label: 'Import OpenAPI Spec…',     onClick: workspace.handleImportOpenAPI, disabled: !workspace.workspacePath },
+        { kind: 'action', label: 'Import OpenAPI from URL…', onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) }, disabled: !workspace.workspacePath },
         { kind: 'separator' },
-        { kind: 'action', label: 'Open Workspace…',   onClick: handleOpenWorkspace },
-        { kind: 'action', label: 'New Workspace…',    onClick: handleNewWorkspace },
-        { kind: 'action', label: 'Close Workspace',   onClick: handleCloseWorkspace, disabled: !workspacePath },
+        { kind: 'action', label: 'Open Workspace…',          onClick: workspace.handleOpenWorkspace },
+        { kind: 'action', label: 'New Workspace…',           onClick: workspace.handleNewWorkspace },
+        { kind: 'action', label: 'Close Workspace',          onClick: workspace.handleCloseWorkspace, disabled: !workspace.workspacePath },
       ],
     },
     {
       label: 'View',
       items: [
-        { kind: 'action', label: settings.theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme', onClick: handleToggleTheme },
+        { kind: 'action', label: settings.settings.theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme', onClick: settings.handleToggleTheme },
         { kind: 'separator' },
-        { kind: 'action', label: 'Settings…', onClick: () => setShowSettings(true) },
+        { kind: 'action', label: 'Settings…', onClick: () => settings.setShowSettings(true) },
       ],
     },
     {
@@ -892,9 +223,9 @@ export default function App() {
       items: [
         {
           kind: 'action',
-          label: demoStarting ? 'Starting Demo…' : demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
-          onClick: demoRunning ? handleStopDemo : handleStartDemo,
-          disabled: demoStarting,
+          label: demo.demoStarting ? 'Starting Demo…' : demo.demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
+          onClick: demo.demoRunning ? demo.handleStopDemo : demo.handleStartDemo,
+          disabled: demo.demoStarting,
         },
         { kind: 'separator' },
         { kind: 'action', label: 'About ApiDesk', onClick: () => setShowAbout(true) },
@@ -902,96 +233,95 @@ export default function App() {
     },
   ]
 
-  const tabInfos = tabs.map(t => ({
+  const { tabs: tabList, activeTabId, activeTab, updateTab } = tabs
+  const closingTab = tabs.closingDirtyTabId ? tabList.find(t => t.id === tabs.closingDirtyTabId) : null
+  const tabInfos = tabList.map(t => ({
     id: t.id,
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
   }))
 
-  const closingTab = closingDirtyTabId ? tabs.find(t => t.id === closingDirtyTabId) : null
-
-  // ---- Render ----
-
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       <MenuBar menus={menus} />
 
-      {deletingFilePath && (
+      {workspace.deletingFilePath && (
         <DeleteRequestDialog
-          filePath={deletingFilePath}
-          onCancel={() => setDeletingFilePath(null)}
-          onConfirm={confirmDeleteFile}
+          filePath={workspace.deletingFilePath}
+          onCancel={() => workspace.setDeletingFilePath(null)}
+          onConfirm={workspace.confirmDeleteFile}
         />
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
 
-      {importFromURLDialog && (
+      {workspace.importFromURLDialog && (
         <ImportFromURLDialog
-          value={importFromURLInput}
-          onChange={v => { setImportFromURLInput(v); setImportFromURLError('') }}
-          onCancel={() => { setImportFromURLDialog(false); setImportFromURLError('') }}
-          onConfirm={handleImportFromURL}
-          error={importFromURLError}
+          value={workspace.importFromURLInput}
+          onChange={v => { workspace.setImportFromURLInput(v); workspace.setImportFromURLError('') }}
+          onCancel={() => { workspace.setImportFromURLDialog(false); workspace.setImportFromURLError('') }}
+          onConfirm={workspace.handleImportFromURL}
+          error={workspace.importFromURLError}
         />
       )}
 
-      {newFolderDialog && (
+      {workspace.newFolderDialog && (
         <NewFolderDialog
-          parentLabel={newFolderDialog.parentLabel}
-          value={newFolderName}
-          onChange={v => { setNewFolderName(v); setNewFolderError('') }}
-          onCancel={() => { setNewFolderDialog(null); setNewFolderError('') }}
-          onConfirm={confirmCreateFolder}
-          error={newFolderError}
+          parentLabel={workspace.newFolderDialog.parentLabel}
+          value={workspace.newFolderName}
+          onChange={v => { workspace.setNewFolderName(v); workspace.setNewFolderError('') }}
+          onCancel={() => { workspace.setNewFolderDialog(null); workspace.setNewFolderError('') }}
+          onConfirm={workspace.confirmCreateFolder}
+          error={workspace.newFolderError}
         />
       )}
 
-      {deletingFolderPath && (
+      {workspace.deletingFolderPath && (
         <DeleteFolderDialog
-          folderPath={deletingFolderPath}
-          onCancel={() => setDeletingFolderPath(null)}
-          onConfirm={confirmDeleteFolder}
+          folderPath={workspace.deletingFolderPath}
+          onCancel={() => workspace.setDeletingFolderPath(null)}
+          onConfirm={workspace.confirmDeleteFolder}
         />
       )}
 
       {closingTab && (
         <CloseDirtyTabDialog
           tabName={closingTab.name}
-          onCancel={() => setClosingDirtyTabId(null)}
-          onDiscard={() => { setClosingDirtyTabId(null); removeTab(closingTab.id) }}
+          onCancel={() => tabs.setClosingDirtyTabId(null)}
+          onDiscard={() => { tabs.setClosingDirtyTabId(null); tabs.removeTab(closingTab.id) }}
           onSave={async () => {
-            const ok = await saveTabById(closingTab.id)
-            if (ok) { setClosingDirtyTabId(null); removeTab(closingTab.id) }
+            const ok = await tabs.saveTabById(closingTab.id)
+            if (ok) { tabs.setClosingDirtyTabId(null); tabs.removeTab(closingTab.id) }
           }}
         />
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {showSettings && (
+        {settings.showSettings && (
           <SettingsPanel
-            settings={settings}
-            onSave={handleSaveSettings}
-            onReset={handleResetSettings}
-            onPreview={applySettings}
-            onClose={() => { applySettings(settings); setShowSettings(false) }}
+            settings={settings.settings}
+            onSave={settings.handleSaveSettings}
+            onReset={settings.handleResetSettings}
+            onPreview={settings.applySettings}
+            onClose={() => { settings.applySettings(settings.settings); settings.setShowSettings(false) }}
           />
         )}
+
         {showEnvEditor && (
           <EnvironmentEditor
             envPath={editingEnvPath}
-            workspacePath={workspacePath}
+            workspacePath={workspace.workspacePath}
             onClose={() => setShowEnvEditor(false)}
             onSaved={async saved => {
               setShowEnvEditor(false)
-              await refreshWorkspace()
+              await workspace.refreshWorkspace()
               try { await selectEnvironment(saved.path) } catch { /* best-effort */ }
-              await refreshWorkspace()
+              await workspace.refreshWorkspace()
             }}
             onDeleted={async () => {
               setShowEnvEditor(false)
-              await refreshWorkspace()
+              await workspace.refreshWorkspace()
             }}
           />
         )}
@@ -1000,29 +330,28 @@ export default function App() {
           width={sidebarWidth}
           tab={sidebarTab}
           onTabChange={setSidebarTab}
-          workspacePath={workspacePath}
-          fileTree={fileTree}
-          history={history}
-          onOpenWorkspace={handleOpenWorkspace}
-          onNewWorkspace={handleNewWorkspace}
-          onSelectFile={handleSelectFile}
-          onDeleteFile={handleDeleteFile}
-          onDuplicateFile={handleDuplicateFile}
-          onDeleteFolder={handleDeleteFolder}
-          onNewRequestInFolder={handleNewRequestInFolder}
-          onCreateFolder={handleCreateFolder}
-          onRenameFile={handleRenameFile}
-          onRenameFolder={handleRenameFolder}
-          onSelectHistory={handleSelectHistory}
-          onClearHistory={handleClearHistory}
-          onImportOpenAPI={handleImportOpenAPI}
-          onRefresh={refreshWorkspace}
-          importing={importing}
+          workspacePath={workspace.workspacePath}
+          fileTree={workspace.fileTree}
+          history={workspace.history}
+          onOpenWorkspace={workspace.handleOpenWorkspace}
+          onNewWorkspace={workspace.handleNewWorkspace}
+          onSelectFile={workspace.handleSelectFile}
+          onDeleteFile={workspace.handleDeleteFile}
+          onDuplicateFile={workspace.handleDuplicateFile}
+          onDeleteFolder={workspace.handleDeleteFolder}
+          onNewRequestInFolder={tabs.handleNewRequestInFolder}
+          onCreateFolder={workspace.handleCreateFolder}
+          onRenameFile={workspace.handleRenameFile}
+          onRenameFolder={workspace.handleRenameFolder}
+          onSelectHistory={tabs.handleSelectHistory}
+          onClearHistory={workspace.handleClearHistory}
+          onImportOpenAPI={workspace.handleImportOpenAPI}
+          onRefresh={workspace.refreshWorkspace}
+          importing={workspace.importing}
           activeFilePath={activeTab.filePath ?? undefined}
-          dirtyFilePaths={new Set(tabs.filter(t => t.filePath && isTabDirty(t)).map(t => t.filePath!))}
+          dirtyFilePaths={tabs.dirtyFilePaths}
         />
 
-        {/* Sidebar resize handle */}
         <div
           className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
           onMouseDown={e => {
@@ -1037,173 +366,30 @@ export default function App() {
           <TabBar
             tabs={tabInfos}
             activeTabId={activeTabId}
-            onSelect={handleSelectTab}
-            onClose={handleCloseTab}
-            onNew={handleNewTab}
+            onSelect={tabs.handleSelectTab}
+            onClose={tabs.handleCloseTab}
+            onNew={tabs.handleNewTab}
           />
 
-          {/* Request header bar */}
-          <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              {isTabDirty(activeTab) && (
-                <span className="shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />
-              )}
-              {activeTab.name !== null && (
-                <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[activeTab.method])}>
-                  {activeTab.method}
-                </span>
-              )}
-              {activeTab.editingName ? (
-                <input
-                  autoFocus
-                  type="text"
-                  value={activeTab.name ?? ''}
-                  onChange={e => updateTab(activeTabId, { name: e.target.value })}
-                  onBlur={() => {
-                    if (!activeTab.name?.trim()) updateTab(activeTabId, { name: null, editingName: false })
-                    else updateTab(activeTabId, { editingName: false })
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === 'Escape') {
-                      if (!activeTab.name?.trim()) updateTab(activeTabId, { name: null, editingName: false })
-                      else updateTab(activeTabId, { editingName: false })
-                    }
-                  }}
-                  className={cn(
-                    'text-xs font-medium bg-transparent outline-none',
-                    'border-b border-[var(--color-accent)]',
-                    'text-[var(--color-foreground)] w-40',
-                  )}
-                />
-              ) : activeTab.name !== null ? (
-                <button
-                  type="button"
-                  onClick={() => updateTab(activeTabId, { editingName: true, saveError: null })}
-                  title="Click to rename"
-                  className="text-xs font-medium text-[var(--color-foreground)] hover:text-[var(--color-accent)] truncate transition-colors text-left"
-                >
-                  {activeTab.name}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => updateTab(activeTabId, { name: '', editingName: true })}
-                  title="Click to name this request"
-                  className="text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-                >
-                  New Request
-                </button>
-              )}
-              {activeTab.saveError && (
-                <span className="text-label text-[var(--color-destructive)] truncate ml-1">
-                  {activeTab.saveError}
-                </span>
-              )}
-            </div>
+          <AppToolbar
+            activeTab={activeTab}
+            activeTabId={activeTabId}
+            updateTab={updateTab}
+            environments={workspace.environments}
+            activeEnv={workspace.activeEnv}
+            workspacePath={workspace.workspacePath}
+            demoRunning={demo.demoRunning}
+            demoPort={demo.demoPort}
+            onOpenRequest={workspace.handleOpenRequest}
+            onSaveRequest={tabs.handleSaveRequest}
+            onNewRequest={tabs.handleNewTab}
+            onDuplicateTab={tabs.handleDuplicateTab}
+            onShowSettings={() => settings.setShowSettings(true)}
+            onEnvChange={workspace.handleEnvChange}
+            onEditEnv={() => { setEditingEnvPath(workspace.activeEnv?.path ?? null); setShowEnvEditor(true) }}
+            onStopDemo={demo.handleStopDemo}
+          />
 
-            <div className="ml-auto flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleOpenRequest}
-                title="Open request file"
-                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              >
-                <FolderOpen size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveRequest}
-                title="Save request (Ctrl+S)"
-                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              >
-                <Save size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={handleNewRequest}
-                title="New request tab (Ctrl+N)"
-                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              >
-                <FilePlus size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={handleDuplicateTab}
-                title="Duplicate tab"
-                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              >
-                <CopyPlus size={13} />
-              </button>
-              <SnippetButton tab={activeTab} />
-              <button
-                type="button"
-                onClick={() => setShowSettings(true)}
-                title="Settings"
-                className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              >
-                <Settings size={13} />
-              </button>
-
-              {environments.length > 0 && (
-                <div className="w-px h-4 bg-[var(--color-border)]" />
-              )}
-
-              {environments.length > 0 && (
-                <select
-                  value={activeEnv?.path ?? ''}
-                  onChange={e => handleEnvChange(e.target.value)}
-                  className={cn(
-                    'bg-[var(--color-muted)] text-xs rounded px-2 py-0.5',
-                    'border border-[var(--color-border)] outline-none cursor-pointer',
-                    activeEnv ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]',
-                  )}
-                >
-                  <option value="">No environment</option>
-                  {environments.map(env => (
-                    <option key={env.path} value={env.path}>{env.name}</option>
-                  ))}
-                </select>
-              )}
-
-              {workspacePath && (
-                <button
-                  type="button"
-                  onClick={() => { setEditingEnvPath(activeEnv?.path ?? null); setShowEnvEditor(true) }}
-                  title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'Create environment'}
-                  className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-                >
-                  <Pencil size={13} />
-                </button>
-              )}
-
-              {demoRunning && (
-                <>
-                  <div className="w-px h-4 bg-[var(--color-border)]" />
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard.writeText(`http://localhost:${demoPort}`).catch(() => {})}
-                      title={`Copy base URL: http://localhost:${demoPort}`}
-                      className="text-emerald-400 font-mono hover:text-emerald-300 transition-colors"
-                    >
-                      Demo :{demoPort}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleStopDemo}
-                      title="Stop demo server"
-                      className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors leading-none"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </header>
-
-          {/* Request + Response split */}
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               <RequestEditor
@@ -1226,7 +412,6 @@ export default function App() {
               />
             </div>
 
-            {/* Response resize handle */}
             <div
               className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
               onMouseDown={e => {

@@ -106,6 +106,11 @@ export function Sidebar({
             {history.length === 0 ? (
               <p className="p-3 text-xs text-[var(--color-muted-foreground)]">No requests yet.</p>
             ) : (
+              <p className="px-3 py-1.5 text-[10px] text-[var(--color-muted-foreground)] italic border-b border-[var(--color-border)]">
+                Restores method + URL only
+              </p>
+            )}
+            {history.length > 0 && (
               <ul>
                 {history.map(entry => (
                   <li key={entry.id}>

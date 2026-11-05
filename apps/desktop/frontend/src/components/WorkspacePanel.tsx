@@ -319,6 +319,15 @@ export function WorkspacePanel({
   // ---- Context menu ----
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [explorerError, setExplorerError] = useState<string | null>(null)
+
+  async function handleOpenInExplorer(path: string) {
+    const err = await openInExplorer(path)
+    if (err) {
+      setExplorerError(err)
+      setTimeout(() => setExplorerError(null), 4000)
+    }
+  }
 
   function handleContextMenu(e: React.MouseEvent, node: FileNode) {
     e.preventDefault()
@@ -334,7 +343,7 @@ export function WorkspacePanel({
         ...(onCreateFolder ? [{ kind: 'action' as const, label: 'New Subfolder', onClick: () => onCreateFolder(node.path) }] : []),
         { kind: 'separator' },
         { kind: 'action', label: 'Rename', onClick: () => setRenamingPath(node.path) },
-        { kind: 'action', label: 'Open in Explorer', onClick: () => openInExplorer(node.path) },
+        { kind: 'action', label: 'Open in Explorer', onClick: () => handleOpenInExplorer(node.path) },
         { kind: 'separator' },
         {
           kind: 'action',
@@ -425,6 +434,11 @@ export function WorkspacePanel({
                   <X size={10} />
                 </button>
               )}
+            </div>
+          )}
+          {explorerError && (
+            <div className="px-2 py-1 text-[10px] text-red-400 bg-red-500/10 border-b border-red-500/20 truncate" title={explorerError}>
+              {explorerError}
             </div>
           )}
           <div className="flex-1 overflow-auto py-1">

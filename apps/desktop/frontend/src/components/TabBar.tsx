@@ -18,6 +18,11 @@ const TAB_METHOD_COLOR: Record<string, string> = {
   OPTIONS: 'text-cyan-400',
 }
 
+const TAB_METHOD_ABBR: Record<string, string> = {
+  GET: 'GET', POST: 'PST', PUT: 'PUT', PATCH: 'PCH',
+  DELETE: 'DEL', HEAD: 'HED', OPTIONS: 'OPT',
+}
+
 type TabBarProps = {
   tabs: TabInfo[]
   activeTabId: string
@@ -49,7 +54,7 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
               <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
             )}
             <span className={cn('shrink-0 font-mono font-bold text-[10px]', TAB_METHOD_COLOR[tab.method] ?? '')}>
-              {tab.method.slice(0, 3)}
+              {TAB_METHOD_ABBR[tab.method] ?? tab.method.slice(0, 3)}
             </span>
             <span className="truncate flex-1 text-[11px]">
               {tab.name ?? 'New Request'}
