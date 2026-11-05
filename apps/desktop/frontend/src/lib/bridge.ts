@@ -33,6 +33,7 @@ import {
   LoadResponseCache as WailsLoadResponseCache,
   OpenInSystemViewer as WailsOpenInSystemViewer,
   OpenInExplorer as WailsOpenInExplorer,
+  MoveRequest as WailsMoveRequest,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -380,6 +381,11 @@ export async function openInSystemViewer(content: string, format: string): Promi
 
 export async function openInExplorer(path: string): Promise<string> {
   const result = await WailsOpenInExplorer(path)
+  return result as unknown as string
+}
+
+export async function moveRequest(srcPath: string, destDir: string): Promise<string> {
+  const result = await WailsMoveRequest(srcPath, destDir)
   return result as unknown as string
 }
 

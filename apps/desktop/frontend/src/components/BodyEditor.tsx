@@ -8,6 +8,7 @@ const BODY_TYPES: { value: BodyType; label: string }[] = [
   { value: 'json', label: 'JSON' },
   { value: 'raw', label: 'Raw' },
   { value: 'form-urlencoded', label: 'Form URL Encoded' },
+  { value: 'multipart', label: 'Multipart Form' },
 ]
 
 const PLACEHOLDER: Record<BodyType, string> = {
@@ -15,7 +16,10 @@ const PLACEHOLDER: Record<BodyType, string> = {
   json: '{\n  "key": "value"\n}',
   raw: 'Body content…',
   'form-urlencoded': '',
+  multipart: '',
 }
+
+const IS_FORM_TYPE = (t: BodyType) => t === 'form-urlencoded' || t === 'multipart'
 
 function parseFormPairs(content: string): KVPair[] {
   if (!content.trim()) return []
@@ -46,9 +50,9 @@ type Props = {
 export function BodyEditor({ body, onChange }: Props) {
   const [formPairs, setFormPairs] = useState<KVPair[]>(() => parseFormPairs(body.content))
 
-  // Re-parse into pairs only when switching into form-urlencoded mode
+  // Re-parse into pairs only when switching into a form body type
   useEffect(() => {
-    if (body.type === 'form-urlencoded') {
+    if (IS_FORM_TYPE(body.type)) {
       setFormPairs(parseFormPairs(body.content))
     }
   }, [body.type]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -67,7 +71,7 @@ export function BodyEditor({ body, onChange }: Props) {
 
   function handleFormPairsChange(pairs: KVPair[]) {
     setFormPairs(pairs)
-    onChange({ type: 'form-urlencoded', content: serializeFormPairs(pairs) })
+    onChange({ type: IS_FORM_TYPE(body.type) ? body.type : 'form-urlencoded', content: serializeFormPairs(pairs) })
   }
 
   return (
@@ -98,7 +102,7 @@ export function BodyEditor({ body, onChange }: Props) {
         )}
       </div>
 
-      {body.type === 'form-urlencoded' ? (
+      {IS_FORM_TYPE(body.type) ? (
         <div className="flex-1 overflow-auto">
           <KeyValueEditor
             pairs={formPairs}

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import {
   openWorkspace, newWorkspace, closeWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest, deleteRequest,
-  createFolder, deleteFolder, renameFolder, renameRequest,
+  createFolder, deleteFolder, renameFolder, renameRequest, moveRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment, getEnvironment,
   importOpenAPISpec, importOpenAPISpecFromURL,
   getHistory, clearHistory,
@@ -299,6 +299,20 @@ export function useWorkspace(deps: {
     }
   }
 
+  async function handleMoveFile(srcPath: string, destDir: string) {
+    try {
+      const newPath = await moveRequest(srcPath, destDir)
+      if (!newPath) return
+      setTabsState(prev => ({
+        ...prev,
+        tabs: prev.tabs.map(t => t.filePath === srcPath ? { ...t, filePath: newPath } : t),
+      }))
+      await refreshWorkspace()
+    } catch (err) {
+      console.error('move file:', err)
+    }
+  }
+
   async function handleImportOpenAPI() {
     setImporting(true)
     try {
@@ -342,7 +356,7 @@ export function useWorkspace(deps: {
     refreshWorkspace, refreshHistory,
     handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace,
     handleSelectFile, handleOpenRequest, handleEnvChange,
-    handleClearHistory, handleDuplicateFile,
+    handleClearHistory, handleDuplicateFile, handleMoveFile,
     deletingFilePath, setDeletingFilePath, confirmDeleteFile, handleDeleteFile,
     handleCreateFolder,
     newFolderDialog, setNewFolderDialog,

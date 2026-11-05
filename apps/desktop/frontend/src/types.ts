@@ -5,7 +5,7 @@ export type KVPair = {
   enabled: boolean
 }
 
-export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded'
+export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded' | 'multipart'
 
 export type BodyState = {
   type: BodyType

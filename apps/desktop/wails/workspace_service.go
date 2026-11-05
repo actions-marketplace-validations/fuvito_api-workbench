@@ -521,6 +521,33 @@ func (w *WorkspaceService) RenameRequest(path, newName string) (string, error) {
 	return newPath, nil
 }
 
+// MoveRequest moves a request file into a different folder within the workspace.
+// Returns the new file path.
+func (w *WorkspaceService) MoveRequest(srcPath, destDir string) (string, error) {
+	if w.workspacePath != "" {
+		for _, p := range []string{srcPath, destDir} {
+			rel, err := filepath.Rel(w.workspacePath, p)
+			if err != nil || strings.HasPrefix(rel, "..") {
+				return "", fmt.Errorf("path is outside the current workspace")
+			}
+		}
+	}
+	newPath := filepath.Join(destDir, filepath.Base(srcPath))
+	if newPath == srcPath {
+		return srcPath, nil // already in this folder
+	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("creating destination: %w", err)
+	}
+	if _, err := os.Stat(newPath); err == nil {
+		return "", fmt.Errorf("a file named %q already exists in the destination folder", filepath.Base(srcPath))
+	}
+	if err := os.Rename(srcPath, newPath); err != nil {
+		return "", fmt.Errorf("moving file: %w", err)
+	}
+	return newPath, nil
+}
+
 // DeleteRequest removes a request file from disk.
 func (w *WorkspaceService) DeleteRequest(path string) error {
 	if path == "" {

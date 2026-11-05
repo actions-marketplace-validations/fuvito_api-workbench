@@ -54,6 +54,10 @@ export function LoadResponseCache(arg1) {
   return window['go']['main']['WorkspaceService']['LoadResponseCache'](arg1);
 }
 
+export function MoveRequest(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['MoveRequest'](arg1, arg2);
+}
+
 export function NewWorkspace() {
   return window['go']['main']['WorkspaceService']['NewWorkspace']();
 }

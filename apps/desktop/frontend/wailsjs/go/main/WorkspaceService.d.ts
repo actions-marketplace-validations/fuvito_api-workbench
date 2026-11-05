@@ -29,6 +29,8 @@ export function LoadRequest(arg1:string):Promise<main.RequestFileIO>;
 
 export function LoadResponseCache(arg1:string):Promise<main.ResponseCacheIO>;
 
+export function MoveRequest(arg1:string,arg2:string):Promise<string>;
+
 export function NewWorkspace():Promise<string>;
 
 export function OpenInExplorer(arg1:string):Promise<string>;

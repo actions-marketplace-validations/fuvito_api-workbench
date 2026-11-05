@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -163,7 +164,16 @@ func (tc *timingCollector) build(start time.Time) domain.Timing {
 
 func buildHTTPRequest(ctx context.Context, req *domain.Request) (*http.Request, error) {
 	var bodyReader io.Reader
-	if req.Body != nil && req.Body.Content != "" {
+	var multipartContentType string
+
+	if req.Body != nil && req.Body.Type == domain.BodyMultipart {
+		r, ct, err := buildMultipartBody(req.Body.Content)
+		if err != nil {
+			return nil, fmt.Errorf("building multipart body: %w", err)
+		}
+		bodyReader = r
+		multipartContentType = ct
+	} else if req.Body != nil && req.Body.Content != "" {
 		bodyReader = bytes.NewBufferString(req.Body.Content)
 	}
 
@@ -182,7 +192,9 @@ func buildHTTPRequest(ctx context.Context, req *domain.Request) (*http.Request, 
 		httpReq.Header.Set(h.Name, h.Value)
 	}
 
-	if req.Body != nil && req.Body.Type != domain.BodyNone && httpReq.Header.Get("Content-Type") == "" {
+	if multipartContentType != "" {
+		httpReq.Header.Set("Content-Type", multipartContentType)
+	} else if req.Body != nil && req.Body.Type != domain.BodyNone && httpReq.Header.Get("Content-Type") == "" {
 		if ct := contentTypeFor(req.Body.Type); ct != "" {
 			httpReq.Header.Set("Content-Type", ct)
 		}
@@ -193,6 +205,28 @@ func buildHTTPRequest(ctx context.Context, req *domain.Request) (*http.Request, 
 	}
 
 	return httpReq, nil
+}
+
+func buildMultipartBody(content string) (io.Reader, string, error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if content != "" {
+		values, err := url.ParseQuery(content)
+		if err != nil {
+			return nil, "", err
+		}
+		for name, vals := range values {
+			for _, v := range vals {
+				if err := mw.WriteField(name, v); err != nil {
+					return nil, "", err
+				}
+			}
+		}
+	}
+	if err := mw.Close(); err != nil {
+		return nil, "", err
+	}
+	return &buf, mw.FormDataContentType(), nil
 }
 
 func buildResponse(resp *http.Response, duration time.Duration, maxBodySize int64) (*domain.Response, error) {

@@ -343,6 +343,7 @@ export default function App() {
           onCreateFolder={workspace.handleCreateFolder}
           onRenameFile={workspace.handleRenameFile}
           onRenameFolder={workspace.handleRenameFolder}
+          onMoveFile={workspace.handleMoveFile}
           onSelectHistory={tabs.handleSelectHistory}
           onClearHistory={workspace.handleClearHistory}
           onImportOpenAPI={workspace.handleImportOpenAPI}

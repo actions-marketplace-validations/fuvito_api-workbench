@@ -80,6 +80,7 @@ type TreeNodeProps = {
   onCreateFolder?: (parentPath: string) => void
   onRenameFile?: (path: string, newName: string) => void
   onRenameFolder?: (path: string, newName: string) => void
+  onMoveFile?: (srcPath: string, destDir: string) => void
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
   renamingPath?: string | null
@@ -92,12 +93,13 @@ type TreeNodeProps = {
 function TreeNode({
   node, depth,
   onSelect, onDelete, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
-  onRenameFile, onRenameFolder,
+  onRenameFile, onRenameFolder, onMoveFile,
   activeFilePath, dirtyFilePaths,
   renamingPath, onRenameEnd, onContextMenu,
   collapsedPaths, onToggleCollapse,
 }: TreeNodeProps) {
   const [localRenaming, setLocalRenaming] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
   const expanded = !collapsedPaths.has(node.path)
   const indent = depth * 12
 
@@ -111,9 +113,21 @@ function TreeNode({
   if (node.isDir) {
     const isEmpty = !node.children?.some(c => !c.name.startsWith('.'))
     return (
-      <div>
+      <div
+        onDragOver={e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true) }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false) }}
+        onDrop={e => {
+          e.preventDefault(); e.stopPropagation()
+          setIsDragOver(false)
+          const src = e.dataTransfer.getData('application/x-apideskrequest')
+          if (src && src !== node.path) onMoveFile?.(src, node.path)
+        }}
+      >
         <div
-          className="group flex items-center hover:bg-[var(--color-muted)] transition-colors"
+          className={cn(
+            'group flex items-center hover:bg-[var(--color-muted)] transition-colors',
+            isDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40',
+          )}
           style={{ paddingLeft: `${8 + indent}px` }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, node) }}
         >
@@ -194,6 +208,7 @@ function TreeNode({
             onCreateFolder={onCreateFolder}
             onRenameFile={onRenameFile}
             onRenameFolder={onRenameFolder}
+            onMoveFile={onMoveFile}
             activeFilePath={activeFilePath}
             dirtyFilePaths={dirtyFilePaths}
             renamingPath={renamingPath}
@@ -212,8 +227,13 @@ function TreeNode({
 
   return (
     <div
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.setData('application/x-apideskrequest', node.path)
+        e.dataTransfer.effectAllowed = 'move'
+      }}
       className={cn(
-        'group flex items-center gap-1.5 py-0.5 text-xs transition-colors',
+        'group flex items-center gap-1.5 py-0.5 text-xs transition-colors cursor-grab active:cursor-grabbing',
         isActive
           ? 'bg-[var(--color-muted)] text-[var(--color-foreground)] border-l-2 border-[var(--color-accent)]'
           : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] border-l-2 border-transparent',
@@ -289,6 +309,7 @@ type WorkspacePanelProps = {
   onCreateFolder?: (parentPath: string) => void
   onRenameFile?: (path: string, newName: string) => void
   onRenameFolder?: (path: string, newName: string) => void
+  onMoveFile?: (srcPath: string, destDir: string) => void
   onImportOpenAPI: () => void
   onRefresh?: () => void
   importing?: boolean
@@ -309,6 +330,7 @@ export function WorkspacePanel({
   onCreateFolder,
   onRenameFile,
   onRenameFolder,
+  onMoveFile,
   onImportOpenAPI,
   onRefresh,
   importing,
@@ -476,6 +498,7 @@ export function WorkspacePanel({
                   onCreateFolder={onCreateFolder}
                   onRenameFile={onRenameFile}
                   onRenameFolder={onRenameFolder}
+                  onMoveFile={onMoveFile}
                   activeFilePath={activeFilePath}
                   dirtyFilePaths={dirtyFilePaths}
                   renamingPath={renamingPath}
