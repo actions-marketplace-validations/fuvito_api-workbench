@@ -390,7 +390,10 @@ func (w *WorkspaceService) CreateFolder(parentPath, name string) (string, error)
 		if w.workspacePath == "" {
 			return "", fmt.Errorf("no workspace open — open or create a workspace first")
 		}
-		parentPath = w.workspacePath
+		parentPath = filepath.Join(w.workspacePath, "requests")
+		if err := os.MkdirAll(parentPath, 0755); err != nil {
+			return "", err
+		}
 	}
 	if w.workspacePath != "" {
 		rel, err := filepath.Rel(w.workspacePath, parentPath)

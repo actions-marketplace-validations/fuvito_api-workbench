@@ -72,6 +72,7 @@ export default function App() {
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
   const [newFolderDialog, setNewFolderDialog] = useState<{ parentPath: string; parentLabel: string } | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
+  const [newFolderError, setNewFolderError] = useState('')
 
   // --- Derived ---
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
@@ -501,6 +502,7 @@ export default function App() {
       : 'requests'
     setNewFolderDialog({ parentPath, parentLabel })
     setNewFolderName('')
+    setNewFolderError('')
   }
 
   async function confirmCreateFolder() {
@@ -509,9 +511,10 @@ export default function App() {
       await createFolder(newFolderDialog.parentPath, newFolderName.trim())
       setNewFolderDialog(null)
       setNewFolderName('')
+      setNewFolderError('')
       await refreshWorkspace()
     } catch (err) {
-      console.error('create folder:', err)
+      setNewFolderError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -733,9 +736,10 @@ export default function App() {
         <NewFolderDialog
           parentLabel={newFolderDialog.parentLabel}
           value={newFolderName}
-          onChange={setNewFolderName}
-          onCancel={() => setNewFolderDialog(null)}
+          onChange={v => { setNewFolderName(v); setNewFolderError('') }}
+          onCancel={() => { setNewFolderDialog(null); setNewFolderError('') }}
           onConfirm={confirmCreateFolder}
+          error={newFolderError}
         />
       )}
 

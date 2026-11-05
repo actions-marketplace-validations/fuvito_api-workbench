@@ -104,12 +104,14 @@ export function NewFolderDialog({
   onChange,
   onCancel,
   onConfirm,
+  error,
 }: {
   parentLabel: string
   value: string
   onChange: (v: string) => void
   onCancel: () => void
   onConfirm: () => void
+  error?: string
 }) {
   return (
     <div
@@ -138,10 +140,14 @@ export function NewFolderDialog({
           placeholder="folder-name"
           className={cn(
             'w-full text-xs rounded px-3 py-1.5 bg-[var(--color-muted)]',
-            'border border-[var(--color-border)] outline-none focus:border-[var(--color-accent)]',
+            'border outline-none focus:border-[var(--color-accent)]',
+            error ? 'border-red-500' : 'border-[var(--color-border)]',
             'text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]',
           )}
         />
+        {error && (
+          <p className="text-xs text-red-400 -mt-2">{error}</p>
+        )}
         <div className="flex gap-2 justify-end">
           <button
             type="button"
