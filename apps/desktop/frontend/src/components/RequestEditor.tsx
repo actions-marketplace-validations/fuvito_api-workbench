@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { METHOD_COLOR, HTTP_METHODS } from '@/lib/httpUtils'
+import { METHOD_COLOR, HTTP_METHODS, HTTP_REQUEST_HEADERS } from '@/lib/httpUtils'
 import type { HttpMethod } from '@/lib/httpUtils'
 import type { KVPair, BodyState, AuthState } from '@/types'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
@@ -205,6 +205,7 @@ export function RequestEditor({
               onChange={onHeadersChange}
               keyPlaceholder="Header"
               valuePlaceholder="Value"
+              keySuggestions={HTTP_REQUEST_HEADERS}
             />
           </div>
         )}

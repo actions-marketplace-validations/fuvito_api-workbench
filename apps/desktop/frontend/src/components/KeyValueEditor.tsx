@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KVPair } from '@/types'
@@ -7,6 +8,7 @@ type Props = {
   onChange: (pairs: KVPair[]) => void
   keyPlaceholder?: string
   valuePlaceholder?: string
+  keySuggestions?: string[]
 }
 
 const inputCls = cn(
@@ -22,7 +24,10 @@ export function KeyValueEditor({
   onChange,
   keyPlaceholder = 'Key',
   valuePlaceholder = 'Value',
+  keySuggestions,
 }: Props) {
+  const listId = useId()
+
   function add() {
     onChange([...pairs, { id: crypto.randomUUID(), name: '', value: '', enabled: true }])
   }
@@ -37,6 +42,11 @@ export function KeyValueEditor({
 
   return (
     <div className="flex flex-col gap-1.5">
+      {keySuggestions && (
+        <datalist id={listId}>
+          {keySuggestions.map(s => <option key={s} value={s} />)}
+        </datalist>
+      )}
       {pairs.length > 0 && (
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="w-4 shrink-0" />
@@ -62,6 +72,7 @@ export function KeyValueEditor({
             value={pair.name}
             onChange={e => update(pair.id, 'name', e.target.value)}
             placeholder={keyPlaceholder}
+            list={keySuggestions ? listId : undefined}
             className={inputCls}
           />
           <input

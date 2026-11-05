@@ -2,6 +2,73 @@ import type { KVPair, BodyState, AuthState } from '@/types'
 import type { AuthPayload, RequestFileIO } from '@/lib/bridge'
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
+
+export const HTTP_REQUEST_HEADERS: string[] = [
+  // Content negotiation
+  'Accept',
+  'Accept-Charset',
+  'Accept-Encoding',
+  'Accept-Language',
+  // Auth
+  'Authorization',
+  'Proxy-Authorization',
+  // Caching
+  'Cache-Control',
+  'If-Match',
+  'If-Modified-Since',
+  'If-None-Match',
+  'If-Range',
+  'If-Unmodified-Since',
+  'Pragma',
+  // Connection
+  'Connection',
+  'Keep-Alive',
+  'TE',
+  'Trailer',
+  'Transfer-Encoding',
+  'Upgrade',
+  // Request context
+  'From',
+  'Host',
+  'Origin',
+  'Referer',
+  'User-Agent',
+  // Body
+  'Content-Encoding',
+  'Content-Language',
+  'Content-Length',
+  'Content-Location',
+  'Content-MD5',
+  'Content-Range',
+  'Content-Type',
+  // Misc standard
+  'Date',
+  'Expect',
+  'Forwarded',
+  'Max-Forwards',
+  'Range',
+  'Via',
+  // CORS
+  'Access-Control-Request-Headers',
+  'Access-Control-Request-Method',
+  // Common API / custom
+  'API-Key',
+  'Idempotency-Key',
+  'X-API-Key',
+  'X-Auth-Token',
+  'X-Content-Type-Options',
+  'X-Correlation-ID',
+  'X-CSRF-Token',
+  'X-Forwarded-For',
+  'X-Forwarded-Host',
+  'X-Forwarded-Proto',
+  'X-RateLimit-Limit',
+  'X-RateLimit-Remaining',
+  'X-Real-IP',
+  'X-Request-ID',
+  'X-Request-Start',
+  'X-Response-Time',
+]
 export type HttpMethod = typeof HTTP_METHODS[number]
 
 export const METHOD_COLOR: Record<HttpMethod, string> = {
