@@ -644,7 +644,7 @@ const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> =
       'Full HTTP execution with DNS/TCP/TLS/TTFB/transfer timing breakdown',
       'OpenAPI 3.0/3.1 spec import — generates request collections automatically',
       'Scenario engine: multi-step execution, variable extraction, assertions',
-      'CLI command apidesk run for CI/CD scenario execution',
+      'CLI — apidesk run for scenario execution in CI/CD pipelines',
       'Request and execution history via SQLite',
       'Settings: theme, font size, timeout, proxy URL, TLS skip-verify',
       'Cross-platform release builds (Windows, macOS, Linux) via GitHub Actions',
@@ -677,8 +677,8 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
             <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.1.0 — Public MVP</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
-            API Contract Validation and Spec Conformance Testing — with a full API development workbench.
-            Local-first, open-source, and git-native.
+            Your local-first API workbench. Test requests, validate OpenAPI contracts,
+            and run scenario pipelines in CI/CD — all from plain files your team can version-control.
           </p>
         </div>
 
