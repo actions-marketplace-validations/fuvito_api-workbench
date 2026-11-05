@@ -13,11 +13,12 @@ export interface AppSettings {
 type SettingsPanelProps = {
   settings: AppSettings
   onSave: (s: AppSettings) => void
+  onReset: () => void
   onClose: () => void
   onPreview?: (s: AppSettings) => void
 }
 
-export function SettingsPanel({ settings, onSave, onClose, onPreview }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }: SettingsPanelProps) {
   const [local, setLocal] = useState<AppSettings>({ ...settings })
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
@@ -121,28 +122,40 @@ export function SettingsPanel({ settings, onSave, onClose, onPreview }: Settings
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[var(--color-border)]">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)]">
           <button
             type="button"
-            onClick={onClose}
+            onClick={onReset}
             className={cn(
-              'text-xs rounded px-4 py-1.5',
-              'bg-[var(--color-muted)] text-[var(--color-foreground)] border border-[var(--color-border)]',
-              'hover:bg-[var(--color-border)] transition-colors',
+              'text-xs rounded px-3 py-1.5',
+              'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors',
             )}
           >
-            Cancel
+            Reset to defaults
           </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className={cn(
-              'text-xs rounded px-4 py-1.5 font-semibold',
-              'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity',
-            )}
-          >
-            Save
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className={cn(
+                'text-xs rounded px-4 py-1.5',
+                'bg-[var(--color-muted)] text-[var(--color-foreground)] border border-[var(--color-border)]',
+                'hover:bg-[var(--color-border)] transition-colors',
+              )}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className={cn(
+                'text-xs rounded px-4 py-1.5 font-semibold',
+                'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity',
+              )}
+            >
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>

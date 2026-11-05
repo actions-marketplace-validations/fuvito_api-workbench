@@ -163,6 +163,7 @@ export function RequestEditor({
             type="button"
             onClick={onSend}
             disabled={!url.trim()}
+            title="Send (Ctrl+Enter)"
             className={cn(
               'bg-[var(--color-accent)] text-white text-xs font-semibold rounded px-4 py-1',
               'transition-opacity disabled:opacity-40 hover:opacity-90 shrink-0',

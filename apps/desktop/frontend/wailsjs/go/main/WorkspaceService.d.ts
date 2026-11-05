@@ -31,6 +31,10 @@ export function LoadResponseCache(arg1:string):Promise<main.ResponseCacheIO>;
 
 export function NewWorkspace():Promise<string>;
 
+export function OpenInExplorer(arg1:string):Promise<string>;
+
+export function OpenInSystemViewer(arg1:string,arg2:string):Promise<string>;
+
 export function OpenRequest():Promise<main.RequestFileIO>;
 
 export function OpenWorkspace():Promise<string>;

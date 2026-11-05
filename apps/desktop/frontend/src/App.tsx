@@ -9,7 +9,7 @@ import {
   loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
   createFolder, deleteFolder, renameFolder, renameRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
-  importOpenAPISpec, importOpenAPISpecFromURL, getSettings, saveSettings,
+  importOpenAPISpec, importOpenAPISpecFromURL, getSettings, saveSettings, resetSettings,
   startDemo, stopDemo, saveResponseCache, loadResponseCache,
   type HistoryEntry, type FileNode,
   type EnvInfo, type RequestFileIO, type AppSettings,
@@ -227,6 +227,8 @@ export default function App() {
         handleCloseTab(tabsStateRef.current.activeTabId)
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const el = document.activeElement
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
         e.preventDefault()
         handleSendRef.current?.()
       }
@@ -423,6 +425,38 @@ export default function App() {
     return saveTabById(activeTabId)
   }
 
+  async function handleSaveAsRequest(): Promise<boolean> {
+    const tab = tabsStateRef.current.tabs.find(t => t.id === activeTabId)
+    if (!tab) return false
+    updateTab(activeTabId, { saveError: null })
+    const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
+    try {
+      const req: RequestFileIO = {
+        schemaVersion: '1',
+        name,
+        method: tab.method,
+        url: tab.url.trim(),
+        headers: tab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
+        queryParams: tab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
+        body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
+        auth: authStateToPayload(tab.auth) ?? undefined,
+        filePath: '',
+        targetDir: tab.targetDir ?? '',
+      }
+      const savedPath = await saveRequest(req)
+      if (savedPath) {
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name)
+        updateTab(activeTabId, { name, filePath: savedPath, savedKey })
+        await refreshWorkspace()
+        return true
+      }
+      return false
+    } catch (err) {
+      updateTab(activeTabId, { saveError: String(err).replace(/^Error: /, '') })
+      return false
+    }
+  }
+
   // ---- Environment operations ----
 
   async function handleEnvChange(path: string) {
@@ -499,6 +533,17 @@ export default function App() {
       applySettings(saved)
     } catch (err) {
       console.error('save settings:', err)
+    }
+  }
+
+  async function handleResetSettings() {
+    try {
+      const defaults = await resetSettings()
+      setSettings(defaults)
+      applySettings(defaults)
+      setShowSettings(false)
+    } catch (err) {
+      console.error('reset settings:', err)
     }
   }
 
@@ -824,6 +869,7 @@ export default function App() {
         { kind: 'action', label: 'New Tab',           shortcut: 'Ctrl+N', onClick: handleNewTab },
         { kind: 'action', label: 'Open Request…',     shortcut: 'Ctrl+O', onClick: handleOpenRequest },
         { kind: 'action', label: 'Save Request',      shortcut: 'Ctrl+S', onClick: handleSaveRequest },
+        { kind: 'action', label: 'Save As…',                             onClick: handleSaveAsRequest },
         { kind: 'separator' },
         { kind: 'action', label: 'Import OpenAPI Spec…', onClick: handleImportOpenAPI, disabled: !workspacePath },
         { kind: 'action', label: 'Import OpenAPI from URL…', onClick: () => { setImportFromURLInput(''); setImportFromURLError(''); setImportFromURLDialog(true) }, disabled: !workspacePath },
@@ -927,6 +973,7 @@ export default function App() {
           <SettingsPanel
             settings={settings}
             onSave={handleSaveSettings}
+            onReset={handleResetSettings}
             onPreview={applySettings}
             onClose={() => { applySettings(settings); setShowSettings(false) }}
           />
@@ -1121,7 +1168,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => { setEditingEnvPath(activeEnv?.path ?? null); setShowEnvEditor(true) }}
-                  title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'New environment'}
+                  title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'Create environment'}
                   className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
                 >
                   <Pencil size={13} />
@@ -1133,7 +1180,14 @@ export default function App() {
                   <div className="w-px h-4 bg-[var(--color-border)]" />
                   <div className="flex items-center gap-1.5 text-xs">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                    <span className="text-emerald-400 font-mono">Demo :{demoPort}</span>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(`http://localhost:${demoPort}`).catch(() => {})}
+                      title={`Copy base URL: http://localhost:${demoPort}`}
+                      className="text-emerald-400 font-mono hover:text-emerald-300 transition-colors"
+                    >
+                      Demo :{demoPort}
+                    </button>
                     <button
                       type="button"
                       onClick={handleStopDemo}

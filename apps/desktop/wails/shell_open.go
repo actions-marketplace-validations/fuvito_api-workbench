@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	goruntime "runtime"
 )
 
@@ -26,6 +27,41 @@ func (s *WorkspaceService) OpenInSystemViewer(content, format string) string {
 	if err := openWithSystemApp(path); err != nil {
 		return "could not open viewer: " + err.Error()
 	}
+	return ""
+}
+
+// OpenInExplorer opens the given path in the OS file manager.
+// For files it selects the item in its parent folder; for directories it opens the folder.
+func (s *WorkspaceService) OpenInExplorer(path string) string {
+	native := filepath.FromSlash(path)
+	fi, statErr := os.Stat(native)
+	isDir := statErr == nil && fi.IsDir()
+
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		if isDir {
+			cmd = exec.Command("explorer", native)
+		} else {
+			cmd = exec.Command("explorer", "/select,"+native)
+		}
+	case "darwin":
+		if isDir {
+			cmd = exec.Command("open", native)
+		} else {
+			cmd = exec.Command("open", "-R", native)
+		}
+	default:
+		if isDir {
+			cmd = exec.Command("xdg-open", native)
+		} else {
+			cmd = exec.Command("xdg-open", filepath.Dir(native))
+		}
+	}
+	if err := cmd.Start(); err != nil {
+		return "could not open explorer: " + err.Error()
+	}
+	go cmd.Wait() //nolint:errcheck
 	return ""
 }
 

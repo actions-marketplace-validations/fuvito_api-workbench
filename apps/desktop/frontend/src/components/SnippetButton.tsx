@@ -88,12 +88,6 @@ export function SnippetButton({ tab }: { tab: TabState }) {
     setTimeout(() => setCopied(false), 2000)
   }, [])
 
-  // Auto-copy whenever the dialog opens or format changes
-  useEffect(() => {
-    if (!open) return
-    copyToClipboard(snippet)
-  }, [open, snippet, copyToClipboard])
-
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {

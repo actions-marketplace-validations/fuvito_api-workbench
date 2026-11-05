@@ -59,7 +59,8 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
               onClick={e => { e.stopPropagation(); onClose(tab.id) }}
               title="Close tab"
               className={cn(
-                'shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity',
+                'shrink-0 rounded p-0.5 transition-opacity',
+                tab.isDirty ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
                 'hover:bg-[var(--color-muted)]',
               )}
             >

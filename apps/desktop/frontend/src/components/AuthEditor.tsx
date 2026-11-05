@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AuthState, AuthType } from '@/types'
 
@@ -30,6 +32,35 @@ type Props = {
   onChange: (a: AuthState) => void
 }
 
+function SecretInput({ value, onChange, placeholder, autoComplete }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  autoComplete?: string
+}) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative flex items-center">
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={cn(inputCls, 'pr-8')}
+        autoComplete={autoComplete ?? 'off'}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        title={show ? 'Hide' : 'Show'}
+        className="absolute right-2 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+      >
+        {show ? <EyeOff size={12} /> : <Eye size={12} />}
+      </button>
+    </div>
+  )
+}
+
 export function AuthEditor({ auth, onChange }: Props) {
   function switchType(t: AuthType) {
     if (t === 'none') onChange({ type: 'none' })
@@ -54,13 +85,10 @@ export function AuthEditor({ auth, onChange }: Props) {
 
       {auth.type === 'bearer' && (
         <Field label="Token">
-          <input
-            type="text"
+          <SecretInput
             value={auth.token}
-            onChange={e => onChange({ ...auth, token: e.target.value })}
+            onChange={v => onChange({ ...auth, token: v })}
             placeholder="eyJhbGci…"
-            className={inputCls}
-            autoComplete="off"
           />
         </Field>
       )}
@@ -102,13 +130,10 @@ export function AuthEditor({ auth, onChange }: Props) {
             />
           </Field>
           <Field label="Value">
-            <input
-              type="text"
+            <SecretInput
               value={auth.value}
-              onChange={e => onChange({ ...auth, value: e.target.value })}
+              onChange={v => onChange({ ...auth, value: v })}
               placeholder="api-key-value"
-              className={inputCls}
-              autoComplete="off"
             />
           </Field>
           <Field label="Add to">

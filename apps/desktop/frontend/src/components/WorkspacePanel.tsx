@@ -5,6 +5,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
+import { openInExplorer } from '@/lib/bridge'
+import { ContextMenu, type ContextMenuAction } from '@/components/ContextMenu'
 
 // ---- Tree filter ----
 
@@ -80,6 +82,9 @@ type TreeNodeProps = {
   onRenameFolder?: (path: string, newName: string) => void
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
+  renamingPath?: string | null
+  onRenameEnd?: () => void
+  onContextMenu?: (e: React.MouseEvent, node: FileNode) => void
 }
 
 function TreeNode({
@@ -87,18 +92,27 @@ function TreeNode({
   onSelect, onDelete, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder,
   activeFilePath, dirtyFilePaths,
+  renamingPath, onRenameEnd, onContextMenu,
 }: TreeNodeProps) {
+  const [localRenaming, setLocalRenaming] = useState(false)
   const [expanded, setExpanded] = useState(true)
-  const [renaming, setRenaming] = useState(false)
   const indent = depth * 12
 
+  const isRenaming = localRenaming || renamingPath === node.path
+
+  function endRename() {
+    setLocalRenaming(false)
+    onRenameEnd?.()
+  }
+
   if (node.isDir) {
-    const isEmpty = !node.children || node.children.length === 0
+    const isEmpty = !node.children?.some(c => !c.name.startsWith('.'))
     return (
       <div>
         <div
           className="group flex items-center hover:bg-[var(--color-muted)] transition-colors"
           style={{ paddingLeft: `${8 + indent}px` }}
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, node) }}
         >
           <button
             type="button"
@@ -113,23 +127,23 @@ function TreeNode({
             </span>
           </button>
           <div className="flex-1 min-w-0 flex items-center py-0.5 mr-1">
-            {renaming ? (
+            {isRenaming ? (
               <RenameInput
                 initialValue={node.name}
-                onConfirm={v => { onRenameFolder?.(node.path, v); setRenaming(false) }}
-                onCancel={() => setRenaming(false)}
+                onConfirm={v => { onRenameFolder?.(node.path, v); endRename() }}
+                onCancel={endRename}
               />
             ) : (
               <span
                 className="truncate text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] cursor-default select-none"
-                onDoubleClick={() => setRenaming(true)}
+                onDoubleClick={() => setLocalRenaming(true)}
                 title="Double-click to rename"
               >
                 {node.name}
               </span>
             )}
           </div>
-          {!renaming && (
+          {!isRenaming && (
             <div className="flex items-center gap-0.5 mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
               {onNewRequestInFolder && (
                 <button
@@ -179,6 +193,9 @@ function TreeNode({
             onRenameFolder={onRenameFolder}
             activeFilePath={activeFilePath}
             dirtyFilePaths={dirtyFilePaths}
+            renamingPath={renamingPath}
+            onRenameEnd={onRenameEnd}
+            onContextMenu={onContextMenu}
           />
         ))}
       </div>
@@ -197,13 +214,14 @@ function TreeNode({
           : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] border-l-2 border-transparent',
       )}
       style={{ paddingLeft: `${6 + indent + 15}px` }}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, node) }}
     >
       <FileText size={11} className="shrink-0" />
-      {renaming ? (
+      {isRenaming ? (
         <RenameInput
           initialValue={displayName}
-          onConfirm={v => { onRenameFile?.(node.path, v); setRenaming(false) }}
-          onCancel={() => setRenaming(false)}
+          onConfirm={v => { onRenameFile?.(node.path, v); endRename() }}
+          onCancel={endRename}
         />
       ) : (
         <button
@@ -214,7 +232,7 @@ function TreeNode({
           <span
             className="truncate flex-1"
             title={node.name}
-            onDoubleClick={e => { e.stopPropagation(); setRenaming(true) }}
+            onDoubleClick={e => { e.stopPropagation(); setLocalRenaming(true) }}
           >
             {displayName}
           </span>
@@ -223,7 +241,7 @@ function TreeNode({
           )}
         </button>
       )}
-      {!renaming && (onDuplicateFile || onDelete) && (
+      {!isRenaming && (onDuplicateFile || onDelete) && (
         <div className="flex items-center mr-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           {onDuplicateFile && (
             <button
@@ -295,6 +313,52 @@ export function WorkspacePanel({
     : null
   const [searchQuery, setSearchQuery] = useState('')
   const filteredTree = filterTree(fileTree, searchQuery)
+
+  // ---- Context menu ----
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+
+  function handleContextMenu(e: React.MouseEvent, node: FileNode) {
+    e.preventDefault()
+    e.stopPropagation()
+    setCtxMenu({ x: e.clientX, y: e.clientY, node })
+  }
+
+  function buildCtxItems(node: FileNode): ContextMenuAction[] {
+    if (node.isDir) {
+      const isEmpty = !node.children?.some(c => !c.name.startsWith('.'))
+      return [
+        ...(onNewRequestInFolder ? [{ kind: 'action' as const, label: 'New Request in Folder', onClick: () => onNewRequestInFolder(node.path) }] : []),
+        ...(onCreateFolder ? [{ kind: 'action' as const, label: 'New Subfolder', onClick: () => onCreateFolder(node.path) }] : []),
+        { kind: 'separator' },
+        { kind: 'action', label: 'Rename', onClick: () => setRenamingPath(node.path) },
+        { kind: 'action', label: 'Open in Explorer', onClick: () => openInExplorer(node.path) },
+        { kind: 'separator' },
+        {
+          kind: 'action',
+          label: isEmpty ? 'Delete' : 'Delete — folder not empty',
+          danger: true,
+          disabled: !isEmpty || !onDeleteFolder,
+          onClick: () => onDeleteFolder?.(node.path),
+        },
+      ]
+    }
+    return [
+      { kind: 'action', label: 'Open', onClick: () => onSelectFile(node.path) },
+      ...(onDuplicateFile ? [{ kind: 'action' as const, label: 'Duplicate', onClick: () => onDuplicateFile(node.path) }] : []),
+      { kind: 'separator' },
+      { kind: 'action', label: 'Rename', onClick: () => setRenamingPath(node.path) },
+      { kind: 'action', label: 'Open in Explorer', onClick: () => openInExplorer(node.path) },
+      { kind: 'separator' },
+      {
+        kind: 'action',
+        label: 'Delete',
+        danger: true,
+        disabled: !onDeleteFile,
+        onClick: () => onDeleteFile?.(node.path),
+      },
+    ]
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -374,6 +438,9 @@ export function WorkspacePanel({
                   onRenameFolder={onRenameFolder}
                   activeFilePath={activeFilePath}
                   dirtyFilePaths={dirtyFilePaths}
+                  renamingPath={renamingPath}
+                  onRenameEnd={() => setRenamingPath(null)}
+                  onContextMenu={handleContextMenu}
                 />
               ))
             )}
@@ -406,6 +473,15 @@ export function WorkspacePanel({
             Open Existing
           </button>
         </div>
+      )}
+
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={buildCtxItems(ctxMenu.node)}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
     </div>
   )

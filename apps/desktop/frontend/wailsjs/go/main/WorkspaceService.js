@@ -58,6 +58,14 @@ export function NewWorkspace() {
   return window['go']['main']['WorkspaceService']['NewWorkspace']();
 }
 
+export function OpenInExplorer(arg1) {
+  return window['go']['main']['WorkspaceService']['OpenInExplorer'](arg1);
+}
+
+export function OpenInSystemViewer(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['OpenInSystemViewer'](arg1, arg2);
+}
+
 export function OpenRequest() {
   return window['go']['main']['WorkspaceService']['OpenRequest']();
 }

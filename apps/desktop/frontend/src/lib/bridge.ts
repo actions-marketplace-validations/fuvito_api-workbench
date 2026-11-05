@@ -32,6 +32,7 @@ import {
   SaveResponseCache as WailsSaveResponseCache,
   LoadResponseCache as WailsLoadResponseCache,
   OpenInSystemViewer as WailsOpenInSystemViewer,
+  OpenInExplorer as WailsOpenInExplorer,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -374,6 +375,11 @@ export async function saveResponseCache(reqPath: string, response: ResponseData)
 
 export async function openInSystemViewer(content: string, format: string): Promise<string> {
   const result = await WailsOpenInSystemViewer(content, format)
+  return result as unknown as string
+}
+
+export async function openInExplorer(path: string): Promise<string> {
+  const result = await WailsOpenInExplorer(path)
   return result as unknown as string
 }
 
