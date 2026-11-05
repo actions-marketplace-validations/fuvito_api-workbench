@@ -32,6 +32,7 @@ import {
   HTTP_METHODS, METHOD_COLOR, authStateToPayload, requestFileIOToState,
 } from '@/lib/httpUtils'
 import type { HttpMethod } from '@/lib/httpUtils'
+import { parseCurl } from '@/lib/curlImport'
 import { computeStateKey, createBlankTab, isTabDirty, isBlankTab } from '@/lib/tabState'
 import type { TabState } from '@/lib/tabState'
 import type { KVPair } from '@/types'
@@ -203,6 +204,7 @@ export default function App() {
   // ---- Keyboard shortcuts ----
 
   const saveTabByIdRef = useRef<((id: string) => Promise<boolean>) | null>(null)
+  const handleSendRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -217,6 +219,10 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'w') {
         e.preventDefault()
         handleCloseTab(tabsStateRef.current.activeTabId)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        handleSendRef.current?.()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -408,6 +414,7 @@ export default function App() {
       targetDir: null,
       savedKey,
       response: null,
+      responseCachedAt: null,
       loading: false,
       saveError: null,
       editingName: false,
@@ -607,11 +614,27 @@ export default function App() {
     }
   }
 
-  // ---- URL paste param extraction ----
+  // ---- URL paste: curl import or query-param extraction ----
 
   function handleUrlPaste(raw: string) {
     try {
+      // curl import
+      const curlResult = parseCurl(raw)
+      if (curlResult) {
+        updateTab(activeTabId, {
+          method: curlResult.method,
+          url: curlResult.url,
+          queryParams: curlResult.queryParams,
+          headers: curlResult.headers,
+          body: curlResult.body,
+          auth: curlResult.auth,
+        })
+        return
+      }
+
+      // Strip query params from pasted URL
       const qIdx = raw.indexOf('?')
+      if (qIdx === -1) return
       const baseUrl = raw.slice(0, qIdx)
       const search = raw.slice(qIdx + 1)
       const parsed = new URLSearchParams(search)
@@ -658,6 +681,8 @@ export default function App() {
       refreshHistory()
     }
   }
+
+  handleSendRef.current = handleSend
 
   // ---- Demo server ----
 

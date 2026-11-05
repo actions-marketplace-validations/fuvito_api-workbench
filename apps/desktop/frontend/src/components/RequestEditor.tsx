@@ -133,8 +133,8 @@ export function RequestEditor({
           onChange={onUrlChange}
           onKeyDown={handleKeyDown}
           onPaste={e => {
-            const text = e.clipboardData.getData('text')
-            if (text.includes('?')) {
+            const text = e.clipboardData.getData('text').trim()
+            if (/^curl\b/i.test(text) || text.includes('?')) {
               e.preventDefault()
               onUrlPaste(text)
             }
