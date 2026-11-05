@@ -9,7 +9,7 @@ import {
   createFolder, deleteFolder, renameFolder, renameRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
   importOpenAPISpec, getSettings, saveSettings,
-  startDemo, stopDemo,
+  startDemo, stopDemo, saveResponseCache, loadResponseCache,
   type HistoryEntry, type FileNode,
   type EnvInfo, type RequestFileIO, type AppSettings,
 } from '@/lib/bridge'
@@ -90,7 +90,7 @@ export default function App() {
     setTabsState(prev => ({ ...prev, activeTabId: id }))
   }
 
-  function openFileAsTab(r: RequestFileIO, path: string) {
+  function openFileAsTab(r: RequestFileIO, path: string): string {
     const state = requestFileIOToState(r)
     const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null)
     const newTab: TabState = {
@@ -101,13 +101,16 @@ export default function App() {
       targetDir: null,
       savedKey,
       response: null,
+      responseCachedAt: null,
       loading: false,
       saveError: null,
       editingName: false,
     }
+    let resolvedId = newTab.id
     setTabsState(prev => {
       const active = prev.tabs.find(t => t.id === prev.activeTabId)
       if (active && isBlankTab(active)) {
+        resolvedId = prev.activeTabId
         return {
           tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
           activeTabId: prev.activeTabId,
@@ -115,6 +118,23 @@ export default function App() {
       }
       return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
     })
+    return resolvedId
+  }
+
+  async function loadCacheIntoTab(tabId: string, path: string) {
+    try {
+      const cached = await loadResponseCache(path)
+      if (!cached) return
+      const { cachedAt, ...response } = cached
+      setTabsState(prev => ({
+        ...prev,
+        tabs: prev.tabs.map(t =>
+          t.id === tabId && t.response === null
+            ? { ...t, response, responseCachedAt: cachedAt }
+            : t,
+        ),
+      }))
+    } catch { /* cache miss is not an error */ }
   }
 
   // ---- Init ----
@@ -293,7 +313,8 @@ export default function App() {
     try {
       const r = await loadRequest(path)
       if (!r) return
-      openFileAsTab(r, path)
+      const tabId = openFileAsTab(r, path)
+      loadCacheIntoTab(tabId, path)
     } catch (err) {
       console.error('load request:', err)
     }
@@ -305,7 +326,8 @@ export default function App() {
       if (!r || !r.filePath) return
       const existing = tabsStateRef.current.tabs.find(t => t.filePath === r.filePath)
       if (existing) { switchTo(existing.id); return }
-      openFileAsTab(r, r.filePath)
+      const tabId = openFileAsTab(r, r.filePath)
+      loadCacheIntoTab(tabId, r.filePath)
     } catch (err) {
       console.error('open request:', err)
     }
@@ -613,7 +635,7 @@ export default function App() {
   async function handleSend() {
     if (!activeTab.url.trim() || activeTab.loading) return
     const tabId = activeTabId
-    updateTab(tabId, { loading: true, response: null })
+    updateTab(tabId, { loading: true, response: null, responseCachedAt: null })
     try {
       const result = await executeRequest({
         method: activeTab.method,
@@ -625,6 +647,10 @@ export default function App() {
         timeoutMs: 0,
       })
       updateTab(tabId, { response: result })
+      const filePath = tabsStateRef.current.tabs.find(t => t.id === tabId)?.filePath
+      if (filePath && !result.error) {
+        saveResponseCache(filePath, result).catch(() => {})
+      }
     } catch (err) {
       updateTab(tabId, { response: { statusCode: 0, status: '', headers: [], body: '', durationMs: 0, size: 0, timing: { dnsMs: 0, connectMs: 0, tlsMs: 0, ttfbMs: 0, transferMs: 0 }, error: String(err) } })
     } finally {
@@ -1025,7 +1051,7 @@ export default function App() {
               className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
               style={responseWidth > 0 ? { width: responseWidth } : {}}
             >
-              <ResponseViewer response={activeTab.response} loading={activeTab.loading} />
+              <ResponseViewer response={activeTab.response} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} />
             </div>
           </div>
         </main>

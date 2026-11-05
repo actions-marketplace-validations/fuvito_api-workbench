@@ -15,6 +15,7 @@ export type TabState = {
   targetDir: string | null
   savedKey: string
   response: ResponseData | null
+  responseCachedAt: string | null
   loading: boolean
   saveError: string | null
   editingName: boolean
@@ -59,6 +60,7 @@ export function createBlankTab(targetDir: string | null = null): TabState {
     targetDir,
     savedKey,
     response: null,
+    responseCachedAt: null,
     loading: false,
     saveError: null,
     editingName: false,

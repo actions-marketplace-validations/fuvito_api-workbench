@@ -25,6 +25,8 @@ export function ListRequests():Promise<Array<main.FileNodeIO>>;
 
 export function LoadRequest(arg1:string):Promise<main.RequestFileIO>;
 
+export function LoadResponseCache(arg1:string):Promise<main.ResponseCacheIO>;
+
 export function NewWorkspace():Promise<string>;
 
 export function OpenRequest():Promise<main.RequestFileIO>;
@@ -38,5 +40,7 @@ export function RenameRequest(arg1:string,arg2:string):Promise<string>;
 export function SaveEnvironment(arg1:main.EnvironmentIO):Promise<main.EnvironmentInfoIO>;
 
 export function SaveRequest(arg1:main.RequestFileIO):Promise<string>;
+
+export function SaveResponseCache(arg1:string,arg2:main.ResponseCacheIO):Promise<void>;
 
 export function SelectEnvironment(arg1:string):Promise<void>;

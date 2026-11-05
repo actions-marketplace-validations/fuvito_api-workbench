@@ -23,6 +23,8 @@ import {
   DeleteFolder as WailsDeleteFolder,
   RenameFolder as WailsRenameFolder,
   RenameRequest as WailsRenameRequest,
+  SaveResponseCache as WailsSaveResponseCache,
+  LoadResponseCache as WailsLoadResponseCache,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -332,4 +334,21 @@ export async function isDemoRunning(): Promise<boolean> {
 export async function getDemoPort(): Promise<number> {
   const result = await WailsGetDemoPort()
   return result as unknown as number
+}
+
+// ---- Response cache ----
+
+export interface ResponseCacheData extends ResponseData {
+  cachedAt: string
+}
+
+export async function saveResponseCache(reqPath: string, response: ResponseData): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await WailsSaveResponseCache(reqPath, response as any)
+}
+
+export async function loadResponseCache(reqPath: string): Promise<ResponseCacheData | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await WailsLoadResponseCache(reqPath)
+  return result as unknown as ResponseCacheData | null
 }

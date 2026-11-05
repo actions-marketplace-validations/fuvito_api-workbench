@@ -46,6 +46,10 @@ export function LoadRequest(arg1) {
   return window['go']['main']['WorkspaceService']['LoadRequest'](arg1);
 }
 
+export function LoadResponseCache(arg1) {
+  return window['go']['main']['WorkspaceService']['LoadResponseCache'](arg1);
+}
+
 export function NewWorkspace() {
   return window['go']['main']['WorkspaceService']['NewWorkspace']();
 }
@@ -72,6 +76,10 @@ export function SaveEnvironment(arg1) {
 
 export function SaveRequest(arg1) {
   return window['go']['main']['WorkspaceService']['SaveRequest'](arg1);
+}
+
+export function SaveResponseCache(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['SaveResponseCache'](arg1, arg2);
 }
 
 export function SelectEnvironment(arg1) {

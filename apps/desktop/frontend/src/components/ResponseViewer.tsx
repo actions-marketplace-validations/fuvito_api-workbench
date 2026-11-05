@@ -81,12 +81,24 @@ function JsonBody({ body }: { body: string }) {
   )
 }
 
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const s = Math.floor(diffMs / 1000)
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
 type ResponseViewerProps = {
   response: ResponseData | null
   loading: boolean
+  cachedAt?: string | null
 }
 
-export function ResponseViewer({ response, loading }: ResponseViewerProps) {
+export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerProps) {
   const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
 
   return (
@@ -110,6 +122,11 @@ export function ResponseViewer({ response, loading }: ResponseViewerProps) {
           <span className="text-xs text-[var(--color-muted-foreground)]">Response</span>
         )}
         {response?.timing && !response.error && <TimingBar timing={response.timing} total={response.durationMs} />}
+        {cachedAt && !loading && (
+          <span className="ml-auto shrink-0 text-[10px] text-[var(--color-muted-foreground)] italic" title={new Date(cachedAt).toLocaleString()}>
+            Last run {timeAgo(cachedAt)}
+          </span>
+        )}
       </div>
 
       {/* Tabs */}

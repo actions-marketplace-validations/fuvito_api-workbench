@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -718,7 +719,10 @@ headers:
 		return err
 	}
 
-	// Gitignore all environment files so secrets are never accidentally committed.
+	// Gitignore environment files (secrets) and the response cache.
+	if err := writeFile(filepath.Join(dir, ".gitignore"), ".apideskcache/\n"); err != nil {
+		return err
+	}
 	if err := writeFile(filepath.Join(dir, "environments", ".gitignore"), "*\n"); err != nil {
 		return err
 	}
@@ -752,4 +756,67 @@ func (w *WorkspaceService) NewWorkspace() (string, error) {
 	w.workspacePath = dir
 	w.persistConfig()
 	return dir, nil
+}
+
+// ---- Response cache ----
+
+// ResponseCacheIO holds the last response for a request file, persisted to .apideskcache/.
+type ResponseCacheIO struct {
+	CachedAt   string     `json:"cachedAt"`
+	StatusCode int        `json:"statusCode"`
+	Status     string     `json:"status"`
+	Headers    []HeaderIO `json:"headers,omitempty"`
+	Body       string     `json:"body"`
+	DurationMs int64      `json:"durationMs"`
+	Size       int64      `json:"size"`
+	Timing     TimingIO   `json:"timing"`
+}
+
+func (w *WorkspaceService) cachePath(reqPath string) (string, error) {
+	if w.workspacePath == "" {
+		return "", fmt.Errorf("no workspace open")
+	}
+	rel, err := filepath.Rel(w.workspacePath, reqPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("path is outside the current workspace")
+	}
+	base := strings.TrimSuffix(strings.TrimSuffix(rel, ".yaml"), ".yml")
+	return filepath.Join(w.workspacePath, ".apideskcache", base+".json"), nil
+}
+
+// SaveResponseCache persists the last response for a request file.
+func (w *WorkspaceService) SaveResponseCache(reqPath string, response ResponseCacheIO) error {
+	path, err := w.cachePath(reqPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	response.CachedAt = time.Now().UTC().Format(time.RFC3339)
+	data, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+	return atomicWrite(path, data)
+}
+
+// LoadResponseCache returns the last cached response for a request file, or nil if none exists.
+func (w *WorkspaceService) LoadResponseCache(reqPath string) (*ResponseCacheIO, error) {
+	path, err := w.cachePath(reqPath)
+	if err != nil {
+		return nil, nil // no workspace — silently return nothing
+	}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var cache ResponseCacheIO
+	if err := json.Unmarshal(data, &cache); err != nil {
+		return nil, err
+	}
+	return &cache, nil
 }
