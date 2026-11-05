@@ -708,12 +708,29 @@ export default function App() {
   async function handleStopDemo() {
     try {
       await stopDemo()
+      const port = demoPort
       setDemoRunning(false)
       setDemoPort(0)
       setWorkspacePath('')
       setFileTree([])
       setEnvironments([])
       setActiveEnv(null)
+      if (port > 0) {
+        setTabsState(prev => {
+          const prefix = `http://localhost:${port}`
+          const remaining = prev.tabs.filter(t => !t.url.startsWith(prefix))
+          if (remaining.length === prev.tabs.length) return prev
+          if (remaining.length === 0) {
+            const blank = createBlankTab()
+            return { tabs: [blank], activeTabId: blank.id }
+          }
+          const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
+          return {
+            tabs: remaining,
+            activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
+          }
+        })
+      }
     } catch (err) {
       console.error('demo stop error:', err)
     }
