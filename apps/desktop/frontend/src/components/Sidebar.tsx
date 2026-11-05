@@ -23,6 +23,7 @@ export type SidebarProps = {
   onRenameFile: (path: string, newName: string) => void
   onRenameFolder: (path: string, newName: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
+  onClearHistory: () => void
   onImportOpenAPI: () => void
   importing?: boolean
   activeFilePath?: string
@@ -36,7 +37,7 @@ export function Sidebar({
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder,
-  onSelectHistory,
+  onSelectHistory, onClearHistory,
   onImportOpenAPI, importing,
   activeFilePath, dirtyFilePaths,
 }: SidebarProps) {
@@ -87,7 +88,19 @@ export function Sidebar({
         )}
 
         {tab === 'history' && (
-          <div className="flex-1 overflow-auto">
+          <div className="flex flex-col flex-1 overflow-hidden">
+            {history.length > 0 && (
+              <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0">
+                <button
+                  type="button"
+                  onClick={onClearHistory}
+                  className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+                >
+                  Clear history
+                </button>
+              </div>
+            )}
+            <div className="flex-1 overflow-auto">
             {history.length === 0 ? (
               <p className="p-3 text-xs text-[var(--color-muted-foreground)]">No requests yet.</p>
             ) : (
@@ -121,6 +134,7 @@ export function Sidebar({
                 ))}
               </ul>
             )}
+            </div>
           </div>
         )}
       </div>

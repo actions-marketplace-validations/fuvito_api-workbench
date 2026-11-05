@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -67,14 +70,44 @@ func (s *OpenAPIService) ImportOpenAPISpecFromPath(path, baseURL string) ImportR
 	return s.importFromPath(path, baseURL)
 }
 
+// ImportOpenAPISpecFromURL fetches an OpenAPI spec from a URL and imports it.
+func (s *OpenAPIService) ImportOpenAPISpecFromURL(url, baseURL string) ImportResult {
+	if url == "" {
+		return ImportResult{Error: "URL is required"}
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return ImportResult{Error: fmt.Sprintf("fetching URL: %v", err)}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return ImportResult{Error: fmt.Sprintf("server returned %d", resp.StatusCode)}
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ImportResult{Error: fmt.Sprintf("reading response: %v", err)}
+	}
+	format := "yaml"
+	ct := resp.Header.Get("Content-Type")
+	if strings.Contains(ct, "json") || strings.HasSuffix(strings.ToLower(url), ".json") {
+		format = "json"
+	}
+	return s.importFromBytes(data, format, baseURL)
+}
+
 func (s *OpenAPIService) importFromPath(path, baseURL string) ImportResult {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ImportResult{Error: fmt.Sprintf("reading file: %v", err)}
 	}
 
-	ext := strings.TrimPrefix(filepath.Ext(path), ".")
-	spec, err := openapi.ParseBytes(data, ext)
+	format := strings.TrimPrefix(filepath.Ext(path), ".")
+	return s.importFromBytes(data, format, baseURL)
+}
+
+func (s *OpenAPIService) importFromBytes(data []byte, format, baseURL string) ImportResult {
+	spec, err := openapi.ParseBytes(data, format)
 	if err != nil {
 		return ImportResult{Error: fmt.Sprintf("parsing spec: %v", err)}
 	}

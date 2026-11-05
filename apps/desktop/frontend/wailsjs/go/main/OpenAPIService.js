@@ -9,3 +9,7 @@ export function ImportOpenAPISpec(arg1) {
 export function ImportOpenAPISpecFromPath(arg1, arg2) {
   return window['go']['main']['OpenAPIService']['ImportOpenAPISpecFromPath'](arg1, arg2);
 }
+
+export function ImportOpenAPISpecFromURL(arg1, arg2) {
+  return window['go']['main']['OpenAPIService']['ImportOpenAPISpecFromURL'](arg1, arg2);
+}

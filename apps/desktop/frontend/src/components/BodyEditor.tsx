@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import type { BodyState, BodyType } from '@/types'
+import type { BodyState, BodyType, KVPair } from '@/types'
+import { KeyValueEditor } from '@/components/KeyValueEditor'
 
 const BODY_TYPES: { value: BodyType; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -12,7 +14,28 @@ const PLACEHOLDER: Record<BodyType, string> = {
   none: '',
   json: '{\n  "key": "value"\n}',
   raw: 'Body content…',
-  'form-urlencoded': 'key=value&other=data',
+  'form-urlencoded': '',
+}
+
+function parseFormPairs(content: string): KVPair[] {
+  if (!content.trim()) return []
+  return content.split('&').flatMap(pair => {
+    const eqIdx = pair.indexOf('=')
+    try {
+      const name = decodeURIComponent(eqIdx === -1 ? pair : pair.slice(0, eqIdx))
+      const value = eqIdx === -1 ? '' : decodeURIComponent(pair.slice(eqIdx + 1))
+      return name ? [{ id: crypto.randomUUID(), name, value, enabled: true }] : []
+    } catch {
+      return []
+    }
+  })
+}
+
+function serializeFormPairs(pairs: KVPair[]): string {
+  return pairs
+    .filter(p => p.enabled && p.name.trim())
+    .map(p => `${encodeURIComponent(p.name.trim())}=${encodeURIComponent(p.value)}`)
+    .join('&')
 }
 
 type Props = {
@@ -21,6 +44,15 @@ type Props = {
 }
 
 export function BodyEditor({ body, onChange }: Props) {
+  const [formPairs, setFormPairs] = useState<KVPair[]>(() => parseFormPairs(body.content))
+
+  // Re-parse into pairs only when switching into form-urlencoded mode
+  useEffect(() => {
+    if (body.type === 'form-urlencoded') {
+      setFormPairs(parseFormPairs(body.content))
+    }
+  }, [body.type]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function switchType(t: BodyType) {
     onChange({ type: t, content: t === 'none' ? '' : body.content })
   }
@@ -31,6 +63,11 @@ export function BodyEditor({ body, onChange }: Props) {
     } catch {
       // leave as-is if not valid JSON
     }
+  }
+
+  function handleFormPairsChange(pairs: KVPair[]) {
+    setFormPairs(pairs)
+    onChange({ type: 'form-urlencoded', content: serializeFormPairs(pairs) })
   }
 
   return (
@@ -61,7 +98,16 @@ export function BodyEditor({ body, onChange }: Props) {
         )}
       </div>
 
-      {body.type !== 'none' ? (
+      {body.type === 'form-urlencoded' ? (
+        <div className="flex-1 overflow-auto">
+          <KeyValueEditor
+            pairs={formPairs}
+            onChange={handleFormPairsChange}
+            keyPlaceholder="Key"
+            valuePlaceholder="Value"
+          />
+        </div>
+      ) : body.type !== 'none' ? (
         <textarea
           value={body.content}
           onChange={e => onChange({ ...body, content: e.target.value })}

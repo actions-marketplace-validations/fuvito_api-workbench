@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, X, Clock } from 'lucide-react'
+import { Search, X, Clock, Copy, Check, AlignLeft, Code2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
 import type { ResponseData } from '@/lib/bridge'
@@ -238,23 +238,24 @@ function countMatches(text: string, query: string): number {
 
 // ---- Body component ----
 
-function BodyContent({ body, headers, search, activeMatch }: {
+function BodyContent({ body, headers, search, activeMatch, raw }: {
   body: string
   headers: Array<{ name: string; value: string }>
   search: string
   activeMatch: number
+  raw?: boolean
 }) {
   const ct = headers.find(h => h.name.toLowerCase() === 'content-type')?.value
-  const pretty = prettyBody(body)
+  const displayBody = raw ? body : prettyBody(body)
   const fmt = detectFormat(body, ct)
 
   let highlighted: React.ReactNode
   if (!search) {
-    if (fmt === 'json' && body.length < 500_000) highlighted = highlightJSON(pretty)
-    else if (fmt === 'xml' || fmt === 'html') highlighted = highlightXML(pretty)
-    else highlighted = pretty
+    if (!raw && fmt === 'json' && body.length < 500_000) highlighted = highlightJSON(displayBody)
+    else if (!raw && (fmt === 'xml' || fmt === 'html')) highlighted = highlightXML(displayBody)
+    else highlighted = displayBody
   } else {
-    highlighted = highlightSearch(pretty, search, activeMatch)
+    highlighted = highlightSearch(displayBody, search, activeMatch)
   }
 
   return (
@@ -290,10 +291,21 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
   const [searchQuery, setSearchQuery] = useState('')
   const [activeMatch, setActiveMatch] = useState(0)
   const [showTimingDialog, setShowTimingDialog] = useState(false)
+  const [rawMode, setRawMode] = useState(false)
+  const [copied, setCopied] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
-  const bodyText = response && !response.error ? prettyBody(response.body) : ''
+  const bodyText = response && !response.error ? (rawMode ? response.body : prettyBody(response.body)) : ''
+
+  async function handleCopy() {
+    if (!response?.body) return
+    try {
+      await navigator.clipboard.writeText(response.body)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { /* ignore */ }
+  }
   const matchCount = countMatches(bodyText, searchQuery)
 
   const openSearch = useCallback(() => {
@@ -348,6 +360,22 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
               className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
               <Search size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setRawMode(m => !m)}
+              title={rawMode ? 'Switch to pretty view' : 'Switch to raw view'}
+              className={cn('transition-colors', rawMode ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}
+            >
+              {rawMode ? <Code2 size={12} /> : <AlignLeft size={12} />}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopy}
+              title="Copy response body"
+              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+            >
+              {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
             </button>
           </>
         ) : response?.error ? (
@@ -418,7 +446,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
           <div className="text-xs text-red-400 font-mono whitespace-pre-wrap break-all">{response.error}</div>
         )}
         {!loading && response && !response.error && activeTab === 'Body' && (
-          <BodyContent body={response.body} headers={response.headers} search={searchQuery} activeMatch={activeMatch} />
+          <BodyContent body={response.body} headers={response.headers} search={searchQuery} activeMatch={activeMatch} raw={rawMode} />
         )}
         {!loading && response && !response.error && activeTab === 'Headers' && (
           <table className="w-full text-xs font-mono">

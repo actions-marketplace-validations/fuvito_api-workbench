@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -81,11 +82,14 @@ type HistoryEntryIO struct {
 // ---- Service ----
 
 type RequestService struct {
-	ctx       context.Context
-	exec      *executor.Executor
-	store     *history.Store
-	workspace *WorkspaceService
-	settings  *SettingsService
+	ctx        context.Context
+	exec       *executor.Executor
+	store      *history.Store
+	workspace  *WorkspaceService
+	settings   *SettingsService
+	mu         sync.Mutex
+	cancelLast context.CancelFunc
+	execGen    uint64
 }
 
 func NewRequestService(ws *WorkspaceService, ss *SettingsService) *RequestService {
@@ -156,7 +160,26 @@ func (s *RequestService) Execute(input RequestInput) ResponseOutput {
 	resolver := variables.NewResolver(env)
 	resolved := resolver.InterpolateRequest(req)
 
-	resp, err := s.exec.Execute(s.ctx, resolved)
+	// Per-request cancellable context so CancelRequest() can abort in-flight calls.
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.mu.Lock()
+	if s.cancelLast != nil {
+		s.cancelLast()
+	}
+	s.cancelLast = cancel
+	s.execGen++
+	gen := s.execGen
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		s.mu.Lock()
+		if s.execGen == gen {
+			s.cancelLast = nil
+		}
+		s.mu.Unlock()
+	}()
+
+	resp, err := s.exec.Execute(ctx, resolved)
 	if err != nil {
 		return ResponseOutput{Error: err.Error()}
 	}
@@ -190,6 +213,26 @@ func (s *RequestService) GetHistory() []HistoryEntryIO {
 		}
 	}
 	return out
+}
+
+// CancelRequest aborts the currently in-flight Execute call, if any.
+func (s *RequestService) CancelRequest() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelLast != nil {
+		s.cancelLast()
+		s.cancelLast = nil
+	}
+}
+
+// ClearHistory deletes all entries from the request history.
+func (s *RequestService) ClearHistory() {
+	if s.store == nil {
+		return
+	}
+	if err := s.store.Clear(); err != nil {
+		log.Printf("clearing history: %v", err)
+	}
 }
 
 func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {

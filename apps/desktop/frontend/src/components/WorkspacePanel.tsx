@@ -1,10 +1,27 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
-  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus,
+  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
+
+// ---- Tree filter ----
+
+function filterTree(nodes: FileNode[], query: string): FileNode[] {
+  if (!query) return nodes
+  const q = query.toLowerCase()
+  return nodes.flatMap(node => {
+    if (node.isDir) {
+      const filteredChildren = filterTree(node.children ?? [], q)
+      if (filteredChildren.length > 0) return [{ ...node, children: filteredChildren }]
+      if (node.name.toLowerCase().includes(q)) return [{ ...node }]
+      return []
+    }
+    const displayName = node.name.replace(/\.(yaml|yml|json)$/i, '')
+    return displayName.toLowerCase().includes(q) ? [node] : []
+  })
+}
 
 // ---- Inline rename input ----
 
@@ -276,6 +293,8 @@ export function WorkspacePanel({
   const folderName = workspacePath
     ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
     : null
+  const [searchQuery, setSearchQuery] = useState('')
+  const filteredTree = filterTree(fileTree, searchQuery)
 
   return (
     <div className="flex flex-col h-full">
@@ -315,13 +334,32 @@ export function WorkspacePanel({
               </button>
             </div>
           </div>
+          {fileTree.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-1 border-b border-[var(--color-border)]">
+              <Search size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Filter requests…"
+                className="flex-1 min-w-0 bg-transparent text-xs outline-none text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]"
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery('')} className="shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex-1 overflow-auto py-1">
             {fileTree.length === 0 ? (
               <p className="px-3 py-2 text-xs text-[var(--color-muted-foreground)]">
                 No request files found.
               </p>
+            ) : filteredTree.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-[var(--color-muted-foreground)]">No matches.</p>
             ) : (
-              fileTree.map(node => (
+              filteredTree.map(node => (
                 <TreeNode
                   key={node.path}
                   node={node}

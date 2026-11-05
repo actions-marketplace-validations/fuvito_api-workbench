@@ -4,11 +4,12 @@ import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
 import {
-  executeRequest, getHistory, openWorkspace, newWorkspace, closeWorkspace, getWorkspacePath, listRequests,
+  executeRequest, getHistory, cancelRequest, clearHistory,
+  openWorkspace, newWorkspace, closeWorkspace, getWorkspacePath, listRequests,
   loadRequest, saveRequest, openRequest, deleteRequest, setHasDirtyTabs,
   createFolder, deleteFolder, renameFolder, renameRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment,
-  importOpenAPISpec, getSettings, saveSettings,
+  importOpenAPISpec, importOpenAPISpecFromURL, getSettings, saveSettings,
   startDemo, stopDemo, saveResponseCache, loadResponseCache,
   type HistoryEntry, type FileNode,
   type EnvInfo, type RequestFileIO, type AppSettings,
@@ -27,6 +28,7 @@ import {
   DeleteFolderDialog,
   NewFolderDialog,
   CloseDirtyTabDialog,
+  ImportFromURLDialog,
 } from '@/components/ConfirmDialogs'
 import {
   HTTP_METHODS, METHOD_COLOR, authStateToPayload, requestFileIOToState,
@@ -74,6 +76,9 @@ export default function App() {
   const [newFolderDialog, setNewFolderDialog] = useState<{ parentPath: string; parentLabel: string } | null>(null)
   const [newFolderName, setNewFolderName] = useState('')
   const [newFolderError, setNewFolderError] = useState('')
+  const [importFromURLDialog, setImportFromURLDialog] = useState(false)
+  const [importFromURLInput, setImportFromURLInput] = useState('')
+  const [importFromURLError, setImportFromURLError] = useState('')
 
   // --- Derived ---
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
@@ -515,6 +520,45 @@ export default function App() {
     }
   }
 
+  async function handleImportFromURL() {
+    const url = importFromURLInput.trim()
+    if (!url) return
+    setImportFromURLDialog(false)
+    setImporting(true)
+    setImportFromURLError('')
+    try {
+      const result = await importOpenAPISpecFromURL(url)
+      if (result.error) {
+        setImportFromURLError(result.error)
+        setImportFromURLDialog(true)
+      } else {
+        setImportFromURLInput('')
+        await refreshWorkspace()
+      }
+    } catch (err) {
+      console.error('import from URL failed:', err)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  // ---- Cancel in-flight request ----
+
+  function handleCancel() {
+    cancelRequest().catch(() => {})
+  }
+
+  // ---- Clear history ----
+
+  async function handleClearHistory() {
+    try {
+      await clearHistory()
+      setHistory([])
+    } catch (err) {
+      console.error('clear history:', err)
+    }
+  }
+
   // ---- Duplicate request file ----
 
   async function handleDuplicateFile(path: string) {
@@ -782,6 +826,7 @@ export default function App() {
         { kind: 'action', label: 'Save Request',      shortcut: 'Ctrl+S', onClick: handleSaveRequest },
         { kind: 'separator' },
         { kind: 'action', label: 'Import OpenAPI Spec…', onClick: handleImportOpenAPI, disabled: !workspacePath },
+        { kind: 'action', label: 'Import OpenAPI from URL…', onClick: () => { setImportFromURLInput(''); setImportFromURLError(''); setImportFromURLDialog(true) }, disabled: !workspacePath },
         { kind: 'separator' },
         { kind: 'action', label: 'Open Workspace…',   onClick: handleOpenWorkspace },
         { kind: 'action', label: 'New Workspace…',    onClick: handleNewWorkspace },
@@ -835,6 +880,16 @@ export default function App() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+
+      {importFromURLDialog && (
+        <ImportFromURLDialog
+          value={importFromURLInput}
+          onChange={v => { setImportFromURLInput(v); setImportFromURLError('') }}
+          onCancel={() => { setImportFromURLDialog(false); setImportFromURLError('') }}
+          onConfirm={handleImportFromURL}
+          error={importFromURLError}
+        />
+      )}
 
       {newFolderDialog && (
         <NewFolderDialog
@@ -912,6 +967,7 @@ export default function App() {
           onRenameFile={handleRenameFile}
           onRenameFolder={handleRenameFolder}
           onSelectHistory={handleSelectHistory}
+          onClearHistory={handleClearHistory}
           onImportOpenAPI={handleImportOpenAPI}
           importing={importing}
           activeFilePath={activeTab.filePath ?? undefined}
@@ -1111,6 +1167,7 @@ export default function App() {
                 onBodyChange={b => updateTab(activeTabId, { body: b })}
                 onAuthChange={a => updateTab(activeTabId, { auth: a })}
                 onSend={handleSend}
+                onCancel={handleCancel}
               />
             </div>
 

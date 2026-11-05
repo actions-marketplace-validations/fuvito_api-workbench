@@ -5,3 +5,5 @@ import {main} from '../models';
 export function ImportOpenAPISpec(arg1:string):Promise<main.ImportResult>;
 
 export function ImportOpenAPISpecFromPath(arg1:string,arg2:string):Promise<main.ImportResult>;
+
+export function ImportOpenAPISpecFromURL(arg1:string,arg2:string):Promise<main.ImportResult>;

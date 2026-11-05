@@ -3,7 +3,12 @@
 // The generated wailsjs classes use 'namespace' (not erasable syntax in TS7),
 // so all Wails imports are isolated here.
 import { SetHasDirtyTabs as WailsSetHasDirtyTabs } from '@wailsjs/go/main/App'
-import { Execute as WailsExecute, GetHistory as WailsGetHistory } from '@wailsjs/go/main/RequestService'
+import {
+  Execute as WailsExecute,
+  GetHistory as WailsGetHistory,
+  CancelRequest as WailsCancelRequest,
+  ClearHistory as WailsClearHistory,
+} from '@wailsjs/go/main/RequestService'
 import {
   OpenWorkspace as WailsOpenWorkspace,
   NewWorkspace as WailsNewWorkspace,
@@ -30,6 +35,7 @@ import {
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
   ImportOpenAPISpecFromPath as WailsImportOpenAPISpecFromPath,
+  ImportOpenAPISpecFromURL as WailsImportOpenAPISpecFromURL,
 } from '@wailsjs/go/main/OpenAPIService'
 import {
   GetSettings as WailsGetSettings,
@@ -150,6 +156,14 @@ export async function getHistory(): Promise<HistoryEntry[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsGetHistory()
   return (result ?? []) as unknown as HistoryEntry[]
+}
+
+export async function cancelRequest(): Promise<void> {
+  await WailsCancelRequest()
+}
+
+export async function clearHistory(): Promise<void> {
+  await WailsClearHistory()
 }
 
 // ---- Workspace ----
@@ -294,6 +308,11 @@ export async function importOpenAPISpec(baseURL = ''): Promise<ImportResult> {
 
 export async function importOpenAPISpecFromPath(path: string, baseURL = ''): Promise<ImportResult> {
   const result = await WailsImportOpenAPISpecFromPath(path, baseURL)
+  return result as unknown as ImportResult
+}
+
+export async function importOpenAPISpecFromURL(url: string, baseURL = ''): Promise<ImportResult> {
+  const result = await WailsImportOpenAPISpecFromURL(url, baseURL)
   return result as unknown as ImportResult
 }
 

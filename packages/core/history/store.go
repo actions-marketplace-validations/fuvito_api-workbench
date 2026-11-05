@@ -112,6 +112,12 @@ func (s *Store) Recent(limit int) ([]Entry, error) {
 	return entries, rows.Err()
 }
 
+// Clear deletes all history entries.
+func (s *Store) Clear() error {
+	_, err := s.db.Exec(`DELETE FROM history`)
+	return err
+}
+
 // Close releases the database connection.
 func (s *Store) Close() error {
 	return s.db.Close()

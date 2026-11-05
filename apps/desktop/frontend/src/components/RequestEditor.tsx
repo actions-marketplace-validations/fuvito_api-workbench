@@ -85,6 +85,7 @@ export type RequestEditorProps = {
   onBodyChange: (b: BodyState) => void
   onAuthChange: (a: AuthState) => void
   onSend: () => void
+  onCancel?: () => void
 }
 
 export function RequestEditor({
@@ -92,7 +93,7 @@ export function RequestEditor({
   queryParams, headers, body, auth,
   onMethodChange, onUrlChange, onUrlPaste,
   onQueryParamsChange, onHeadersChange, onBodyChange, onAuthChange,
-  onSend,
+  onSend, onCancel,
 }: RequestEditorProps) {
   const [activeTab, setActiveTab] = useState<RequestEditorTab>('Params')
 
@@ -149,17 +150,27 @@ export function RequestEditor({
           )}
         />
 
-        <button
-          type="button"
-          onClick={onSend}
-          disabled={loading || !url.trim()}
-          className={cn(
-            'bg-[var(--color-accent)] text-white text-xs font-semibold rounded px-4 py-1',
-            'transition-opacity disabled:opacity-40 hover:opacity-90 shrink-0',
-          )}
-        >
-          {loading ? 'Sending…' : 'Send'}
-        </button>
+        {loading ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="bg-[var(--color-muted)] border border-[var(--color-border)] text-red-400 hover:text-red-300 text-xs font-semibold rounded px-4 py-1 transition-colors shrink-0"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!url.trim()}
+            className={cn(
+              'bg-[var(--color-accent)] text-white text-xs font-semibold rounded px-4 py-1',
+              'transition-opacity disabled:opacity-40 hover:opacity-90 shrink-0',
+            )}
+          >
+            Send
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
