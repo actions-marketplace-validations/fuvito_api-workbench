@@ -22,7 +22,7 @@ type Props = {
 
 export function BodyEditor({ body, onChange }: Props) {
   function switchType(t: BodyType) {
-    onChange({ type: t, content: t === body.type ? body.content : '' })
+    onChange({ type: t, content: t === 'none' ? '' : body.content })
   }
 
   function formatJSON() {

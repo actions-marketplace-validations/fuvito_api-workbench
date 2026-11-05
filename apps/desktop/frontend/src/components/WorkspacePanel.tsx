@@ -62,14 +62,14 @@ type TreeNodeProps = {
   onRenameFile?: (path: string, newName: string) => void
   onRenameFolder?: (path: string, newName: string) => void
   activeFilePath?: string
-  isDirty?: boolean
+  dirtyFilePaths?: Set<string>
 }
 
 function TreeNode({
   node, depth,
   onSelect, onDelete, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder,
-  activeFilePath, isDirty,
+  activeFilePath, dirtyFilePaths,
 }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(true)
   const [renaming, setRenaming] = useState(false)
@@ -161,7 +161,7 @@ function TreeNode({
             onRenameFile={onRenameFile}
             onRenameFolder={onRenameFolder}
             activeFilePath={activeFilePath}
-            isDirty={isDirty}
+            dirtyFilePaths={dirtyFilePaths}
           />
         ))}
       </div>
@@ -201,7 +201,7 @@ function TreeNode({
           >
             {displayName}
           </span>
-          {isActive && isDirty && (
+          {dirtyFilePaths?.has(node.path) && (
             <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
           )}
         </button>
@@ -252,7 +252,7 @@ type WorkspacePanelProps = {
   onImportOpenAPI: () => void
   importing?: boolean
   activeFilePath?: string
-  isDirty?: boolean
+  dirtyFilePaths?: Set<string>
 }
 
 export function WorkspacePanel({
@@ -271,7 +271,7 @@ export function WorkspacePanel({
   onImportOpenAPI,
   importing,
   activeFilePath,
-  isDirty,
+  dirtyFilePaths,
 }: WorkspacePanelProps) {
   const folderName = workspacePath
     ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
@@ -335,7 +335,7 @@ export function WorkspacePanel({
                   onRenameFile={onRenameFile}
                   onRenameFolder={onRenameFolder}
                   activeFilePath={activeFilePath}
-                  isDirty={isDirty}
+                  dirtyFilePaths={dirtyFilePaths}
                 />
               ))
             )}

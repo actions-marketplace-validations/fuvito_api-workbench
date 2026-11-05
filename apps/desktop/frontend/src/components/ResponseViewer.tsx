@@ -350,6 +350,8 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
               <Search size={12} />
             </button>
           </>
+        ) : response?.error ? (
+          <span className="text-xs font-semibold text-red-400">Network Error</span>
         ) : (
           <span className="text-xs text-[var(--color-muted-foreground)]">Response</span>
         )}

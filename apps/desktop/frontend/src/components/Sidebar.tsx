@@ -26,7 +26,7 @@ export type SidebarProps = {
   onImportOpenAPI: () => void
   importing?: boolean
   activeFilePath?: string
-  isDirty?: boolean
+  dirtyFilePaths?: Set<string>
 }
 
 export function Sidebar({
@@ -38,7 +38,7 @@ export function Sidebar({
   onRenameFile, onRenameFolder,
   onSelectHistory,
   onImportOpenAPI, importing,
-  activeFilePath, isDirty,
+  activeFilePath, dirtyFilePaths,
 }: SidebarProps) {
   return (
     <aside
@@ -82,7 +82,7 @@ export function Sidebar({
             onImportOpenAPI={onImportOpenAPI}
             importing={importing}
             activeFilePath={activeFilePath}
-            isDirty={isDirty}
+            dirtyFilePaths={dirtyFilePaths}
           />
         )}
 

@@ -25,12 +25,14 @@ type DemoResult struct {
 }
 
 type DemoService struct {
-	ctx     context.Context
-	ws      *WorkspaceService
-	server  *http.Server
-	tempDir string
-	port    int
-	mu      sync.Mutex
+	ctx              context.Context
+	ws               *WorkspaceService
+	server           *http.Server
+	tempDir          string
+	port             int
+	mu               sync.Mutex
+	prevWorkspace    string
+	prevEnvPath      string
 }
 
 func NewDemoService(ws *WorkspaceService) *DemoService {
@@ -98,6 +100,8 @@ func (d *DemoService) StartDemo() DemoResult {
 	d.server = srv
 	d.tempDir = tmpDir
 	d.port = port
+	d.prevWorkspace = d.ws.workspacePath
+	d.prevEnvPath = d.ws.activeEnvPath
 
 	d.ws.openWorkspaceDirect(tmpDir)
 
@@ -121,6 +125,18 @@ func (d *DemoService) StopDemo() {
 		d.tempDir = ""
 	}
 	d.port = 0
+
+	// Restore the workspace that was open before the demo started.
+	d.ws.workspacePath = d.prevWorkspace
+	d.ws.activeEnvPath = d.prevEnvPath
+	d.ws.activeEnv = nil
+	if d.prevEnvPath != "" {
+		if env, err := d.ws.loadEnvFile(d.prevEnvPath); err == nil {
+			d.ws.activeEnv = env
+		}
+	}
+	d.prevWorkspace = ""
+	d.prevEnvPath = ""
 }
 
 // ---- helpers ----

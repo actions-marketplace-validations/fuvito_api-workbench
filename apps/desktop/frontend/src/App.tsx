@@ -744,14 +744,11 @@ export default function App() {
 
   async function handleStopDemo() {
     try {
-      await stopDemo()
       const port = demoPort
+      await stopDemo()
       setDemoRunning(false)
       setDemoPort(0)
-      setWorkspacePath('')
-      setFileTree([])
-      setEnvironments([])
-      setActiveEnv(null)
+      // Close demo tabs, then restore the previous workspace state from Go.
       if (port > 0) {
         setTabsState(prev => {
           const prefix = `http://localhost:${port}`
@@ -768,6 +765,7 @@ export default function App() {
           }
         })
       }
+      await refreshWorkspace()
     } catch (err) {
       console.error('demo stop error:', err)
     }
@@ -917,7 +915,7 @@ export default function App() {
           onImportOpenAPI={handleImportOpenAPI}
           importing={importing}
           activeFilePath={activeTab.filePath ?? undefined}
-          isDirty={isTabDirty(activeTab)}
+          dirtyFilePaths={new Set(tabs.filter(t => t.filePath && isTabDirty(t)).map(t => t.filePath!))}
         />
 
         {/* Sidebar resize handle */}
