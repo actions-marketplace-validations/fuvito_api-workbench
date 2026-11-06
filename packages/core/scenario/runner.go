@@ -46,9 +46,13 @@ func New(exec *executor.Executor) *Runner {
 }
 
 // Run executes all steps of the scenario sequentially.
-// env provides the initial variable set; variables extracted in each step
-// are made available to all subsequent steps.
 func (r *Runner) Run(ctx context.Context, s *domain.Scenario, env *domain.Environment) *Result {
+	return r.RunFrom(ctx, s, env, 0)
+}
+
+// RunFrom executes the scenario starting from the given step index (0-based).
+// Steps before fromStep and disabled steps are recorded as skipped.
+func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.Environment, fromStep int) *Result {
 	result := &Result{
 		Scenario:  s,
 		StartedAt: time.Now(),
@@ -60,6 +64,10 @@ func (r *Runner) Run(ctx context.Context, s *domain.Scenario, env *domain.Enviro
 
 	for i := range s.Steps {
 		step := &s.Steps[i]
+		if i < fromStep || step.Disabled {
+			result.Steps = append(result.Steps, StepResult{Name: step.Name, Skipped: true})
+			continue
+		}
 		sr := r.runStep(ctx, step, resolver, prevFailed)
 		result.Steps = append(result.Steps, sr)
 
@@ -67,7 +75,6 @@ func (r *Runner) Run(ctx context.Context, s *domain.Scenario, env *domain.Enviro
 			result.Passed = false
 			prevFailed = true
 			if step.FailPolicy == domain.FailPolicyStop || step.FailPolicy == "" {
-				// mark remaining steps as skipped
 				for j := i + 1; j < len(s.Steps); j++ {
 					result.Steps = append(result.Steps, StepResult{
 						Name:    s.Steps[j].Name,

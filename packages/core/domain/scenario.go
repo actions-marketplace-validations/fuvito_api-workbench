@@ -21,6 +21,7 @@ type RetryPolicy struct {
 type ScenarioStep struct {
 	Name        string
 	Description string
+	Disabled    bool // when true, step is skipped without being counted as a failure
 	RequestRef  string
 	Request     *Request
 	Extractions []Extraction

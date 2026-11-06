@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Play, Loader2, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp, ChevronRight, Save, X, Plus, Trash2 } from 'lucide-react'
+import { Play, Loader2, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp, ChevronRight, Save, X, Plus, Trash2, Eye, EyeOff } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { yaml } from '@codemirror/lang-yaml'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,7 @@ function serializeScenarioToYAML(d: ScenarioDetail): string {
     for (const step of d.steps) {
       lines.push(`  - name: ${yamlScalar(step.name)}`)
       if (step.description) lines.push(`    description: ${yamlScalar(step.description)}`)
+      if (step.disabled) lines.push('    disabled: true')
       if (step.requestRef) {
         lines.push(`    requestRef: ${yamlScalar(step.requestRef)}`)
       } else if (step.method || step.url) {
@@ -137,7 +138,7 @@ function AssertionRow({ assertion, onChange, onRemove }: {
           value={assertion.path ?? ''}
           onChange={e => onChange({ path: e.target.value })}
           placeholder={assertion.type === 'jsonpath' ? '$.field' : 'Header-Name'}
-          className={cn(inputCls, 'w-28 flex-1 min-w-[5rem]')}
+          className={cn(inputCls, 'w-28 flex-1 min-w-[5rem]', !assertion.path?.trim() && 'border-red-500/70 focus:border-red-500')}
         />
       )}
       {isSchema ? (
@@ -259,7 +260,7 @@ function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'name', valuePlaceho
 const sectionLabelCls = 'text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)] mb-1.5'
 const addBtnCls = 'flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors mt-1'
 
-function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown }: {
+function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown, onToggleDisabled }: {
   step: StepDetail
   index: number
   isFirst: boolean
@@ -268,6 +269,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
   onRemove: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  onToggleDisabled: () => void
 }) {
   function updateHeader(i: number, u: { name?: string; value?: string }) {
     onChange({ headers: (step.headers ?? []).map((h, hi) => hi === i ? { ...h, ...u } : h) })
@@ -310,7 +312,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
   }
 
   return (
-    <div className="rounded border border-[var(--color-border)] bg-[var(--color-muted)] text-xs overflow-hidden">
+    <div className={cn('rounded border border-[var(--color-border)] bg-[var(--color-muted)] text-xs overflow-hidden', step.disabled && 'opacity-60')}>
       {/* Step header */}
       <div className="px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         <div className="flex items-center gap-2">
@@ -326,9 +328,17 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
           <div className="flex items-center shrink-0">
             <button
               type="button"
+              onClick={onToggleDisabled}
+              title={step.disabled ? 'Enable step' : 'Disable step (skip during run)'}
+              className={cn('p-1 transition-colors', step.disabled ? 'text-amber-400 hover:text-amber-300' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}
+            >
+              {step.disabled ? <EyeOff size={12} /> : <Eye size={12} />}
+            </button>
+            <button
+              type="button"
               onClick={onMoveUp}
               disabled={isFirst}
-              title="Move step up"
+              title="Move step up (Alt+↑)"
               className={cn('p-1 transition-colors', isFirst ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}
             >
               <ChevronUp size={12} />
@@ -337,7 +347,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
               type="button"
               onClick={onMoveDown}
               disabled={isLast}
-              title="Move step down"
+              title="Move step down (Alt+↓)"
               className={cn('p-1 transition-colors', isLast ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}
             >
               <ChevronDown size={12} />
@@ -599,7 +609,7 @@ function CollapsibleSection({ title, badge, defaultOpen = true, children }: {
 
 // ---- StepListRow (compact left-panel row, shared between view and edit modes) ----
 
-function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove }: {
+function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onToggleDisabled, onRunFrom }: {
   step: StepDetail
   index: number
   result: StepResult | null
@@ -611,8 +621,11 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
   onMoveUp?: () => void
   onMoveDown?: () => void
   onRemove?: () => void
+  onToggleDisabled?: () => void
+  onRunFrom?: () => void
 }) {
   const badge = step.method ? METHOD_BADGE[step.method] ?? '' : ''
+  const isDisabled = step.disabled ?? false
   return (
     <div
       role="button"
@@ -624,6 +637,7 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
         selected
           ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]'
           : 'border-transparent hover:bg-[var(--color-muted)]',
+        isDisabled && 'opacity-50',
       )}
     >
       <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[11px] font-bold">
@@ -631,9 +645,10 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className={cn('text-xs font-medium truncate', selected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
+          <span className={cn('text-xs font-medium truncate', isDisabled ? 'line-through text-[var(--color-muted-foreground)]' : selected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
             {step.name || 'Untitled step'}
           </span>
+          {isDisabled && <EyeOff size={9} className="shrink-0 text-amber-400" />}
           {result && (
             result.skipped
               ? <MinusCircle size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
@@ -651,13 +666,18 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
           </div>
         ) : null}
       </div>
-      {editMode && (
+      {editMode ? (
         <div className="shrink-0 flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button type="button" onClick={e => { e.stopPropagation(); onMoveUp?.() }} disabled={isFirst} title="Move up"
+          <button type="button" onClick={e => { e.stopPropagation(); onToggleDisabled?.() }}
+            title={isDisabled ? 'Enable step' : 'Disable step'}
+            className={cn('p-1 transition-colors', isDisabled ? 'text-amber-400 hover:text-amber-300' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
+            {isDisabled ? <EyeOff size={11} /> : <Eye size={11} />}
+          </button>
+          <button type="button" onClick={e => { e.stopPropagation(); onMoveUp?.() }} disabled={isFirst} title="Move up (Alt+↑)"
             className={cn('p-1 transition-colors', isFirst ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
             <ChevronUp size={11} />
           </button>
-          <button type="button" onClick={e => { e.stopPropagation(); onMoveDown?.() }} disabled={isLast} title="Move down"
+          <button type="button" onClick={e => { e.stopPropagation(); onMoveDown?.() }} disabled={isLast} title="Move down (Alt+↓)"
             className={cn('p-1 transition-colors', isLast ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
             <ChevronDown size={11} />
           </button>
@@ -666,14 +686,23 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
             <Trash2 size={11} />
           </button>
         </div>
-      )}
+      ) : onRunFrom ? (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onRunFrom() }}
+          title="Run from this step"
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors"
+        >
+          <Play size={9} /> from here
+        </button>
+      ) : null}
     </div>
   )
 }
 
 // ---- StepDetailPanel (right panel for view mode) ----
 
-function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResult | null }) {
+function StepDetailPanel({ step, result, onRunFrom }: { step: StepDetail; result: StepResult | null; onRunFrom?: () => void }) {
   const badge = step.method ? METHOD_BADGE[step.method] ?? '' : ''
   const bodyPreview = step.bodyContent ? tryPrettyJSON(step.bodyContent) : null
   const responseBodyFormatted = result?.responseBody ? tryPrettyJSON(result.responseBody) : null
@@ -691,8 +720,23 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
             {step.url && <span className="text-[var(--color-muted-foreground)] font-mono text-xs truncate">{step.url}</span>}
           </span>
         }
+        badge={onRunFrom ? (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onRunFrom() }}
+            title="Run scenario from this step"
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors"
+          >
+            <Play size={9} /> Run from here
+          </button>
+        ) : undefined}
         defaultOpen
       >
+        {step.disabled && (
+          <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+            <EyeOff size={11} /> This step is disabled and will be skipped during runs.
+          </div>
+        )}
         {step.requestRef && (
           <p className="text-xs text-[var(--color-muted-foreground)] font-mono mb-2 break-all">↗ {step.requestRef}</p>
         )}
@@ -888,6 +932,8 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
   const [leftPanelWidth, setLeftPanelWidth] = useState(240)
   const containerRef = useRef<HTMLDivElement>(null)
+  const selectedStepIndexRef = useRef<number | null>(null)
+  useEffect(() => { selectedStepIndexRef.current = selectedStepIndex }, [selectedStepIndex])
 
   function handleDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault()
@@ -932,16 +978,46 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     }
   }, [detail]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keyboard shortcuts: Alt+Up/Down to reorder steps in visual edit mode
+  useEffect(() => {
+    if (mode !== 'visual') return
+    function handleKey(e: KeyboardEvent) {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+      e.preventDefault()
+      const idx = selectedStepIndexRef.current
+      if (idx === null) return
+      moveVisualStep(idx, e.key === 'ArrowUp' ? -1 : 1)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleRun() {
     onRunningChange(true)
     onResultChange(null)
     try {
-      const r = await runScenario(scenarioPath, selectedEnvPath)
+      const r = await runScenario(scenarioPath, selectedEnvPath, 0)
       onResultChange(r)
       saveScenarioResult(scenarioPath, r).catch(() => {})
-      // Auto-focus first failed step, else keep current selection
       const firstFailed = r.steps.findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
+    } catch (e) {
+      onResultChange({ name: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
+    } finally {
+      onRunningChange(false)
+    }
+  }
+
+  async function handleRunFrom(fromStep: number) {
+    onRunningChange(true)
+    onResultChange(null)
+    try {
+      const r = await runScenario(scenarioPath, selectedEnvPath, fromStep)
+      onResultChange(r)
+      saveScenarioResult(scenarioPath, r).catch(() => {})
+      const firstFailed = r.steps.findIndex(s => !s.passed && !s.skipped)
+      if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
+      else setSelectedStepIndex(fromStep)
     } catch (e) {
       onResultChange({ name: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
@@ -1031,15 +1107,28 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   }
 
   function moveVisualStep(from: number, dir: -1 | 1) {
-    if (!visualDetail) return
-    const to = from + dir
-    if (to < 0 || to >= visualDetail.steps.length) return
-    const steps = [...visualDetail.steps]
-    ;[steps[from], steps[to]] = [steps[to], steps[from]]
-    setVisualDetail({ ...visualDetail, steps })
+    setVisualDetail(prev => {
+      if (!prev) return prev
+      const to = from + dir
+      if (to < 0 || to >= prev.steps.length) return prev
+      const steps = [...prev.steps]
+      ;[steps[from], steps[to]] = [steps[to], steps[from]]
+      return { ...prev, steps }
+    })
     setVisualDirty(true)
-    if (selectedStepIndex === from) setSelectedStepIndex(to)
-    else if (selectedStepIndex === to) setSelectedStepIndex(from)
+    setSelectedStepIndex(prev => {
+      if (prev === from) return from + dir
+      if (prev === from + dir) return from
+      return prev
+    })
+  }
+
+  function toggleVisualStepDisabled(i: number) {
+    setVisualDetail(prev => {
+      if (!prev) return prev
+      return { ...prev, steps: prev.steps.map((s, idx) => idx === i ? { ...s, disabled: !s.disabled } : s) }
+    })
+    setVisualDirty(true)
   }
 
   async function handleSave() {
@@ -1199,7 +1288,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
               ) : mode === 'view' ? (
                 viewSteps.length === 0 ? (
                   <p className="px-3 py-4 text-xs text-center text-[var(--color-muted-foreground)]">
-                    No steps. Click <strong>Edit</strong> to add one.
+                    No steps yet. Switch to <strong>Edit</strong> to add your first step.
                   </p>
                 ) : (
                   viewSteps.map((step, i) => (
@@ -1208,6 +1297,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                       result={result?.steps[i] ?? null}
                       selected={selectedStepIndex === i}
                       onSelect={setSelectedStepIndex}
+                      onRunFrom={() => handleRunFrom(i)}
                     />
                   ))
                 )
@@ -1228,6 +1318,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                       onMoveUp={() => moveVisualStep(i, -1)}
                       onMoveDown={() => moveVisualStep(i, 1)}
                       onRemove={() => removeVisualStep(i)}
+                      onToggleDisabled={() => toggleVisualStepDisabled(i)}
                     />
                   ))
                 )
@@ -1266,6 +1357,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                 <StepDetailPanel
                   step={detail.steps[selectedStepIndex]}
                   result={result?.steps[selectedStepIndex] ?? null}
+                  onRunFrom={!running ? () => handleRunFrom(selectedStepIndex) : undefined}
                 />
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-xs text-[var(--color-muted-foreground)]">
@@ -1288,6 +1380,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                     onRemove={() => removeVisualStep(selectedStepIndex)}
                     onMoveUp={() => moveVisualStep(selectedStepIndex, -1)}
                     onMoveDown={() => moveVisualStep(selectedStepIndex, 1)}
+                    onToggleDisabled={() => toggleVisualStepDisabled(selectedStepIndex)}
                   />
                 </div>
               ) : (

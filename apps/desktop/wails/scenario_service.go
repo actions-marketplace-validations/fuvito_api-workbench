@@ -44,6 +44,7 @@ type ExtractionDetailIO struct {
 type StepDetailIO struct {
 	Name              string               `json:"name"`
 	Description       string               `json:"description,omitempty"`
+	Disabled          bool                 `json:"disabled,omitempty"`
 	Method            string               `json:"method,omitempty"`
 	URL               string               `json:"url,omitempty"`
 	Headers           []KVPairIO           `json:"headers"`
@@ -208,6 +209,7 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		sd := StepDetailIO{
 			Name:        step.Name,
 			Description: step.Description,
+			Disabled:    step.Disabled,
 			RequestRef:  step.RequestRef,
 			FailPolicy:  string(step.FailPolicy),
 			TimeoutMs:   step.TimeoutMs,
@@ -405,7 +407,8 @@ func (s *ScenarioService) RenameScenario(path, newName string) string {
 
 // RunScenario executes a scenario file and returns the full result.
 // envPath overrides the workspace active environment; pass "" to use the active env.
-func (s *ScenarioService) RunScenario(path, envPath string) ScenarioResultIO {
+// fromStep is the 0-based index of the first step to execute; pass 0 to run all steps.
+func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) ScenarioResultIO {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ScenarioResultIO{Error: fmt.Sprintf("read file: %v", err)}
@@ -457,7 +460,7 @@ func (s *ScenarioService) RunScenario(path, envPath string) ScenarioResultIO {
 		}
 	}
 
-	result := runner.Run(s.ctx, sc, env)
+	result := runner.RunFrom(s.ctx, sc, env, fromStep)
 
 	out := ScenarioResultIO{
 		Name:       result.Scenario.Name,

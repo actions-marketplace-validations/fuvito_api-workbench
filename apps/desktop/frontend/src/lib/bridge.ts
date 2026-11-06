@@ -438,6 +438,7 @@ export interface ExtractionDetail {
 export interface StepDetail {
   name: string
   description?: string
+  disabled?: boolean
   method?: string
   url?: string
   headers?: Array<{ name: string; value: string }>
@@ -498,8 +499,8 @@ export async function loadScenario(path: string): Promise<ScenarioDetail> {
   return result as unknown as ScenarioDetail
 }
 
-export async function runScenario(path: string, envPath = ''): Promise<ScenarioResult> {
-  const result = await WailsRunScenario(path, envPath)
+export async function runScenario(path: string, envPath = '', fromStep = 0): Promise<ScenarioResult> {
+  const result = await WailsRunScenario(path, envPath, fromStep)
   return result as unknown as ScenarioResult
 }
 
