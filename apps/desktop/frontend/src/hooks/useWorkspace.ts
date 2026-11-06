@@ -107,7 +107,10 @@ export function useWorkspace(deps: {
         setTabsState(prev => {
           const norm = (p: string) => p.replace(/\\/g, '/')
           const prefix = norm(path).replace(/\/?$/, '/')
-          const remaining = prev.tabs.filter(t => !norm(t.filePath ?? '').startsWith(prefix))
+          const remaining = prev.tabs.filter(t =>
+            !norm(t.filePath ?? '').startsWith(prefix) &&
+            !norm(t.scenarioPath ?? '').startsWith(prefix)
+          )
           if (remaining.length === prev.tabs.length) return prev
           if (remaining.length === 0) {
             const blank = createBlankTab()
