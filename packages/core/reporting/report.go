@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 )
@@ -216,6 +217,156 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 
 	report := jUnitTestSuites{
 		Name:       result.Scenario.Name,
+		Tests:      suite.Tests,
+		Failures:   suite.Failures,
+		Errors:     suite.Errors,
+		Time:       suite.Time,
+		TestSuites: []jUnitSuite{suite},
+	}
+
+	out, err := xml.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(xml.Header), out...), nil
+}
+
+// ---- Conformance reporting ----
+
+// ConformText returns a human-readable conformance report suitable for terminal / CI output.
+func ConformText(result *conformance.ConformResult) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
+	fmt.Fprintf(&b, "Base URL: %s\n\n", result.BaseURL)
+
+	for _, op := range result.Operations {
+		if op.Skipped {
+			fmt.Fprintf(&b, "  SKIP  %-7s %s\n", op.Method, op.Path)
+			continue
+		}
+		status := "PASS"
+		if op.Error != "" || !op.Passed() {
+			status = "FAIL"
+		}
+		suffix := ""
+		if op.StatusCode > 0 {
+			suffix = fmt.Sprintf("  %d  %dms", op.StatusCode, op.DurationMs)
+		}
+		fmt.Fprintf(&b, "  %s  %-7s %s%s\n", status, op.Method, op.Path, suffix)
+		if op.Error != "" {
+			fmt.Fprintf(&b, "         error: %s\n", op.Error)
+		}
+		for _, v := range op.Violations {
+			fmt.Fprintf(&b, "         ✗ %s\n", v.Error())
+		}
+	}
+
+	fmt.Fprintln(&b)
+	passed, failed, skipped := result.Counts()
+	total := passed + failed + skipped
+
+	verdict := "PASSED"
+	if failed > 0 {
+		verdict = "FAILED"
+	}
+	fmt.Fprintf(&b, "%s  %d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms\n",
+		verdict, total, passed, failed, skipped, result.Duration.Milliseconds())
+
+	return b.String()
+}
+
+// JSONConformReport is the machine-readable structure for a conformance run.
+type JSONConformReport struct {
+	SpecTitle   string              `json:"specTitle"`
+	SpecVersion string              `json:"specVersion"`
+	BaseURL     string              `json:"baseURL"`
+	Passed      bool                `json:"passed"`
+	DurationMs  int64               `json:"durationMs"`
+	Operations  []JSONConformOp     `json:"operations"`
+}
+
+type JSONConformOp struct {
+	OperationID string   `json:"operationId,omitempty"`
+	Method      string   `json:"method"`
+	Path        string   `json:"path"`
+	StatusCode  int      `json:"statusCode,omitempty"`
+	DurationMs  int64    `json:"durationMs,omitempty"`
+	Passed      bool     `json:"passed"`
+	Skipped     bool     `json:"skipped,omitempty"`
+	Error       string   `json:"error,omitempty"`
+	Violations  []string `json:"violations,omitempty"`
+}
+
+// ConformJSON returns a machine-readable JSON conformance report.
+func ConformJSON(result *conformance.ConformResult) ([]byte, error) {
+	passed, failed, _ := result.Counts()
+	report := JSONConformReport{
+		SpecTitle:   result.SpecTitle,
+		SpecVersion: result.SpecVersion,
+		BaseURL:     result.BaseURL,
+		Passed:      failed == 0,
+		DurationMs:  result.Duration.Milliseconds(),
+	}
+	for _, op := range result.Operations {
+		jo := JSONConformOp{
+			OperationID: op.OperationID,
+			Method:      op.Method,
+			Path:        op.Path,
+			StatusCode:  op.StatusCode,
+			DurationMs:  op.DurationMs,
+			Passed:      op.Passed(),
+			Skipped:     op.Skipped,
+			Error:       op.Error,
+		}
+		for _, v := range op.Violations {
+			jo.Violations = append(jo.Violations, v.Error())
+		}
+		report.Operations = append(report.Operations, jo)
+	}
+	_ = passed
+	return json.MarshalIndent(report, "", "  ")
+}
+
+// ConformJUnit returns a JUnit XML conformance report.
+func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
+	_, failed, _ := result.Counts()
+
+	suite := jUnitSuite{
+		Name:     result.SpecTitle,
+		Tests:    len(result.Operations),
+		Failures: failed,
+		Time:     secStr(result.Duration.Milliseconds()),
+	}
+
+	for _, op := range result.Operations {
+		tc := jUnitCase{
+			Name:      op.Method + " " + op.Path,
+			ClassName: result.SpecTitle,
+			Time:      secStr(op.DurationMs),
+		}
+		switch {
+		case op.Skipped:
+			skipped := struct{}{}
+			tc.Skipped = &skipped
+		case op.Error != "":
+			suite.Errors++
+			tc.Error = &jUnitError{Message: op.Error, Text: op.Error}
+		case !op.Passed():
+			msgs := make([]string, len(op.Violations))
+			for i, v := range op.Violations {
+				msgs[i] = "  ✗ " + v.Error()
+			}
+			tc.Failure = &jUnitFailure{
+				Message: fmt.Sprintf("%d violation(s)", len(op.Violations)),
+				Text:    strings.Join(msgs, "\n"),
+			}
+		}
+		suite.Cases = append(suite.Cases, tc)
+	}
+
+	report := jUnitTestSuites{
+		Name:       result.SpecTitle,
 		Tests:      suite.Tests,
 		Failures:   suite.Failures,
 		Errors:     suite.Errors,

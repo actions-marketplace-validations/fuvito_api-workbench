@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -31,6 +32,8 @@ func main() {
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())
 	root.AddCommand(generateCmd())
+	root.AddCommand(conformCmd())
+	root.AddCommand(diffCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(2)
@@ -268,7 +271,28 @@ func runCmd() *cobra.Command {
 			}
 
 			exec := executor.New(executor.Options{})
-			runner := scenario.New(exec)
+			var runner *scenario.Runner
+			if s.SpecFile != "" {
+				specPath := s.SpecFile
+				if !filepath.IsAbs(specPath) {
+					specPath = filepath.Join(filepath.Dir(scenarioPath), specPath)
+				}
+				specData, err := os.ReadFile(specPath)
+				if err != nil {
+					return fmt.Errorf("reading spec file %q: %w", specPath, err)
+				}
+				ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
+				if ext == "yml" {
+					ext = "yaml"
+				}
+				spec, err := openapi.ParseBytes(specData, ext)
+				if err != nil {
+					return fmt.Errorf("parsing spec file %q: %w", specPath, err)
+				}
+				runner = scenario.NewWithSpec(exec, spec)
+			} else {
+				runner = scenario.New(exec)
+			}
 			result := runner.Run(context.Background(), s, env)
 
 			var reportBytes []byte
@@ -335,39 +359,9 @@ operation declares a security requirement.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src := args[0]
 
-			var data []byte
-			var specFormat string
-
-			if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
-				client := &http.Client{Timeout: 30 * time.Second}
-				resp, err := client.Get(src)
-				if err != nil {
-					return fmt.Errorf("fetching spec: %w", err)
-				}
-				defer resp.Body.Close()
-				if resp.StatusCode != http.StatusOK {
-					return fmt.Errorf("server returned %d", resp.StatusCode)
-				}
-				data, err = io.ReadAll(resp.Body)
-				if err != nil {
-					return fmt.Errorf("reading response: %w", err)
-				}
-				ct := resp.Header.Get("Content-Type")
-				if strings.Contains(ct, "json") || strings.HasSuffix(strings.ToLower(src), ".json") {
-					specFormat = "json"
-				} else {
-					specFormat = "yaml"
-				}
-			} else {
-				var err error
-				data, err = os.ReadFile(src)
-				if err != nil {
-					return fmt.Errorf("reading spec: %w", err)
-				}
-				specFormat = strings.TrimPrefix(strings.ToLower(filepath.Ext(src)), ".")
-				if specFormat == "yml" {
-					specFormat = "yaml"
-				}
+			data, specFormat, err := fetchSpec(src)
+			if err != nil {
+				return err
 			}
 
 			spec, err := openapi.ParseBytes(data, specFormat)
@@ -479,6 +473,289 @@ operation declares a security requirement.`,
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be generated without writing any files")
 
+	return cmd
+}
+
+func conformCmd() *cobra.Command {
+	var baseURL string
+	var envFile string
+	var tagsCSV string
+	var pathsCSV string
+	var format string
+	var outputFile string
+	var requestTimeout int
+	var failFast bool
+
+	cmd := &cobra.Command{
+		Use:   "conform <spec-file-or-url>",
+		Short: "Run all spec operations against a live server and validate responses",
+		Long: `Parse an OpenAPI 3.0/3.1 spec, execute each declared operation against
+a running server, and validate every response against the spec's declared
+response schema.
+
+Exit codes:
+  0  all operations conformed
+  1  one or more violations or execution failures
+  2  spec parse or configuration error`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			src := args[0]
+
+			data, specFormat, err := fetchSpec(src)
+			if err != nil {
+				return err
+			}
+
+			spec, err := openapi.ParseBytes(data, specFormat)
+			if err != nil {
+				return fmt.Errorf("parsing spec: %w", err)
+			}
+
+			var env *domain.Environment
+			if envFile != "" {
+				envData, err := os.ReadFile(envFile)
+				if err != nil {
+					return fmt.Errorf("reading environment: %w", err)
+				}
+				env, err = serialization.ParseEnvironmentFile(envData, envFile)
+				if err != nil {
+					return fmt.Errorf("parsing environment: %w", err)
+				}
+			}
+
+			opts := conformance.Options{
+				FailFast:         failFast,
+				RequestTimeoutMs: requestTimeout,
+			}
+			if tagsCSV != "" {
+				for _, t := range strings.Split(tagsCSV, ",") {
+					if t = strings.TrimSpace(t); t != "" {
+						opts.Tags = append(opts.Tags, t)
+					}
+				}
+			}
+			if pathsCSV != "" {
+				for _, p := range strings.Split(pathsCSV, ",") {
+					if p = strings.TrimSpace(p); p != "" {
+						opts.Paths = append(opts.Paths, p)
+					}
+				}
+			}
+
+			exec := executor.New(executor.Options{})
+			runner := conformance.New(exec)
+			result := runner.Run(context.Background(), spec, baseURL, env, opts)
+
+			var reportBytes []byte
+			switch strings.ToLower(format) {
+			case "json":
+				reportBytes, err = reporting.ConformJSON(result)
+				if err != nil {
+					return fmt.Errorf("generating JSON report: %w", err)
+				}
+				reportBytes = append(reportBytes, '\n')
+			case "junit":
+				reportBytes, err = reporting.ConformJUnit(result)
+				if err != nil {
+					return fmt.Errorf("generating JUnit report: %w", err)
+				}
+			default:
+				reportBytes = []byte(reporting.ConformText(result))
+			}
+
+			if outputFile != "" {
+				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
+					return fmt.Errorf("creating output directory: %w", err)
+				}
+				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
+					return fmt.Errorf("writing output file: %w", err)
+				}
+			} else {
+				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
+			}
+
+			_, failed, _ := result.Counts()
+			if failed > 0 {
+				os.Exit(1)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&baseURL, "base-url", "b", "", "Base URL to send requests to (overrides spec servers[0])")
+	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file for variable resolution")
+	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
+	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
+	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
+	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
+	return cmd
+}
+
+// fetchSpec retrieves spec bytes and detected format from a file path or URL.
+func fetchSpec(src string) (data []byte, format string, err error) {
+	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, fetchErr := client.Get(src)
+		if fetchErr != nil {
+			return nil, "", fmt.Errorf("fetching spec: %w", fetchErr)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, "", fmt.Errorf("server returned %d", resp.StatusCode)
+		}
+		data, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, "", fmt.Errorf("reading response: %w", err)
+		}
+		ct := resp.Header.Get("Content-Type")
+		if strings.Contains(ct, "json") || strings.HasSuffix(strings.ToLower(src), ".json") {
+			format = "json"
+		} else {
+			format = "yaml"
+		}
+		return data, format, nil
+	}
+	data, err = os.ReadFile(src)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading spec: %w", err)
+	}
+	format = strings.TrimPrefix(strings.ToLower(filepath.Ext(src)), ".")
+	if format == "yml" {
+		format = "yaml"
+	}
+	return data, format, nil
+}
+
+func diffCmd() *cobra.Command {
+	var format string
+	var outputFile string
+	var breakingOnly bool
+
+	cmd := &cobra.Command{
+		Use:   "diff <base-spec> <revision-spec>",
+		Short: "Compare two OpenAPI specs and report breaking and non-breaking changes",
+		Long: `Parse two OpenAPI 3.0/3.1 specs and classify every change as breaking
+(ERR), potentially breaking (WARN), or informational (INFO).
+
+Exit codes:
+  0  no breaking changes found
+  1  one or more breaking changes found
+  2  spec parse or configuration error`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			baseData, baseFmt, err := fetchSpec(args[0])
+			if err != nil {
+				return err
+			}
+			revData, revFmt, err := fetchSpec(args[1])
+			if err != nil {
+				return err
+			}
+
+			baseSpec, err := openapi.ParseBytes(baseData, baseFmt)
+			if err != nil {
+				return fmt.Errorf("parsing base spec: %w", err)
+			}
+			revSpec, err := openapi.ParseBytes(revData, revFmt)
+			if err != nil {
+				return fmt.Errorf("parsing revision spec: %w", err)
+			}
+
+			result, err := openapi.Diff(baseSpec, revSpec)
+			if err != nil {
+				return fmt.Errorf("diffing specs: %w", err)
+			}
+
+			changes := result.Changes
+			if breakingOnly {
+				filtered := changes[:0]
+				for _, c := range changes {
+					if c.Breaking {
+						filtered = append(filtered, c)
+					}
+				}
+				changes = filtered
+			}
+
+			var reportBytes []byte
+			switch strings.ToLower(format) {
+			case "json":
+				type jsonChange struct {
+					ID       string `json:"id"`
+					Level    string `json:"level"`
+					Breaking bool   `json:"breaking"`
+					Text     string `json:"text"`
+				}
+				type jsonOut struct {
+					HasBreaking bool         `json:"hasBreaking"`
+					Changes     []jsonChange `json:"changes"`
+				}
+				out := jsonOut{HasBreaking: result.HasBreaking}
+				for _, c := range changes {
+					out.Changes = append(out.Changes, jsonChange{
+						ID:       c.ID,
+						Level:    c.Level,
+						Breaking: c.Breaking,
+						Text:     c.Text,
+					})
+				}
+				b, _ := json.MarshalIndent(out, "", "  ")
+				reportBytes = append(b, '\n')
+			default:
+				var sb strings.Builder
+				if len(changes) == 0 {
+					if breakingOnly {
+						fmt.Fprintln(&sb, "No breaking changes.")
+					} else {
+						fmt.Fprintln(&sb, "No changes.")
+					}
+				} else {
+					for _, c := range changes {
+						mark := " "
+						if c.Breaking {
+							mark = "!"
+						}
+						fmt.Fprintf(&sb, "  [%s] %s  %s\n", c.Level, mark, c.Text)
+					}
+					fmt.Fprintln(&sb)
+					breaking := 0
+					for _, c := range changes {
+						if c.Breaking {
+							breaking++
+						}
+					}
+					if result.HasBreaking {
+						fmt.Fprintf(&sb, "%d change(s)  ·  %d breaking\n", len(changes), breaking)
+					} else {
+						fmt.Fprintf(&sb, "%d change(s)  ·  no breaking changes\n", len(changes))
+					}
+				}
+				reportBytes = []byte(sb.String())
+			}
+
+			if outputFile != "" {
+				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
+					return fmt.Errorf("creating output directory: %w", err)
+				}
+				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
+					return fmt.Errorf("writing output file: %w", err)
+				}
+			} else {
+				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
+			}
+
+			if result.HasBreaking {
+				os.Exit(1)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
+	cmd.Flags().BoolVar(&breakingOnly, "breaking-only", false, "Show only breaking changes")
 	return cmd
 }
 

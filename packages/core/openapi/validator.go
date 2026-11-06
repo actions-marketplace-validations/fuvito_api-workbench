@@ -1,9 +1,11 @@
 package openapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -123,6 +125,80 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 		return []ValidationError{{Message: err.Error()}}
 	}
 	return nil
+}
+
+// ValidateRequest checks that req conforms to the spec's declared request schema
+// for the matching operation. Returns nil if valid or if the path is not in the spec.
+func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
+	router, err := gorillamux.NewRouter(s.doc)
+	if err != nil {
+		return []ValidationError{{Message: "building router: " + err.Error()}}
+	}
+
+	rawURL := req.URL
+	if idx := strings.Index(rawURL, "?"); idx >= 0 {
+		rawURL = rawURL[:idx]
+	}
+
+	httpReq, err := http.NewRequestWithContext(context.Background(), string(req.Method), rawURL, nil)
+	if err != nil {
+		return []ValidationError{{Message: "building request: " + err.Error()}}
+	}
+
+	if len(req.QueryParams) > 0 {
+		q := httpReq.URL.Query()
+		for _, p := range req.QueryParams {
+			if p.Name != "" {
+				q.Set(p.Name, p.Value)
+			}
+		}
+		httpReq.URL.RawQuery = q.Encode()
+	}
+
+	for _, h := range req.Headers {
+		if h.Name != "" {
+			httpReq.Header.Set(h.Name, h.Value)
+		}
+	}
+
+	if req.Body != nil && req.Body.Content != "" {
+		ct := bodyContentType(req.Body.Type)
+		httpReq.Header.Set("Content-Type", ct)
+		b := []byte(req.Body.Content)
+		httpReq.Body = io.NopCloser(bytes.NewReader(b))
+		httpReq.ContentLength = int64(len(b))
+	}
+
+	route, _, err := router.FindRoute(httpReq)
+	if err != nil {
+		return nil // path not in spec — skip
+	}
+
+	input := &openapi3filter.RequestValidationInput{
+		Request: httpReq,
+		Route:   route,
+	}
+
+	if err := openapi3filter.ValidateRequest(context.Background(), input); err != nil {
+		if re, ok := err.(*openapi3filter.RequestError); ok {
+			return parseSchemaErrors(re.Err)
+		}
+		return []ValidationError{{Message: err.Error()}}
+	}
+	return nil
+}
+
+func bodyContentType(t domain.BodyType) string {
+	switch t {
+	case domain.BodyJSON:
+		return "application/json"
+	case domain.BodyFormURLEncoded:
+		return "application/x-www-form-urlencoded"
+	case domain.BodyMultipart:
+		return "multipart/form-data"
+	default:
+		return "text/plain"
+	}
 }
 
 func findOperation(doc *openapi3.T, operationID string) *openapi3.Operation {

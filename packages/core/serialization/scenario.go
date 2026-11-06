@@ -13,10 +13,11 @@ import (
 
 // ScenarioFile is the on-disk representation of a Scenario.
 type ScenarioFile struct {
-	SchemaVersion string      `yaml:"schemaVersion" json:"schemaVersion"`
-	Name          string      `yaml:"name" json:"name"`
-	Description   string      `yaml:"description,omitempty" json:"description,omitempty"`
-	Steps         []StepFile  `yaml:"steps" json:"steps"`
+	SchemaVersion string     `yaml:"schemaVersion" json:"schemaVersion"`
+	Name          string     `yaml:"name" json:"name"`
+	Description   string     `yaml:"description,omitempty" json:"description,omitempty"`
+	SpecFile      string     `yaml:"specFile,omitempty" json:"specFile,omitempty"`
+	Steps         []StepFile `yaml:"steps" json:"steps"`
 }
 
 type RetryPolicyFile struct {
@@ -25,16 +26,17 @@ type RetryPolicyFile struct {
 }
 
 type StepFile struct {
-	Name        string           `yaml:"name" json:"name"`
-	Description string           `yaml:"description,omitempty" json:"description,omitempty"`
-	Disabled    bool             `yaml:"disabled,omitempty" json:"disabled,omitempty"`
-	RequestRef  string           `yaml:"requestRef,omitempty" json:"requestRef,omitempty"`
-	Request     *RequestFile     `yaml:"request,omitempty" json:"request,omitempty"`
-	Assertions  []AssertionFile  `yaml:"assertions,omitempty" json:"assertions,omitempty"`
-	Extractions []ExtractionFile `yaml:"extractions,omitempty" json:"extractions,omitempty"`
-	FailPolicy  string           `yaml:"failPolicy,omitempty" json:"failPolicy,omitempty"`
-	TimeoutMs   int              `yaml:"timeoutMs,omitempty" json:"timeoutMs,omitempty"`
-	Retry       *RetryPolicyFile `yaml:"retry,omitempty" json:"retry,omitempty"`
+	Name         string           `yaml:"name" json:"name"`
+	Description  string           `yaml:"description,omitempty" json:"description,omitempty"`
+	Disabled     bool             `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+	RequestRef   string           `yaml:"requestRef,omitempty" json:"requestRef,omitempty"`
+	Request      *RequestFile     `yaml:"request,omitempty" json:"request,omitempty"`
+	Assertions   []AssertionFile  `yaml:"assertions,omitempty" json:"assertions,omitempty"`
+	Extractions  []ExtractionFile `yaml:"extractions,omitempty" json:"extractions,omitempty"`
+	FailPolicy   string           `yaml:"failPolicy,omitempty" json:"failPolicy,omitempty"`
+	TimeoutMs    int              `yaml:"timeoutMs,omitempty" json:"timeoutMs,omitempty"`
+	Retry        *RetryPolicyFile `yaml:"retry,omitempty" json:"retry,omitempty"`
+	ValidateSpec *bool            `yaml:"validateSpec,omitempty" json:"validateSpec,omitempty"`
 }
 
 type AssertionFile struct {
@@ -94,6 +96,7 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 		SchemaVersion: sf.SchemaVersion,
 		Name:          sf.Name,
 		Description:   sf.Description,
+		SpecFile:      sf.SpecFile,
 	}
 	for _, step := range sf.Steps {
 		ds, err := stepFileToDomain(&step)
@@ -107,12 +110,13 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 
 func stepFileToDomain(sf *StepFile) (*domain.ScenarioStep, error) {
 	step := &domain.ScenarioStep{
-		Name:        sf.Name,
-		Description: sf.Description,
-		Disabled:    sf.Disabled,
-		RequestRef:  sf.RequestRef,
-		FailPolicy:  domain.FailPolicy(sf.FailPolicy),
-		TimeoutMs:   sf.TimeoutMs,
+		Name:         sf.Name,
+		Description:  sf.Description,
+		Disabled:     sf.Disabled,
+		RequestRef:   sf.RequestRef,
+		FailPolicy:   domain.FailPolicy(sf.FailPolicy),
+		TimeoutMs:    sf.TimeoutMs,
+		ValidateSpec: sf.ValidateSpec,
 	}
 	if sf.Retry != nil && sf.Retry.MaxAttempts > 0 {
 		step.Retry = &domain.RetryPolicy{
@@ -152,6 +156,7 @@ func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 		SchemaVersion: "1",
 		Name:          s.Name,
 		Description:   s.Description,
+		SpecFile:      s.SpecFile,
 	}
 	for _, step := range s.Steps {
 		sf.Steps = append(sf.Steps, stepDomainToFile(&step))
@@ -161,12 +166,13 @@ func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 
 func stepDomainToFile(step *domain.ScenarioStep) StepFile {
 	sf := StepFile{
-		Name:        step.Name,
-		Description: step.Description,
-		Disabled:    step.Disabled,
-		RequestRef:  step.RequestRef,
-		FailPolicy:  string(step.FailPolicy),
-		TimeoutMs:   step.TimeoutMs,
+		Name:         step.Name,
+		Description:  step.Description,
+		Disabled:     step.Disabled,
+		RequestRef:   step.RequestRef,
+		FailPolicy:   string(step.FailPolicy),
+		TimeoutMs:    step.TimeoutMs,
+		ValidateSpec: step.ValidateSpec,
 	}
 	if step.Retry != nil && step.Retry.MaxAttempts > 0 {
 		sf.Retry = &RetryPolicyFile{

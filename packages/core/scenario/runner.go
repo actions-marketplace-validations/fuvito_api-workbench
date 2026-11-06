@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/assertions"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
@@ -39,10 +41,17 @@ type Result struct {
 type Runner struct {
 	exec     *executor.Executor
 	asserter *assertions.Evaluator
+	spec     *openapi.Spec // nil if no spec binding
 }
 
 func New(exec *executor.Executor) *Runner {
 	return &Runner{exec: exec, asserter: assertions.New()}
+}
+
+// NewWithSpec creates a Runner that automatically validates each step's response
+// against the provided OpenAPI spec.
+func NewWithSpec(exec *executor.Executor, spec *openapi.Spec) *Runner {
+	return &Runner{exec: exec, asserter: assertions.New(), spec: spec}
 }
 
 // Run executes all steps of the scenario sequentially.
@@ -124,6 +133,27 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 		}
 	}
 
+	// Spec conformance validation (when spec is bound and not opted out)
+	if r.spec != nil {
+		doValidate := true
+		if step.ValidateSpec != nil {
+			doValidate = *step.ValidateSpec
+		}
+		if doValidate {
+			path := urlPath(resolved.URL)
+			violations := openapi.ValidateResponseByPath(r.spec, string(resolved.Method), path, resp.StatusCode, resp)
+			for _, v := range violations {
+				ar := domain.AssertionResult{
+					Assertion: domain.Assertion{Type: domain.AssertionSchema, Name: "spec conformance"},
+					Passed:    false,
+					Message:   v.Error(),
+				}
+				sr.Assertions = append(sr.Assertions, ar)
+				sr.Passed = false
+			}
+		}
+	}
+
 	// Extract variables (regardless of assertion outcome)
 	extracted := make(map[string]string)
 	for _, ex := range step.Extractions {
@@ -172,6 +202,17 @@ func extractValue(ex domain.Extraction, resp *domain.Response) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown extraction source %q", ex.Source)
 	}
+}
+
+func urlPath(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	if u.Path == "" {
+		return "/"
+	}
+	return u.Path
 }
 
 // AllPassed reports whether every non-skipped step passed all assertions.
