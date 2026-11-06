@@ -803,7 +803,7 @@ function StepResultCard({ sr, index }: { sr: StepResult; index: number }) {
           {sr.error && (
             <p className="text-red-400 text-[11px] font-mono break-all">{sr.error}</p>
           )}
-          {sr.assertions.map((ar, i) => (
+          {(sr.assertions ?? []).map((ar, i) => (
             <div key={i} className="flex items-start gap-1.5">
               {ar.passed
                 ? <CheckCircle2 size={10} className="shrink-0 text-emerald-400 mt-0.5" />
@@ -813,7 +813,7 @@ function StepResultCard({ sr, index }: { sr: StepResult; index: number }) {
               </span>
             </div>
           ))}
-          {Object.entries(sr.extracted).map(([k, v]) => (
+          {Object.entries(sr.extracted ?? {}).map(([k, v]) => (
             <div key={k} className="flex items-baseline gap-1 text-[11px]">
               <span className="text-violet-400 shrink-0">→ {k}:</span>
               <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>

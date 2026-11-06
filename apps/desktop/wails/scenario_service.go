@@ -464,11 +464,12 @@ func (s *ScenarioService) RunScenario(path, envPath string) ScenarioResultIO {
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{
-			Name:      sr.Name,
-			Passed:    sr.Passed,
-			Skipped:   sr.Skipped,
-			Error:     sr.Error,
-			Extracted: sr.Extracted,
+			Name:       sr.Name,
+			Passed:     sr.Passed,
+			Skipped:    sr.Skipped,
+			Error:      sr.Error,
+			Extracted:  sr.Extracted,
+			Assertions: []AssertionResultIO{},
 		}
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
