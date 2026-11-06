@@ -6,6 +6,10 @@ export function ActiveEnvironment() {
   return window['go']['main']['WorkspaceService']['ActiveEnvironment']();
 }
 
+export function ClearResponseCache(arg1) {
+  return window['go']['main']['WorkspaceService']['ClearResponseCache'](arg1);
+}
+
 export function CloseWorkspace() {
   return window['go']['main']['WorkspaceService']['CloseWorkspace']();
 }
