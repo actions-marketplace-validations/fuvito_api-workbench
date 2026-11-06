@@ -1,0 +1,21 @@
+schemaVersion: "1"
+name: Health Check
+description: Verify the server is running and returns expected health metadata.
+
+steps:
+  - name: Check health endpoint
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.status"
+        operator: eq
+        expected: ok
+      - type: jsonpath
+        path: "$.version"
+        operator: ne
+        expected: ""

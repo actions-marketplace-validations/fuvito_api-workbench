@@ -1,0 +1,52 @@
+schemaVersion: "1"
+name: Error Handling
+description: Verify the server returns correct error status codes and messages for bad requests.
+
+steps:
+  - name: Login with wrong password
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"admin","password":"wrong"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 401
+      - type: jsonpath
+        path: "$.error"
+        operator: ne
+        expected: ""
+    failPolicy: continue
+
+  - name: Create user with missing fields
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      body:
+        type: json
+        content: '{"name":"No Email Here"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 422
+      - type: jsonpath
+        path: "$.error"
+        operator: contains
+        expected: required
+    failPolicy: continue
+
+  - name: Fetch non-existent user
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/99999"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 404
+      - type: jsonpath
+        path: "$.error"
+        operator: contains
+        expected: not found
+    failPolicy: continue

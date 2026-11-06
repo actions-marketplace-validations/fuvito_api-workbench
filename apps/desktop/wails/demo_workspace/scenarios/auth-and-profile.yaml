@@ -1,0 +1,49 @@
+schemaVersion: "1"
+name: Auth and Protected Resource
+description: Login to obtain a Bearer token, then use it to access a protected endpoint.
+
+steps:
+  - name: Login
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"admin","password":"secret"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.token"
+        operator: ne
+        expected: ""
+      - type: jsonpath
+        path: "$.token_type"
+        operator: eq
+        expected: Bearer
+    extractions:
+      - name: authToken
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - name: Get profile
+    request:
+      method: GET
+      url: "{{baseUrl}}/auth/profile"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.role"
+        operator: eq
+        expected: admin
+      - type: jsonpath
+        path: "$.email"
+        operator: contains
+        expected: example.com
