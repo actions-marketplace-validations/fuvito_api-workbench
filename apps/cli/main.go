@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -27,6 +30,7 @@ func main() {
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())
+	root.AddCommand(generateCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(2)
@@ -308,4 +312,196 @@ func runCmd() *cobra.Command {
 	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
 
 	return cmd
+}
+
+func generateCmd() *cobra.Command {
+	var baseURL string
+	var outputDir string
+	var format string
+	var dryRun bool
+
+	cmd := &cobra.Command{
+		Use:   "generate <spec-file-or-url>",
+		Short: "Generate request files from an OpenAPI specification",
+		Long: `Parse an OpenAPI 3.0/3.1 spec and write one YAML request file per operation.
+
+The argument may be a local file path or an http/https URL.
+
+Each generated file contains the HTTP method, URL (with path parameters as
+{{paramName}} placeholders), required headers and query params, an empty JSON
+body stub for POST/PUT/PATCH operations, and a Bearer auth hint when the
+operation declares a security requirement.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			src := args[0]
+
+			var data []byte
+			var specFormat string
+
+			if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
+				client := &http.Client{Timeout: 30 * time.Second}
+				resp, err := client.Get(src)
+				if err != nil {
+					return fmt.Errorf("fetching spec: %w", err)
+				}
+				defer resp.Body.Close()
+				if resp.StatusCode != http.StatusOK {
+					return fmt.Errorf("server returned %d", resp.StatusCode)
+				}
+				data, err = io.ReadAll(resp.Body)
+				if err != nil {
+					return fmt.Errorf("reading response: %w", err)
+				}
+				ct := resp.Header.Get("Content-Type")
+				if strings.Contains(ct, "json") || strings.HasSuffix(strings.ToLower(src), ".json") {
+					specFormat = "json"
+				} else {
+					specFormat = "yaml"
+				}
+			} else {
+				var err error
+				data, err = os.ReadFile(src)
+				if err != nil {
+					return fmt.Errorf("reading spec: %w", err)
+				}
+				specFormat = strings.TrimPrefix(strings.ToLower(filepath.Ext(src)), ".")
+				if specFormat == "yml" {
+					specFormat = "yaml"
+				}
+			}
+
+			spec, err := openapi.ParseBytes(data, specFormat)
+			if err != nil {
+				return fmt.Errorf("parsing spec: %w", err)
+			}
+
+			title, version := spec.Info()
+			reqs, err := openapi.GenerateRequests(spec, baseURL)
+			if err != nil {
+				return fmt.Errorf("generating requests: %w", err)
+			}
+
+			// Resolve output directory.
+			destDir := outputDir
+			if destDir == "" {
+				dirName := genSanitizeDirName(title)
+				if dirName == "" {
+					dirName = "requests"
+				}
+				destDir = dirName
+			}
+
+			type genResult struct {
+				OperationID string   `json:"operationId,omitempty"`
+				Method      string   `json:"method"`
+				URL         string   `json:"url"`
+				Path        string   `json:"path"`
+				Tags        []string `json:"tags,omitempty"`
+			}
+			var results []genResult
+			var skipped int
+
+			for _, gr := range reqs {
+				filename := genSanitizeFilename(gr.OperationID)
+				if filename == "" {
+					filename = genSanitizeFilename(gr.Request.Name)
+				}
+				if filename == "" {
+					filename = strings.ToLower(string(gr.Request.Method)) + "-request"
+				}
+				savePath := filepath.Join(destDir, filename+".yaml")
+
+				if !dryRun {
+					yamlData, err := serialization.WriteRequest(gr.Request, "yaml")
+					if err != nil {
+						skipped++
+						continue
+					}
+					if err := os.MkdirAll(destDir, 0o755); err != nil {
+						return fmt.Errorf("creating output directory: %w", err)
+					}
+					if err := os.WriteFile(savePath, yamlData, 0o644); err != nil {
+						skipped++
+						continue
+					}
+				}
+
+				results = append(results, genResult{
+					OperationID: gr.OperationID,
+					Method:      string(gr.Request.Method),
+					URL:         gr.Request.URL,
+					Path:        savePath,
+					Tags:        gr.Tags,
+				})
+			}
+
+			switch strings.ToLower(format) {
+			case "json":
+				type jsonOut struct {
+					SpecTitle   string      `json:"specTitle"`
+					SpecVersion string      `json:"specVersion"`
+					OutputDir   string      `json:"outputDir"`
+					DryRun      bool        `json:"dryRun"`
+					Generated   []genResult `json:"generated"`
+					Skipped     int         `json:"skipped"`
+				}
+				b, _ := json.MarshalIndent(jsonOut{
+					SpecTitle:   title,
+					SpecVersion: version,
+					OutputDir:   destDir,
+					DryRun:      dryRun,
+					Generated:   results,
+					Skipped:     skipped,
+				}, "", "  ")
+				fmt.Fprintln(cmd.OutOrStdout(), string(b))
+			default:
+				dryTag := ""
+				if dryRun {
+					dryTag = " (dry run)"
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "%s %s%s → %s\n\n", title, version, dryTag, destDir)
+				for _, r := range results {
+					fmt.Fprintf(cmd.OutOrStdout(), "  %-7s %s\n", r.Method, r.URL)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n%d request(s) generated", len(results))
+				if skipped > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "  %d skipped (write error)", skipped)
+				}
+				fmt.Fprintln(cmd.OutOrStdout())
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&baseURL, "base-url", "b", "", "Override base URL from spec (e.g. https://api.example.com/v1)")
+	cmd.Flags().StringVarP(&outputDir, "output", "o", "", "Output directory for generated files (default: ./<spec-title>)")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be generated without writing any files")
+
+	return cmd
+}
+
+func genSanitizeDirName(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' {
+			b.WriteRune(r)
+		} else if r == ' ' || r == '_' {
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
+}
+
+func genSanitizeFilename(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
+			b.WriteRune(r)
+		} else if r == ' ' {
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
 }
