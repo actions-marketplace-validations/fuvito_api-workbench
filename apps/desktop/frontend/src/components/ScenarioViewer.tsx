@@ -1050,7 +1050,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
     } catch (e) {
-      onResultChange({ name: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
+      onResultChange({ title: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
       onRunningChange(false)
     }
@@ -1067,7 +1067,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
       else setSelectedStepIndex(fromStep)
     } catch (e) {
-      onResultChange({ name: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
+      onResultChange({ title: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
       onRunningChange(false)
     }

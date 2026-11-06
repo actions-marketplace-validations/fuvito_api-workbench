@@ -111,8 +111,8 @@ export function setupMockBridge() {
       },
       ScenarioService: {
         ListScenarios: () => Promise.resolve(bridge['scenarios']),
-        LoadScenario: () => Promise.resolve(bridge['scenarioDetail'] ?? { path: '', name: '', description: '', error: '', steps: [] }),
-        RunScenario: (_path: string, _envPath: string) => Promise.resolve(bridge['scenarioResult'] ?? { name: '', error: '', passed: true, durationMs: 0, steps: [] }),
+        LoadScenario: () => Promise.resolve(bridge['scenarioDetail'] ?? { path: '', title: '', description: '', error: '', steps: [] }),
+        RunScenario: (_path: string, _envPath: string) => Promise.resolve(bridge['scenarioResult'] ?? { title: '', error: '', passed: true, durationMs: 0, steps: [] }),
         LoadScenarioRaw: () => Promise.resolve(bridge['scenarioRaw'] ?? ''),
         SaveScenarioRaw: (_path: string, content: string) => { bridge['scenarioRaw'] = content; return Promise.resolve('') },
         SaveScenarioResult: (path: string, result: unknown) => {
@@ -126,10 +126,10 @@ export function setupMockBridge() {
         CreateScenario: (name: string) => {
           const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
           const path = `/workspace/scenarios/${slug || 'scenario'}.yaml`
-          const newScenario = { name, path, stepCount: 1 }
+          const newScenario = { title: name, path, stepCount: 1 }
           ;(bridge['scenarios'] as unknown[]).push(newScenario)
-          bridge['scenarioDetail'] = { path, name, description: '', steps: [], error: '' }
-          bridge['scenarioRaw'] = `schemaVersion: "1"\nname: ${name}\nsteps:\n  - name: Step 1\n`
+          bridge['scenarioDetail'] = { path, title: name, description: '', steps: [], error: '' }
+          bridge['scenarioRaw'] = `schemaVersion: "1"\ntitle: ${name}\nsteps:\n  - title: Step 1\n`
           return Promise.resolve({ path, error: '' })
         },
         DuplicateScenario: (path: string) => {

@@ -1,16 +1,16 @@
 import { test, expect, gotoApp } from '../../fixtures/test.js'
 import type { Page } from '@playwright/test'
 
-const SCENARIO = { name: 'User flow', path: '/ws/scenarios/user-flow.yaml', stepCount: 2 }
+const SCENARIO = { title: 'User flow', path: '/ws/scenarios/user-flow.yaml', stepCount: 2 }
 
 const SCENARIO_DETAIL = {
   path: '/ws/scenarios/user-flow.yaml',
-  name: 'User flow',
+  title: 'User flow',
   description: 'End-to-end user lifecycle',
   error: '',
   steps: [
     {
-      name: 'Create user',
+      title: 'Create user',
       method: 'POST',
       url: 'https://api.example.com/users',
       requestRef: '',
@@ -19,7 +19,7 @@ const SCENARIO_DETAIL = {
       extractions: [{ name: 'userId', source: 'jsonpath', path: '$.id' }],
     },
     {
-      name: 'Fetch user',
+      title: 'Fetch user',
       method: 'GET',
       url: 'https://api.example.com/users/{{userId}}',
       requestRef: '',
@@ -34,13 +34,13 @@ const SCENARIO_DETAIL = {
 }
 
 const SCENARIO_RESULT = {
-  name: 'User flow',
+  title: 'User flow',
   error: '',
   passed: true,
   durationMs: 150,
   steps: [
     {
-      name: 'Create user',
+      title: 'Create user',
       error: '',
       passed: true,
       skipped: false,
@@ -50,7 +50,7 @@ const SCENARIO_RESULT = {
       assertions: [{ type: 'status', message: 'status = 201', passed: true }],
     },
     {
-      name: 'Fetch user',
+      title: 'Fetch user',
       error: '',
       passed: true,
       skipped: false,
@@ -186,12 +186,12 @@ test.describe('Scenarios', () => {
 
   test('FAILED badge shown when scenario fails', async ({ page }) => {
     const failResult = {
-      name: 'User flow',
+      title: 'User flow',
       error: '',
       passed: false,
       durationMs: 80,
       steps: [{
-        name: 'Create user',
+        title: 'Create user',
         error: '',
         passed: false,
         skipped: false,
@@ -394,8 +394,8 @@ test.describe('Scenario result persistence', () => {
 })
 
 test.describe('Scenario management — run all', () => {
-  const FLOW_A = { name: 'Flow A', path: '/ws/scenarios/flow-a.yaml', stepCount: 1 }
-  const FLOW_B = { name: 'Flow B', path: '/ws/scenarios/flow-b.yaml', stepCount: 1 }
+  const FLOW_A = { title: 'Flow A', path: '/ws/scenarios/flow-a.yaml', stepCount: 1 }
+  const FLOW_B = { title: 'Flow B', path: '/ws/scenarios/flow-b.yaml', stepCount: 1 }
 
   test('Run All button appears when workspace has scenarios', async ({ page }) => {
     await withScenarios(page)
@@ -422,7 +422,7 @@ test.describe('Scenario management — run all', () => {
   })
 
   test('clicking a result row opens the scenario tab', async ({ page }) => {
-    const detailA = { path: FLOW_A.path, name: 'Flow A', description: '', steps: [], error: '' }
+    const detailA = { path: FLOW_A.path, title: 'Flow A', description: '', steps: [], error: '' }
     await withScenarios(page, { initialScenarios: [FLOW_A, FLOW_B], detail: detailA })
     await gotoApp(page)
     await page.locator('aside').getByTitle('Run all scenarios').click()
@@ -495,9 +495,9 @@ test.describe('Scenario visual editor', () => {
     await gotoApp(page)
     await openInEditMode(page)
     // Step name inputs appear (one per step) with correct values
-    await expect(page.getByPlaceholder('Step name')).toHaveCount(2)
-    await expect(page.getByPlaceholder('Step name').first()).toHaveValue('Create user')
-    await expect(page.getByPlaceholder('Step name').nth(1)).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step title')).toHaveCount(2)
+    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Fetch user')
   })
 
   test('visual editor shows method and URL fields', async ({ page }) => {
@@ -521,7 +521,7 @@ test.describe('Scenario visual editor', () => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await page.getByPlaceholder('Step name').first().fill('Changed name')
+    await page.getByPlaceholder('Step title').first().fill('Changed name')
     await page.getByRole('button', { name: 'Discard' }).click()
     // Back in view mode — Run button visible
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
@@ -548,20 +548,20 @@ test.describe('Scenario visual editor', () => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await expect(page.getByPlaceholder('Step name')).toHaveCount(2)
+    await expect(page.getByPlaceholder('Step title')).toHaveCount(2)
     await page.getByRole('button', { name: 'Add step' }).click()
-    await expect(page.getByPlaceholder('Step name')).toHaveCount(3)
+    await expect(page.getByPlaceholder('Step title')).toHaveCount(3)
   })
 
   test('Remove step button deletes the step', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await expect(page.getByPlaceholder('Step name')).toHaveCount(2)
+    await expect(page.getByPlaceholder('Step title')).toHaveCount(2)
     await page.getByTitle('Remove step').first().click()
-    await expect(page.getByPlaceholder('Step name')).toHaveCount(1)
+    await expect(page.getByPlaceholder('Step title')).toHaveCount(1)
     // The remaining step is "Fetch user"
-    await expect(page.getByPlaceholder('Step name').first()).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Fetch user')
   })
 
   test('Add assertion button inserts a new assertion row', async ({ page }) => {
@@ -651,9 +651,9 @@ test.describe('Scenario visual editor', () => {
 })
 
 const MULTI_SCENARIOS = [
-  { name: 'Auth flow', path: '/ws/scenarios/auth-flow.yaml', stepCount: 2 },
-  { name: 'User lifecycle', path: '/ws/scenarios/user-lifecycle.yaml', stepCount: 4 },
-  { name: 'Health check', path: '/ws/scenarios/health-check.yaml', stepCount: 1 },
+  { title: 'Auth flow', path: '/ws/scenarios/auth-flow.yaml', stepCount: 2 },
+  { title: 'User lifecycle', path: '/ws/scenarios/user-lifecycle.yaml', stepCount: 4 },
+  { title: 'Health check', path: '/ws/scenarios/health-check.yaml', stepCount: 1 },
 ]
 
 test.describe('Scenario search/filter', () => {
@@ -726,13 +726,13 @@ test.describe('Scenario visual editor — step reordering', () => {
     await gotoApp(page)
     await openInEditMode(page)
     // Before: step 1 = "Create user", step 2 = "Fetch user"
-    await expect(page.getByPlaceholder('Step name').first()).toHaveValue('Create user')
-    await expect(page.getByPlaceholder('Step name').nth(1)).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Fetch user')
     // Click move-down on the first step
     await page.getByTitle('Move step down').first().click()
     // After: step 1 = "Fetch user", step 2 = "Create user"
-    await expect(page.getByPlaceholder('Step name').first()).toHaveValue('Fetch user')
-    await expect(page.getByPlaceholder('Step name').nth(1)).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Create user')
   })
 
   test('move-up on second step swaps it with the first', async ({ page }) => {
@@ -740,8 +740,8 @@ test.describe('Scenario visual editor — step reordering', () => {
     await gotoApp(page)
     await openInEditMode(page)
     await page.getByTitle('Move step up').nth(1).click()
-    await expect(page.getByPlaceholder('Step name').first()).toHaveValue('Fetch user')
-    await expect(page.getByPlaceholder('Step name').nth(1)).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Create user')
   })
 
   test('step numbers update after reorder', async ({ page }) => {

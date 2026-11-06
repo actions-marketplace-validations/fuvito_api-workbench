@@ -367,7 +367,7 @@ export function WorkspacePanel({
   const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
   const [scenarioQuery, setScenarioQuery] = useState('')
   const filteredScenarios = scenarioQuery
-    ? scenarios.filter(s => s.name.toLowerCase().includes(scenarioQuery.toLowerCase()))
+    ? scenarios.filter(s => s.title.toLowerCase().includes(scenarioQuery.toLowerCase()))
     : scenarios
 
   function handleToggleCollapse(path: string) {
@@ -612,7 +612,7 @@ export function WorkspacePanel({
                     <Play size={10} className="shrink-0 text-violet-400" />
                     {renamingScenarioPath === s.path ? (
                       <RenameInput
-                        initialValue={s.name}
+                        initialValue={s.title}
                         onConfirm={newName => {
                           setRenamingScenarioPath(null)
                           onRenameScenario?.(s.path, newName)
@@ -623,12 +623,12 @@ export function WorkspacePanel({
                       <button
                         type="button"
                         className="flex-1 min-w-0 flex items-center gap-1.5 text-left py-0.5 min-w-0"
-                        onClick={() => onSelectScenario?.(s.path, s.name)}
+                        onClick={() => onSelectScenario?.(s.path, s.title)}
                         onDoubleClick={e => { e.stopPropagation(); setRenamingScenarioPath(s.path) }}
-                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setScenarioCtxMenu({ x: e.clientX, y: e.clientY, path: s.path, name: s.name }) }}
+                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setScenarioCtxMenu({ x: e.clientX, y: e.clientY, path: s.path, name: s.title }) }}
                         title="Click to open · Double-click to rename"
                       >
-                        <span className="truncate flex-1">{s.name}</span>
+                        <span className="truncate flex-1">{s.title}</span>
                         {!!s.stepCount && (
                           <span className="shrink-0 text-[10px] tabular-nums text-[var(--color-muted-foreground)]">
                             {s.stepCount}

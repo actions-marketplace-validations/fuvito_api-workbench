@@ -94,7 +94,7 @@ describe('requestFileIOToState', () => {
     url: 'https://example.com',
     headers: [],
     queryParams: [],
-    name: '',
+    title: '',
     schemaVersion: '1',
   }
 

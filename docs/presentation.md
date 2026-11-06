@@ -32,6 +32,8 @@ The Go core is the product. The desktop app and CLI are two interfaces to the sa
 
 ## Desktop UI
 
+![App shell](images/01-app-shell.png)
+
 A three-panel layout designed for API development work.
 
 ```
@@ -54,9 +56,15 @@ A three-panel layout designed for API development work.
 - **Settings panel** (gear icon): timeout, proxy, TLS skip-verify
 - **OpenAPI import** button generates a full request collection from a spec file
 
+![Settings panel](images/09-settings.png)
+
 ---
 
 ## Requests
+
+![Request editor — params tab](images/02-request-params.png)
+
+![Request editor — bearer auth](images/03-request-auth.png)
 
 Every request is a plain YAML (or JSON) file. Portable, diffable, committable.
 
@@ -86,6 +94,10 @@ body:
 - Paste a URL containing `?foo=1&bar=2` — params are stripped and merged into the Params tab automatically
 - Tab badges show a count (Params, Headers) or dot (Body, Auth) when anything is configured
 - Send with Enter or the Send button
+
+![Response viewer — JSON body](images/04-response-viewer.png)
+
+![Response viewer — headers tab](images/05-response-headers.png)
 
 **Response viewer shows:**
 - Status code, duration, and response size
@@ -134,6 +146,8 @@ variables:
 ---
 
 ## Scenarios
+
+![Scenario view mode](images/06-scenario-view.png)
 
 A scenario is a multi-step API flow. Steps run sequentially; variables extracted from one response are available in all subsequent steps.
 
@@ -203,6 +217,10 @@ steps:
 **Spec binding:** Add `specFile:` to a scenario and every step's response is automatically validated against the OpenAPI spec — no manual `schema` assertions needed.
 
 **Desktop scenario editor:** Visual step builder (add/remove steps, edit assertions, drag to reorder) or raw YAML mode. Run button executes the scenario and shows per-step pass/fail inline.
+
+![Scenario run result — PASSED](images/07-scenario-result.png)
+
+![Scenario visual editor](images/08-scenario-editor.png)
 
 ---
 
