@@ -155,7 +155,7 @@ export function RequestEditor({
             step={1000}
             value={timeoutMs || ''}
             onChange={e => onTimeoutChange(e.target.value === '' ? 0 : Number(e.target.value))}
-            placeholder="0"
+            placeholder="default"
             className={cn(
               'w-16 text-right',
               inputCls, 'px-2 py-1',

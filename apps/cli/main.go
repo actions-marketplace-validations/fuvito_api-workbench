@@ -250,6 +250,12 @@ func runCmd() *cobra.Command {
 					return fmt.Errorf("generating JSON report: %w", err)
 				}
 				fmt.Fprintln(cmd.OutOrStdout(), string(out))
+			case "junit":
+				out, err := reporting.JUnit(result)
+				if err != nil {
+					return fmt.Errorf("generating JUnit report: %w", err)
+				}
+				fmt.Fprint(cmd.OutOrStdout(), string(out))
 			default:
 				fmt.Fprint(cmd.OutOrStdout(), reporting.Text(result))
 			}
@@ -262,7 +268,7 @@ func runCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file (YAML or JSON)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
 
 	return cmd
 }

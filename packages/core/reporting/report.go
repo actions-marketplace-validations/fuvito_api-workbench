@@ -2,6 +2,7 @@ package reporting
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"strings"
 
@@ -124,6 +125,109 @@ type JSONAssertion struct {
 	Actual   string `json:"actual"`
 	Passed   bool   `json:"passed"`
 	Message  string `json:"message,omitempty"`
+}
+
+// ---- JUnit XML ----
+
+type jUnitTestSuites struct {
+	XMLName    xml.Name       `xml:"testsuites"`
+	Name       string         `xml:"name,attr"`
+	Tests      int            `xml:"tests,attr"`
+	Failures   int            `xml:"failures,attr"`
+	Errors     int            `xml:"errors,attr"`
+	Time       string         `xml:"time,attr"`
+	TestSuites []jUnitSuite   `xml:"testsuite"`
+}
+
+type jUnitSuite struct {
+	Name     string        `xml:"name,attr"`
+	Tests    int           `xml:"tests,attr"`
+	Failures int           `xml:"failures,attr"`
+	Errors   int           `xml:"errors,attr"`
+	Time     string        `xml:"time,attr"`
+	Cases    []jUnitCase   `xml:"testcase"`
+}
+
+type jUnitCase struct {
+	Name      string         `xml:"name,attr"`
+	ClassName string         `xml:"classname,attr"`
+	Time      string         `xml:"time,attr"`
+	Skipped   *struct{}      `xml:"skipped"`
+	Failure   *jUnitFailure  `xml:"failure"`
+	Error     *jUnitError    `xml:"error"`
+}
+
+type jUnitFailure struct {
+	Message string `xml:"message,attr"`
+	Text    string `xml:",chardata"`
+}
+
+type jUnitError struct {
+	Message string `xml:"message,attr"`
+	Text    string `xml:",chardata"`
+}
+
+func secStr(ms int64) string { return fmt.Sprintf("%.3f", float64(ms)/1000.0) }
+
+// JUnit returns a JUnit-compatible XML report.
+// Supported by Jenkins (Publish JUnit Results), GitHub Actions (dorny/test-reporter),
+// GitLab CI (junit artifact), and CircleCI (store_test_results).
+func JUnit(result *scenario.Result) ([]byte, error) {
+	_, failed, _ := result.Counts()
+
+	suite := jUnitSuite{
+		Name:     result.Scenario.Name,
+		Tests:    len(result.Steps),
+		Failures: failed,
+		Time:     secStr(result.Duration.Milliseconds()),
+	}
+
+	for _, sr := range result.Steps {
+		stepMs := int64(0)
+		if sr.Response != nil {
+			stepMs = sr.Response.Duration.Milliseconds()
+		}
+		tc := jUnitCase{
+			Name:      sr.Name,
+			ClassName: result.Scenario.Name,
+			Time:      secStr(stepMs),
+		}
+		switch {
+		case sr.Skipped:
+			skipped := struct{}{}
+			tc.Skipped = &skipped
+		case sr.Error != "":
+			suite.Errors++
+			tc.Error = &jUnitError{Message: sr.Error, Text: sr.Error}
+		case !sr.Passed:
+			var lines []string
+			for _, ar := range sr.Assertions {
+				if !ar.Passed {
+					lines = append(lines, fmt.Sprintf("  ✗ %s: %s", assertionLabel(ar.Assertion), ar.Message))
+				}
+			}
+			tc.Failure = &jUnitFailure{
+				Message: fmt.Sprintf("%d assertion(s) failed", len(lines)),
+				Text:    strings.Join(lines, "\n"),
+			}
+		}
+		suite.Cases = append(suite.Cases, tc)
+	}
+
+	report := jUnitTestSuites{
+		Name:       result.Scenario.Name,
+		Tests:      suite.Tests,
+		Failures:   suite.Failures,
+		Errors:     suite.Errors,
+		Time:       suite.Time,
+		TestSuites: []jUnitSuite{suite},
+	}
+
+	out, err := xml.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(xml.Header), out...), nil
 }
 
 // JSON returns a machine-readable JSON report.
