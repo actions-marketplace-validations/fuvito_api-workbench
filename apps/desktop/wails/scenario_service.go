@@ -74,14 +74,16 @@ type AssertionResultIO struct {
 }
 
 type StepResultIO struct {
-	Name       string              `json:"name"`
-	Passed     bool                `json:"passed"`
-	Skipped    bool                `json:"skipped"`
-	StatusCode int                 `json:"statusCode"`
-	DurationMs int64               `json:"durationMs"`
-	Error      string              `json:"error,omitempty"`
-	Extracted  map[string]string   `json:"extracted"`
-	Assertions []AssertionResultIO `json:"assertions"`
+	Name            string              `json:"name"`
+	Passed          bool                `json:"passed"`
+	Skipped         bool                `json:"skipped"`
+	StatusCode      int                 `json:"statusCode"`
+	DurationMs      int64               `json:"durationMs"`
+	Error           string              `json:"error,omitempty"`
+	Extracted       map[string]string   `json:"extracted"`
+	Assertions      []AssertionResultIO `json:"assertions"`
+	ResponseBody    string              `json:"responseBody,omitempty"`
+	ResponseHeaders []HeaderIO          `json:"responseHeaders,omitempty"`
 }
 
 type ScenarioResultIO struct {
@@ -474,6 +476,13 @@ func (s *ScenarioService) RunScenario(path, envPath string) ScenarioResultIO {
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
 			step.DurationMs = sr.Response.Duration.Milliseconds()
+			step.ResponseBody = sr.Response.BodyString()
+			for _, h := range sr.Response.Headers {
+				step.ResponseHeaders = append(step.ResponseHeaders, HeaderIO{Name: h.Name, Value: h.Value})
+			}
+			if step.ResponseHeaders == nil {
+				step.ResponseHeaders = []HeaderIO{}
+			}
 		}
 		for _, ar := range sr.Assertions {
 			step.Assertions = append(step.Assertions, AssertionResultIO{

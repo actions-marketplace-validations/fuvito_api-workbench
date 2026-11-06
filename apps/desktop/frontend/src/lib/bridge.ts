@@ -476,6 +476,8 @@ export interface StepResult {
   error?: string
   extracted: Record<string, string>
   assertions: AssertionResult[]
+  responseBody?: string
+  responseHeaders?: Array<{ name: string; value: string }>
 }
 
 export interface ScenarioResult {

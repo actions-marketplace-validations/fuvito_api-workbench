@@ -544,106 +544,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
   )
 }
 
-function VisualEditor({ value, onChange }: { value: ScenarioDetail; onChange: (d: ScenarioDetail) => void }) {
-  function update<K extends keyof ScenarioDetail>(key: K, val: ScenarioDetail[K]) {
-    onChange({ ...value, [key]: val })
-  }
-
-  function updateStep(i: number, updates: Partial<StepDetail>) {
-    update('steps', value.steps.map((s, idx) => idx === i ? { ...s, ...updates } : s))
-  }
-
-  function addStep() {
-    update('steps', [...value.steps, {
-      name: `Step ${value.steps.length + 1}`,
-      description: '',
-      method: 'GET',
-      url: '',
-      headers: [],
-      queryParams: [],
-      bodyType: 'none',
-      bodyContent: '',
-      assertions: [{ type: 'status', operator: 'eq', expected: 200 }],
-      extractions: [],
-      timeoutMs: 0,
-      retryMaxAttempts: 0,
-      retryDelayMs: 1000,
-    }])
-  }
-
-  function removeStep(i: number) {
-    update('steps', value.steps.filter((_, idx) => idx !== i))
-  }
-
-  function moveStep(from: number, dir: -1 | 1) {
-    const to = from + dir
-    if (to < 0 || to >= value.steps.length) return
-    const steps = [...value.steps]
-    ;[steps[from], steps[to]] = [steps[to], steps[from]]
-    update('steps', steps)
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto py-3 px-3 flex flex-col gap-2">
-      {/* Scenario meta */}
-      <div className="flex flex-col gap-1.5 pb-3 mb-1 border-b border-[var(--color-border)]">
-        <input
-          value={value.name}
-          onChange={e => update('name', e.target.value)}
-          placeholder="Scenario name"
-          className="bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-sm font-semibold text-[var(--color-foreground)] py-0.5"
-        />
-        <input
-          value={value.description}
-          onChange={e => update('description', e.target.value)}
-          placeholder="Description (optional)"
-          className="bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-muted-foreground)] py-0.5"
-        />
-      </div>
-
-      {/* Steps */}
-      {value.steps.map((step, i) => (
-        <StepEditorCard
-          key={i}
-          step={step}
-          index={i}
-          isFirst={i === 0}
-          isLast={i === value.steps.length - 1}
-          onChange={updates => updateStep(i, updates)}
-          onRemove={() => removeStep(i)}
-          onMoveUp={() => moveStep(i, -1)}
-          onMoveDown={() => moveStep(i, 1)}
-        />
-      ))}
-
-      {/* Add step */}
-      <button
-        type="button"
-        onClick={addStep}
-        className={cn(
-          'flex items-center justify-center gap-1.5 py-2 rounded border border-dashed border-[var(--color-border)]',
-          'text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:border-[var(--color-accent)] transition-colors',
-        )}
-      >
-        <Plus size={12} /> Add step
-      </button>
-    </div>
-  )
-}
-
-// ---- Main view sub-components ----
-
-type Props = {
-  scenarioPath: string
-  scenarioName: string
-  result: ScenarioResult | null
-  running: boolean
-  theme?: 'dark' | 'light'
-  environments?: EnvInfo[]
-  activeEnvPath?: string
-  onResultChange: (result: ScenarioResult | null) => void
-  onRunningChange: (running: boolean) => void
-}
+// ---- Shared helpers ----
 
 const OPERATOR_LABEL: Record<string, string> = {
   eq: '=', ne: '≠', contains: '∋', matches: '~', gt: '>', lt: '<',
@@ -658,171 +559,299 @@ function assertionSummary(a: { type: string; path?: string; operator?: string; e
   return `${a.type === 'jsonpath' ? '$.'+path : path} ${op} ${exp}`.trim()
 }
 
-function StepCard({ step, index, result }: {
-  step: ScenarioDetail['steps'][number]
-  index: number
-  result: StepResult | null
+function tryPrettyJSON(s: string): string {
+  try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
+}
+
+function statusColor(code: number): string {
+  if (code < 300) return 'text-emerald-400'
+  if (code < 400) return 'text-blue-400'
+  if (code < 500) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+// ---- CollapsibleSection ----
+
+function CollapsibleSection({ title, badge, defaultOpen = true, children }: {
+  title: React.ReactNode
+  badge?: React.ReactNode
+  defaultOpen?: boolean
+  children: React.ReactNode
 }) {
-  const badge = step.method ? METHOD_BADGE[step.method] ?? 'text-[var(--color-muted-foreground)]' : ''
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className={cn(
-      'mx-2 mb-1.5 rounded border text-xs',
-      'bg-[var(--color-muted)] border-[var(--color-border)]',
-    )}>
-      <div className="flex items-start gap-2 px-2.5 py-2">
-        <span className="shrink-0 w-4 h-4 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[9px] font-bold mt-0.5">
-          {index + 1}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="font-semibold text-[var(--color-foreground)]">{step.name}</span>
-            {result && (
-              result.skipped
-                ? <MinusCircle size={11} className="text-[var(--color-muted-foreground)] shrink-0" />
-                : result.passed
-                  ? <CheckCircle2 size={11} className="text-emerald-400 shrink-0" />
-                  : <XCircle size={11} className="text-red-400 shrink-0" />
-            )}
-          </div>
-          {step.description && (
-            <p className="text-[11px] text-[var(--color-muted-foreground)] italic leading-snug mb-0.5">{step.description}</p>
-          )}
-          {step.requestRef ? (
-            <p className="text-[var(--color-muted-foreground)] truncate">ref: {step.requestRef}</p>
-          ) : step.method ? (
-            <p className="flex items-center gap-1 truncate">
-              <span className={cn('font-mono font-bold text-[10px] shrink-0', badge)}>{step.method}</span>
-              <span className="text-[var(--color-muted-foreground)] truncate">{step.url}</span>
-              {step.bodyType && step.bodyType !== 'none' && (
-                <span className="shrink-0 rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)]">
-                  {step.bodyType}
-                </span>
-              )}
-            </p>
-          ) : null}
-          {step.headers && step.headers.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {step.headers.map((h, i) => (
-                <span key={i} className="rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)] font-mono">
-                  {h.name}: {h.value}
-                </span>
-              ))}
-            </div>
-          )}
-          {step.queryParams && step.queryParams.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {step.queryParams.map((q, i) => (
-                <span key={i} className="rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)] font-mono">
-                  ?{q.name}={q.value}
-                </span>
-              ))}
-            </div>
-          )}
-          {(step.assertions?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {step.assertions.map((a, i) => (
-                <span key={i} className="rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)]">
-                  {assertionSummary(a)}
-                </span>
-              ))}
-            </div>
-          )}
-          {(step.extractions?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {step.extractions.map((e, i) => (
-                <span key={i} className="rounded bg-violet-500/10 border border-violet-500/20 px-1 py-0.5 text-[10px] text-violet-400">
-                  → {e.name}
-                </span>
-              ))}
-            </div>
-          )}
-          {(step.failPolicy && step.failPolicy !== 'stop') || (step.timeoutMs && step.timeoutMs > 0) || (step.retryMaxAttempts && step.retryMaxAttempts > 0) ? (
-            <div className="flex flex-wrap gap-1.5 mt-0.5">
-              {step.failPolicy && step.failPolicy !== 'stop' && (
-                <span className="text-[10px] text-[var(--color-muted-foreground)]">on fail: {step.failPolicy}</span>
-              )}
-              {step.timeoutMs && step.timeoutMs > 0 ? (
-                <span className="text-[10px] text-[var(--color-muted-foreground)]">⏱ {step.timeoutMs} ms</span>
-              ) : null}
-              {step.retryMaxAttempts && step.retryMaxAttempts > 0 ? (
-                <span className="text-[10px] text-[var(--color-muted-foreground)]">↺ {step.retryMaxAttempts}×{step.retryDelayMs ? ` ${step.retryDelayMs} ms` : ''}</span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
+    <div className="border-b border-[var(--color-border)] last:border-0">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-muted)]/50 transition-colors"
+      >
+        {open
+          ? <ChevronDown size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />
+          : <ChevronRight size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />}
+        <span className="flex-1 text-xs font-semibold text-[var(--color-foreground)]">{title}</span>
+        {badge && <span className="shrink-0">{badge}</span>}
+      </button>
+      {open && <div className="px-4 pb-3 pt-1">{children}</div>}
     </div>
   )
 }
 
-function StepResultCard({ sr, index }: { sr: StepResult; index: number }) {
-  const [expanded, setExpanded] = useState(true)
+// ---- StepListRow (compact left-panel row, shared between view and edit modes) ----
 
+function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove }: {
+  step: StepDetail
+  index: number
+  result: StepResult | null
+  selected: boolean
+  onSelect: (i: number) => void
+  editMode?: boolean
+  isFirst?: boolean
+  isLast?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  onRemove?: () => void
+}) {
+  const badge = step.method ? METHOD_BADGE[step.method] ?? '' : ''
   return (
-    <div className={cn(
-      'mx-2 mb-1.5 rounded border text-xs',
-      sr.skipped
-        ? 'bg-[var(--color-muted)] border-[var(--color-border)] opacity-60'
-        : sr.passed
-          ? 'bg-emerald-500/5 border-emerald-500/20'
-          : 'bg-red-500/5 border-red-500/20',
-    )}>
-      <button
-        type="button"
-        className="w-full flex items-center gap-2 px-2.5 py-2 text-left"
-        onClick={() => setExpanded(e => !e)}
-      >
-        <span className="shrink-0 w-4 h-4 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[9px] font-bold">
-          {index + 1}
-        </span>
-        {sr.skipped ? (
-          <MinusCircle size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />
-        ) : sr.passed ? (
-          <CheckCircle2 size={12} className="shrink-0 text-emerald-400" />
-        ) : (
-          <XCircle size={12} className="shrink-0 text-red-400" />
-        )}
-        <span className="flex-1 font-semibold text-[var(--color-foreground)]">{sr.name}</span>
-        {sr.statusCode > 0 && (
-          <span className={cn(
-            'shrink-0 font-mono text-[10px] font-bold',
-            sr.statusCode < 300 ? 'text-emerald-400' : sr.statusCode < 400 ? 'text-blue-400' : sr.statusCode < 500 ? 'text-amber-400' : 'text-red-400',
-          )}>{sr.statusCode}</span>
-        )}
-        {sr.durationMs > 0 && (
-          <span className="shrink-0 text-[var(--color-muted-foreground)] text-[10px]">{sr.durationMs} ms</span>
-        )}
-        {expanded ? <ChevronDown size={10} className="shrink-0 text-[var(--color-muted-foreground)]" /> : <ChevronRight size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />}
-      </button>
-
-      {expanded && (
-        <div className="px-2.5 pb-2 pt-0 flex flex-col gap-1">
-          {sr.error && (
-            <p className="text-red-400 text-[11px] font-mono break-all">{sr.error}</p>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(index)}
+      onKeyDown={e => e.key === 'Enter' && onSelect(index)}
+      className={cn(
+        'group relative flex items-start gap-2 px-3 py-2.5 cursor-pointer transition-colors border-l-2 select-none',
+        selected
+          ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]'
+          : 'border-transparent hover:bg-[var(--color-muted)]',
+      )}
+    >
+      <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[9px] font-bold">
+        {index + 1}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className={cn('text-xs font-medium truncate', selected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
+            {step.name || 'Untitled step'}
+          </span>
+          {result && (
+            result.skipped
+              ? <MinusCircle size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
+              : result.passed
+                ? <CheckCircle2 size={10} className="shrink-0 text-emerald-400" />
+                : <XCircle size={10} className="shrink-0 text-red-400" />
           )}
-          {(sr.assertions ?? []).map((ar, i) => (
-            <div key={i} className="flex items-start gap-1.5">
-              {ar.passed
-                ? <CheckCircle2 size={10} className="shrink-0 text-emerald-400 mt-0.5" />
-                : <XCircle size={10} className="shrink-0 text-red-400 mt-0.5" />}
-              <span className={cn('text-[11px] break-all', ar.passed ? 'text-[var(--color-muted-foreground)]' : 'text-red-300')}>
-                {ar.message}
-              </span>
-            </div>
-          ))}
-          {Object.entries(sr.extracted ?? {}).map(([k, v]) => (
-            <div key={k} className="flex items-baseline gap-1 text-[11px]">
-              <span className="text-violet-400 shrink-0">→ {k}:</span>
-              <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>
-            </div>
-          ))}
-          {sr.skipped && (
-            <p className="text-[var(--color-muted-foreground)] text-[11px]">Skipped — previous step failed.</p>
-          )}
+        </div>
+        {step.requestRef ? (
+          <p className="text-[11px] text-[var(--color-muted-foreground)] truncate font-mono mt-0.5">↗ {step.requestRef}</p>
+        ) : step.method ? (
+          <div className="flex items-center gap-1 mt-0.5">
+            <span className={cn('font-mono font-bold text-[10px] shrink-0', badge)}>{step.method}</span>
+            <span className="text-[11px] text-[var(--color-muted-foreground)] truncate">{step.url}</span>
+          </div>
+        ) : null}
+      </div>
+      {editMode && (
+        <div className="shrink-0 flex items-center gap-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button type="button" onClick={e => { e.stopPropagation(); onMoveUp?.() }} disabled={isFirst} title="Move up"
+            className={cn('p-1 transition-colors', isFirst ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
+            <ChevronUp size={11} />
+          </button>
+          <button type="button" onClick={e => { e.stopPropagation(); onMoveDown?.() }} disabled={isLast} title="Move down"
+            className={cn('p-1 transition-colors', isLast ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
+            <ChevronDown size={11} />
+          </button>
+          <button type="button" onClick={e => { e.stopPropagation(); onRemove?.() }} title="Remove step"
+            className="p-1 text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors">
+            <Trash2 size={11} />
+          </button>
         </div>
       )}
     </div>
   )
+}
+
+// ---- StepDetailPanel (right panel for view mode) ----
+
+function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResult | null }) {
+  const badge = step.method ? METHOD_BADGE[step.method] ?? '' : ''
+  const bodyPreview = step.bodyContent ? tryPrettyJSON(step.bodyContent) : null
+  const responseBodyFormatted = result?.responseBody ? tryPrettyJSON(result.responseBody) : null
+  const contentType = result?.responseHeaders?.find(h => h.name.toLowerCase() === 'content-type')?.value?.split(';')[0]
+
+  return (
+    <div className="flex flex-col overflow-y-auto h-full">
+
+      {/* Request */}
+      <CollapsibleSection
+        title={
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0">Request</span>
+            {step.method && <span className={cn('font-mono font-bold text-[11px] shrink-0', badge)}>{step.method}</span>}
+            {step.url && <span className="text-[var(--color-muted-foreground)] font-mono text-[11px] truncate">{step.url}</span>}
+          </span>
+        }
+        defaultOpen
+      >
+        {step.requestRef && (
+          <p className="text-xs text-[var(--color-muted-foreground)] font-mono mb-2 break-all">↗ {step.requestRef}</p>
+        )}
+        {step.description && (
+          <p className="text-[11px] text-[var(--color-muted-foreground)] italic mb-2">{step.description}</p>
+        )}
+
+        {(step.headers?.length ?? 0) > 0 && (
+          <div className="mb-2">
+            <p className={sectionLabelCls}>Headers</p>
+            {step.headers!.map((h, i) => (
+              <div key={i} className="flex items-baseline gap-1 text-[11px] font-mono mb-0.5">
+                <span className="text-[var(--color-muted-foreground)] shrink-0">{h.name}:</span>
+                <span className="text-[var(--color-foreground)] break-all">{h.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {(step.queryParams?.length ?? 0) > 0 && (
+          <div className="mb-2">
+            <p className={sectionLabelCls}>Query Params</p>
+            <div className="flex flex-wrap gap-1">
+              {step.queryParams!.map((q, i) => (
+                <span key={i} className="font-mono text-[11px] bg-[var(--color-muted)] border border-[var(--color-border)] rounded px-1.5 py-0.5 text-[var(--color-muted-foreground)]">
+                  ?{q.name}={q.value}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step.bodyType && step.bodyType !== 'none' && bodyPreview && (
+          <div className="mb-2">
+            <p className={sectionLabelCls}>Body · {step.bodyType}</p>
+            <pre className="text-[11px] font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+              {bodyPreview}
+            </pre>
+          </div>
+        )}
+
+        {(step.assertions?.length ?? 0) > 0 && (
+          <div className="mb-2">
+            <p className={sectionLabelCls}>Assertions</p>
+            <div className="flex flex-wrap gap-1">
+              {step.assertions.map((a, i) => (
+                <span key={i} className="rounded bg-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.5 text-[11px] text-[var(--color-muted-foreground)]">
+                  {assertionSummary(a)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(step.extractions?.length ?? 0) > 0 && (
+          <div className="mb-2">
+            <p className={sectionLabelCls}>Extractions</p>
+            <div className="flex flex-wrap gap-1">
+              {step.extractions.map((e, i) => (
+                <span key={i} className="rounded bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 text-[11px] text-violet-400">→ {e.name}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {((step.failPolicy && step.failPolicy !== 'stop') || (step.timeoutMs && step.timeoutMs > 0) || (step.retryMaxAttempts && step.retryMaxAttempts > 0)) && (
+          <div className="flex flex-wrap gap-3 text-[11px] text-[var(--color-muted-foreground)]">
+            {step.failPolicy && step.failPolicy !== 'stop' && <span>on fail: {step.failPolicy}</span>}
+            {step.timeoutMs && step.timeoutMs > 0 ? <span>⏱ {step.timeoutMs} ms</span> : null}
+            {step.retryMaxAttempts && step.retryMaxAttempts > 0 ? <span>↺ {step.retryMaxAttempts}× · {step.retryDelayMs ?? 1000} ms delay</span> : null}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* Result */}
+      {result && (
+        <CollapsibleSection
+          title="Result"
+          badge={
+            <span className="flex items-center gap-2 text-[11px]">
+              {result.skipped
+                ? <span className="text-[var(--color-muted-foreground)]">SKIPPED</span>
+                : result.passed
+                  ? <span className="font-semibold text-emerald-400">PASSED</span>
+                  : <span className="font-semibold text-red-400">FAILED</span>}
+              {result.statusCode > 0 && <span className={cn('font-mono font-bold', statusColor(result.statusCode))}>{result.statusCode}</span>}
+              {result.durationMs > 0 && <span className="text-[var(--color-muted-foreground)]">{result.durationMs} ms</span>}
+            </span>
+          }
+          defaultOpen
+        >
+          {result.error && <p className="text-red-400 text-[11px] font-mono break-all mb-2">{result.error}</p>}
+          {result.skipped && <p className="text-[11px] text-[var(--color-muted-foreground)]">Skipped — previous step failed.</p>}
+          <div className="flex flex-col gap-0.5">
+            {(result.assertions ?? []).map((ar, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                {ar.passed
+                  ? <CheckCircle2 size={11} className="shrink-0 text-emerald-400 mt-0.5" />
+                  : <XCircle size={11} className="shrink-0 text-red-400 mt-0.5" />}
+                <span className={cn('text-[11px] break-all', ar.passed ? 'text-[var(--color-muted-foreground)]' : 'text-red-300')}>
+                  {ar.message}
+                </span>
+              </div>
+            ))}
+          </div>
+          {Object.entries(result.extracted ?? {}).length > 0 && (
+            <div className="mt-2 flex flex-col gap-0.5">
+              {Object.entries(result.extracted ?? {}).map(([k, v]) => (
+                <div key={k} className="flex items-baseline gap-1 text-[11px]">
+                  <span className="text-violet-400 shrink-0">→ {k}:</span>
+                  <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CollapsibleSection>
+      )}
+
+      {/* Response */}
+      {result?.responseBody && (
+        <CollapsibleSection
+          title="Response"
+          badge={contentType ? <span className="text-[11px] text-[var(--color-muted-foreground)] font-mono">{contentType}</span> : undefined}
+          defaultOpen={false}
+        >
+          {(result.responseHeaders?.length ?? 0) > 0 && (
+            <div className="mb-3">
+              <p className={sectionLabelCls}>Headers</p>
+              <div className="max-h-28 overflow-y-auto flex flex-col gap-0.5">
+                {result.responseHeaders!.map((h, i) => (
+                  <div key={i} className="flex items-baseline gap-1 text-[11px] font-mono">
+                    <span className="text-[var(--color-muted-foreground)] shrink-0">{h.name}:</span>
+                    <span className="text-[var(--color-foreground)] break-all">{h.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <pre className="text-[11px] font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-72 whitespace-pre-wrap break-all">
+            {responseBodyFormatted}
+          </pre>
+        </CollapsibleSection>
+      )}
+    </div>
+  )
+}
+
+// ---- Props ----
+
+type Props = {
+  scenarioPath: string
+  scenarioName: string
+  result: ScenarioResult | null
+  running: boolean
+  theme?: 'dark' | 'light'
+  environments?: EnvInfo[]
+  activeEnvPath?: string
+  onResultChange: (result: ScenarioResult | null) => void
+  onRunningChange: (running: boolean) => void
 }
 
 // ---- Main component ----
@@ -831,6 +860,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const [detail, setDetail] = useState<ScenarioDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedEnvPath, setSelectedEnvPath] = useState(activeEnvPath)
+  const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null)
 
   const [mode, setMode] = useState<'view' | 'visual' | 'yaml'>('view')
 
@@ -847,6 +877,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // Reset when scenario changes
   useEffect(() => {
     setDetail(null)
     setLoadError(null)
@@ -858,6 +889,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setVisualDetail(null)
     setVisualDirty(false)
     setSelectedEnvPath(activeEnvPath)
+    setSelectedStepIndex(null)
     loadScenario(scenarioPath)
       .then(d => { if (d.error) setLoadError(d.error); else setDetail(d) })
       .catch(e => setLoadError(String(e)))
@@ -866,6 +898,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       .catch(() => {})
   }, [scenarioPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-select first step once detail loads
+  useEffect(() => {
+    if (detail && selectedStepIndex === null && detail.steps.length > 0) {
+      setSelectedStepIndex(0)
+    }
+  }, [detail]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleRun() {
     onRunningChange(true)
     onResultChange(null)
@@ -873,6 +912,9 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       const r = await runScenario(scenarioPath, selectedEnvPath)
       onResultChange(r)
       saveScenarioResult(scenarioPath, r).catch(() => {})
+      // Auto-focus first failed step, else keep current selection
+      const firstFailed = r.steps.findIndex(s => !s.passed && !s.skipped)
+      if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
     } catch (e) {
       onResultChange({ name: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
@@ -897,7 +939,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
   function handleEnterVisual() {
     if (!detail) return
-    setVisualDetail({
+    const vd: ScenarioDetail = {
       ...detail,
       steps: detail.steps.map(s => ({
         ...s,
@@ -912,14 +954,65 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         retryMaxAttempts: s.retryMaxAttempts ?? 0,
         retryDelayMs: s.retryDelayMs ?? 1000,
       })),
-    })
+    }
+    setVisualDetail(vd)
     setVisualDirty(false)
+    if (selectedStepIndex === null && vd.steps.length > 0) setSelectedStepIndex(0)
     setMode('visual')
   }
 
-  function handleVisualChange(d: ScenarioDetail) {
-    setVisualDetail(d)
+  // Visual editor step management
+  function updateVisualStep(i: number, updates: Partial<StepDetail>) {
+    if (!visualDetail) return
+    setVisualDetail({ ...visualDetail, steps: visualDetail.steps.map((s, idx) => idx === i ? { ...s, ...updates } : s) })
     setVisualDirty(true)
+  }
+
+  function addVisualStep() {
+    if (!visualDetail) return
+    const newStep: StepDetail = {
+      name: `Step ${visualDetail.steps.length + 1}`,
+      description: '',
+      method: 'GET',
+      url: '',
+      headers: [],
+      queryParams: [],
+      bodyType: 'none',
+      bodyContent: '',
+      assertions: [{ type: 'status', operator: 'eq', expected: 200 }],
+      extractions: [],
+      timeoutMs: 0,
+      retryMaxAttempts: 0,
+      retryDelayMs: 1000,
+    }
+    const newSteps = [...visualDetail.steps, newStep]
+    setVisualDetail({ ...visualDetail, steps: newSteps })
+    setVisualDirty(true)
+    setSelectedStepIndex(newSteps.length - 1)
+  }
+
+  function removeVisualStep(i: number) {
+    if (!visualDetail) return
+    const newSteps = visualDetail.steps.filter((_, idx) => idx !== i)
+    setVisualDetail({ ...visualDetail, steps: newSteps })
+    setVisualDirty(true)
+    if (selectedStepIndex === i) {
+      setSelectedStepIndex(newSteps.length > 0 ? Math.min(i, newSteps.length - 1) : null)
+    } else if (selectedStepIndex !== null && selectedStepIndex > i) {
+      setSelectedStepIndex(selectedStepIndex - 1)
+    }
+  }
+
+  function moveVisualStep(from: number, dir: -1 | 1) {
+    if (!visualDetail) return
+    const to = from + dir
+    if (to < 0 || to >= visualDetail.steps.length) return
+    const steps = [...visualDetail.steps]
+    ;[steps[from], steps[to]] = [steps[to], steps[from]]
+    setVisualDetail({ ...visualDetail, steps })
+    setVisualDirty(true)
+    if (selectedStepIndex === from) setSelectedStepIndex(to)
+    else if (selectedStepIndex === to) setSelectedStepIndex(from)
   }
 
   async function handleSave() {
@@ -957,8 +1050,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const toggleActiveCls = 'bg-[var(--color-accent)] text-white'
   const toggleInactiveCls = 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]'
 
+  // Current steps list (view: from loaded detail, edit: from visualDetail)
+  const viewSteps = detail?.steps ?? []
+  const editSteps = visualDetail?.steps ?? []
+
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
+
       {/* Header */}
       <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         <div className="flex-1 min-w-0">
@@ -969,107 +1067,63 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
         {/* View / Edit / YAML toggle */}
         <div className="shrink-0 flex rounded overflow-hidden border border-[var(--color-border)] text-[11px]">
-          <button
-            type="button"
-            onClick={() => setMode('view')}
-            disabled={mode === 'view' || saving}
-            className={cn('px-2.5 py-1 transition-colors', mode === 'view' ? toggleActiveCls : toggleInactiveCls)}
-          >
+          <button type="button" onClick={() => setMode('view')} disabled={mode === 'view' || saving}
+            className={cn('px-2.5 py-1 transition-colors', mode === 'view' ? toggleActiveCls : toggleInactiveCls)}>
             View
           </button>
-          <button
-            type="button"
-            onClick={handleEnterVisual}
-            disabled={mode === 'visual' || saving || !detail}
-            className={cn('px-2.5 py-1 transition-colors', mode === 'visual' ? toggleActiveCls : toggleInactiveCls)}
-          >
+          <button type="button" onClick={handleEnterVisual} disabled={mode === 'visual' || saving || !detail}
+            className={cn('px-2.5 py-1 transition-colors', mode === 'visual' ? toggleActiveCls : toggleInactiveCls)}>
             Edit
           </button>
-          <button
-            type="button"
-            onClick={handleEnterYaml}
-            disabled={mode === 'yaml' || loadingRaw || saving}
-            className={cn('px-2.5 py-1 transition-colors flex items-center gap-1', mode === 'yaml' ? toggleActiveCls : toggleInactiveCls)}
-          >
+          <button type="button" onClick={handleEnterYaml} disabled={mode === 'yaml' || loadingRaw || saving}
+            className={cn('px-2.5 py-1 transition-colors flex items-center gap-1', mode === 'yaml' ? toggleActiveCls : toggleInactiveCls)}>
             {loadingRaw ? <Loader2 size={10} className="animate-spin" /> : null}
             YAML
           </button>
         </div>
 
-        {/* Right side: view controls or save/discard */}
+        {/* Controls */}
         {!isEditing ? (
           <>
             {environments.length > 0 && (
-              <select
-                value={selectedEnvPath}
-                onChange={e => setSelectedEnvPath(e.target.value)}
-                title="Environment for this run"
-                className={cn(
-                  'shrink-0 bg-[var(--color-muted)] text-xs rounded px-2 py-0.5',
-                  'border border-[var(--color-border)] outline-none cursor-pointer',
-                  selectedEnvPath ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]',
-                )}
-              >
+              <select value={selectedEnvPath} onChange={e => setSelectedEnvPath(e.target.value)} title="Environment for this run"
+                className={cn('shrink-0 text-xs rounded px-2 py-0.5 border outline-none cursor-pointer',
+                  'bg-[var(--color-input)] border-[var(--color-input-border)]',
+                  selectedEnvPath ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]')}>
                 <option value="">No environment</option>
-                {environments.map(env => (
-                  <option key={env.path} value={env.path}>{env.name}</option>
-                ))}
+                {environments.map(env => <option key={env.path} value={env.path}>{env.name}</option>)}
               </select>
             )}
             {result && !running && (
               <div className="shrink-0 flex items-center gap-2">
-                <span className={cn(
-                  'text-xs font-semibold px-2 py-0.5 rounded',
-                  result.passed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400',
-                )}>
+                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded',
+                  result.passed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
                   {result.passed ? 'PASSED' : 'FAILED'}
                 </span>
                 <span className="text-xs text-[var(--color-muted-foreground)]">
-                  {passed}/{passed + failed + skipped} steps · {result.durationMs} ms
+                  {passed}/{passed + failed + skipped} · {result.durationMs} ms
                 </span>
               </div>
             )}
-            <button
-              type="button"
-              onClick={handleRun}
-              disabled={running || !detail}
-              className={cn(
-                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
+            <button type="button" onClick={handleRun} disabled={running || !detail}
+              className={cn('shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
                 'bg-[var(--color-accent)] text-white',
-                (running || !detail) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
-              )}
-            >
-              {running
-                ? <><Loader2 size={12} className="animate-spin" /> Running…</>
-                : <><Play size={12} /> Run</>}
+                (running || !detail) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90')}>
+              {running ? <><Loader2 size={12} className="animate-spin" /> Running…</> : <><Play size={12} /> Run</>}
             </button>
           </>
         ) : (
           <>
-            {saveError && (
-              <span className="text-xs text-red-400 shrink-0 max-w-[200px] truncate" title={saveError}>{saveError}</span>
-            )}
-            <button
-              type="button"
-              onClick={handleDiscard}
-              disabled={saving}
-              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
-            >
+            {saveError && <span className="text-xs text-red-400 shrink-0 max-w-[200px] truncate" title={saveError}>{saveError}</span>}
+            <button type="button" onClick={handleDiscard} disabled={saving}
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
               <X size={11} /> Discard
             </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || (mode === 'yaml' && !isDirty)}
-              className={cn(
-                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
+            <button type="button" onClick={handleSave} disabled={saving || (mode === 'yaml' && !isDirty)}
+              className={cn('shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
                 'bg-[var(--color-accent)] text-white',
-                (saving || (mode === 'yaml' && !isDirty)) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
-              )}
-            >
-              {saving
-                ? <><Loader2 size={12} className="animate-spin" /> Saving…</>
-                : <><Save size={12} /> Save</>}
+                (saving || (mode === 'yaml' && !isDirty)) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90')}>
+              {saving ? <><Loader2 size={12} className="animate-spin" /> Saving…</> : <><Save size={12} /> Save</>}
             </button>
           </>
         )}
@@ -1078,76 +1132,138 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       {/* Body */}
       {mode === 'yaml' ? (
         <div className="flex-1 overflow-hidden">
-          {rawError ? (
-            <p className="px-3 py-2 text-xs text-red-400">{rawError}</p>
-          ) : (
-            <CodeMirror
-              value={editorContent}
-              extensions={[yaml()]}
-              theme={theme === 'light' ? 'light' : 'dark'}
-              onChange={v => setEditorContent(v)}
-              height="100%"
-              style={{ height: '100%', fontSize: '12px' }}
-            />
-          )}
+          {rawError
+            ? <p className="px-3 py-2 text-xs text-red-400">{rawError}</p>
+            : <CodeMirror value={editorContent} extensions={[yaml()]} theme={theme === 'light' ? 'light' : 'dark'}
+                onChange={v => setEditorContent(v)} height="100%" style={{ height: '100%', fontSize: '12px' }} />}
         </div>
-      ) : mode === 'visual' && visualDetail ? (
-        <VisualEditor value={visualDetail} onChange={handleVisualChange} />
       ) : (
         <div className="flex-1 flex overflow-hidden">
-          {/* Left: step definitions */}
-          <div className="w-[42%] shrink-0 border-r border-[var(--color-border)] overflow-y-auto py-2">
-            {loadError ? (
-              <p className="px-3 py-2 text-xs text-red-400">{loadError}</p>
-            ) : !detail ? (
-              <div className="px-3 py-2 flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
-                <Loader2 size={12} className="animate-spin" /> Loading…
+
+          {/* Left panel: step list */}
+          <div className="w-[240px] shrink-0 border-r border-[var(--color-border)] flex flex-col overflow-hidden">
+
+            {/* Edit mode: scenario meta */}
+            {mode === 'visual' && visualDetail && (
+              <div className="shrink-0 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-card)]">
+                <input
+                  value={visualDetail.name}
+                  onChange={e => { setVisualDetail({ ...visualDetail, name: e.target.value }); setVisualDirty(true) }}
+                  placeholder="Scenario name"
+                  className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs font-semibold text-[var(--color-foreground)] py-0.5 mb-0.5"
+                />
+                <input
+                  value={visualDetail.description}
+                  onChange={e => { setVisualDetail({ ...visualDetail, description: e.target.value }); setVisualDirty(true) }}
+                  placeholder="Description (optional)"
+                  className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-[11px] text-[var(--color-muted-foreground)] py-0.5"
+                />
               </div>
-            ) : (
-              <>
-                {detail.description && (
-                  <div className="mx-2 mb-2 px-2.5 py-2 rounded bg-[var(--color-muted)] border border-[var(--color-border)]">
-                    <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed whitespace-pre-wrap">{detail.description}</p>
-                  </div>
-                )}
-                {detail.steps.length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-[var(--color-muted-foreground)]">No steps defined.</p>
+            )}
+
+            {/* Step list */}
+            <div className="flex-1 overflow-y-auto py-1">
+              {loadError ? (
+                <p className="px-3 py-2 text-xs text-red-400">{loadError}</p>
+              ) : mode === 'view' && !detail ? (
+                <div className="px-3 py-2 flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
+                  <Loader2 size={12} className="animate-spin" /> Loading…
+                </div>
+              ) : mode === 'view' ? (
+                viewSteps.length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-center text-[var(--color-muted-foreground)]">
+                    No steps. Click <strong>Edit</strong> to add one.
+                  </p>
                 ) : (
-                  detail.steps.map((step, i) => (
-                    <StepCard
-                      key={i}
-                      step={step}
-                      index={i}
+                  viewSteps.map((step, i) => (
+                    <StepListRow
+                      key={i} step={step} index={i}
                       result={result?.steps[i] ?? null}
+                      selected={selectedStepIndex === i}
+                      onSelect={setSelectedStepIndex}
                     />
                   ))
-                )}
-              </>
+                )
+              ) : (
+                // Visual edit mode
+                editSteps.length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-center text-[var(--color-muted-foreground)]">No steps yet.</p>
+                ) : (
+                  editSteps.map((step, i) => (
+                    <StepListRow
+                      key={i} step={step} index={i}
+                      result={result?.steps[i] ?? null}
+                      selected={selectedStepIndex === i}
+                      onSelect={setSelectedStepIndex}
+                      editMode
+                      isFirst={i === 0}
+                      isLast={i === editSteps.length - 1}
+                      onMoveUp={() => moveVisualStep(i, -1)}
+                      onMoveDown={() => moveVisualStep(i, 1)}
+                      onRemove={() => removeVisualStep(i)}
+                    />
+                  ))
+                )
+              )}
+            </div>
+
+            {/* Edit mode: add step */}
+            {mode === 'visual' && (
+              <div className="shrink-0 px-2 py-2 border-t border-[var(--color-border)]">
+                <button type="button" onClick={addVisualStep}
+                  className={cn('w-full flex items-center justify-center gap-1.5 py-1.5 rounded border border-dashed border-[var(--color-border)]',
+                    'text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:border-[var(--color-accent)] transition-colors')}>
+                  <Plus size={11} /> Add step
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Right: results */}
-          <div className="flex-1 overflow-y-auto py-2 min-w-0">
-            {running ? (
-              <div className="px-4 py-6 flex flex-col items-center gap-3 text-[var(--color-muted-foreground)]">
-                <Loader2 size={20} className="animate-spin" />
-                <p className="text-sm">Running scenario…</p>
-              </div>
-            ) : !result ? (
-              <div className="px-4 py-6 text-center text-xs text-[var(--color-muted-foreground)]">
-                <Play size={24} className="mx-auto mb-2 opacity-30" />
-                Click <strong>Run</strong> to execute this scenario.
-              </div>
-            ) : result.error ? (
-              <div className="mx-2 p-3 rounded border border-red-500/30 bg-red-500/5 text-xs text-red-400">
-                {result.error}
-              </div>
+          {/* Right panel */}
+          <div className="flex-1 overflow-hidden min-w-0">
+            {mode === 'view' ? (
+              running ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--color-muted-foreground)]">
+                  <Loader2 size={20} className="animate-spin" />
+                  <p className="text-sm">Running scenario…</p>
+                </div>
+              ) : selectedStepIndex !== null && detail?.steps[selectedStepIndex] ? (
+                <StepDetailPanel
+                  step={detail.steps[selectedStepIndex]}
+                  result={result?.steps[selectedStepIndex] ?? null}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-xs text-[var(--color-muted-foreground)]">
+                  <Play size={24} className="mb-2 opacity-30" />
+                  {detail && detail.steps.length > 0
+                    ? 'Select a step to see its details.'
+                    : <span>Click <strong>Edit</strong> to add steps, then <strong>Run</strong>.</span>}
+                </div>
+              )
             ) : (
-              result.steps.map((sr, i) => (
-                <StepResultCard key={i} sr={sr} index={i} />
-              ))
+              // Visual edit mode
+              selectedStepIndex !== null && visualDetail?.steps[selectedStepIndex] ? (
+                <div className="h-full overflow-y-auto p-3">
+                  <StepEditorCard
+                    step={visualDetail.steps[selectedStepIndex]}
+                    index={selectedStepIndex}
+                    isFirst={selectedStepIndex === 0}
+                    isLast={selectedStepIndex === editSteps.length - 1}
+                    onChange={updates => updateVisualStep(selectedStepIndex, updates)}
+                    onRemove={() => removeVisualStep(selectedStepIndex)}
+                    onMoveUp={() => moveVisualStep(selectedStepIndex, -1)}
+                    onMoveDown={() => moveVisualStep(selectedStepIndex, 1)}
+                  />
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-xs text-[var(--color-muted-foreground)]">
+                  <Plus size={24} className="mb-2 opacity-30" />
+                  Select a step to edit, or add a new one.
+                </div>
+              )
             )}
           </div>
+
         </div>
       )}
     </div>
