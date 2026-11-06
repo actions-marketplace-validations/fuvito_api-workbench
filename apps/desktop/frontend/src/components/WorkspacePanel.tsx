@@ -61,8 +61,9 @@ function RenameInput({
       }}
       onClick={e => e.stopPropagation()}
       className={cn(
-        'flex-1 min-w-0 bg-transparent outline-none text-xs',
-        'border-b border-[var(--color-accent)] text-[var(--color-foreground)]',
+        'flex-1 min-w-0 outline-none text-xs rounded-sm px-1',
+        'bg-[var(--color-input)] border border-[var(--color-accent)]',
+        'text-[var(--color-foreground)]',
       )}
     />
   )

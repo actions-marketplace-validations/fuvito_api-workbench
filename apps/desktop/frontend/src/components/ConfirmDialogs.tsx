@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { inputCls } from '@/lib/styles'
 
 export function DeleteRequestDialog({
   filePath,
@@ -138,12 +139,7 @@ export function NewFolderDialog({
             if (e.key === 'Escape') onCancel()
           }}
           placeholder="folder-name"
-          className={cn(
-            'w-full text-xs rounded px-3 py-1.5 bg-[var(--color-muted)]',
-            'border outline-none focus:border-[var(--color-accent)]',
-            error ? 'border-red-500' : 'border-[var(--color-border)]',
-            'text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]',
-          )}
+          className={cn(inputCls, 'w-full px-3 py-1.5', error && 'border-red-500')}
         />
         {error && (
           <p className="text-xs text-red-400 -mt-2">{error}</p>
@@ -208,12 +204,7 @@ export function ImportFromURLDialog({
             if (e.key === 'Escape') onCancel()
           }}
           placeholder="https://api.example.com/openapi.json"
-          className={cn(
-            'w-full text-xs rounded px-3 py-1.5 bg-[var(--color-muted)] font-mono',
-            'border outline-none focus:border-[var(--color-accent)]',
-            error ? 'border-red-500' : 'border-[var(--color-border)]',
-            'text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]',
-          )}
+          className={cn(inputCls, 'w-full px-3 py-1.5 font-mono', error && 'border-red-500')}
         />
         {error && <p className="text-xs text-red-400 -mt-2">{error}</p>}
         <div className="flex gap-2 justify-end">

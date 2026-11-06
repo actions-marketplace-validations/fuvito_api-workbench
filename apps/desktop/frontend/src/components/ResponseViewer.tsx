@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Search, X, Clock, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
@@ -101,7 +101,7 @@ function TimingDialog({ timing, total, onClose }: {
 
 function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing']; total: number; onClick: () => void }) {
   if (!timing || total === 0) return null
-  const segments = buildSegments(timing)
+  const segments = useMemo(() => buildSegments(timing!), [timing]) // eslint-disable-line react-hooks/exhaustive-deps
   if (segments.length === 0) {
     return <p className="text-xs text-[var(--color-muted-foreground)] mt-1 italic">No timing breakdown available.</p>
   }
@@ -417,30 +417,42 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
               type="button"
               onClick={openSearch}
               title="Search body (Ctrl+F)"
-              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              aria-label="Search body"
+              className="flex items-center gap-1 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
               <Search size={12} />
+              <span className="text-[10px] font-mono opacity-60 hidden sm:inline">Ctrl+F</span>
             </button>
             <button
               type="button"
               onClick={() => setRawMode(m => !m)}
               title={rawMode ? 'Switch to pretty view' : 'Switch to raw view'}
+              aria-label={rawMode ? 'Switch to pretty view' : 'Switch to raw view'}
               className={cn('transition-colors', rawMode ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}
             >
               {rawMode ? <Code2 size={12} /> : <AlignLeft size={12} />}
             </button>
-            <button
-              type="button"
-              onClick={handleCopy}
-              title={copied ? 'Copied!' : 'Copy response body'}
-              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-            >
-              {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleCopy}
+                title={copied ? 'Copied!' : 'Copy response body'}
+                aria-label="Copy response body"
+                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              >
+                {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+              </button>
+              {copied && (
+                <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[var(--color-foreground)] text-[var(--color-background)] text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
+                  Copied!
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={handleOpenExternal}
               title="Open in system viewer"
+              aria-label="Open in system viewer"
               className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
               <ExternalLink size={12} />
@@ -450,6 +462,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
                 type="button"
                 onClick={onClear}
                 title="Clear response"
+                aria-label="Clear response"
                 className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
               >
                 <Trash2 size={12} />
@@ -464,6 +477,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
                 type="button"
                 onClick={onClear}
                 title="Clear response"
+                aria-label="Clear response"
                 className="ml-auto text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
               >
                 <Trash2 size={12} />

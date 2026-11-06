@@ -27,6 +27,7 @@ export type TabState = {
   scenarioName?: string | null
   scenarioResult?: ScenarioResult | null
   scenarioRunning?: boolean
+  scenarioDirty?: boolean
 }
 
 export function computeStateKey(
@@ -79,7 +80,7 @@ export function createBlankTab(targetDir: string | null = null): TabState {
 }
 
 export function isTabDirty(tab: TabState): boolean {
-  if (tab.kind === 'scenario') return false
+  if (tab.kind === 'scenario') return tab.scenarioDirty === true
   return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs) !== tab.savedKey
 }
 

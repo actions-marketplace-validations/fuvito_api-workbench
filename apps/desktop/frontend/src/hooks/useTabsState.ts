@@ -89,6 +89,12 @@ export function useTabsState(deps: {
     const { tabs: currentTabs } = tabsStateRef.current
     const tab = currentTabs.find(t => t.id === id)
     if (!tab) return
+    if (tab.kind === 'scenario' && tab.scenarioDirty) {
+      if (window.confirm(`"${tab.name ?? 'Scenario'}" has unsaved changes. Close anyway?`)) {
+        removeTab(id)
+      }
+      return
+    }
     if (isTabDirty(tab)) {
       setClosingDirtyTabId(id)
     } else {

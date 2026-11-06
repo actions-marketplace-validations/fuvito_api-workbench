@@ -226,7 +226,7 @@ export function RequestEditor({
           >
             {tab}
             {tabBadge[tab] && (
-              <span className="text-[10px] text-[var(--color-accent)] font-semibold">
+              <span className="text-[10px] font-semibold px-1 rounded bg-[var(--color-accent)]/15 text-[var(--color-accent)]">
                 {tabBadge[tab]}
               </span>
             )}

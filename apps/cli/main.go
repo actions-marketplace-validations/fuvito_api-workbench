@@ -105,6 +105,7 @@ func requestCmd() *cobra.Command {
 
 func validateCmd() *cobra.Command {
 	var format string
+	var outputFile string
 
 	cmd := &cobra.Command{
 		Use:   "validate <scenario-file> [file2...]",
@@ -140,6 +141,7 @@ func validateCmd() *cobra.Command {
 				}
 			}
 
+			var reportBytes []byte
 			switch strings.ToLower(format) {
 			case "json":
 				type jsonIssue struct {
@@ -165,22 +167,23 @@ func validateCmd() *cobra.Command {
 					out = append(out, jr)
 				}
 				b, _ := json.MarshalIndent(out, "", "  ")
-				fmt.Fprintln(cmd.OutOrStdout(), string(b))
+				reportBytes = append(b, '\n')
 
 			default:
+				var sb strings.Builder
 				for _, r := range results {
 					if r.err != nil {
-						fmt.Fprintf(cmd.OutOrStdout(), "%s\n  PARSE ERROR: %s\n\n", r.path, r.err)
+						fmt.Fprintf(&sb, "%s\n  PARSE ERROR: %s\n\n", r.path, r.err)
 						continue
 					}
 					if len(r.issues) == 0 {
-						fmt.Fprintf(cmd.OutOrStdout(), "%s  OK\n", r.path)
+						fmt.Fprintf(&sb, "%s  OK\n", r.path)
 					} else {
-						fmt.Fprintf(cmd.OutOrStdout(), "%s\n", r.path)
+						fmt.Fprintf(&sb, "%s\n", r.path)
 						for _, iss := range r.issues {
-							fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", iss)
+							fmt.Fprintf(&sb, "  %s\n", iss)
 						}
-						fmt.Fprintln(cmd.OutOrStdout())
+						sb.WriteByte('\n')
 					}
 				}
 				if len(results) > 1 {
@@ -190,9 +193,21 @@ func validateCmd() *cobra.Command {
 							valid++
 						}
 					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%d file(s) checked  %d valid  %d invalid\n",
+					fmt.Fprintf(&sb, "%d file(s) checked  %d valid  %d invalid\n",
 						len(results), valid, len(results)-valid)
 				}
+				reportBytes = []byte(sb.String())
+			}
+
+			if outputFile != "" {
+				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
+					return fmt.Errorf("creating output directory: %w", err)
+				}
+				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
+					return fmt.Errorf("writing output file: %w", err)
+				}
+			} else {
+				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
 			}
 
 			if !allValid {
@@ -203,12 +218,15 @@ func validateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	return cmd
 }
 
 func runCmd() *cobra.Command {
 	var envFile string
 	var format string
+	var outputFile string
+	var timeoutMs int
 
 	cmd := &cobra.Command{
 		Use:   "run <scenario-file>",
@@ -227,6 +245,12 @@ func runCmd() *cobra.Command {
 				return fmt.Errorf("parsing scenario: %w", err)
 			}
 
+			if timeoutMs > 0 {
+				for i := range s.Steps {
+					s.Steps[i].TimeoutMs = timeoutMs
+				}
+			}
+
 			var env *domain.Environment
 			if envFile != "" {
 				envData, err := os.ReadFile(envFile)
@@ -243,21 +267,32 @@ func runCmd() *cobra.Command {
 			runner := scenario.New(exec)
 			result := runner.Run(context.Background(), s, env)
 
+			var reportBytes []byte
 			switch strings.ToLower(format) {
 			case "json":
-				out, err := reporting.JSON(result)
+				reportBytes, err = reporting.JSON(result)
 				if err != nil {
 					return fmt.Errorf("generating JSON report: %w", err)
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), string(out))
+				reportBytes = append(reportBytes, '\n')
 			case "junit":
-				out, err := reporting.JUnit(result)
+				reportBytes, err = reporting.JUnit(result)
 				if err != nil {
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
-				fmt.Fprint(cmd.OutOrStdout(), string(out))
 			default:
-				fmt.Fprint(cmd.OutOrStdout(), reporting.Text(result))
+				reportBytes = []byte(reporting.Text(result))
+			}
+
+			if outputFile != "" {
+				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
+					return fmt.Errorf("creating output directory: %w", err)
+				}
+				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
+					return fmt.Errorf("writing output file: %w", err)
+				}
+			} else {
+				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
 			}
 
 			if !result.Passed {
@@ -269,6 +304,8 @@ func runCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file (YAML or JSON)")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
+	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
 
 	return cmd
 }

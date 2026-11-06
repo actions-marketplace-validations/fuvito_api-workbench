@@ -934,11 +934,12 @@ type Props = {
   activeEnvPath?: string
   onResultChange: (result: ScenarioResult | null) => void
   onRunningChange: (running: boolean) => void
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 // ---- Main component ----
 
-export function ScenarioViewer({ scenarioPath, scenarioName, result, running, theme = 'dark', environments = [], activeEnvPath = '', onResultChange, onRunningChange }: Props) {
+export function ScenarioViewer({ scenarioPath, scenarioName, result, running, theme = 'dark', environments = [], activeEnvPath = '', onResultChange, onRunningChange, onDirtyChange }: Props) {
   const [detail, setDetail] = useState<ScenarioDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedEnvPath, setSelectedEnvPath] = useState(activeEnvPath)
@@ -1209,12 +1210,14 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const isEditing = mode === 'visual' || mode === 'yaml'
   const isDirty = (mode === 'yaml' && editorContent !== rawContent) || (mode === 'visual' && visualDirty)
 
+  useEffect(() => { onDirtyChange?.(isDirty) }, [isDirty]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const passed = result ? (result.steps ?? []).filter(s => s.passed && !s.skipped).length : 0
   const failed = result ? (result.steps ?? []).filter(s => !s.passed && !s.skipped).length : 0
   const skipped = result ? (result.steps ?? []).filter(s => s.skipped).length : 0
 
-  const toggleActiveCls = 'bg-[var(--color-accent)] text-white'
-  const toggleInactiveCls = 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]'
+  const toggleActiveCls = 'border-b-2 border-[var(--color-accent)] text-[var(--color-foreground)]'
+  const toggleInactiveCls = 'border-b-2 border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
 
   // Current steps list (view: from loaded detail, edit: from visualDetail)
   const viewSteps = detail?.steps ?? []
@@ -1234,18 +1237,18 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
           )}
         </div>
 
-        {/* View / Edit / YAML toggle */}
-        <div className="shrink-0 flex rounded overflow-hidden border border-[var(--color-border)] text-[11px]">
+        {/* View / Edit / YAML toggle — underline-style tabs */}
+        <div className="shrink-0 flex text-xs">
           <button type="button" onClick={() => setMode('view')} disabled={mode === 'view' || saving}
-            className={cn('px-2.5 py-1 transition-colors', mode === 'view' ? toggleActiveCls : toggleInactiveCls)}>
+            className={cn('px-3 py-1 transition-colors', mode === 'view' ? toggleActiveCls : toggleInactiveCls)}>
             View
           </button>
           <button type="button" onClick={handleEnterVisual} disabled={mode === 'visual' || saving || !detail}
-            className={cn('px-2.5 py-1 transition-colors', mode === 'visual' ? toggleActiveCls : toggleInactiveCls)}>
+            className={cn('px-3 py-1 transition-colors', mode === 'visual' ? toggleActiveCls : toggleInactiveCls)}>
             Edit
           </button>
           <button type="button" onClick={handleEnterYaml} disabled={mode === 'yaml' || loadingRaw || saving}
-            className={cn('px-2.5 py-1 transition-colors flex items-center gap-1', mode === 'yaml' ? toggleActiveCls : toggleInactiveCls)}>
+            className={cn('px-3 py-1 transition-colors flex items-center gap-1', mode === 'yaml' ? toggleActiveCls : toggleInactiveCls)}>
             {loadingRaw ? <Loader2 size={10} className="animate-spin" /> : null}
             YAML
           </button>
@@ -1330,13 +1333,25 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
               </div>
             )}
 
+            {/* Panel column header */}
+            <div className="shrink-0 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-background)]">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">
+                {isEditing ? 'Edit Steps' : 'Steps'}
+              </span>
+            </div>
+
             {/* Step list */}
             <div className="flex-1 overflow-y-auto py-1">
               {loadError ? (
                 <p className="px-3 py-2 text-xs text-red-400">{loadError}</p>
               ) : mode === 'view' && !detail ? (
-                <div className="px-3 py-2 flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
-                  <Loader2 size={12} className="animate-spin" /> Loading…
+                <div className="flex flex-col py-1">
+                  {[0.7, 0.9, 0.6].map((w, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2">
+                      <div className="w-4 h-4 rounded-full bg-[var(--color-muted)] animate-pulse shrink-0" />
+                      <div className="h-2 rounded bg-[var(--color-muted)] animate-pulse" style={{ width: `${w * 100}%` }} />
+                    </div>
+                  ))}
                 </div>
               ) : mode === 'view' ? (
                 viewSteps.length === 0 ? (
@@ -1399,7 +1414,14 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
           </div>
 
           {/* Right panel */}
-          <div className="flex-1 overflow-hidden min-w-0">
+          <div className="flex-1 overflow-hidden min-w-0 flex flex-col">
+            {/* Panel column header */}
+            <div className="shrink-0 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-background)]">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">
+                {isEditing ? 'Step Editor' : 'Results'}
+              </span>
+            </div>
+            <div className="flex-1 overflow-hidden">
             {mode === 'view' ? (
               running ? (
                 <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--color-muted-foreground)]">
@@ -1443,6 +1465,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                 </div>
               )
             )}
+            </div>
           </div>
 
         </div>

@@ -415,7 +415,10 @@ export default function App() {
           }}
           onDeleteScenario={async (path) => {
             const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
-            if (matchTab && !window.confirm('Delete this scenario? This cannot be undone.')) return
+            const msg = matchTab?.scenarioDirty
+              ? 'This scenario has unsaved changes. Delete anyway? This cannot be undone.'
+              : 'Delete this scenario? This cannot be undone.'
+            if (!window.confirm(msg)) return
             const err = await deleteScenario(path)
             if (!err) {
               if (matchTab) tabs.removeTab(matchTab.id)
@@ -491,6 +494,7 @@ export default function App() {
                 activeEnvPath={workspace.activeEnv?.path ?? ''}
                 onResultChange={r => updateTab(activeTabId, { scenarioResult: r })}
                 onRunningChange={running => updateTab(activeTabId, { scenarioRunning: running })}
+                onDirtyChange={dirty => updateTab(activeTabId, { scenarioDirty: dirty })}
               />
             ) : (
               <>

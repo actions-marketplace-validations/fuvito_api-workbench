@@ -52,7 +52,7 @@ export function KeyValueEditor({
               if (el) el.indeterminate = pairs.some(p => p.enabled) && !pairs.every(p => p.enabled)
             }}
             onChange={e => onChange(pairs.map(p => ({ ...p, enabled: e.target.checked })))}
-            className="shrink-0 accent-[var(--color-accent)] w-3.5 h-3.5"
+            className="shrink-0 accent-[var(--color-accent)] w-3.5 h-3.5 focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-background)]"
           />
           <span className="flex-1 text-[10px] text-[var(--color-muted-foreground)] uppercase tracking-widest font-semibold">
             {keyPlaceholder}
@@ -69,7 +69,7 @@ export function KeyValueEditor({
             type="checkbox"
             checked={pair.enabled}
             onChange={e => update(pair.id, 'enabled', e.target.checked)}
-            className="shrink-0 accent-[var(--color-accent)] w-3.5 h-3.5"
+            className="shrink-0 accent-[var(--color-accent)] w-3.5 h-3.5 focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-background)]"
           />
           <input
             type="text"
@@ -89,6 +89,7 @@ export function KeyValueEditor({
           <button
             type="button"
             onClick={() => remove(pair.id)}
+            aria-label="Remove row"
             className="shrink-0 w-4 flex items-center justify-center text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)] transition-colors"
           >
             <X size={11} />

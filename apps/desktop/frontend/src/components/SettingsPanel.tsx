@@ -47,7 +47,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className={cn(
         'w-[460px] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)]',
         'shadow-2xl flex flex-col',
@@ -55,7 +55,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
           <span className="text-sm font-semibold text-[var(--color-foreground)]">Settings</span>
-          <button type="button" onClick={onClose} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+          <button type="button" onClick={onClose} aria-label="Close settings" className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
             <X size={15} />
           </button>
         </div>
@@ -128,7 +128,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                     type="checkbox"
                     checked={local.tlsSkipVerify}
                     onChange={e => set('tlsSkipVerify', e.target.checked)}
-                    className="accent-[var(--color-accent)]"
+                    className="accent-[var(--color-accent)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-background)]"
                   />
                   <span className="text-xs text-[var(--color-muted-foreground)]">
                     Allow self-signed / invalid certificates
