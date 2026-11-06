@@ -231,6 +231,150 @@ Classifies every change as `ERR` (breaking), `WARN` (potentially breaking), or `
 
 ---
 
+## API Contract Validation
+
+ApiDesk's primary purpose is verifying that an API's actual runtime behaviour matches its declared OpenAPI contract. Three complementary tools cover the full conformance workflow.
+
+---
+
+### 1 — Automatic Spec Conformance (`apidesk conform`)
+
+Parses a spec, executes every declared operation against a live server, and validates each response against the declared response schema — without writing a single test file.
+
+```
+                  openapi.yaml
+                       │
+                 parse + generate
+                       │
+              ┌────────▼────────┐
+              │  for each op:   │
+              │  1. build req   │
+              │  2. execute     │
+              │  3. validate    │
+              │     response    │
+              └────────┬────────┘
+                       │
+              per-operation result:
+              PASS / FAIL (+ violations) / SKIP
+```
+
+What "conformance" means per operation:
+- The server responded (no network error, no timeout)
+- The response body matches the schema declared for that status code in the spec
+- Required fields are present, types are correct, enum values are within range
+
+**Coverage flag** shows which operations actually received a response vs. which were skipped or unreachable:
+
+```
+Coverage: 7 / 8 operations (88%)
+
+Covered:   POST /auth/login  ·  GET /health  ·  GET /users  ·  ...
+Not covered:  GET /protected
+```
+
+Filter by tag or path prefix to run conformance against a subset of the spec:
+
+```bash
+apidesk conform openapi.yaml --base-url https://api.example.com \
+  --tags users,auth \
+  --env environments/ci.yaml \
+  --coverage \
+  --format junit \
+  --output results/conform.xml
+```
+
+---
+
+### 2 — Scenario-Level Spec Binding
+
+Bind a scenario to a spec file and every step's response is automatically validated against the spec's declared schema — no manual `schema` assertions needed in each step.
+
+```yaml
+schemaVersion: "1"
+title: User lifecycle
+specFile: ../openapi.yaml      # one line enables automatic validation
+
+steps:
+  - title: Create user
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      body:
+        type: json
+        content: '{"name":"Alice","email":"alice@example.com"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "201"
+    # No "schema" assertion needed here — specFile covers it
+```
+
+When `specFile` is set, the scenario runner calls `ValidateResponseByPath` after every step and appends any schema violations as failed assertion results. Steps can still carry explicit `schema` assertions for additional inline checks.
+
+---
+
+### 3 — Breaking Change Detection (`apidesk diff`)
+
+Compares two spec versions and classifies every change. Used as a CI gate to prevent spec regressions from reaching consumers.
+
+```bash
+apidesk diff openapi-base.yaml openapi-pr.yaml
+```
+
+```
+  [ERR] !  GET /users/{id}: response field "email" removed
+  [ERR] !  POST /users: required request field "role" added
+  [WARN]   PUT /users/{id}: response field "updatedAt" type changed
+  [INFO]   POST /exports: new endpoint added
+
+4 change(s)  ·  2 breaking
+```
+
+| Level | Meaning | Breaking? |
+|---|---|---|
+| `ERR` | Consumers will break without code changes | Yes |
+| `WARN` | May break depending on client strictness | Potentially |
+| `INFO` | Additive or documentation-only change | No |
+
+**What counts as breaking:**
+
+- Endpoint removed
+- Required request parameter or field added
+- Response field removed or renamed
+- Response field type changed
+- Enum value removed
+- Auth requirement added to an operation
+
+Exit code `1` when breaking changes are found — the PR is blocked automatically in CI.
+
+---
+
+### How the three fit together in a CI pipeline
+
+```
+On every PR
+────────────────────────────────────────────────────────────
+  apidesk diff main-spec.yaml pr-spec.yaml
+  └── exit 1 if breaking → PR blocked before tests run
+
+On merge to main (or nightly)
+────────────────────────────────────────────────────────────
+  apidesk conform openapi.yaml --base-url $STAGING_URL \
+    --env environments/ci.yaml --coverage --format junit
+  └── exit 1 if violations → build fails
+  └── JUnit report published to CI dashboard
+
+Scenario suite (per-service integration tests)
+────────────────────────────────────────────────────────────
+  apidesk run scenarios/user-lifecycle.yaml \
+    --env environments/ci.yaml --format junit
+  └── exit 1 if assertion failures → build fails
+```
+
+All three produce JUnit XML consumed natively by Jenkins, GitHub Actions, GitLab CI, and CircleCI.
+
+---
+
 ## CLI
 
 The `apidesk` CLI is the same Go core with a terminal interface. All three main commands produce machine-readable output and return meaningful exit codes.
