@@ -629,7 +629,7 @@ function CollapsibleSection({ title, badge, defaultOpen = true, children }: {
 
 // ---- StepListRow (compact left-panel row, shared between view and edit modes) ----
 
-function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onToggleDisabled, onRunFrom }: {
+function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onToggleDisabled, onRunFrom, running = false }: {
   step: StepDetail
   index: number
   result: StepResult | null
@@ -643,15 +643,20 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
   onRemove?: () => void
   onToggleDisabled?: () => void
   onRunFrom?: () => void
+  running?: boolean
 }) {
   const badge = step.method ? METHOD_BADGE[step.method] ?? '' : ''
   const isDisabled = step.disabled ?? false
+  const isPending = running && !result
   return (
     <div
-      role="button"
+      role="option"
+      aria-selected={selected}
       tabIndex={0}
       onClick={() => onSelect(index)}
-      onKeyDown={e => e.key === 'Enter' && onSelect(index)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(index) }
+      }}
       className={cn(
         'group relative flex items-start gap-2 px-3 py-2.5 cursor-pointer transition-colors border-l-2 select-none',
         selected
@@ -660,8 +665,13 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
         isDisabled && 'opacity-50',
       )}
     >
-      <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[11px] font-bold">
-        {index + 1}
+      <span className={cn(
+        'shrink-0 w-5 h-5 mt-0.5 rounded-full flex items-center justify-center text-[11px] font-bold',
+        isPending
+          ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)] animate-pulse'
+          : 'bg-[var(--color-border)] text-[var(--color-muted-foreground)]',
+      )}>
+        {isPending ? <Loader2 size={10} className="animate-spin" /> : index + 1}
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -962,6 +972,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
   const [leftPanelWidth, setLeftPanelWidth] = useState(240)
   const containerRef = useRef<HTMLDivElement>(null)
+  const stepListRef = useRef<HTMLDivElement>(null)
   const selectedStepIndexRef = useRef<number | null>(null)
   useEffect(() => { selectedStepIndexRef.current = selectedStepIndex }, [selectedStepIndex])
 
@@ -1007,6 +1018,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       setSelectedStepIndex(0)
     }
   }, [detail]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll selected step into view and focus the row for keyboard users
+  useEffect(() => {
+    if (selectedStepIndex === null || !stepListRef.current) return
+    const row = stepListRef.current.querySelectorAll<HTMLElement>('[role="option"]')[selectedStepIndex]
+    row?.scrollIntoView({ block: 'nearest' })
+  }, [selectedStepIndex])
 
   // Keyboard shortcuts: Alt+Up/Down to reorder steps in visual edit mode
   useEffect(() => {
@@ -1341,7 +1359,23 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
             </div>
 
             {/* Step list */}
-            <div className="flex-1 overflow-y-auto py-1">
+            <div
+              ref={stepListRef}
+              role="listbox"
+              aria-label="Scenario steps"
+              className="flex-1 overflow-y-auto py-1 outline-none"
+              onKeyDown={e => {
+                const steps = mode === 'view' ? viewSteps : editSteps
+                if (!steps.length) return
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setSelectedStepIndex(prev => Math.min((prev ?? -1) + 1, steps.length - 1))
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setSelectedStepIndex(prev => Math.max((prev ?? 1) - 1, 0))
+                }
+              }}
+            >
               {loadError ? (
                 <p className="px-3 py-2 text-xs text-red-400">{loadError}</p>
               ) : mode === 'view' && !detail ? (
@@ -1366,6 +1400,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                       selected={selectedStepIndex === i}
                       onSelect={setSelectedStepIndex}
                       onRunFrom={() => handleRunFrom(i)}
+                      running={running}
                     />
                   ))
                 )
@@ -1395,10 +1430,10 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
             {/* Edit mode: add step */}
             {mode === 'visual' && (
-              <div className="shrink-0 px-2 py-2 border-t border-[var(--color-border)]">
+              <div className="shrink-0 px-3 py-2 border-t border-[var(--color-border)]">
                 <button type="button" onClick={addVisualStep}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded bg-[var(--color-accent)] text-white text-xs font-semibold hover:opacity-90 transition-opacity">
-                  <Plus size={13} /> Add Step
+                  className="text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors flex items-center gap-1">
+                  <Plus size={11} /> Add Step
                 </button>
               </div>
             )}
@@ -1421,7 +1456,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                 {isEditing ? 'Step Editor' : 'Results'}
               </span>
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden" role="region" aria-label="Step details">
             {mode === 'view' ? (
               running ? (
                 <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--color-muted-foreground)]">
