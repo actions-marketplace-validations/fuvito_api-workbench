@@ -256,8 +256,8 @@ function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'name', valuePlaceho
   )
 }
 
-const sectionLabelCls = 'text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)] mb-1.5'
-const addBtnCls = 'flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors mt-1'
+const sectionLabelCls = 'text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)] mb-1.5'
+const addBtnCls = 'flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors mt-1'
 
 function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown }: {
   step: StepDetail
@@ -314,7 +314,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
       {/* Step header */}
       <div className="px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         <div className="flex items-center gap-2">
-          <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[9px] font-bold">
+          <span className="shrink-0 w-5 h-5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[11px] font-bold">
             {index + 1}
           </span>
           <input
@@ -356,7 +356,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
           value={step.description ?? ''}
           onChange={e => onChange({ description: e.target.value })}
           placeholder="Step description (optional)"
-          className="w-full mt-1 bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-[11px] text-[var(--color-muted-foreground)] py-0.5 italic placeholder:not-italic"
+          className="w-full mt-1 bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-muted-foreground)] py-0.5 italic placeholder:not-italic"
         />
       </div>
 
@@ -382,7 +382,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
           <select
             value={step.bodyType ?? 'none'}
             onChange={e => onChange({ bodyType: e.target.value })}
-            className={cn(selectCls, 'text-[10px]')}
+            className={selectCls}
             title="Request body type"
           >
             {BODY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -397,7 +397,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
                   onChange({ bodyContent: JSON.stringify(JSON.parse(step.bodyContent ?? ''), null, 2) })
                 } catch { /* invalid JSON — leave as-is */ }
               }}
-              className={cn('shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--color-border)] transition-colors',
+              className={cn('shrink-0 text-xs px-1.5 py-0.5 rounded border border-[var(--color-border)] transition-colors',
                 step.bodyType === 'json'
                   ? 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
                   : 'opacity-30 cursor-not-allowed text-[var(--color-muted-foreground)]'
@@ -491,13 +491,13 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
       </div>
 
       {/* Options: fail policy, timeout, retry */}
-      <div className="px-3 py-2 flex flex-wrap gap-x-4 gap-y-1.5">
+      <div className="px-3 py-2 flex flex-wrap gap-x-4 gap-y-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[var(--color-muted-foreground)] text-[10px] shrink-0">On failure:</span>
+          <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">On failure:</span>
           <select
             value={step.failPolicy ?? 'stop'}
             onChange={e => onChange({ failPolicy: e.target.value })}
-            className={cn(selectCls, 'text-[10px]')}
+            className={selectCls}
           >
             <option value="stop">stop remaining steps</option>
             <option value="continue">continue next steps</option>
@@ -505,19 +505,19 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
           </select>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[var(--color-muted-foreground)] text-[10px] shrink-0">Timeout:</span>
+          <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Timeout:</span>
           <input
             type="number"
             min={0}
             value={step.timeoutMs ?? 0}
             onChange={e => onChange({ timeoutMs: Math.max(0, parseInt(e.target.value) || 0) })}
             title="Step timeout in milliseconds (0 = use global default)"
-            className={cn(inputCls, 'w-16 text-[10px]')}
+            className={cn(inputCls, 'w-16')}
           />
-          <span className="text-[var(--color-muted-foreground)] text-[10px]">ms</span>
+          <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[var(--color-muted-foreground)] text-[10px] shrink-0">Retry:</span>
+          <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Retry:</span>
           <input
             type="number"
             min={0}
@@ -525,9 +525,9 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
             value={step.retryMaxAttempts ?? 0}
             onChange={e => onChange({ retryMaxAttempts: Math.max(0, parseInt(e.target.value) || 0) })}
             title="Maximum retry attempts (0 = no retry)"
-            className={cn(inputCls, 'w-10 text-[10px]')}
+            className={cn(inputCls, 'w-12')}
           />
-          <span className="text-[var(--color-muted-foreground)] text-[10px]">× delay</span>
+          <span className="text-[var(--color-muted-foreground)] text-xs">× delay</span>
           <input
             type="number"
             min={0}
@@ -535,9 +535,9 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
             onChange={e => onChange({ retryDelayMs: Math.max(0, parseInt(e.target.value) || 0) })}
             title="Delay between retry attempts in milliseconds"
             disabled={(step.retryMaxAttempts ?? 0) === 0}
-            className={cn(inputCls, 'w-16 text-[10px]', (step.retryMaxAttempts ?? 0) === 0 && 'opacity-40')}
+            className={cn(inputCls, 'w-16', (step.retryMaxAttempts ?? 0) === 0 && 'opacity-40')}
           />
-          <span className="text-[var(--color-muted-foreground)] text-[10px]">ms</span>
+          <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
         </div>
       </div>
     </div>
@@ -626,7 +626,7 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
           : 'border-transparent hover:bg-[var(--color-muted)]',
       )}
     >
-      <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[9px] font-bold">
+      <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-[var(--color-border)] text-[var(--color-muted-foreground)] flex items-center justify-center text-[11px] font-bold">
         {index + 1}
       </span>
       <div className="flex-1 min-w-0">
@@ -643,11 +643,11 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
           )}
         </div>
         {step.requestRef ? (
-          <p className="text-[11px] text-[var(--color-muted-foreground)] truncate font-mono mt-0.5">↗ {step.requestRef}</p>
+          <p className="text-xs text-[var(--color-muted-foreground)] truncate font-mono mt-0.5">↗ {step.requestRef}</p>
         ) : step.method ? (
           <div className="flex items-center gap-1 mt-0.5">
-            <span className={cn('font-mono font-bold text-[10px] shrink-0', badge)}>{step.method}</span>
-            <span className="text-[11px] text-[var(--color-muted-foreground)] truncate">{step.url}</span>
+            <span className={cn('font-mono font-bold text-xs shrink-0', badge)}>{step.method}</span>
+            <span className="text-xs text-[var(--color-muted-foreground)] truncate">{step.url}</span>
           </div>
         ) : null}
       </div>
@@ -687,8 +687,8 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
         title={
           <span className="flex items-center gap-2 min-w-0">
             <span className="shrink-0">Request</span>
-            {step.method && <span className={cn('font-mono font-bold text-[11px] shrink-0', badge)}>{step.method}</span>}
-            {step.url && <span className="text-[var(--color-muted-foreground)] font-mono text-[11px] truncate">{step.url}</span>}
+            {step.method && <span className={cn('font-mono font-bold text-xs shrink-0', badge)}>{step.method}</span>}
+            {step.url && <span className="text-[var(--color-muted-foreground)] font-mono text-xs truncate">{step.url}</span>}
           </span>
         }
         defaultOpen
@@ -697,14 +697,14 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
           <p className="text-xs text-[var(--color-muted-foreground)] font-mono mb-2 break-all">↗ {step.requestRef}</p>
         )}
         {step.description && (
-          <p className="text-[11px] text-[var(--color-muted-foreground)] italic mb-2">{step.description}</p>
+          <p className="text-xs text-[var(--color-muted-foreground)] italic mb-2">{step.description}</p>
         )}
 
         {(step.headers?.length ?? 0) > 0 && (
           <div className="mb-2">
             <p className={sectionLabelCls}>Headers</p>
             {step.headers!.map((h, i) => (
-              <div key={i} className="flex items-baseline gap-1 text-[11px] font-mono mb-0.5">
+              <div key={i} className="flex items-baseline gap-1 text-xs font-mono mb-0.5">
                 <span className="text-[var(--color-muted-foreground)] shrink-0">{h.name}:</span>
                 <span className="text-[var(--color-foreground)] break-all">{h.value}</span>
               </div>
@@ -717,7 +717,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
             <p className={sectionLabelCls}>Query Params</p>
             <div className="flex flex-wrap gap-1">
               {step.queryParams!.map((q, i) => (
-                <span key={i} className="font-mono text-[11px] bg-[var(--color-muted)] border border-[var(--color-border)] rounded px-1.5 py-0.5 text-[var(--color-muted-foreground)]">
+                <span key={i} className="font-mono text-xs bg-[var(--color-muted)] border border-[var(--color-border)] rounded px-1.5 py-0.5 text-[var(--color-muted-foreground)]">
                   ?{q.name}={q.value}
                 </span>
               ))}
@@ -728,7 +728,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
         {step.bodyType && step.bodyType !== 'none' && bodyPreview && (
           <div className="mb-2">
             <p className={sectionLabelCls}>Body · {step.bodyType}</p>
-            <pre className="text-[11px] font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+            <pre className="text-xs font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-32 whitespace-pre-wrap break-all">
               {bodyPreview}
             </pre>
           </div>
@@ -739,7 +739,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
             <p className={sectionLabelCls}>Assertions</p>
             <div className="flex flex-wrap gap-1">
               {step.assertions.map((a, i) => (
-                <span key={i} className="rounded bg-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.5 text-[11px] text-[var(--color-muted-foreground)]">
+                <span key={i} className="rounded bg-[var(--color-muted)] border border-[var(--color-border)] px-1.5 py-0.5 text-xs text-[var(--color-muted-foreground)]">
                   {assertionSummary(a)}
                 </span>
               ))}
@@ -752,14 +752,14 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
             <p className={sectionLabelCls}>Extractions</p>
             <div className="flex flex-wrap gap-1">
               {step.extractions.map((e, i) => (
-                <span key={i} className="rounded bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 text-[11px] text-violet-400">→ {e.name}</span>
+                <span key={i} className="rounded bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 text-xs text-violet-400">→ {e.name}</span>
               ))}
             </div>
           </div>
         )}
 
         {((step.failPolicy && step.failPolicy !== 'stop') || (step.timeoutMs && step.timeoutMs > 0) || (step.retryMaxAttempts && step.retryMaxAttempts > 0)) && (
-          <div className="flex flex-wrap gap-3 text-[11px] text-[var(--color-muted-foreground)]">
+          <div className="flex flex-wrap gap-3 text-xs text-[var(--color-muted-foreground)]">
             {step.failPolicy && step.failPolicy !== 'stop' && <span>on fail: {step.failPolicy}</span>}
             {step.timeoutMs && step.timeoutMs > 0 ? <span>⏱ {step.timeoutMs} ms</span> : null}
             {step.retryMaxAttempts && step.retryMaxAttempts > 0 ? <span>↺ {step.retryMaxAttempts}× · {step.retryDelayMs ?? 1000} ms delay</span> : null}
@@ -772,7 +772,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
         <CollapsibleSection
           title="Result"
           badge={
-            <span className="flex items-center gap-2 text-[11px]">
+            <span className="flex items-center gap-2 text-xs">
               {result.skipped
                 ? <span className="text-[var(--color-muted-foreground)]">SKIPPED</span>
                 : result.passed
@@ -784,15 +784,15 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
           }
           defaultOpen
         >
-          {result.error && <p className="text-red-400 text-[11px] font-mono break-all mb-2">{result.error}</p>}
-          {result.skipped && <p className="text-[11px] text-[var(--color-muted-foreground)]">Skipped — previous step failed.</p>}
+          {result.error && <p className="text-red-400 text-xs font-mono break-all mb-2">{result.error}</p>}
+          {result.skipped && <p className="text-xs text-[var(--color-muted-foreground)]">Skipped — previous step failed.</p>}
           <div className="flex flex-col gap-0.5">
             {(result.assertions ?? []).map((ar, i) => (
               <div key={i} className="flex items-start gap-1.5">
                 {ar.passed
                   ? <CheckCircle2 size={11} className="shrink-0 text-emerald-400 mt-0.5" />
                   : <XCircle size={11} className="shrink-0 text-red-400 mt-0.5" />}
-                <span className={cn('text-[11px] break-all', ar.passed ? 'text-[var(--color-muted-foreground)]' : 'text-red-300')}>
+                <span className={cn('text-xs break-all', ar.passed ? 'text-[var(--color-muted-foreground)]' : 'text-red-300')}>
                   {ar.message}
                 </span>
               </div>
@@ -801,7 +801,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
           {Object.entries(result.extracted ?? {}).length > 0 && (
             <div className="mt-2 flex flex-col gap-0.5">
               {Object.entries(result.extracted ?? {}).map(([k, v]) => (
-                <div key={k} className="flex items-baseline gap-1 text-[11px]">
+                <div key={k} className="flex items-baseline gap-1 text-xs">
                   <span className="text-violet-400 shrink-0">→ {k}:</span>
                   <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>
                 </div>
@@ -815,7 +815,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
       {result?.responseBody && (
         <CollapsibleSection
           title="Response"
-          badge={contentType ? <span className="text-[11px] text-[var(--color-muted-foreground)] font-mono">{contentType}</span> : undefined}
+          badge={contentType ? <span className="text-xs text-[var(--color-muted-foreground)] font-mono">{contentType}</span> : undefined}
           defaultOpen={false}
         >
           {(result.responseHeaders?.length ?? 0) > 0 && (
@@ -823,7 +823,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
               <p className={sectionLabelCls}>Headers</p>
               <div className="max-h-28 overflow-y-auto flex flex-col gap-0.5">
                 {result.responseHeaders!.map((h, i) => (
-                  <div key={i} className="flex items-baseline gap-1 text-[11px] font-mono">
+                  <div key={i} className="flex items-baseline gap-1 text-xs font-mono">
                     <span className="text-[var(--color-muted-foreground)] shrink-0">{h.name}:</span>
                     <span className="text-[var(--color-foreground)] break-all">{h.value}</span>
                   </div>
@@ -831,7 +831,7 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
               </div>
             </div>
           )}
-          <pre className="text-[11px] font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-72 whitespace-pre-wrap break-all">
+          <pre className="text-xs font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-72 whitespace-pre-wrap break-all">
             {responseBodyFormatted}
           </pre>
         </CollapsibleSection>
