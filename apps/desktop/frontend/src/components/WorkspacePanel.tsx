@@ -628,8 +628,11 @@ export function WorkspacePanel({
                         title="Click to open · Double-click to rename"
                       >
                         <span className="truncate flex-1">{s.name}</span>
-                        {s.stepCount !== undefined && s.stepCount > 0 && (
-                          <span className="shrink-0 text-[10px] text-[var(--color-muted-foreground)] tabular-nums">
+                        {s.stepCount !== undefined && (
+                          <span className={cn(
+                            'shrink-0 text-[10px] tabular-nums',
+                            s.stepCount === 0 ? 'text-amber-400' : 'text-[var(--color-muted-foreground)]',
+                          )}>
                             {s.stepCount}
                           </span>
                         )}

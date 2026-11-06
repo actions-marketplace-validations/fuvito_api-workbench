@@ -102,13 +102,23 @@ function TimingDialog({ timing, total, onClose }: {
 function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing']; total: number; onClick: () => void }) {
   if (!timing || total === 0) return null
   const segments = buildSegments(timing)
-  if (segments.length === 0) return null
+  if (segments.length === 0) {
+    return <p className="text-xs text-[var(--color-muted-foreground)] mt-1 italic">No timing breakdown available.</p>
+  }
   const sum = segments.reduce((a, s) => a + s.ms, 0)
-  // Compute proportional widths then enforce a 1% minimum, then re-normalise so the bar always fills exactly 100%.
+  // Compute proportional widths, enforce 1% minimum, re-normalise, then round so total stays at 100%.
   const raw = segments.map(s => (s.ms / (sum || 1)) * 100)
   const withMin = raw.map(w => Math.max(w, 1))
   const inflated = withMin.reduce((a, b) => a + b, 0)
-  const widths = withMin.map(w => (w / inflated) * 100)
+  const widths = withMin.map((w, i, arr) => {
+    const rounded = Math.round((w / inflated) * 100 * 10) / 10
+    // Assign last segment the remainder so widths sum to exactly 100
+    if (i === arr.length - 1) {
+      const sumSoFar = arr.slice(0, -1).reduce((a, b) => a + Math.round((b / inflated) * 100 * 10) / 10, 0)
+      return Math.max(0, 100 - sumSoFar)
+    }
+    return rounded
+  })
   return (
     <button
       type="button"

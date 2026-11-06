@@ -414,9 +414,10 @@ export default function App() {
             }
           }}
           onDeleteScenario={async (path) => {
+            const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
+            if (matchTab && !window.confirm('Delete this scenario? This cannot be undone.')) return
             const err = await deleteScenario(path)
             if (!err) {
-              const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
               if (matchTab) tabs.removeTab(matchTab.id)
               await workspace.refreshWorkspace()
             }
@@ -434,6 +435,8 @@ export default function App() {
                 ),
               }))
               await workspace.refreshWorkspace()
+            } else {
+              window.alert(result.replace(/^error:\s*/i, ''))
             }
           }}
         />

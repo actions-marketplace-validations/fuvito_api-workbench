@@ -533,7 +533,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
             min={0}
             value={step.retryDelayMs ?? 1000}
             onChange={e => onChange({ retryDelayMs: Math.max(0, parseInt(e.target.value) || 0) })}
-            title="Delay between retry attempts in milliseconds"
+            title={(step.retryMaxAttempts ?? 0) === 0 ? 'Set Retry attempts > 0 to enable delay' : 'Delay between retry attempts in milliseconds'}
             disabled={(step.retryMaxAttempts ?? 0) === 0}
             className={cn(inputCls, 'w-16', (step.retryMaxAttempts ?? 0) === 0 && 'opacity-40')}
           />
