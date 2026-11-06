@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Play, Loader2, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp, ChevronRight, Save, X, Plus, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Play, Loader2, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp, ChevronRight, Save, X, Plus, Trash2, Eye, EyeOff, Copy } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { yaml } from '@codemirror/lang-yaml'
 import { cn } from '@/lib/utils'
@@ -271,6 +271,11 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
   onMoveDown: () => void
   onToggleDisabled: () => void
 }) {
+  const hasNonDefaultOptions = (step.failPolicy && step.failPolicy !== 'stop') ||
+    (step.timeoutMs && step.timeoutMs > 0) ||
+    (step.retryMaxAttempts && step.retryMaxAttempts > 0)
+  const [showAdvanced, setShowAdvanced] = useState(!!hasNonDefaultOptions)
+
   function updateHeader(i: number, u: { name?: string; value?: string }) {
     onChange({ headers: (step.headers ?? []).map((h, hi) => hi === i ? { ...h, ...u } : h) })
   }
@@ -500,55 +505,70 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
         </button>
       </div>
 
-      {/* Options: fail policy, timeout, retry */}
-      <div className="px-3 py-2 flex flex-wrap gap-x-4 gap-y-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">On failure:</span>
-          <select
-            value={step.failPolicy ?? 'stop'}
-            onChange={e => onChange({ failPolicy: e.target.value })}
-            className={selectCls}
-          >
-            <option value="stop">stop remaining steps</option>
-            <option value="continue">continue next steps</option>
-            <option value="skip">skip this step if prev failed</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Timeout:</span>
-          <input
-            type="number"
-            min={0}
-            value={step.timeoutMs ?? 0}
-            onChange={e => onChange({ timeoutMs: Math.max(0, parseInt(e.target.value) || 0) })}
-            title="Step timeout in milliseconds (0 = use global default)"
-            className={cn(inputCls, 'w-16')}
-          />
-          <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Retry:</span>
-          <input
-            type="number"
-            min={0}
-            max={10}
-            value={step.retryMaxAttempts ?? 0}
-            onChange={e => onChange({ retryMaxAttempts: Math.max(0, parseInt(e.target.value) || 0) })}
-            title="Maximum retry attempts (0 = no retry)"
-            className={cn(inputCls, 'w-12')}
-          />
-          <span className="text-[var(--color-muted-foreground)] text-xs">× delay</span>
-          <input
-            type="number"
-            min={0}
-            value={step.retryDelayMs ?? 1000}
-            onChange={e => onChange({ retryDelayMs: Math.max(0, parseInt(e.target.value) || 0) })}
-            title={(step.retryMaxAttempts ?? 0) === 0 ? 'Set Retry attempts > 0 to enable delay' : 'Delay between retry attempts in milliseconds'}
-            disabled={(step.retryMaxAttempts ?? 0) === 0}
-            className={cn(inputCls, 'w-16', (step.retryMaxAttempts ?? 0) === 0 && 'opacity-40')}
-          />
-          <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
-        </div>
+      {/* Advanced: fail policy, timeout, retry */}
+      <div className="border-t border-[var(--color-border)]">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(v => !v)}
+          className="w-full flex items-center gap-1.5 px-3 py-2 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+        >
+          {showAdvanced ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+          <span>Advanced</span>
+          {hasNonDefaultOptions && !showAdvanced && (
+            <span className="ml-1 w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
+          )}
+        </button>
+        {showAdvanced && (
+          <div className="px-3 pb-2 flex flex-wrap gap-x-4 gap-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">On failure:</span>
+              <select
+                value={step.failPolicy ?? 'stop'}
+                onChange={e => onChange({ failPolicy: e.target.value })}
+                className={selectCls}
+              >
+                <option value="stop">stop remaining steps</option>
+                <option value="continue">continue next steps</option>
+                <option value="skip">skip this step if prev failed</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Timeout:</span>
+              <input
+                type="number"
+                min={0}
+                value={step.timeoutMs ?? 0}
+                onChange={e => onChange({ timeoutMs: Math.max(0, parseInt(e.target.value) || 0) })}
+                title="Step timeout in milliseconds (0 = use global default)"
+                className={cn(inputCls, 'w-16')}
+              />
+              <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Retry:</span>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={step.retryMaxAttempts ?? 0}
+                onChange={e => onChange({ retryMaxAttempts: Math.max(0, parseInt(e.target.value) || 0) })}
+                title="Maximum retry attempts (0 = no retry)"
+                className={cn(inputCls, 'w-12')}
+              />
+              <span className="text-[var(--color-muted-foreground)] text-xs">× delay</span>
+              <input
+                type="number"
+                min={0}
+                value={step.retryDelayMs ?? 1000}
+                onChange={e => onChange({ retryDelayMs: Math.max(0, parseInt(e.target.value) || 0) })}
+                title={(step.retryMaxAttempts ?? 0) === 0 ? 'Set Retry attempts > 0 to enable delay' : 'Delay between retry attempts in milliseconds'}
+                disabled={(step.retryMaxAttempts ?? 0) === 0}
+                className={cn(inputCls, 'w-16', (step.retryMaxAttempts ?? 0) === 0 && 'opacity-40')}
+              />
+              <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -879,10 +899,19 @@ function StepDetailPanel({ step, result, onRunFrom }: { step: StepDetail; result
           </div>
           {Object.entries(result.extracted ?? {}).length > 0 && (
             <div className="mt-3 flex flex-col gap-1">
+              <p className={sectionLabelCls}>Extracted</p>
               {Object.entries(result.extracted ?? {}).map(([k, v]) => (
-                <div key={k} className="flex items-baseline gap-1 text-xs">
+                <div key={k} className="flex items-center gap-1 text-xs group/extract">
                   <span className="text-violet-400 shrink-0">→ {k}:</span>
-                  <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>
+                  <span className="text-[var(--color-foreground)] font-mono break-all flex-1">{v}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(v)}
+                    title={`Copy value of ${k}`}
+                    className="shrink-0 opacity-0 group-hover/extract:opacity-100 transition-opacity p-0.5 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                  >
+                    <Copy size={10} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -999,7 +1028,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       const r = await runScenario(scenarioPath, selectedEnvPath, 0)
       onResultChange(r)
       saveScenarioResult(scenarioPath, r).catch(() => {})
-      const firstFailed = r.steps.findIndex(s => !s.passed && !s.skipped)
+      const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
     } catch (e) {
       onResultChange({ name: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
@@ -1015,7 +1044,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       const r = await runScenario(scenarioPath, selectedEnvPath, fromStep)
       onResultChange(r)
       saveScenarioResult(scenarioPath, r).catch(() => {})
-      const firstFailed = r.steps.findIndex(s => !s.passed && !s.skipped)
+      const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
       else setSelectedStepIndex(fromStep)
     } catch (e) {
@@ -1134,6 +1163,25 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   async function handleSave() {
     setSaving(true)
     setSaveError(null)
+    // Validate visual editor state before serializing
+    if (mode === 'visual' && visualDetail) {
+      for (const step of visualDetail.steps) {
+        for (const a of step.assertions) {
+          if ((a.type === 'jsonpath' || a.type === 'header') && !a.path?.trim()) {
+            setSaveError(`Step "${step.name}": ${a.type} assertion requires a path.`)
+            setSaving(false)
+            return
+          }
+        }
+        for (const e of step.extractions) {
+          if (!e.name?.trim()) {
+            setSaveError(`Step "${step.name}": extraction is missing a variable name.`)
+            setSaving(false)
+            return
+          }
+        }
+      }
+    }
     try {
       const content = mode === 'yaml' ? editorContent : serializeScenarioToYAML(visualDetail!)
       const err = await saveScenarioRaw(scenarioPath, content)
@@ -1151,7 +1199,9 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   }
 
   function handleDiscard() {
+    if (isDirty && !window.confirm('Discard unsaved changes?')) return
     if (mode === 'yaml') setEditorContent(rawContent)
+    setVisualDirty(false)
     setSaveError(null)
     setMode('view')
   }
@@ -1159,9 +1209,9 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const isEditing = mode === 'visual' || mode === 'yaml'
   const isDirty = (mode === 'yaml' && editorContent !== rawContent) || (mode === 'visual' && visualDirty)
 
-  const passed = result ? result.steps.filter(s => s.passed && !s.skipped).length : 0
-  const failed = result ? result.steps.filter(s => !s.passed && !s.skipped).length : 0
-  const skipped = result ? result.steps.filter(s => s.skipped).length : 0
+  const passed = result ? (result.steps ?? []).filter(s => s.passed && !s.skipped).length : 0
+  const failed = result ? (result.steps ?? []).filter(s => !s.passed && !s.skipped).length : 0
+  const skipped = result ? (result.steps ?? []).filter(s => s.skipped).length : 0
 
   const toggleActiveCls = 'bg-[var(--color-accent)] text-white'
   const toggleInactiveCls = 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]'
@@ -1179,6 +1229,9 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
           <h2 className="text-sm font-semibold text-[var(--color-foreground)] truncate">
             {detail?.name ?? scenarioName}
           </h2>
+          {!isEditing && detail?.description && (
+            <p className="text-xs text-[var(--color-muted-foreground)] truncate">{detail.description}</p>
+          )}
         </div>
 
         {/* View / Edit / YAML toggle */}
@@ -1294,7 +1347,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                   viewSteps.map((step, i) => (
                     <StepListRow
                       key={i} step={step} index={i}
-                      result={result?.steps[i] ?? null}
+                      result={result?.steps?.[i] ?? null}
                       selected={selectedStepIndex === i}
                       onSelect={setSelectedStepIndex}
                       onRunFrom={() => handleRunFrom(i)}
@@ -1309,7 +1362,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                   editSteps.map((step, i) => (
                     <StepListRow
                       key={i} step={step} index={i}
-                      result={result?.steps[i] ?? null}
+                      result={result?.steps?.[i] ?? null}
                       selected={selectedStepIndex === i}
                       onSelect={setSelectedStepIndex}
                       editMode
