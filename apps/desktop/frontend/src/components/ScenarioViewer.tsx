@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Play, Loader2, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronUp, ChevronRight, Save, X, Plus, Trash2 } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
 import { yaml } from '@codemirror/lang-yaml'
@@ -584,15 +584,15 @@ function CollapsibleSection({ title, badge, defaultOpen = true, children }: {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-muted)]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-left bg-[var(--color-muted)] hover:bg-[var(--color-border)] transition-colors"
       >
         {open
-          ? <ChevronDown size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />
-          : <ChevronRight size={12} className="shrink-0 text-[var(--color-muted-foreground)]" />}
-        <span className="flex-1 text-xs font-semibold text-[var(--color-foreground)]">{title}</span>
+          ? <ChevronDown size={13} className="shrink-0 text-[var(--color-muted-foreground)]" />
+          : <ChevronRight size={13} className="shrink-0 text-[var(--color-muted-foreground)]" />}
+        <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-[var(--color-foreground)]">{title}</span>
         {badge && <span className="shrink-0">{badge}</span>}
       </button>
-      {open && <div className="px-4 pb-3 pt-1">{children}</div>}
+      {open && <div className="px-4 pb-4 pt-2">{children}</div>}
     </div>
   )
 }
@@ -767,50 +767,6 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
         )}
       </CollapsibleSection>
 
-      {/* Result */}
-      {result && (
-        <CollapsibleSection
-          title="Result"
-          badge={
-            <span className="flex items-center gap-2 text-xs">
-              {result.skipped
-                ? <span className="text-[var(--color-muted-foreground)]">SKIPPED</span>
-                : result.passed
-                  ? <span className="font-semibold text-emerald-400">PASSED</span>
-                  : <span className="font-semibold text-red-400">FAILED</span>}
-              {result.statusCode > 0 && <span className={cn('font-mono font-bold', statusColor(result.statusCode))}>{result.statusCode}</span>}
-              {result.durationMs > 0 && <span className="text-[var(--color-muted-foreground)]">{result.durationMs} ms</span>}
-            </span>
-          }
-          defaultOpen
-        >
-          {result.error && <p className="text-red-400 text-xs font-mono break-all mb-2">{result.error}</p>}
-          {result.skipped && <p className="text-xs text-[var(--color-muted-foreground)]">Skipped — previous step failed.</p>}
-          <div className="flex flex-col gap-0.5">
-            {(result.assertions ?? []).map((ar, i) => (
-              <div key={i} className="flex items-start gap-1.5">
-                {ar.passed
-                  ? <CheckCircle2 size={11} className="shrink-0 text-emerald-400 mt-0.5" />
-                  : <XCircle size={11} className="shrink-0 text-red-400 mt-0.5" />}
-                <span className={cn('text-xs break-all', ar.passed ? 'text-[var(--color-muted-foreground)]' : 'text-red-300')}>
-                  {ar.message}
-                </span>
-              </div>
-            ))}
-          </div>
-          {Object.entries(result.extracted ?? {}).length > 0 && (
-            <div className="mt-2 flex flex-col gap-0.5">
-              {Object.entries(result.extracted ?? {}).map(([k, v]) => (
-                <div key={k} className="flex items-baseline gap-1 text-xs">
-                  <span className="text-violet-400 shrink-0">→ {k}:</span>
-                  <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CollapsibleSection>
-      )}
-
       {/* Response */}
       {result?.responseBody && (
         <CollapsibleSection
@@ -834,6 +790,59 @@ function StepDetailPanel({ step, result }: { step: StepDetail; result: StepResul
           <pre className="text-xs font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 overflow-auto max-h-72 whitespace-pre-wrap break-all">
             {responseBodyFormatted}
           </pre>
+        </CollapsibleSection>
+      )}
+
+      {/* Result */}
+      {result && (
+        <CollapsibleSection
+          title="Result"
+          badge={
+            <span className="flex items-center gap-2 text-xs">
+              {result.skipped
+                ? <span className="text-[var(--color-muted-foreground)]">SKIPPED</span>
+                : result.passed
+                  ? <span className="font-semibold text-emerald-400">PASSED</span>
+                  : <span className="font-semibold text-red-400">FAILED</span>}
+              {result.statusCode > 0 && <span className={cn('font-mono font-bold', statusColor(result.statusCode))}>{result.statusCode}</span>}
+              {result.durationMs > 0 && <span className="text-[var(--color-muted-foreground)]">{result.durationMs} ms</span>}
+            </span>
+          }
+          defaultOpen
+        >
+          {result.error && <p className="text-red-400 text-xs font-mono break-all mb-2">{result.error}</p>}
+          {result.skipped && <p className="text-xs text-[var(--color-muted-foreground)]">Skipped — previous step failed.</p>}
+          <div className="flex flex-col gap-1.5">
+            {(result.assertions ?? []).map((ar, i) => {
+              const def = step.assertions?.[i]
+              const label = def ? assertionSummary(def) : ar.message
+              return (
+                <div key={i} className="flex items-start gap-2">
+                  {ar.passed
+                    ? <CheckCircle2 size={14} className="shrink-0 text-emerald-400 mt-0.5" />
+                    : <XCircle size={14} className="shrink-0 text-red-400 mt-0.5" />}
+                  <div className="flex-1 min-w-0">
+                    <span className={cn('text-xs font-mono', ar.passed ? 'text-[var(--color-foreground)]' : 'text-red-300')}>
+                      {label}
+                    </span>
+                    {!ar.passed && ar.message && ar.message !== label && (
+                      <p className="text-xs text-red-400 mt-0.5 break-all">{ar.message}</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {Object.entries(result.extracted ?? {}).length > 0 && (
+            <div className="mt-3 flex flex-col gap-1">
+              {Object.entries(result.extracted ?? {}).map(([k, v]) => (
+                <div key={k} className="flex items-baseline gap-1 text-xs">
+                  <span className="text-violet-400 shrink-0">→ {k}:</span>
+                  <span className="text-[var(--color-foreground)] font-mono break-all">{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </CollapsibleSection>
       )}
     </div>
@@ -876,6 +885,24 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [leftPanelWidth, setLeftPanelWidth] = useState(240)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  function handleDividerMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = leftPanelWidth
+    function onMouseMove(ev: MouseEvent) {
+      setLeftPanelWidth(Math.max(160, Math.min(480, startWidth + (ev.clientX - startX))))
+    }
+    function onMouseUp() {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
 
   // Reset when scenario changes
   useEffect(() => {
@@ -1138,10 +1165,10 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                 onChange={v => setEditorContent(v)} height="100%" style={{ height: '100%', fontSize: '12px' }} />}
         </div>
       ) : (
-        <div className="flex-1 flex overflow-hidden">
+        <div ref={containerRef} className="flex-1 flex overflow-hidden">
 
           {/* Left panel: step list */}
-          <div className="w-[240px] shrink-0 border-r border-[var(--color-border)] flex flex-col overflow-hidden">
+          <div className="shrink-0 flex flex-col overflow-hidden" style={{ width: leftPanelWidth }}>
 
             {/* Edit mode: scenario meta */}
             {mode === 'visual' && visualDetail && (
@@ -1156,7 +1183,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                   value={visualDetail.description}
                   onChange={e => { setVisualDetail({ ...visualDetail, description: e.target.value }); setVisualDirty(true) }}
                   placeholder="Description (optional)"
-                  className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-[11px] text-[var(--color-muted-foreground)] py-0.5"
+                  className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-muted-foreground)] py-0.5"
                 />
               </div>
             )}
@@ -1211,12 +1238,20 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
             {mode === 'visual' && (
               <div className="shrink-0 px-2 py-2 border-t border-[var(--color-border)]">
                 <button type="button" onClick={addVisualStep}
-                  className={cn('w-full flex items-center justify-center gap-1.5 py-1.5 rounded border border-dashed border-[var(--color-border)]',
-                    'text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:border-[var(--color-accent)] transition-colors')}>
-                  <Plus size={11} /> Add step
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded bg-[var(--color-accent)] text-white text-xs font-semibold hover:opacity-90 transition-opacity">
+                  <Plus size={13} /> Add Step
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Draggable divider */}
+          <div
+            onMouseDown={handleDividerMouseDown}
+            className="group w-[5px] shrink-0 cursor-col-resize flex items-center justify-center hover:bg-[var(--color-accent)]/15 transition-colors active:bg-[var(--color-accent)]/25"
+            title="Drag to resize"
+          >
+            <div className="w-px h-full bg-[var(--color-border)] group-hover:bg-[var(--color-accent)] transition-colors" />
           </div>
 
           {/* Right panel */}
