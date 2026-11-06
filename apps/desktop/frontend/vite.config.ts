@@ -11,6 +11,10 @@ export default defineConfig({
       '@wailsjs': `${import.meta.dirname}/wailsjs`,
     },
   },
+  server: {
+    // Wails WebView uses wails.localhost as the request origin in dev mode.
+    allowedHosts: ['wails.localhost'],
+  },
   build: {
     // Output to the Wails embed directory so Go can embed the built assets.
     outDir: '../wails/frontend/dist',
