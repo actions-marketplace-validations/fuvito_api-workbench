@@ -379,6 +379,7 @@ export function WorkspacePanel({
 
   // ---- Context menu ----
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
+  const [scenarioCtxMenu, setScenarioCtxMenu] = useState<{ x: number; y: number; path: string; name: string } | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [explorerError, setExplorerError] = useState<string | null>(null)
 
@@ -623,6 +624,7 @@ export function WorkspacePanel({
                         className="flex-1 min-w-0 flex items-center gap-1.5 text-left py-0.5 min-w-0"
                         onClick={() => onSelectScenario?.(s.path, s.name)}
                         onDoubleClick={e => { e.stopPropagation(); setRenamingScenarioPath(s.path) }}
+                        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setScenarioCtxMenu({ x: e.clientX, y: e.clientY, path: s.path, name: s.name }) }}
                         title="Click to open · Double-click to rename"
                       >
                         <span className="truncate flex-1">{s.name}</span>
@@ -729,6 +731,23 @@ export function WorkspacePanel({
           y={ctxMenu.y}
           items={buildCtxItems(ctxMenu.node)}
           onClose={() => setCtxMenu(null)}
+        />
+      )}
+
+      {scenarioCtxMenu && (
+        <ContextMenu
+          x={scenarioCtxMenu.x}
+          y={scenarioCtxMenu.y}
+          items={[
+            { kind: 'action', label: 'Open', onClick: () => { onSelectScenario?.(scenarioCtxMenu.path, scenarioCtxMenu.name); setScenarioCtxMenu(null) } },
+            ...(onDuplicateScenario ? [{ kind: 'action' as const, label: 'Duplicate', onClick: () => { onDuplicateScenario(scenarioCtxMenu.path); setScenarioCtxMenu(null) } }] : []),
+            { kind: 'separator' as const },
+            { kind: 'action', label: 'Rename', onClick: () => { setRenamingScenarioPath(scenarioCtxMenu.path); setScenarioCtxMenu(null) } },
+            { kind: 'action', label: 'Open in Explorer', onClick: () => { openInExplorer(scenarioCtxMenu.path); setScenarioCtxMenu(null) } },
+            { kind: 'separator' as const },
+            { kind: 'action', label: 'Delete', danger: true, disabled: !onDeleteScenario, onClick: () => { onDeleteScenario?.(scenarioCtxMenu.path); setScenarioCtxMenu(null) } },
+          ]}
+          onClose={() => setScenarioCtxMenu(null)}
         />
       )}
     </div>

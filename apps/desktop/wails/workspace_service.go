@@ -630,7 +630,7 @@ func isRequestFile(path string) bool {
 	return isDataFile(filepath.Base(path))
 }
 
-func buildFileTree(root, dir string, skipEnvDir bool) ([]FileNodeIO, error) {
+func buildFileTree(root, dir string, skipSpecialDirs bool) ([]FileNodeIO, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -639,13 +639,13 @@ func buildFileTree(root, dir string, skipEnvDir bool) ([]FileNodeIO, error) {
 	var nodes []FileNodeIO
 	for _, e := range entries {
 		name := e.Name()
-		// Skip hidden files/dirs and the environments directory at root level
+		// Skip hidden files/dirs and the managed directories at root level
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		path := filepath.Join(dir, name)
 		if e.IsDir() {
-			if skipEnvDir && path == filepath.Join(root, "environments") {
+			if skipSpecialDirs && (path == filepath.Join(root, "environments") || path == filepath.Join(root, "scenarios")) {
 				continue
 			}
 			children, err := buildFileTree(root, path, false)
