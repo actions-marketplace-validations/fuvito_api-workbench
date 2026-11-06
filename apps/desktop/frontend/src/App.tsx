@@ -22,7 +22,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario } from '@/lib/bridge'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
 import { isTabDirty } from '@/lib/tabState'
@@ -123,6 +123,14 @@ export default function App() {
 
   // Request execution
   const handleSendRef = useRef<(() => void) | null>(null)
+
+  async function handleClearResponse() {
+    const { activeTab, activeTabId, updateTab } = tabs
+    updateTab(activeTabId, { response: null, responseCachedAt: null })
+    if (activeTab.filePath) {
+      clearResponseCache(activeTab.filePath).catch(() => {})
+    }
+  }
 
   async function handleSend() {
     const { activeTab, activeTabId, updateTab, tabsStateRef } = tabs
@@ -521,7 +529,7 @@ export default function App() {
                   className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
                   style={responseWidth > 0 ? { width: responseWidth } : {}}
                 >
-                  <ResponseViewer response={activeTab.response} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} />
+                  <ResponseViewer response={activeTab.response} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} />
                 </div>
               </>
             )}

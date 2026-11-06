@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Search, X, Clock, Copy, Check, AlignLeft, Code2, ExternalLink } from 'lucide-react'
+import { Search, X, Clock, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
 import { openInSystemViewer } from '@/lib/bridge'
@@ -314,9 +314,10 @@ type ResponseViewerProps = {
   response: ResponseData | null
   loading: boolean
   cachedAt?: string | null
+  onClear?: () => void
 }
 
-export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerProps) {
+export function ResponseViewer({ response, loading, cachedAt, onClear }: ResponseViewerProps) {
   const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -434,9 +435,31 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
             >
               <ExternalLink size={12} />
             </button>
+            {onClear && (
+              <button
+                type="button"
+                onClick={onClear}
+                title="Clear response"
+                className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
           </>
         ) : response?.error ? (
-          <span className="text-xs font-semibold text-red-400">Network Error</span>
+          <>
+            <span className="text-xs font-semibold text-red-400">Network Error</span>
+            {onClear && (
+              <button
+                type="button"
+                onClick={onClear}
+                title="Clear response"
+                className="ml-auto text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </>
         ) : (
           <span className="text-xs text-[var(--color-muted-foreground)]">Response</span>
         )}

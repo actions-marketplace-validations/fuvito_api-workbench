@@ -31,6 +31,7 @@ import {
   RenameRequest as WailsRenameRequest,
   SaveResponseCache as WailsSaveResponseCache,
   LoadResponseCache as WailsLoadResponseCache,
+  ClearResponseCache as WailsClearResponseCache,
   OpenInSystemViewer as WailsOpenInSystemViewer,
   OpenInExplorer as WailsOpenInExplorer,
   MoveRequest as WailsMoveRequest,
@@ -406,6 +407,10 @@ export async function loadResponseCache(reqPath: string): Promise<ResponseCacheD
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsLoadResponseCache(reqPath)
   return result as unknown as ResponseCacheData | null
+}
+
+export async function clearResponseCache(reqPath: string): Promise<void> {
+  await WailsClearResponseCache(reqPath)
 }
 
 // ---- Scenarios ----

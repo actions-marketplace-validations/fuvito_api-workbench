@@ -836,6 +836,19 @@ func (w *WorkspaceService) SaveResponseCache(reqPath string, response ResponseCa
 	return atomicWrite(path, data)
 }
 
+// ClearResponseCache deletes the cached response for a request file.
+func (w *WorkspaceService) ClearResponseCache(reqPath string) error {
+	path, err := w.cachePath(reqPath)
+	if err != nil {
+		return nil // no workspace — nothing to clear
+	}
+	err = os.Remove(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
+
 // LoadResponseCache returns the last cached response for a request file, or nil if none exists.
 func (w *WorkspaceService) LoadResponseCache(reqPath string) (*ResponseCacheIO, error) {
 	path, err := w.cachePath(reqPath)
