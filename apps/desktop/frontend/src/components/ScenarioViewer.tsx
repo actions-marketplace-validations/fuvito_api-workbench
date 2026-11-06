@@ -721,7 +721,7 @@ function StepCard({ step, index, result }: {
               ))}
             </div>
           )}
-          {step.assertions.length > 0 && (
+          {(step.assertions?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {step.assertions.map((a, i) => (
                 <span key={i} className="rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)]">
@@ -730,7 +730,7 @@ function StepCard({ step, index, result }: {
               ))}
             </div>
           )}
-          {step.extractions.length > 0 && (
+          {(step.extractions?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {step.extractions.map((e, i) => (
                 <span key={i} className="rounded bg-violet-500/10 border border-violet-500/20 px-1 py-0.5 text-[10px] text-violet-400">

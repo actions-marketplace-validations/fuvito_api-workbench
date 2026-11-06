@@ -211,6 +211,8 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 			TimeoutMs:   step.TimeoutMs,
 			Headers:     []KVPairIO{},
 			QueryParams: []KVPairIO{},
+			Assertions:  []AssertionDetailIO{},
+			Extractions: []ExtractionDetailIO{},
 		}
 		if step.Retry != nil && step.Retry.MaxAttempts > 0 {
 			sd.RetryMaxAttempts = step.Retry.MaxAttempts
