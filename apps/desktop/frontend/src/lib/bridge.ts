@@ -107,7 +107,7 @@ export interface ResponseData {
 }
 
 export interface AppSettings {
-  theme: string
+  theme: 'dark' | 'light'
   fontSize: number
   defaultTimeoutMs: number
   proxyUrl: string
@@ -516,7 +516,8 @@ export async function createScenario(name: string): Promise<CreateScenarioResult
 
 // Returns "" on success or an error message.
 export async function saveScenarioResult(scenarioPath: string, result: ScenarioResult): Promise<void> {
-  await WailsSaveScenarioResult(scenarioPath, result)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await WailsSaveScenarioResult(scenarioPath, result as any)
 }
 
 // Returns null if no cached result exists.

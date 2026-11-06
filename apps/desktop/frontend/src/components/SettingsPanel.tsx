@@ -1,14 +1,9 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { AppSettings } from '@/lib/bridge'
 
-export interface AppSettings {
-  theme: string
-  fontSize: number
-  defaultTimeoutMs: number
-  proxyUrl: string
-  tlsSkipVerify: boolean
-}
+export type { AppSettings }
 
 type SettingsPanelProps = {
   settings: AppSettings
@@ -74,7 +69,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
               <Row label="Theme" changed={isChanged('theme')}>
                 <select
                   value={local.theme}
-                  onChange={e => set('theme', e.target.value)}
+                  onChange={e => set('theme', e.target.value as 'dark' | 'light')}
                   className={inputCls}
                 >
                   <option value="dark">Dark</option>
