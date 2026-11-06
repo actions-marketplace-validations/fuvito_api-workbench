@@ -6,6 +6,7 @@ export type TabInfo = {
   name: string | null
   method: string
   isDirty: boolean
+  kind?: 'request' | 'scenario'
 }
 
 const TAB_METHOD_COLOR: Record<string, string> = {
@@ -53,11 +54,15 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
             {tab.isDirty && (
               <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
             )}
-            <span className={cn('shrink-0 font-mono font-bold text-[10px]', TAB_METHOD_COLOR[tab.method] ?? '')}>
-              {TAB_METHOD_ABBR[tab.method] ?? tab.method.slice(0, 3)}
-            </span>
+            {tab.kind === 'scenario' ? (
+              <span className="shrink-0 font-mono font-bold text-[10px] text-violet-400">SCN</span>
+            ) : (
+              <span className={cn('shrink-0 font-mono font-bold text-[10px]', TAB_METHOD_COLOR[tab.method] ?? '')}>
+                {TAB_METHOD_ABBR[tab.method] ?? tab.method.slice(0, 3)}
+              </span>
+            )}
             <span className="truncate flex-1 text-[11px]">
-              {tab.name ?? 'New Request'}
+              {tab.kind === 'scenario' ? (tab.name ?? 'Scenario') : (tab.name ?? 'New Request')}
             </span>
             <button
               type="button"

@@ -151,6 +151,33 @@ You can edit these files directly in any text editor. `{{variable}}` references 
 go test ./packages/core/...
 ```
 
+### Run frontend unit tests
+
+```bash
+cd apps/desktop/frontend
+pnpm test
+```
+
+### Run E2E tests (Playwright, mocked frontend)
+
+```bash
+cd apps/desktop/e2e
+pnpm install
+npx playwright install chromium
+pnpm test
+```
+
+### Run E2E smoke tests (against live `wails dev`)
+
+```bash
+# In one terminal: start the app
+cd apps/desktop/wails && wails dev
+
+# In another terminal
+cd apps/desktop/e2e
+E2E_SMOKE=1 pnpm test:smoke
+```
+
 ### Build the desktop app (production binary)
 
 ```bash

@@ -291,6 +291,84 @@ func TestExecute_InvalidRequest(t *testing.T) {
 	}
 }
 
+func TestExecute_MultipartFormBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			t.Errorf("Content-Type: want multipart/form-data prefix, got %q", r.Header.Get("Content-Type"))
+		}
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("ParseMultipartForm: %v", err)
+		}
+		if got := r.FormValue("username"); got != "alice" {
+			t.Errorf("username: want alice, got %q", got)
+		}
+		if got := r.FormValue("role"); got != "admin" {
+			t.Errorf("role: want admin, got %q", got)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	_, err := newExec().Execute(context.Background(), &domain.Request{
+		Method: domain.MethodPOST,
+		URL:    srv.URL + "/upload",
+		Body: &domain.RequestBody{
+			Type:    domain.BodyMultipart,
+			Content: "username=alice&role=admin",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExecute_MultipartEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			t.Errorf("Content-Type: want multipart/form-data prefix, got %q", r.Header.Get("Content-Type"))
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	resp, err := newExec().Execute(context.Background(), &domain.Request{
+		Method: domain.MethodPOST,
+		URL:    srv.URL,
+		Body:   &domain.RequestBody{Type: domain.BodyMultipart, Content: ""},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 204 {
+		t.Errorf("status: want 204, got %d", resp.StatusCode)
+	}
+}
+
+func TestExecute_MultipartSpecialChars(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("ParseMultipartForm: %v", err)
+		}
+		if got := r.FormValue("note"); got != "hello world & more" {
+			t.Errorf("note: want %q, got %q", "hello world & more", got)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	_, err := newExec().Execute(context.Background(), &domain.Request{
+		Method: domain.MethodPOST,
+		URL:    srv.URL,
+		Body: &domain.RequestBody{
+			Type:    domain.BodyMultipart,
+			Content: "note=" + "hello+world+%26+more",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestExecute_ResponseSize(t *testing.T) {
 	body := strings.Repeat("x", 1024)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

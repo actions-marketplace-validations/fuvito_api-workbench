@@ -1,9 +1,11 @@
 import type { KVPair, BodyState, AuthState } from '@/types'
-import type { ResponseData } from '@/lib/bridge'
+import type { ResponseData, ScenarioResult } from '@/lib/bridge'
 import type { HttpMethod } from './httpUtils'
 
 export type TabState = {
   id: string
+  kind?: 'request' | 'scenario'
+  // request tab fields
   method: HttpMethod
   url: string
   queryParams: KVPair[]
@@ -20,6 +22,11 @@ export type TabState = {
   loading: boolean
   saveError: string | null
   editingName: boolean
+  // scenario tab fields
+  scenarioPath?: string | null
+  scenarioName?: string | null
+  scenarioResult?: ScenarioResult | null
+  scenarioRunning?: boolean
 }
 
 export function computeStateKey(
@@ -72,9 +79,11 @@ export function createBlankTab(targetDir: string | null = null): TabState {
 }
 
 export function isTabDirty(tab: TabState): boolean {
+  if (tab.kind === 'scenario') return false
   return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs) !== tab.savedKey
 }
 
 export function isBlankTab(tab: TabState): boolean {
+  if (tab.kind === 'scenario') return false
   return tab.url === '' && tab.name === null && tab.filePath === null && !isTabDirty(tab)
 }

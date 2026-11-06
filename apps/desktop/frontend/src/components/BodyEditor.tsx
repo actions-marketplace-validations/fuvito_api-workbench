@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { BodyState, BodyType, KVPair } from '@/types'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
@@ -50,14 +50,10 @@ type Props = {
 export function BodyEditor({ body, onChange }: Props) {
   const [formPairs, setFormPairs] = useState<KVPair[]>(() => parseFormPairs(body.content))
 
-  // Re-parse into pairs only when switching into a form body type
-  useEffect(() => {
-    if (IS_FORM_TYPE(body.type)) {
+  function switchType(t: BodyType) {
+    if (IS_FORM_TYPE(t)) {
       setFormPairs(parseFormPairs(body.content))
     }
-  }, [body.type]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function switchType(t: BodyType) {
     onChange({ type: t, content: t === 'none' ? '' : body.content })
   }
 

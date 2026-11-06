@@ -138,7 +138,7 @@ function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing'];
 
 function highlightJSON(json: string): React.ReactNode {
   const nodes: React.ReactNode[] = []
-  const re = /("(?:[^"\\]|\\.)*")(?=\s*:)|("(?:[^"\\]|\\.)*")|([-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([{}\[\],:])/g
+  const re = /("(?:[^"\\]|\\.)*")(?=\s*:)|("(?:[^"\\]|\\.)*")|([-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([{}[\],:])/g
   let last = 0, i = 0
   for (const m of json.matchAll(re)) {
     if (m.index > last) nodes.push(json.slice(last, m.index))
@@ -375,6 +375,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
   }, [response, showSearch, openSearch, closeSearch])
 
   // Reset search when response changes
+  // eslint-disable-next-line react/set-state-in-effect
   useEffect(() => { closeSearch() }, [response, closeSearch])
 
   // Scroll the active match into view whenever it changes
@@ -395,7 +396,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--color-border)] shrink-0 flex-wrap">
         {response && !response.error && response.statusCode > 0 ? (
           <>
-            <span className={cn('text-xs font-mono font-semibold', statusColor(response.statusCode))}>
+            <span data-testid="response-status" className={cn('text-xs font-mono font-semibold', statusColor(response.statusCode))}>
               {response.statusCode}
             </span>
             <span className="text-xs text-[var(--color-muted-foreground)]">{response.status}</span>
@@ -420,7 +421,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
             <button
               type="button"
               onClick={handleCopy}
-              title="Copy response body"
+              title={copied ? 'Copied!' : 'Copy response body'}
               className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
             >
               {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
@@ -495,7 +496,7 @@ export function ResponseViewer({ response, loading, cachedAt }: ResponseViewerPr
       )}
 
       {/* Content */}
-      <div ref={contentRef} className="flex-1 overflow-auto p-3">
+      <div data-testid="response-body" ref={contentRef} className="flex-1 overflow-auto p-3">
         {loading && <p className="text-xs text-[var(--color-muted-foreground)] animate-pulse">Sending request…</p>}
         {!loading && !response && <p className="text-xs text-[var(--color-muted-foreground)]">Send a request to see the response.</p>}
         {!loading && response?.error && (

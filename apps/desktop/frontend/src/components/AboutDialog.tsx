@@ -117,7 +117,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
         {/* Footer */}
         <div className="flex justify-between items-center px-8 py-4 border-t border-[var(--color-border)] shrink-0">
           <span className="text-[10px] text-[var(--color-muted-foreground)]">
-            © {new Date().getFullYear()} Fuat Yazar
+            © 2026 Fuat Yazar
           </span>
           <button
             type="button"

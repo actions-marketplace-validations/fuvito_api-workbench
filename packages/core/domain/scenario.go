@@ -20,12 +20,14 @@ type RetryPolicy struct {
 // RequestRef is a path to a saved request file relative to the workspace root.
 type ScenarioStep struct {
 	Name        string
+	Description string
 	RequestRef  string
 	Request     *Request
 	Extractions []Extraction
 	Assertions  []Assertion
 	FailPolicy  FailPolicy
 	Retry       *RetryPolicy
+	TimeoutMs   int
 }
 
 // Scenario is a sequential, multi-step workflow used for Spec Conformance Testing.

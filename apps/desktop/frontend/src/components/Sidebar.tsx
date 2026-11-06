@@ -1,9 +1,25 @@
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
-import type { HistoryEntry, FileNode } from '@/lib/bridge'
+import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
 
 export type SidebarTab = 'workspace' | 'history'
+
+export interface RunAllEntry {
+  path: string
+  name: string
+  passed: boolean
+  durationMs: number
+  error?: string
+}
+
+export interface RunAllState {
+  running: boolean
+  done: number
+  total: number
+  passed: number
+  results: RunAllEntry[]
+}
 
 export type SidebarProps = {
   width: number
@@ -12,6 +28,7 @@ export type SidebarProps = {
   workspacePath: string
   fileTree: FileNode[]
   history: HistoryEntry[]
+  scenarios?: ScenarioInfo[]
   onOpenWorkspace: () => void
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
@@ -30,18 +47,34 @@ export type SidebarProps = {
   importing?: boolean
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
+  onSelectScenario?: (path: string, name: string) => void
+  onNewScenario?: (name: string) => void
+  onDuplicateScenario?: (path: string) => void
+  onDeleteScenario?: (path: string) => void
+  onRenameScenario?: (path: string, newName: string) => void
+  runAllState?: RunAllState
+  onRunAllScenarios?: () => void
+  onDismissRunAll?: () => void
 }
 
 export function Sidebar({
   width,
   tab, onTabChange,
-  workspacePath, fileTree, history,
+  workspacePath, fileTree, history, scenarios,
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder, onMoveFile,
   onSelectHistory, onClearHistory,
   onImportOpenAPI, onRefresh, importing,
   activeFilePath, dirtyFilePaths,
+  onSelectScenario,
+  onNewScenario,
+  onDuplicateScenario,
+  onDeleteScenario,
+  onRenameScenario,
+  runAllState,
+  onRunAllScenarios,
+  onDismissRunAll,
 }: SidebarProps) {
   return (
     <aside
@@ -88,6 +121,15 @@ export function Sidebar({
             importing={importing}
             activeFilePath={activeFilePath}
             dirtyFilePaths={dirtyFilePaths}
+            scenarios={scenarios}
+            onSelectScenario={onSelectScenario}
+            onNewScenario={onNewScenario}
+            onDuplicateScenario={onDuplicateScenario}
+            onDeleteScenario={onDeleteScenario}
+            onRenameScenario={onRenameScenario}
+            runAllState={runAllState}
+            onRunAllScenarios={onRunAllScenarios}
+            onDismissRunAll={onDismissRunAll}
           />
         )}
 

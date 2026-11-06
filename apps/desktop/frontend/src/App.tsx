@@ -7,6 +7,7 @@ import { SettingsPanel } from '@/components/SettingsPanel'
 import { EnvironmentEditor } from '@/components/EnvironmentEditor'
 import { RequestEditor } from '@/components/RequestEditor'
 import { ResponseViewer } from '@/components/ResponseViewer'
+import { ScenarioViewer } from '@/components/ScenarioViewer'
 import { Sidebar } from '@/components/Sidebar'
 import type { SidebarTab } from '@/components/Sidebar'
 import { AboutDialog } from '@/components/AboutDialog'
@@ -21,7 +22,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, selectEnvironment } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario } from '@/lib/bridge'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
 import { isTabDirty } from '@/lib/tabState'
@@ -46,6 +47,7 @@ export default function App() {
   })
 
   // Wire cross-dependency after both hooks are initialized
+  // eslint-disable-next-line react/refs
   refreshWorkspaceRef.current = workspace.refreshWorkspace
 
   // Local UI state
@@ -56,6 +58,36 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false)
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
+
+  // Run All Scenarios state
+  const [runAllState, setRunAllState] = useState<import('@/components/Sidebar').RunAllState | null>(null)
+
+  async function handleRunAll() {
+    const list = workspace.scenarioList
+    if (!list.length) return
+    const envPath = workspace.activeEnv?.path ?? ''
+    setRunAllState({ running: true, done: 0, total: list.length, passed: 0, results: [] })
+    let passedCount = 0
+    for (const s of list) {
+      try {
+        const r = await runScenario(s.path, envPath)
+        if (r.passed) passedCount++
+        setRunAllState(prev => prev ? {
+          ...prev,
+          done: prev.done + 1,
+          passed: passedCount,
+          results: [...prev.results, { path: s.path, name: s.name, passed: r.passed, durationMs: r.durationMs }],
+        } : prev)
+      } catch (e) {
+        setRunAllState(prev => prev ? {
+          ...prev,
+          done: prev.done + 1,
+          results: [...prev.results, { path: s.path, name: s.name, passed: false, durationMs: 0, error: String(e) }],
+        } : prev)
+      }
+    }
+    setRunAllState(prev => prev ? { ...prev, running: false } : prev)
+  }
 
   // Init
   useEffect(() => {
@@ -120,6 +152,7 @@ export default function App() {
     }
   }
 
+  // eslint-disable-next-line react/refs
   handleSendRef.current = handleSend
 
   function handleCancel() {
@@ -240,6 +273,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
+    kind: t.kind ?? 'request' as const,
   }))
 
   return (
@@ -351,6 +385,49 @@ export default function App() {
           importing={workspace.importing}
           activeFilePath={activeTab.filePath ?? undefined}
           dirtyFilePaths={tabs.dirtyFilePaths}
+          scenarios={workspace.scenarioList}
+          onSelectScenario={tabs.openScenarioAsTab}
+          runAllState={runAllState ?? undefined}
+          onRunAllScenarios={handleRunAll}
+          onDismissRunAll={() => setRunAllState(null)}
+          onNewScenario={async (name) => {
+            const result = await createScenario(name)
+            if (!result.error && result.path) {
+              await workspace.refreshWorkspace()
+              tabs.openScenarioAsTab(result.path, name)
+            }
+          }}
+          onDuplicateScenario={async (path) => {
+            const result = await duplicateScenario(path)
+            if (!result.error && result.path) {
+              await workspace.refreshWorkspace()
+              const name = result.path.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? 'copy'
+              tabs.openScenarioAsTab(result.path, name)
+            }
+          }}
+          onDeleteScenario={async (path) => {
+            const err = await deleteScenario(path)
+            if (!err) {
+              const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
+              if (matchTab) tabs.removeTab(matchTab.id)
+              await workspace.refreshWorkspace()
+            }
+          }}
+          onRenameScenario={async (path, newName) => {
+            const result = await renameScenario(path, newName)
+            if (!result.startsWith('error:')) {
+              const newPath = result
+              tabs.setTabsState(prev => ({
+                ...prev,
+                tabs: prev.tabs.map(t =>
+                  t.kind === 'scenario' && t.scenarioPath === path
+                    ? { ...t, scenarioPath: newPath, scenarioName: newName, name: newName }
+                    : t
+                ),
+              }))
+              await workspace.refreshWorkspace()
+            }
+          }}
         />
 
         <div
@@ -392,46 +469,62 @@ export default function App() {
           />
 
           <div className="flex-1 flex overflow-hidden">
-            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              <RequestEditor
-                method={activeTab.method}
-                url={activeTab.url}
-                loading={activeTab.loading}
-                queryParams={activeTab.queryParams}
-                headers={activeTab.headers}
-                body={activeTab.body}
-                auth={activeTab.auth}
-                onMethodChange={m => updateTab(activeTabId, { method: m })}
-                onUrlChange={u => updateTab(activeTabId, { url: u })}
-                onUrlPaste={handleUrlPaste}
-                onQueryParamsChange={p => updateTab(activeTabId, { queryParams: p })}
-                onHeadersChange={h => updateTab(activeTabId, { headers: h })}
-                onBodyChange={b => updateTab(activeTabId, { body: b })}
-                onAuthChange={a => updateTab(activeTabId, { auth: a })}
-                timeoutMs={activeTab.timeoutMs}
-                onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
-                envVarMap={workspace.envVarMap}
-                onSend={handleSend}
-                onCancel={handleCancel}
+            {activeTab.kind === 'scenario' ? (
+              <ScenarioViewer
+                scenarioPath={activeTab.scenarioPath ?? ''}
+                scenarioName={activeTab.scenarioName ?? ''}
+                result={activeTab.scenarioResult ?? null}
+                running={activeTab.scenarioRunning ?? false}
+                theme={settings.settings.theme}
+                environments={workspace.environments}
+                activeEnvPath={workspace.activeEnv?.path ?? ''}
+                onResultChange={r => updateTab(activeTabId, { scenarioResult: r })}
+                onRunningChange={running => updateTab(activeTabId, { scenarioRunning: running })}
               />
-            </div>
+            ) : (
+              <>
+                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                  <RequestEditor
+                    method={activeTab.method}
+                    url={activeTab.url}
+                    loading={activeTab.loading}
+                    queryParams={activeTab.queryParams}
+                    headers={activeTab.headers}
+                    body={activeTab.body}
+                    auth={activeTab.auth}
+                    onMethodChange={m => updateTab(activeTabId, { method: m })}
+                    onUrlChange={u => updateTab(activeTabId, { url: u })}
+                    onUrlPaste={handleUrlPaste}
+                    onQueryParamsChange={p => updateTab(activeTabId, { queryParams: p })}
+                    onHeadersChange={h => updateTab(activeTabId, { headers: h })}
+                    onBodyChange={b => updateTab(activeTabId, { body: b })}
+                    onAuthChange={a => updateTab(activeTabId, { auth: a })}
+                    timeoutMs={activeTab.timeoutMs}
+                    onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
+                    envVarMap={workspace.envVarMap}
+                    onSend={handleSend}
+                    onCancel={handleCancel}
+                  />
+                </div>
 
-            <div
-              className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
-              onMouseDown={e => {
-                e.preventDefault()
-                draggingRef.current = 'response'
-                document.body.style.cursor = 'col-resize'
-                document.body.style.userSelect = 'none'
-              }}
-            />
+                <div
+                  className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    draggingRef.current = 'response'
+                    document.body.style.cursor = 'col-resize'
+                    document.body.style.userSelect = 'none'
+                  }}
+                />
 
-            <div
-              className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
-              style={responseWidth > 0 ? { width: responseWidth } : {}}
-            >
-              <ResponseViewer response={activeTab.response} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} />
-            </div>
+                <div
+                  className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
+                  style={responseWidth > 0 ? { width: responseWidth } : {}}
+                >
+                  <ResponseViewer response={activeTab.response} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} />
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>

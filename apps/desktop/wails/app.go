@@ -13,6 +13,7 @@ type App struct {
 	openapiService   *OpenAPIService
 	settingsService  *SettingsService
 	demoService      *DemoService
+	scenarioService  *ScenarioService
 	hasDirtyTabs     bool
 }
 
@@ -27,6 +28,7 @@ func NewApp() *App {
 		openapiService:   NewOpenAPIService(ws),
 		settingsService:  ss,
 		demoService:      NewDemoService(ws),
+		scenarioService:  NewScenarioService(ws, ss),
 	}
 }
 
@@ -37,6 +39,7 @@ func (a *App) startup(ctx context.Context) {
 	a.openapiService.setContext(ctx)
 	a.settingsService.setContext(ctx)
 	a.demoService.setContext(ctx)
+	a.scenarioService.setContext(ctx)
 }
 
 func (a *App) shutdown(_ context.Context) {

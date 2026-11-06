@@ -51,6 +51,19 @@ import {
   IsRunning as WailsIsDemoRunning,
   GetPort as WailsGetDemoPort,
 } from '@wailsjs/go/main/DemoService'
+import {
+  ListScenarios as WailsListScenarios,
+  LoadScenario as WailsLoadScenario,
+  RunScenario as WailsRunScenario,
+  LoadScenarioRaw as WailsLoadScenarioRaw,
+  SaveScenarioRaw as WailsSaveScenarioRaw,
+  CreateScenario as WailsCreateScenario,
+  DuplicateScenario as WailsDuplicateScenario,
+  DeleteScenario as WailsDeleteScenario,
+  RenameScenario as WailsRenameScenario,
+  SaveScenarioResult as WailsSaveScenarioResult,
+  LoadScenarioResult as WailsLoadScenarioResult,
+} from '@wailsjs/go/main/ScenarioService'
 
 // ---- Shared I/O types ----
 
@@ -393,4 +406,132 @@ export async function loadResponseCache(reqPath: string): Promise<ResponseCacheD
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsLoadResponseCache(reqPath)
   return result as unknown as ResponseCacheData | null
+}
+
+// ---- Scenarios ----
+
+export interface ScenarioInfo {
+  name: string
+  path: string
+  stepCount?: number
+}
+
+export interface AssertionDetail {
+  type: string
+  path?: string
+  operator?: string
+  expected?: unknown
+  schema?: string
+}
+
+export interface ExtractionDetail {
+  name: string
+  source: string
+  path?: string
+}
+
+export interface StepDetail {
+  name: string
+  description?: string
+  method?: string
+  url?: string
+  requestRef?: string
+  assertions: AssertionDetail[]
+  extractions: ExtractionDetail[]
+  failPolicy?: string
+  timeoutMs?: number
+  retryMaxAttempts?: number
+  retryDelayMs?: number
+}
+
+export interface ScenarioDetail {
+  path: string
+  name: string
+  description: string
+  steps: StepDetail[]
+  error?: string
+}
+
+export interface AssertionResult {
+  type: string
+  passed: boolean
+  message: string
+}
+
+export interface StepResult {
+  name: string
+  passed: boolean
+  skipped: boolean
+  statusCode: number
+  durationMs: number
+  error?: string
+  extracted: Record<string, string>
+  assertions: AssertionResult[]
+}
+
+export interface ScenarioResult {
+  name: string
+  passed: boolean
+  durationMs: number
+  steps: StepResult[]
+  error?: string
+}
+
+export async function listScenarios(): Promise<ScenarioInfo[]> {
+  const result = await WailsListScenarios()
+  return (result ?? []) as unknown as ScenarioInfo[]
+}
+
+export async function loadScenario(path: string): Promise<ScenarioDetail> {
+  const result = await WailsLoadScenario(path)
+  return result as unknown as ScenarioDetail
+}
+
+export async function runScenario(path: string, envPath = ''): Promise<ScenarioResult> {
+  const result = await WailsRunScenario(path, envPath)
+  return result as unknown as ScenarioResult
+}
+
+export async function loadScenarioRaw(path: string): Promise<string> {
+  return (await WailsLoadScenarioRaw(path)) as unknown as string
+}
+
+export async function saveScenarioRaw(path: string, content: string): Promise<string> {
+  return (await WailsSaveScenarioRaw(path, content)) as unknown as string
+}
+
+export interface CreateScenarioResult {
+  path: string
+  error?: string
+}
+
+export async function createScenario(name: string): Promise<CreateScenarioResult> {
+  const result = await WailsCreateScenario(name)
+  return result as unknown as CreateScenarioResult
+}
+
+// Returns "" on success or an error message.
+export async function saveScenarioResult(scenarioPath: string, result: ScenarioResult): Promise<void> {
+  await WailsSaveScenarioResult(scenarioPath, result)
+}
+
+// Returns null if no cached result exists.
+export async function loadScenarioResult(scenarioPath: string): Promise<ScenarioResult | null> {
+  const r = await WailsLoadScenarioResult(scenarioPath)
+  return r as unknown as ScenarioResult | null
+}
+
+export async function duplicateScenario(path: string): Promise<CreateScenarioResult> {
+  const result = await WailsDuplicateScenario(path)
+  return result as unknown as CreateScenarioResult
+}
+
+// Returns "" on success, or an error message.
+export async function deleteScenario(path: string): Promise<string> {
+  return (await WailsDeleteScenario(path)) as unknown as string
+}
+
+// Returns the new file path on success, or a string starting with "error:" on failure.
+export async function renameScenario(path: string, newName: string): Promise<string> {
+  return (await WailsRenameScenario(path, newName)) as unknown as string
 }

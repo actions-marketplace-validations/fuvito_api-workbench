@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
-  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X, RefreshCw,
+  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X, RefreshCw, Play, Plus, PlayCircle, CheckCircle2, XCircle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { FileNode } from '@/lib/bridge'
+import type { FileNode, ScenarioInfo } from '@/lib/bridge'
+import type { RunAllState } from '@/components/Sidebar'
 import { openInExplorer } from '@/lib/bridge'
 import { ContextMenu, type ContextMenuAction } from '@/components/ContextMenu'
 
@@ -299,9 +300,18 @@ function TreeNode({
 type WorkspacePanelProps = {
   workspacePath: string
   fileTree: FileNode[]
+  scenarios?: ScenarioInfo[]
   onOpenWorkspace: () => void
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
+  onSelectScenario?: (path: string, name: string) => void
+  onNewScenario?: (name: string) => void
+  onDuplicateScenario?: (path: string) => void
+  onDeleteScenario?: (path: string) => void
+  onRenameScenario?: (path: string, newName: string) => void
+  runAllState?: RunAllState
+  onRunAllScenarios?: () => void
+  onDismissRunAll?: () => void
   onDeleteFile?: (path: string) => void
   onDuplicateFile?: (path: string) => void
   onDeleteFolder?: (path: string) => void
@@ -320,9 +330,18 @@ type WorkspacePanelProps = {
 export function WorkspacePanel({
   workspacePath,
   fileTree,
+  scenarios = [],
   onOpenWorkspace,
   onNewWorkspace,
   onSelectFile,
+  onSelectScenario,
+  onNewScenario,
+  onDuplicateScenario,
+  onDeleteScenario,
+  onRenameScenario,
+  runAllState,
+  onRunAllScenarios,
+  onDismissRunAll,
   onDeleteFile,
   onDuplicateFile,
   onDeleteFolder,
@@ -343,11 +362,17 @@ export function WorkspacePanel({
   const [searchQuery, setSearchQuery] = useState('')
   const filteredTree = filterTree(fileTree, searchQuery)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
+  const [creatingScenario, setCreatingScenario] = useState(false)
+  const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
+  const [scenarioQuery, setScenarioQuery] = useState('')
+  const filteredScenarios = scenarioQuery
+    ? scenarios.filter(s => s.name.toLowerCase().includes(scenarioQuery.toLowerCase()))
+    : scenarios
 
   function handleToggleCollapse(path: string) {
     setCollapsedPaths(prev => {
       const next = new Set(prev)
-      next.has(path) ? next.delete(path) : next.add(path)
+      if (next.has(path)) { next.delete(path) } else { next.add(path) }
       return next
     })
   }
@@ -508,6 +533,164 @@ export function WorkspacePanel({
                   onToggleCollapse={handleToggleCollapse}
                 />
               ))
+            )}
+            {(scenarios.length > 0 || onNewScenario) && (
+              <>
+                <div className="px-2 pt-3 pb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">
+                    Scenarios
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {onRunAllScenarios && scenarios.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={onRunAllScenarios}
+                        disabled={runAllState?.running}
+                        title="Run all scenarios"
+                        className="text-[var(--color-muted-foreground)] hover:text-violet-400 transition-colors disabled:opacity-40"
+                      >
+                        {runAllState?.running
+                          ? <Loader2 size={11} className="animate-spin" />
+                          : <PlayCircle size={11} />}
+                      </button>
+                    )}
+                    {onNewScenario && (
+                      <button
+                        type="button"
+                        onClick={() => setCreatingScenario(true)}
+                        title="New scenario"
+                        className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                      >
+                        <Plus size={11} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {scenarios.length > 0 && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 border-t border-[var(--color-border)]">
+                    <Search size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
+                    <input
+                      type="text"
+                      value={scenarioQuery}
+                      onChange={e => setScenarioQuery(e.target.value)}
+                      placeholder="Filter scenarios…"
+                      className="flex-1 min-w-0 bg-transparent text-xs outline-none text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)]"
+                    />
+                    {scenarioQuery && (
+                      <button type="button" onClick={() => setScenarioQuery('')} className="shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                {creatingScenario && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5">
+                    <Play size={10} className="shrink-0 text-violet-400" />
+                    <RenameInput
+                      initialValue=""
+                      onConfirm={name => {
+                        setCreatingScenario(false)
+                        onNewScenario?.(name)
+                      }}
+                      onCancel={() => setCreatingScenario(false)}
+                    />
+                  </div>
+                )}
+                {filteredScenarios.length === 0 && scenarioQuery && (
+                  <p className="px-3 py-1 text-xs text-[var(--color-muted-foreground)]">No matches.</p>
+                )}
+                {filteredScenarios.map(s => (
+                  <div
+                    key={s.path}
+                    className={cn(
+                      'group flex items-center gap-1.5 px-2 py-0.5 text-xs transition-colors',
+                      'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
+                    )}
+                  >
+                    <Play size={10} className="shrink-0 text-violet-400" />
+                    {renamingScenarioPath === s.path ? (
+                      <RenameInput
+                        initialValue={s.name}
+                        onConfirm={newName => {
+                          setRenamingScenarioPath(null)
+                          onRenameScenario?.(s.path, newName)
+                        }}
+                        onCancel={() => setRenamingScenarioPath(null)}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex-1 min-w-0 flex items-center gap-1.5 text-left py-0.5 min-w-0"
+                        onClick={() => onSelectScenario?.(s.path, s.name)}
+                        onDoubleClick={e => { e.stopPropagation(); setRenamingScenarioPath(s.path) }}
+                        title="Click to open · Double-click to rename"
+                      >
+                        <span className="truncate flex-1">{s.name}</span>
+                        {s.stepCount !== undefined && s.stepCount > 0 && (
+                          <span className="shrink-0 text-[10px] text-[var(--color-muted-foreground)] tabular-nums">
+                            {s.stepCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    {!renamingScenarioPath && (onDuplicateScenario || onDeleteScenario) && (
+                      <div className="flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {onDuplicateScenario && (
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); onDuplicateScenario(s.path) }}
+                            title="Duplicate scenario"
+                            className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+                          >
+                            <CopyPlus size={10} />
+                          </button>
+                        )}
+                        {onDeleteScenario && (
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); onDeleteScenario(s.path) }}
+                            title="Delete scenario"
+                            className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-red-400"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {runAllState && (
+              <div className="mx-2 mt-2 mb-1 rounded border border-[var(--color-border)] bg-[var(--color-muted)] text-xs overflow-hidden">
+                <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--color-border)]">
+                  <span className="font-semibold text-[var(--color-foreground)]">
+                    {runAllState.running
+                      ? <span className="flex items-center gap-1.5"><Loader2 size={10} className="animate-spin" /> Running {runAllState.done + 1}/{runAllState.total}…</span>
+                      : `${runAllState.passed}/${runAllState.total} passed`}
+                  </span>
+                  {!runAllState.running && onDismissRunAll && (
+                    <button type="button" onClick={onDismissRunAll} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+                {runAllState.results.map(r => (
+                  <button
+                    key={r.path}
+                    type="button"
+                    onClick={() => onSelectScenario?.(r.path, r.name)}
+                    className="w-full flex items-center gap-1.5 px-2 py-1 text-left hover:bg-[var(--color-border)] transition-colors"
+                  >
+                    {r.passed
+                      ? <CheckCircle2 size={10} className="shrink-0 text-emerald-400" />
+                      : <XCircle size={10} className="shrink-0 text-red-400" />}
+                    <span className="flex-1 truncate text-[var(--color-foreground)]">{r.name}</span>
+                    <span className="shrink-0 text-[var(--color-muted-foreground)] text-[10px]">{r.durationMs}ms</span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </>

@@ -30,6 +30,7 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
 
   const isNew = !envPath
 
+  /* eslint-disable react/set-state-in-effect */
   useEffect(() => {
     if (!envPath) {
       setName('')
@@ -47,6 +48,7 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
       .catch(err => setError(String(err)))
       .finally(() => setLoading(false))
   }, [envPath])
+  /* eslint-enable react/set-state-in-effect */
 
   function addVariable() {
     setVariables(prev => [...prev, { id: crypto.randomUUID(), name: '', value: '', secret: false }])
@@ -64,7 +66,7 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
   function toggleReveal(id: string) {
     setRevealed(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
       return next
     })
   }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"gopkg.in/yaml.v3"
@@ -18,13 +19,21 @@ type ScenarioFile struct {
 	Steps         []StepFile  `yaml:"steps" json:"steps"`
 }
 
+type RetryPolicyFile struct {
+	MaxAttempts int `yaml:"maxAttempts" json:"maxAttempts"`
+	DelayMs     int `yaml:"delayMs,omitempty" json:"delayMs,omitempty"`
+}
+
 type StepFile struct {
 	Name        string           `yaml:"name" json:"name"`
+	Description string           `yaml:"description,omitempty" json:"description,omitempty"`
 	RequestRef  string           `yaml:"requestRef,omitempty" json:"requestRef,omitempty"`
 	Request     *RequestFile     `yaml:"request,omitempty" json:"request,omitempty"`
 	Assertions  []AssertionFile  `yaml:"assertions,omitempty" json:"assertions,omitempty"`
 	Extractions []ExtractionFile `yaml:"extractions,omitempty" json:"extractions,omitempty"`
 	FailPolicy  string           `yaml:"failPolicy,omitempty" json:"failPolicy,omitempty"`
+	TimeoutMs   int              `yaml:"timeoutMs,omitempty" json:"timeoutMs,omitempty"`
+	Retry       *RetryPolicyFile `yaml:"retry,omitempty" json:"retry,omitempty"`
 }
 
 type AssertionFile struct {
@@ -97,9 +106,17 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 
 func stepFileToDomain(sf *StepFile) (*domain.ScenarioStep, error) {
 	step := &domain.ScenarioStep{
-		Name:       sf.Name,
-		RequestRef: sf.RequestRef,
-		FailPolicy: domain.FailPolicy(sf.FailPolicy),
+		Name:        sf.Name,
+		Description: sf.Description,
+		RequestRef:  sf.RequestRef,
+		FailPolicy:  domain.FailPolicy(sf.FailPolicy),
+		TimeoutMs:   sf.TimeoutMs,
+	}
+	if sf.Retry != nil && sf.Retry.MaxAttempts > 0 {
+		step.Retry = &domain.RetryPolicy{
+			MaxAttempts: sf.Retry.MaxAttempts,
+			Delay:       time.Duration(sf.Retry.DelayMs) * time.Millisecond,
+		}
 	}
 	if sf.Request != nil {
 		req, err := requestFileToDomain(sf.Request)
@@ -142,9 +159,17 @@ func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 
 func stepDomainToFile(step *domain.ScenarioStep) StepFile {
 	sf := StepFile{
-		Name:       step.Name,
-		RequestRef: step.RequestRef,
-		FailPolicy: string(step.FailPolicy),
+		Name:        step.Name,
+		Description: step.Description,
+		RequestRef:  step.RequestRef,
+		FailPolicy:  string(step.FailPolicy),
+		TimeoutMs:   step.TimeoutMs,
+	}
+	if step.Retry != nil && step.Retry.MaxAttempts > 0 {
+		sf.Retry = &RetryPolicyFile{
+			MaxAttempts: step.Retry.MaxAttempts,
+			DelayMs:     int(step.Retry.Delay.Milliseconds()),
+		}
 	}
 	if step.Request != nil {
 		sf.Request = requestDomainToFile(step.Request)

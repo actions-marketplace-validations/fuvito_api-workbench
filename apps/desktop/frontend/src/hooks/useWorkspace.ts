@@ -5,9 +5,9 @@ import {
   createFolder, deleteFolder, renameFolder, renameRequest, moveRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment, getEnvironment,
   importOpenAPISpec, importOpenAPISpecFromURL,
-  getHistory, clearHistory,
+  getHistory, clearHistory, listScenarios,
 } from '@/lib/bridge'
-import type { HistoryEntry, FileNode, EnvInfo, RequestFileIO } from '@/lib/bridge'
+import type { HistoryEntry, FileNode, EnvInfo, RequestFileIO, ScenarioInfo } from '@/lib/bridge'
 import { createBlankTab, computeStateKey } from '@/lib/tabState'
 import type { TabsStateTuple } from '@/hooks/useTabsState'
 
@@ -26,6 +26,7 @@ export function useWorkspace(deps: {
   const [envVarMap, setEnvVarMap] = useState<Record<string, string>>({})
   const [importing, setImporting] = useState(false)
   const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [scenarioList, setScenarioList] = useState<ScenarioInfo[]>([])
 
   // Dialog state
   const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
@@ -49,16 +50,18 @@ export function useWorkspace(deps: {
 
   const refreshWorkspace = useCallback(async () => {
     try {
-      const [path, tree, envs, activeE] = await Promise.all([
+      const [path, tree, envs, activeE, scenarios] = await Promise.all([
         getWorkspacePath() as Promise<string>,
         listRequests(),
         listEnvironments(),
         getActiveEnvironment(),
+        listScenarios(),
       ])
       setWorkspacePath(path ?? '')
       setFileTree(tree ?? [])
       setEnvironments(envs ?? [])
       setActiveEnv(activeE)
+      setScenarioList(scenarios ?? [])
       await loadEnvVars(activeE?.path)
     } catch { /* best-effort */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -352,7 +355,7 @@ export function useWorkspace(deps: {
   }
 
   return {
-    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history,
+    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history, scenarioList,
     refreshWorkspace, refreshHistory,
     handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace,
     handleSelectFile, handleOpenRequest, handleEnvChange,

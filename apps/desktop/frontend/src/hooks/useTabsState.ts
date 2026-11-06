@@ -20,6 +20,7 @@ export function useTabsState(deps: {
   })
 
   const tabsStateRef = useRef<TabsStateTuple>({ tabs, activeTabId })
+  // eslint-disable-next-line react/refs
   tabsStateRef.current = { tabs, activeTabId }
 
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
@@ -113,11 +114,15 @@ export function useTabsState(deps: {
       saveError: null,
       editingName: false,
     }
-    let resolvedId = newTab.id
+    // Read current state synchronously to determine which ID to return.
+    // The updater below mirrors this logic without mutating outer state.
+    const currentState = tabsStateRef.current
+    const currentActive = currentState.tabs.find(t => t.id === currentState.activeTabId)
+    const reuseBlank = !!(currentActive && isBlankTab(currentActive))
+    const resolvedId = reuseBlank ? currentState.activeTabId : newTab.id
     setTabsState(prev => {
       const active = prev.tabs.find(t => t.id === prev.activeTabId)
       if (active && isBlankTab(active)) {
-        resolvedId = prev.activeTabId
         return {
           tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
           activeTabId: prev.activeTabId,
@@ -183,6 +188,7 @@ export function useTabsState(deps: {
   }
 
   const saveTabByIdRef = useRef(saveTabById)
+  // eslint-disable-next-line react/refs
   saveTabByIdRef.current = saveTabById
 
   async function handleSaveRequest(): Promise<boolean> {
@@ -251,6 +257,58 @@ export function useTabsState(deps: {
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
   }
 
+  function openScenarioAsTab(scenarioPath: string, scenarioName: string): string {
+    // If an identical scenario tab already exists, switch to it
+    const existing = tabsStateRef.current.tabs.find(
+      t => t.kind === 'scenario' && t.scenarioPath === scenarioPath
+    )
+    if (existing) {
+      switchTo(existing.id)
+      return existing.id
+    }
+    const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
+    const newTab: TabState = {
+      id: crypto.randomUUID(),
+      kind: 'scenario',
+      scenarioPath,
+      scenarioName,
+      scenarioResult: null,
+      scenarioRunning: false,
+      // request fields kept at defaults
+      method: 'GET',
+      url: '',
+      queryParams: [],
+      headers: [],
+      body: { type: 'none', content: '' },
+      auth: { type: 'none' },
+      timeoutMs: 0,
+      name: scenarioName,
+      filePath: null,
+      targetDir: null,
+      savedKey: blankKey,
+      response: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    const currentState = tabsStateRef.current
+    const currentActive = currentState.tabs.find(t => t.id === currentState.activeTabId)
+    const reuseBlank = !!(currentActive && isBlankTab(currentActive))
+    const resolvedId = reuseBlank ? currentState.activeTabId : newTab.id
+    setTabsState(prev => {
+      const active = prev.tabs.find(t => t.id === prev.activeTabId)
+      if (active && isBlankTab(active)) {
+        return {
+          tabs: prev.tabs.map(t => t.id === prev.activeTabId ? { ...newTab, id: prev.activeTabId } : t),
+          activeTabId: prev.activeTabId,
+        }
+      }
+      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+    })
+    return resolvedId
+  }
+
   const dirtyFilePaths = new Set(tabs.filter(t => t.filePath && isTabDirty(t)).map(t => t.filePath!))
 
   return {
@@ -262,6 +320,7 @@ export function useTabsState(deps: {
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest,
     handleSelectHistory, handleNewRequestInFolder,
+    openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,
     dirtyFilePaths,
   }
