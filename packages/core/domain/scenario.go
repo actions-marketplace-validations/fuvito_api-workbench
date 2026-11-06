@@ -19,7 +19,7 @@ type RetryPolicy struct {
 // Either RequestRef or Request must be set, not both.
 // RequestRef is a path to a saved request file relative to the workspace root.
 type ScenarioStep struct {
-	Name         string
+	Title        string
 	Description  string
 	Disabled     bool // when true, step is skipped without being counted as a failure
 	RequestRef   string
@@ -35,7 +35,7 @@ type ScenarioStep struct {
 // Scenario is a sequential, multi-step workflow used for Spec Conformance Testing.
 type Scenario struct {
 	SchemaVersion string
-	Name          string
+	Title         string
 	Description   string
 	SpecFile      string // optional path to OpenAPI spec; enables automatic response schema validation
 	Steps         []ScenarioStep

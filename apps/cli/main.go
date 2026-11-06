@@ -398,7 +398,7 @@ operation declares a security requirement.`,
 			for _, gr := range reqs {
 				filename := genSanitizeFilename(gr.OperationID)
 				if filename == "" {
-					filename = genSanitizeFilename(gr.Request.Name)
+					filename = genSanitizeFilename(gr.Request.Title)
 				}
 				if filename == "" {
 					filename = strings.ToLower(string(gr.Request.Method)) + "-request"

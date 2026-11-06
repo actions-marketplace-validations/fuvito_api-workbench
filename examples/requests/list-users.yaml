@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: List users
+title: List users
 method: GET
 url: "{{baseUrl}}/users"
 auth:

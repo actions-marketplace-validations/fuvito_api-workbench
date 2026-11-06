@@ -16,7 +16,7 @@ import (
 // It maps 1-to-1 with the domain type but carries YAML/JSON tags.
 type RequestFile struct {
 	SchemaVersion string     `yaml:"schemaVersion" json:"schemaVersion"`
-	Name          string     `yaml:"name" json:"name"`
+	Title         string     `yaml:"title,omitempty" json:"title,omitempty"`
 	Description   string     `yaml:"description,omitempty" json:"description,omitempty"`
 	Method        string     `yaml:"method" json:"method"`
 	URL           string     `yaml:"url" json:"url"`
@@ -95,7 +95,7 @@ func requestFileToDomain(rf *RequestFile) (*domain.Request, error) {
 
 	req := &domain.Request{
 		SchemaVersion: rf.SchemaVersion,
-		Name:          rf.Name,
+		Title:         rf.Title,
 		Description:   rf.Description,
 		Method:        domain.HTTPMethod(strings.ToUpper(rf.Method)),
 		URL:           rf.URL,
@@ -140,7 +140,7 @@ func authFileToDomain(a *AuthFile) *domain.Auth {
 func requestDomainToFile(req *domain.Request) *RequestFile {
 	rf := &RequestFile{
 		SchemaVersion: "1",
-		Name:          req.Name,
+		Title:         req.Title,
 		Description:   req.Description,
 		Method:        string(req.Method),
 		URL:           req.URL,

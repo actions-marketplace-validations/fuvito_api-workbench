@@ -89,7 +89,7 @@ type EnvironmentIO struct {
 
 type RequestFileIO struct {
 	SchemaVersion string          `json:"schemaVersion"`
-	Name          string          `json:"name"`
+	Title         string          `json:"title"`
 	Description   string          `json:"description,omitempty"`
 	Method        string          `json:"method"`
 	URL           string          `json:"url"`
@@ -269,11 +269,11 @@ func (w *WorkspaceService) LoadRequest(path string) (*RequestFileIO, error) {
 }
 
 // SaveRequest writes the request to disk without a dialog.
-// The target path is derived from req.Name: {dir}/{slug}.yaml.
+// The target path is derived from req.Title: {dir}/{slug}.yaml.
 // If req.FilePath is set (file already exists), the directory is preserved and
 // the file is renamed when the name slug changes. Returns the saved path.
 func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
-	name := strings.TrimSpace(req.Name)
+	name := strings.TrimSpace(req.Title)
 	if name == "" {
 		name = "request"
 	}
@@ -496,7 +496,7 @@ func (w *WorkspaceService) RenameRequest(path, newName string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parsing %s: %w", path, err)
 	}
-	req.Name = newName
+	req.Title = newName
 
 	slug := sanitizeDirName(newName)
 	if slug == "" {
@@ -663,7 +663,7 @@ func buildFileTree(root, dir string, skipSpecialDirs bool) ([]FileNodeIO, error)
 func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
 	out := &RequestFileIO{
 		SchemaVersion: req.SchemaVersion,
-		Name:          req.Name,
+		Title:         req.Title,
 		Description:   req.Description,
 		Method:        string(req.Method),
 		URL:           req.URL,
@@ -701,7 +701,7 @@ func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
 
 func requestFileIOToDomain(r RequestFileIO) *domain.Request {
 	req := &domain.Request{
-		Name:        r.Name,
+		Title:       r.Title,
 		Description: r.Description,
 		Method:      domain.HTTPMethod(r.Method),
 		URL:         r.URL,
@@ -737,7 +737,7 @@ variables:
     secret: true
 `
 	req := `schemaVersion: "1"
-name: Health Check
+title: Health Check
 method: GET
 url: "{{baseUrl}}/health"
 headers:

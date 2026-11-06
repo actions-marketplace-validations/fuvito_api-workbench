@@ -18,7 +18,7 @@ import (
 
 // StepResult holds the outcome of a single scenario step.
 type StepResult struct {
-	Name        string
+	Title       string
 	Request     *domain.Request
 	Response    *domain.Response
 	Assertions  []domain.AssertionResult
@@ -74,7 +74,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 	for i := range s.Steps {
 		step := &s.Steps[i]
 		if i < fromStep || step.Disabled {
-			result.Steps = append(result.Steps, StepResult{Name: step.Name, Skipped: true})
+			result.Steps = append(result.Steps, StepResult{Title: step.Title, Skipped: true})
 			continue
 		}
 		sr := r.runStep(ctx, step, resolver, prevFailed)
@@ -86,7 +86,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 			if step.FailPolicy == domain.FailPolicyStop || step.FailPolicy == "" {
 				for j := i + 1; j < len(s.Steps); j++ {
 					result.Steps = append(result.Steps, StepResult{
-						Name:    s.Steps[j].Name,
+						Title:   s.Steps[j].Title,
 						Skipped: true,
 					})
 				}
@@ -102,7 +102,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 }
 
 func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolver *variables.Resolver, prevFailed bool) StepResult {
-	sr := StepResult{Name: step.Name}
+	sr := StepResult{Title: step.Title}
 
 	if prevFailed && step.FailPolicy == domain.FailPolicySkip {
 		sr.Skipped = true

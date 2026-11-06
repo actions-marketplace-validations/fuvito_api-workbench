@@ -54,7 +54,7 @@ type RequestBody struct {
 // URL and header values may contain {{variable}} references resolved before execution.
 type Request struct {
 	SchemaVersion string
-	Name          string
+	Title         string
 	Description   string
 	Method        HTTPMethod
 	URL           string

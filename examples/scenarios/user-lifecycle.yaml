@@ -1,9 +1,9 @@
 schemaVersion: "1"
-name: User lifecycle
+title: User lifecycle
 description: Login, create a user, fetch it back, verify it, then delete it.
 
 steps:
-  - name: Login
+  - title: Login
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -24,7 +24,7 @@ steps:
         path: "$.token"
     failPolicy: stop
 
-  - name: Create user
+  - title: Create user
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -52,7 +52,7 @@ steps:
         path: "$.id"
     failPolicy: stop
 
-  - name: Fetch user
+  - title: Fetch user
     request:
       method: GET
       url: "{{baseUrl}}/users/{{userId}}"
@@ -73,7 +73,7 @@ steps:
         expected: "diana@example.com"
     failPolicy: continue
 
-  - name: Delete user
+  - title: Delete user
     request:
       method: DELETE
       url: "{{baseUrl}}/users/{{userId}}"

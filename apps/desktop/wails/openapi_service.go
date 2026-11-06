@@ -144,7 +144,7 @@ func (s *OpenAPIService) importFromBytes(data []byte, format, baseURL string) Im
 
 		filename := sanitizeFilename(gr.OperationID)
 		if filename == "" {
-			filename = sanitizeFilename(gr.Request.Name)
+			filename = sanitizeFilename(gr.Request.Title)
 		}
 		if filename == "" {
 			filename = "request"

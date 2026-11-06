@@ -35,8 +35,8 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 		issues = append(issues, Issue{Step: step, Name: name, Message: msg})
 	}
 
-	if sc.Name == "" {
-		add(0, "", "scenario name is required")
+	if sc.Title == "" {
+		add(0, "", "scenario title is required")
 	}
 	if len(sc.Steps) == 0 {
 		add(0, "", "scenario has no steps")
@@ -47,12 +47,12 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 
 	for i, step := range sc.Steps {
 		num := i + 1
-		name := step.Name
+		name := step.Title
 
 		if name == "" {
-			add(num, "", "step name is required")
+			add(num, "", "step title is required")
 		} else if prev, ok := seenNames[name]; ok {
-			add(num, name, fmt.Sprintf("duplicate step name (also step %d)", prev))
+			add(num, name, fmt.Sprintf("duplicate step title (also step %d)", prev))
 		} else {
 			seenNames[name] = num
 		}

@@ -140,7 +140,7 @@ export interface EnvInfo {
 
 export interface RequestFileIO {
   schemaVersion: string
-  name: string
+  title: string
   description?: string
   method: string
   url: string
@@ -416,7 +416,7 @@ export async function clearResponseCache(reqPath: string): Promise<void> {
 // ---- Scenarios ----
 
 export interface ScenarioInfo {
-  name: string
+  title: string
   path: string
   stepCount?: number
 }
@@ -436,7 +436,7 @@ export interface ExtractionDetail {
 }
 
 export interface StepDetail {
-  name: string
+  title: string
   description?: string
   disabled?: boolean
   method?: string
@@ -456,7 +456,7 @@ export interface StepDetail {
 
 export interface ScenarioDetail {
   path: string
-  name: string
+  title: string
   description: string
   steps: StepDetail[]
   error?: string
@@ -469,7 +469,7 @@ export interface AssertionResult {
 }
 
 export interface StepResult {
-  name: string
+  title: string
   passed: boolean
   skipped: boolean
   statusCode: number
@@ -482,7 +482,7 @@ export interface StepResult {
 }
 
 export interface ScenarioResult {
-  name: string
+  title: string
   passed: boolean
   durationMs: number
   steps: StepResult[]

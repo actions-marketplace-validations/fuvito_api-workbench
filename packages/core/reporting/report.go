@@ -16,7 +16,7 @@ import (
 func Text(result *scenario.Result) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "Scenario: %s\n", result.Scenario.Name)
+	fmt.Fprintf(&b, "Scenario: %s\n", result.Scenario.Title)
 	if result.Scenario.Description != "" {
 		fmt.Fprintf(&b, "          %s\n", result.Scenario.Description)
 	}
@@ -24,7 +24,7 @@ func Text(result *scenario.Result) string {
 
 	for _, sr := range result.Steps {
 		if sr.Skipped {
-			fmt.Fprintf(&b, "  SKIP  %s\n", sr.Name)
+			fmt.Fprintf(&b, "  SKIP  %s\n", sr.Title)
 			continue
 		}
 
@@ -38,7 +38,7 @@ func Text(result *scenario.Result) string {
 			suffix = fmt.Sprintf("  %d  %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
 		}
 
-		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Name, suffix)
+		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Title, suffix)
 
 		if sr.Error != "" {
 			fmt.Fprintf(&b, "         error: %s\n", sr.Error)
@@ -177,7 +177,7 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 	_, failed, _ := result.Counts()
 
 	suite := jUnitSuite{
-		Name:     result.Scenario.Name,
+		Name:     result.Scenario.Title,
 		Tests:    len(result.Steps),
 		Failures: failed,
 		Time:     secStr(result.Duration.Milliseconds()),
@@ -189,8 +189,8 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 			stepMs = sr.Response.Duration.Milliseconds()
 		}
 		tc := jUnitCase{
-			Name:      sr.Name,
-			ClassName: result.Scenario.Name,
+			Name:      sr.Title,
+			ClassName: result.Scenario.Title,
 			Time:      secStr(stepMs),
 		}
 		switch {
@@ -216,7 +216,7 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 	}
 
 	report := jUnitTestSuites{
-		Name:       result.Scenario.Name,
+		Name:       result.Scenario.Title,
 		Tests:      suite.Tests,
 		Failures:   suite.Failures,
 		Errors:     suite.Errors,
@@ -384,14 +384,14 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 // JSON returns a machine-readable JSON report.
 func JSON(result *scenario.Result) ([]byte, error) {
 	report := JSONReport{
-		Scenario:   result.Scenario.Name,
+		Scenario:   result.Scenario.Title,
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
 	}
 
 	for _, sr := range result.Steps {
 		step := JSONStep{
-			Name:      sr.Name,
+			Name:      sr.Title,
 			Passed:    sr.Passed,
 			Skipped:   sr.Skipped,
 			Error:     sr.Error,

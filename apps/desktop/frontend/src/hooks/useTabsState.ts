@@ -105,12 +105,12 @@ export function useTabsState(deps: {
   function openFileAsTab(r: RequestFileIO, path: string): string {
     const state = requestFileIOToState(r)
     const timeoutMs = r.timeoutMs ?? 0
-    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.name || null, timeoutMs)
+    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.title || null, timeoutMs)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       ...state,
       timeoutMs,
-      name: r.name || null,
+      name: r.title || null,
       filePath: path,
       targetDir: null,
       savedKey,
@@ -159,7 +159,7 @@ export function useTabsState(deps: {
     const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
     return {
       schemaVersion: '1',
-      name,
+      title: name,
       method: tab.method,
       url: tab.url.trim(),
       headers: tab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),

@@ -14,7 +14,7 @@ import (
 // ScenarioFile is the on-disk representation of a Scenario.
 type ScenarioFile struct {
 	SchemaVersion string     `yaml:"schemaVersion" json:"schemaVersion"`
-	Name          string     `yaml:"name" json:"name"`
+	Title         string     `yaml:"title,omitempty" json:"title,omitempty"`
 	Description   string     `yaml:"description,omitempty" json:"description,omitempty"`
 	SpecFile      string     `yaml:"specFile,omitempty" json:"specFile,omitempty"`
 	Steps         []StepFile `yaml:"steps" json:"steps"`
@@ -26,7 +26,7 @@ type RetryPolicyFile struct {
 }
 
 type StepFile struct {
-	Name         string           `yaml:"name" json:"name"`
+	Title        string           `yaml:"title,omitempty" json:"title,omitempty"`
 	Description  string           `yaml:"description,omitempty" json:"description,omitempty"`
 	Disabled     bool             `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 	RequestRef   string           `yaml:"requestRef,omitempty" json:"requestRef,omitempty"`
@@ -94,14 +94,14 @@ func WriteScenario(s *domain.Scenario, format string) ([]byte, error) {
 func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 	s := &domain.Scenario{
 		SchemaVersion: sf.SchemaVersion,
-		Name:          sf.Name,
+		Title:         sf.Title,
 		Description:   sf.Description,
 		SpecFile:      sf.SpecFile,
 	}
 	for _, step := range sf.Steps {
 		ds, err := stepFileToDomain(&step)
 		if err != nil {
-			return nil, fmt.Errorf("step %q: %w", step.Name, err)
+			return nil, fmt.Errorf("step %q: %w", step.Title, err)
 		}
 		s.Steps = append(s.Steps, *ds)
 	}
@@ -110,7 +110,7 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 
 func stepFileToDomain(sf *StepFile) (*domain.ScenarioStep, error) {
 	step := &domain.ScenarioStep{
-		Name:         sf.Name,
+		Title:        sf.Title,
 		Description:  sf.Description,
 		Disabled:     sf.Disabled,
 		RequestRef:   sf.RequestRef,
@@ -154,7 +154,7 @@ func stepFileToDomain(sf *StepFile) (*domain.ScenarioStep, error) {
 func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 	sf := &ScenarioFile{
 		SchemaVersion: "1",
-		Name:          s.Name,
+		Title:         s.Title,
 		Description:   s.Description,
 		SpecFile:      s.SpecFile,
 	}
@@ -166,7 +166,7 @@ func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 
 func stepDomainToFile(step *domain.ScenarioStep) StepFile {
 	sf := StepFile{
-		Name:         step.Name,
+		Title:        step.Title,
 		Description:  step.Description,
 		Disabled:     step.Disabled,
 		RequestRef:   step.RequestRef,

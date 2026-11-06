@@ -9,7 +9,7 @@ import (
 
 const yamlRequest = `
 schemaVersion: "1"
-name: Get User
+title: Get User
 method: GET
 url: "{{baseUrl}}/api/users/{{userId}}"
 headers:
@@ -26,7 +26,7 @@ timeout: 30s
 
 const jsonRequest = `{
   "schemaVersion": "1",
-  "name": "Create Item",
+  "title": "Create Item",
   "method": "POST",
   "url": "https://api.example.com/items",
   "body": {"type": "json", "content": "{\"name\": \"test\"}"}
@@ -37,8 +37,8 @@ func TestParseRequest_YAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseRequest: %v", err)
 	}
-	if req.Name != "Get User" {
-		t.Errorf("name: got %q", req.Name)
+	if req.Title != "Get User" {
+		t.Errorf("title: got %q", req.Title)
 	}
 	if req.Method != domain.MethodGET {
 		t.Errorf("method: got %q", req.Method)
@@ -78,14 +78,14 @@ func TestParseRequestFile_Extension(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseRequestFile: %v", err)
 	}
-	if req.Name != "Get User" {
-		t.Errorf("name: got %q", req.Name)
+	if req.Title != "Get User" {
+		t.Errorf("title: got %q", req.Title)
 	}
 }
 
 func TestWriteRequest_RoundTrip(t *testing.T) {
 	original := &domain.Request{
-		Name:   "Round Trip",
+		Title:  "Round Trip",
 		Method: domain.MethodPUT,
 		URL:    "https://example.com/test",
 		Headers: []domain.Header{
@@ -123,10 +123,10 @@ func TestWriteRequest_RoundTrip(t *testing.T) {
 
 const yamlScenario = `
 schemaVersion: "1"
-name: User flow
+title: User flow
 description: Create and retrieve a user
 steps:
-  - name: Create user
+  - title: Create user
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -141,7 +141,7 @@ steps:
       - name: userId
         source: jsonpath
         path: "$.id"
-  - name: Get user
+  - title: Get user
     request:
       method: GET
       url: "{{baseUrl}}/users/{{userId}}"
@@ -161,8 +161,8 @@ func TestParseScenario_YAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseScenario: %v", err)
 	}
-	if s.Name != "User flow" {
-		t.Errorf("name: got %q", s.Name)
+	if s.Title != "User flow" {
+		t.Errorf("title: got %q", s.Title)
 	}
 	if s.Description != "Create and retrieve a user" {
 		t.Errorf("description: got %q", s.Description)
@@ -172,8 +172,8 @@ func TestParseScenario_YAML(t *testing.T) {
 	}
 
 	step0 := s.Steps[0]
-	if step0.Name != "Create user" {
-		t.Errorf("step0 name: %q", step0.Name)
+	if step0.Title != "Create user" {
+		t.Errorf("step0 title: %q", step0.Title)
 	}
 	if step0.Request == nil || step0.Request.Method != domain.MethodPOST {
 		t.Errorf("step0 request method: %+v", step0.Request)
@@ -197,10 +197,10 @@ func TestParseScenario_YAML(t *testing.T) {
 func TestWriteScenario_RoundTrip(t *testing.T) {
 	original := &domain.Scenario{
 		SchemaVersion: "1",
-		Name:          "Round trip",
+		Title:         "Round trip",
 		Steps: []domain.ScenarioStep{
 			{
-				Name: "Step A",
+				Title: "Step A",
 				Request: &domain.Request{
 					Method: domain.MethodGET,
 					URL:    "https://example.com",
@@ -222,8 +222,8 @@ func TestWriteScenario_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseScenario after write: %v", err)
 	}
-	if restored.Name != original.Name {
-		t.Errorf("name: %q != %q", restored.Name, original.Name)
+	if restored.Title != original.Title {
+		t.Errorf("title: %q != %q", restored.Title, original.Title)
 	}
 	if len(restored.Steps) != 1 {
 		t.Fatalf("steps: %d", len(restored.Steps))

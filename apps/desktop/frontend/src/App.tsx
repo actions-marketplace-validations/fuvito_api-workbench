@@ -76,13 +76,13 @@ export default function App() {
           ...prev,
           done: prev.done + 1,
           passed: passedCount,
-          results: [...prev.results, { path: s.path, name: s.name, passed: r.passed, durationMs: r.durationMs }],
+          results: [...prev.results, { path: s.path, name: s.title, passed: r.passed, durationMs: r.durationMs }],
         } : prev)
       } catch (e) {
         setRunAllState(prev => prev ? {
           ...prev,
           done: prev.done + 1,
-          results: [...prev.results, { path: s.path, name: s.name, passed: false, durationMs: 0, error: String(e) }],
+          results: [...prev.results, { path: s.path, name: s.title, passed: false, durationMs: 0, error: String(e) }],
         } : prev)
       }
     }

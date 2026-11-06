@@ -27,14 +27,14 @@ function yamlValue(v: unknown): string {
 }
 
 function serializeScenarioToYAML(d: ScenarioDetail): string {
-  const lines: string[] = ['schemaVersion: "1"', `name: ${yamlScalar(d.name)}`]
+  const lines: string[] = ['schemaVersion: "1"', `title: ${yamlScalar(d.title)}`]
   if (d.description) lines.push(`description: ${yamlScalar(d.description)}`)
   if (!d.steps.length) {
     lines.push('steps: []')
   } else {
     lines.push('steps:')
     for (const step of d.steps) {
-      lines.push(`  - name: ${yamlScalar(step.name)}`)
+      lines.push(`  - title: ${yamlScalar(step.title)}`)
       if (step.description) lines.push(`    description: ${yamlScalar(step.description)}`)
       if (step.disabled) lines.push('    disabled: true')
       if (step.requestRef) {
@@ -325,9 +325,9 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
             {index + 1}
           </span>
           <input
-            value={step.name}
-            onChange={e => onChange({ name: e.target.value })}
-            placeholder="Step name"
+            value={step.title}
+            onChange={e => onChange({ title: e.target.value })}
+            placeholder="Step title"
             className="flex-1 min-w-0 bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-foreground)] font-semibold py-0.5"
           />
           <div className="flex items-center shrink-0">
@@ -676,7 +676,7 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className={cn('text-xs font-medium truncate', isDisabled ? 'line-through text-[var(--color-muted-foreground)]' : selected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
-            {step.name || 'Untitled step'}
+            {step.title || 'Untitled step'}
           </span>
           {isDisabled && <EyeOff size={9} className="shrink-0 text-amber-400" />}
           {result && (
@@ -1122,7 +1122,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   function addVisualStep() {
     if (!visualDetail) return
     const newStep: StepDetail = {
-      name: `Step ${visualDetail.steps.length + 1}`,
+      title: `Step ${visualDetail.steps.length + 1}`,
       description: '',
       method: 'GET',
       url: '',
@@ -1187,14 +1187,14 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       for (const step of visualDetail.steps) {
         for (const a of step.assertions) {
           if ((a.type === 'jsonpath' || a.type === 'header') && !a.path?.trim()) {
-            setSaveError(`Step "${step.name}": ${a.type} assertion requires a path.`)
+            setSaveError(`Step "${step.title}": ${a.type} assertion requires a path.`)
             setSaving(false)
             return
           }
         }
         for (const e of step.extractions) {
           if (!e.name?.trim()) {
-            setSaveError(`Step "${step.name}": extraction is missing a variable name.`)
+            setSaveError(`Step "${step.title}": extraction is missing a variable name.`)
             setSaving(false)
             return
           }
@@ -1248,7 +1248,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-[var(--color-foreground)] truncate">
-            {detail?.name ?? scenarioName}
+            {detail?.title ?? scenarioName}
           </h2>
           {!isEditing && detail?.description && (
             <p className="text-xs text-[var(--color-muted-foreground)] truncate">{detail.description}</p>
@@ -1337,9 +1337,9 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
             {mode === 'visual' && visualDetail && (
               <div className="shrink-0 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-card)]">
                 <input
-                  value={visualDetail.name}
-                  onChange={e => { setVisualDetail({ ...visualDetail, name: e.target.value }); setVisualDirty(true) }}
-                  placeholder="Scenario name"
+                  value={visualDetail.title}
+                  onChange={e => { setVisualDetail({ ...visualDetail, title: e.target.value }); setVisualDirty(true) }}
+                  placeholder="Scenario title"
                   className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs font-semibold text-[var(--color-foreground)] py-0.5 mb-0.5"
                 />
                 <input

@@ -123,7 +123,7 @@ func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Req
 	url := base + path
 
 	req := &domain.Request{
-		Name:   name,
+		Title:  name,
 		Method: domain.HTTPMethod(method),
 		URL:    url,
 	}

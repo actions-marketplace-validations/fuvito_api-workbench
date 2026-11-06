@@ -187,7 +187,7 @@ export function useWorkspace(deps: {
       const req = await loadRequest(path)
       const lastSep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
       const targetDir = lastSep !== -1 ? path.slice(0, lastSep) : ''
-      await saveRequest({ ...req, name: (req.name || 'request') + ' Copy', filePath: '', targetDir })
+      await saveRequest({ ...req, title: (req.title || 'request') + ' Copy', filePath: '', targetDir })
       await refreshWorkspace()
     } catch (err) {
       console.error('duplicate request:', err)

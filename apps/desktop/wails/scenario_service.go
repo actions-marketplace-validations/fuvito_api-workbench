@@ -17,7 +17,7 @@ import (
 // ---- I/O types ----
 
 type ScenarioInfoIO struct {
-	Name      string `json:"name"`
+	Title     string `json:"title"`
 	Path      string `json:"path"`
 	StepCount int    `json:"stepCount"`
 }
@@ -42,7 +42,7 @@ type ExtractionDetailIO struct {
 }
 
 type StepDetailIO struct {
-	Name              string               `json:"name"`
+	Title             string               `json:"title"`
 	Description       string               `json:"description,omitempty"`
 	Disabled          bool                 `json:"disabled,omitempty"`
 	Method            string               `json:"method,omitempty"`
@@ -62,7 +62,7 @@ type StepDetailIO struct {
 
 type ScenarioDetailIO struct {
 	Path        string         `json:"path"`
-	Name        string         `json:"name"`
+	Title       string         `json:"title"`
 	Description string         `json:"description"`
 	Steps       []StepDetailIO `json:"steps"`
 	Error       string         `json:"error,omitempty"`
@@ -75,7 +75,7 @@ type AssertionResultIO struct {
 }
 
 type StepResultIO struct {
-	Name            string              `json:"name"`
+	Title           string              `json:"title"`
 	Passed          bool                `json:"passed"`
 	Skipped         bool                `json:"skipped"`
 	StatusCode      int                 `json:"statusCode"`
@@ -88,7 +88,7 @@ type StepResultIO struct {
 }
 
 type ScenarioResultIO struct {
-	Name       string         `json:"name"`
+	Title      string         `json:"title"`
 	Passed     bool           `json:"passed"`
 	DurationMs int64          `json:"durationMs"`
 	Steps      []StepResultIO `json:"steps"`
@@ -178,7 +178,7 @@ func (s *ScenarioService) ListScenarios() []ScenarioInfoIO {
 			return nil
 		}
 		name := strings.TrimSuffix(d.Name(), filepath.Ext(d.Name()))
-		info := ScenarioInfoIO{Name: name, Path: p}
+		info := ScenarioInfoIO{Title: name, Path: p}
 		if data, err := os.ReadFile(p); err == nil {
 			if sc, err := serialization.ParseScenarioFile(data, d.Name()); err == nil {
 				info.StepCount = len(sc.Steps)
@@ -202,12 +202,12 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 	}
 	detail := ScenarioDetailIO{
 		Path:        path,
-		Name:        sc.Name,
+		Title:       sc.Title,
 		Description: sc.Description,
 	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{
-			Name:        step.Name,
+			Title:       step.Title,
 			Description: step.Description,
 			Disabled:    step.Disabled,
 			RequestRef:  step.RequestRef,
@@ -315,10 +315,10 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 	}
 
 	starter := fmt.Sprintf(`schemaVersion: "1"
-name: %s
+title: %s
 description: ""
 steps:
-  - name: Step 1
+  - title: Step 1
     request:
       method: GET
       url: https://api.example.com
@@ -463,13 +463,13 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	result := runner.RunFrom(s.ctx, sc, env, fromStep)
 
 	out := ScenarioResultIO{
-		Name:       result.Scenario.Name,
+		Title:      result.Scenario.Title,
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{
-			Name:       sr.Name,
+			Title:      sr.Title,
 			Passed:     sr.Passed,
 			Skipped:    sr.Skipped,
 			Error:      sr.Error,

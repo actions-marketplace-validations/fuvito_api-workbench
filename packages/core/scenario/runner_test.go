@@ -26,10 +26,10 @@ func TestRun_AllPass(t *testing.T) {
 	defer srv.Close()
 
 	s := &domain.Scenario{
-		Name: "Simple pass",
+		Title: "Simple pass",
 		Steps: []domain.ScenarioStep{
 			{
-				Name:    "Health check",
+				Title:   "Health check",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL + "/health"},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -65,10 +65,10 @@ func TestRun_VariableExtraction(t *testing.T) {
 	defer srv.Close()
 
 	s := &domain.Scenario{
-		Name: "Create then fetch",
+		Title: "Create then fetch",
 		Steps: []domain.ScenarioStep{
 			{
-				Name:    "Create user",
+				Title:   "Create user",
 				Request: &domain.Request{Method: domain.MethodPOST, URL: srv.URL + "/users"},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "201"},
@@ -78,7 +78,7 @@ func TestRun_VariableExtraction(t *testing.T) {
 				},
 			},
 			{
-				Name:    "Get user",
+				Title:   "Get user",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL + "/users/{{userId}}"},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -91,7 +91,7 @@ func TestRun_VariableExtraction(t *testing.T) {
 	result := newRunner().Run(context.Background(), s, nil)
 	if !result.Passed {
 		for i, sr := range result.Steps {
-			t.Logf("step %d %q: passed=%v error=%q", i, sr.Name, sr.Passed, sr.Error)
+			t.Logf("step %d %q: passed=%v error=%q", i, sr.Title, sr.Passed, sr.Error)
 			for _, ar := range sr.Assertions {
 				t.Logf("  assertion: passed=%v msg=%q", ar.Passed, ar.Message)
 			}
@@ -110,10 +110,10 @@ func TestRun_FailPolicyStop(t *testing.T) {
 	defer srv.Close()
 
 	s := &domain.Scenario{
-		Name: "Fail stop",
+		Title: "Fail stop",
 		Steps: []domain.ScenarioStep{
 			{
-				Name:    "Failing step",
+				Title:   "Failing step",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -121,7 +121,7 @@ func TestRun_FailPolicyStop(t *testing.T) {
 				FailPolicy: domain.FailPolicyStop,
 			},
 			{
-				Name:    "Should be skipped",
+				Title:   "Should be skipped",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 			},
 		},
@@ -156,10 +156,10 @@ func TestRun_WithEnvironment(t *testing.T) {
 	}
 
 	s := &domain.Scenario{
-		Name: "With env",
+		Title: "With env",
 		Steps: []domain.ScenarioStep{
 			{
-				Name: "Auth request",
+				Title: "Auth request",
 				Request: &domain.Request{
 					Method:  domain.MethodGET,
 					URL:     "{{baseUrl}}/protected",
@@ -194,17 +194,17 @@ func TestRun_HeaderExtraction(t *testing.T) {
 	defer srv2.Close()
 
 	s := &domain.Scenario{
-		Name: "Header extraction",
+		Title: "Header extraction",
 		Steps: []domain.ScenarioStep{
 			{
-				Name:    "Step 1",
+				Title:   "Step 1",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Extractions: []domain.Extraction{
 					{Name: "reqID", Source: domain.ExtractHeader, Path: "X-Request-ID"},
 				},
 			},
 			{
-				Name: "Step 2",
+				Title: "Step 2",
 				Request: &domain.Request{
 					Method:  domain.MethodGET,
 					URL:     srv2.URL,
@@ -230,10 +230,10 @@ func TestResult_Counts(t *testing.T) {
 	defer srv.Close()
 
 	s := &domain.Scenario{
-		Name: "Counts",
+		Title: "Counts",
 		Steps: []domain.ScenarioStep{
 			{
-				Name:    "Pass step",
+				Title:   "Pass step",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -241,7 +241,7 @@ func TestResult_Counts(t *testing.T) {
 				FailPolicy: domain.FailPolicyContinue,
 			},
 			{
-				Name:    "Fail step",
+				Title:   "Fail step",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "201"},
