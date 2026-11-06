@@ -485,6 +485,7 @@ func conformCmd() *cobra.Command {
 	var outputFile string
 	var requestTimeout int
 	var failFast bool
+	var showCoverage bool
 
 	cmd := &cobra.Command{
 		Use:   "conform <spec-file-or-url>",
@@ -546,10 +547,15 @@ Exit codes:
 			runner := conformance.New(exec)
 			result := runner.Run(context.Background(), spec, baseURL, env, opts)
 
+			var cov *conformance.CoverageReport
+			if showCoverage {
+				cov = conformance.ComputeCoverage(result)
+			}
+
 			var reportBytes []byte
 			switch strings.ToLower(format) {
 			case "json":
-				reportBytes, err = reporting.ConformJSON(result)
+				reportBytes, err = reporting.ConformJSON(result, cov)
 				if err != nil {
 					return fmt.Errorf("generating JSON report: %w", err)
 				}
@@ -560,7 +566,7 @@ Exit codes:
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
 			default:
-				reportBytes = []byte(reporting.ConformText(result))
+				reportBytes = []byte(reporting.ConformText(result, cov))
 			}
 
 			if outputFile != "" {
@@ -590,6 +596,7 @@ Exit codes:
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
+	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	return cmd
 }
 

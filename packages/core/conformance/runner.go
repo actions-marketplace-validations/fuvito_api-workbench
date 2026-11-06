@@ -56,6 +56,36 @@ func (r *ConformResult) Counts() (passed, failed, skipped int) {
 	return
 }
 
+// CoverageReport summarises how many spec operations were exercised in a run.
+// An operation is "covered" if it received an HTTP response (StatusCode > 0).
+// Skipped operations and execution errors that produced no response are "not covered".
+type CoverageReport struct {
+	Total         int
+	Covered       int
+	NotCovered    int
+	Percent       float64
+	CoveredOps    []OperationResult
+	NotCoveredOps []OperationResult
+}
+
+// ComputeCoverage derives operation coverage from a conformance result.
+func ComputeCoverage(result *ConformResult) *CoverageReport {
+	cr := &CoverageReport{Total: len(result.Operations)}
+	for _, op := range result.Operations {
+		if op.StatusCode > 0 {
+			cr.Covered++
+			cr.CoveredOps = append(cr.CoveredOps, op)
+		} else {
+			cr.NotCovered++
+			cr.NotCoveredOps = append(cr.NotCoveredOps, op)
+		}
+	}
+	if cr.Total > 0 {
+		cr.Percent = float64(cr.Covered) / float64(cr.Total) * 100
+	}
+	return cr
+}
+
 // Options controls which operations are run and how failures are handled.
 type Options struct {
 	// Tags filters operations to those tagged with at least one of the given tags.

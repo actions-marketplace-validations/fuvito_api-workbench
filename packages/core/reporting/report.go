@@ -234,7 +234,8 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 // ---- Conformance reporting ----
 
 // ConformText returns a human-readable conformance report suitable for terminal / CI output.
-func ConformText(result *conformance.ConformResult) string {
+// Pass a non-nil coverage to append a coverage summary section.
+func ConformText(result *conformance.ConformResult, coverage *conformance.CoverageReport) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
@@ -273,17 +274,37 @@ func ConformText(result *conformance.ConformResult) string {
 	fmt.Fprintf(&b, "%s  %d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms\n",
 		verdict, total, passed, failed, skipped, result.Duration.Milliseconds())
 
+	if coverage != nil {
+		fmt.Fprintln(&b)
+		fmt.Fprintf(&b, "Coverage: %d / %d operations (%.0f%%)\n", coverage.Covered, coverage.Total, coverage.Percent)
+		if len(coverage.CoveredOps) > 0 {
+			fmt.Fprintln(&b)
+			fmt.Fprintln(&b, "Covered:")
+			for _, op := range coverage.CoveredOps {
+				fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
+			}
+		}
+		if len(coverage.NotCoveredOps) > 0 {
+			fmt.Fprintln(&b)
+			fmt.Fprintln(&b, "Not covered:")
+			for _, op := range coverage.NotCoveredOps {
+				fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
+			}
+		}
+	}
+
 	return b.String()
 }
 
 // JSONConformReport is the machine-readable structure for a conformance run.
 type JSONConformReport struct {
-	SpecTitle   string              `json:"specTitle"`
-	SpecVersion string              `json:"specVersion"`
-	BaseURL     string              `json:"baseURL"`
-	Passed      bool                `json:"passed"`
-	DurationMs  int64               `json:"durationMs"`
-	Operations  []JSONConformOp     `json:"operations"`
+	SpecTitle   string           `json:"specTitle"`
+	SpecVersion string           `json:"specVersion"`
+	BaseURL     string           `json:"baseURL"`
+	Passed      bool             `json:"passed"`
+	DurationMs  int64            `json:"durationMs"`
+	Operations  []JSONConformOp  `json:"operations"`
+	Coverage    *JSONCoverage    `json:"coverage,omitempty"`
 }
 
 type JSONConformOp struct {
@@ -298,9 +319,27 @@ type JSONConformOp struct {
 	Violations  []string `json:"violations,omitempty"`
 }
 
+// JSONCoverage is the machine-readable coverage summary.
+type JSONCoverage struct {
+	Total         int              `json:"total"`
+	Covered       int              `json:"covered"`
+	NotCovered    int              `json:"notCovered"`
+	Percent       float64          `json:"percent"`
+	CoveredOps    []JSONCoverageOp `json:"coveredOps"`
+	NotCoveredOps []JSONCoverageOp `json:"notCoveredOps"`
+}
+
+// JSONCoverageOp identifies a single operation in a coverage list.
+type JSONCoverageOp struct {
+	OperationID string `json:"operationId,omitempty"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+}
+
 // ConformJSON returns a machine-readable JSON conformance report.
-func ConformJSON(result *conformance.ConformResult) ([]byte, error) {
-	passed, failed, _ := result.Counts()
+// Pass a non-nil coverage to include a coverage summary in the output.
+func ConformJSON(result *conformance.ConformResult, coverage *conformance.CoverageReport) ([]byte, error) {
+	_, failed, _ := result.Counts()
 	report := JSONConformReport{
 		SpecTitle:   result.SpecTitle,
 		SpecVersion: result.SpecVersion,
@@ -324,7 +363,23 @@ func ConformJSON(result *conformance.ConformResult) ([]byte, error) {
 		}
 		report.Operations = append(report.Operations, jo)
 	}
-	_ = passed
+	if coverage != nil {
+		jc := &JSONCoverage{
+			Total:         coverage.Total,
+			Covered:       coverage.Covered,
+			NotCovered:    coverage.NotCovered,
+			Percent:       coverage.Percent,
+			CoveredOps:    make([]JSONCoverageOp, 0, len(coverage.CoveredOps)),
+			NotCoveredOps: make([]JSONCoverageOp, 0, len(coverage.NotCoveredOps)),
+		}
+		for _, op := range coverage.CoveredOps {
+			jc.CoveredOps = append(jc.CoveredOps, JSONCoverageOp{OperationID: op.OperationID, Method: op.Method, Path: op.Path})
+		}
+		for _, op := range coverage.NotCoveredOps {
+			jc.NotCoveredOps = append(jc.NotCoveredOps, JSONCoverageOp{OperationID: op.OperationID, Method: op.Method, Path: op.Path})
+		}
+		report.Coverage = jc
+	}
 	return json.MarshalIndent(report, "", "  ")
 }
 
