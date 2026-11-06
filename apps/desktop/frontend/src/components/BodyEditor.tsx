@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { inputCls, selectCls } from '@/lib/styles'
 import type { BodyState, BodyType, KVPair } from '@/types'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
 
@@ -76,11 +77,7 @@ export function BodyEditor({ body, onChange }: Props) {
         <select
           value={body.type}
           onChange={e => switchType(e.target.value as BodyType)}
-          className={cn(
-            'bg-[var(--color-muted)] text-xs rounded px-2 py-1',
-            'border border-[var(--color-border)] outline-none cursor-pointer',
-            'text-[var(--color-foreground)]',
-          )}
+          className={cn(selectCls, 'px-2 py-1')}
         >
           {BODY_TYPES.map(t => (
             <option key={t.value} value={t.value}>{t.label}</option>
@@ -113,14 +110,7 @@ export function BodyEditor({ body, onChange }: Props) {
           onChange={e => onChange({ ...body, content: e.target.value })}
           placeholder={PLACEHOLDER[body.type]}
           spellCheck={false}
-          className={cn(
-            'flex-1 resize-none bg-[var(--color-muted)] text-xs font-mono rounded px-3 py-2',
-            'border border-[var(--color-border)] outline-none',
-            'focus:border-[var(--color-accent)]',
-            'placeholder:text-[var(--color-muted-foreground)]',
-            'text-[var(--color-foreground)]',
-            'leading-relaxed',
-          )}
+          className={cn(inputCls, 'flex-1 resize-none font-mono px-3 py-2 leading-relaxed')}
         />
       ) : (
         <p className="text-xs text-[var(--color-muted-foreground)]">This request has no body.</p>

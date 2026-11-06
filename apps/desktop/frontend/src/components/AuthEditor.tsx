@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { inputCls as baseInputCls } from '@/lib/styles'
 import type { AuthState, AuthType } from '@/types'
 
 const AUTH_TYPES: { value: AuthType; label: string }[] = [
@@ -10,13 +11,7 @@ const AUTH_TYPES: { value: AuthType; label: string }[] = [
   { value: 'apikey', label: 'API Key' },
 ]
 
-const inputCls = cn(
-  'w-full bg-[var(--color-muted)] text-xs font-mono rounded px-3 py-1.5',
-  'border border-[var(--color-border)] outline-none',
-  'focus:border-[var(--color-accent)]',
-  'placeholder:text-[var(--color-muted-foreground)]',
-  'text-[var(--color-foreground)]',
-)
+const inputCls = cn(baseInputCls, 'w-full font-mono px-3 py-1.5')
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { inputCls as baseInputCls } from '@/lib/styles'
 import type { KVPair } from '@/types'
 
 type Props = {
@@ -11,13 +12,7 @@ type Props = {
   keySuggestions?: string[]
 }
 
-const inputCls = cn(
-  'flex-1 min-w-0 bg-[var(--color-muted)] text-xs font-mono rounded px-2 py-1',
-  'border border-[var(--color-border)] outline-none',
-  'focus:border-[var(--color-accent)]',
-  'placeholder:text-[var(--color-muted-foreground)]',
-  'text-[var(--color-foreground)]',
-)
+const inputCls = cn(baseInputCls, 'flex-1 min-w-0 font-mono px-2 py-1')
 
 export function KeyValueEditor({
   pairs,

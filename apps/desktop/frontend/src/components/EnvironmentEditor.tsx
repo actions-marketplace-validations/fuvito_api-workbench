@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Eye, EyeOff, Trash2, Lock, CopyPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { inputCls as baseInputCls } from '@/lib/styles'
 import { getEnvironment, saveEnvironment, deleteEnvironment } from '@/lib/bridge'
 import type { EnvInfo } from '@/lib/bridge'
 
@@ -314,9 +315,4 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
   )
 }
 
-const inputCls = cn(
-  'w-full bg-[var(--color-muted)] text-xs font-mono rounded px-2 py-1',
-  'border border-[var(--color-border)] outline-none',
-  'focus:border-[var(--color-accent)] text-[var(--color-foreground)]',
-  'placeholder:text-[var(--color-muted-foreground)]',
-)
+const inputCls = cn(baseInputCls, 'w-full font-mono px-2 py-1')

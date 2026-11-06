@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { inputCls, selectCls } from '@/lib/styles'
 import { METHOD_COLOR, HTTP_METHODS, HTTP_REQUEST_HEADERS } from '@/lib/httpUtils'
 import type { HttpMethod } from '@/lib/httpUtils'
 import type { KVPair, BodyState, AuthState } from '@/types'
@@ -125,11 +126,7 @@ export function RequestEditor({
         <select
           value={method}
           onChange={e => onMethodChange(e.target.value as HttpMethod)}
-          className={cn(
-            'bg-[var(--color-muted)] text-xs font-mono font-semibold rounded px-2 py-1',
-            'border border-[var(--color-border)] outline-none cursor-pointer',
-            METHOD_COLOR[method],
-          )}
+          className={cn(selectCls, 'font-mono font-semibold px-2 py-1', METHOD_COLOR[method])}
         >
           {HTTP_METHODS.map(m => (
             <option key={m} value={m}>{m}</option>
@@ -148,13 +145,7 @@ export function RequestEditor({
             }
           }}
           placeholder="https://api.example.com/endpoint"
-          className={cn(
-            'bg-[var(--color-muted)] text-xs font-mono rounded px-3 py-1',
-            'border border-[var(--color-border)] outline-none',
-            'focus:border-[var(--color-accent)]',
-            'placeholder:text-[var(--color-muted-foreground)]',
-            'text-[var(--color-foreground)]',
-          )}
+          className={cn(inputCls, 'font-mono px-3 py-1')}
         />
 
         <div className="flex items-center gap-1 shrink-0" title="Per-request timeout — 0 uses the global default from Settings">
@@ -166,10 +157,8 @@ export function RequestEditor({
             onChange={e => onTimeoutChange(e.target.value === '' ? 0 : Number(e.target.value))}
             placeholder="0"
             className={cn(
-              'w-16 text-xs rounded px-2 py-1 text-right',
-              'bg-[var(--color-muted)] border border-[var(--color-border)] outline-none',
-              'focus:border-[var(--color-accent)] text-[var(--color-foreground)]',
-              'placeholder:text-[var(--color-muted-foreground)]',
+              'w-16 text-right',
+              inputCls, 'px-2 py-1',
             )}
           />
           <span className="text-[10px] text-[var(--color-muted-foreground)]">ms</span>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { inputCls as baseInputCls } from '@/lib/styles'
 import type { AppSettings } from '@/lib/bridge'
 
 export type { AppSettings }
@@ -180,12 +181,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
   )
 }
 
-const inputCls = cn(
-  'w-full bg-[var(--color-muted)] text-xs rounded px-2 py-1',
-  'border border-[var(--color-border)] outline-none',
-  'focus:border-[var(--color-accent)] text-[var(--color-foreground)]',
-  'placeholder:text-[var(--color-muted-foreground)]',
-)
+const inputCls = cn(baseInputCls, 'w-full px-2 py-1')
 
 function Row({ label, children, changed }: { label: string; children: React.ReactNode; changed?: boolean }) {
   return (

@@ -3,6 +3,7 @@ import { Play, Loader2, CheckCircle2, XCircle, MinusCircle, ChevronDown, Chevron
 import CodeMirror from '@uiw/react-codemirror'
 import { yaml } from '@codemirror/lang-yaml'
 import { cn } from '@/lib/utils'
+import { inputCls as baseInputCls, selectCls as baseSelectCls } from '@/lib/styles'
 import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult } from '@/lib/bridge'
 import type { ScenarioDetail, ScenarioResult, StepDetail, AssertionDetail, ExtractionDetail, EnvInfo, StepResult } from '@/lib/bridge'
 import { METHOD_BADGE } from '@/lib/httpUtils'
@@ -109,12 +110,8 @@ const STATUS_OPERATORS = ['eq', 'ne', 'gt', 'lt']
 const ALL_OPERATORS = ['eq', 'ne', 'gt', 'lt', 'contains', 'matches']
 const EXTRACTION_SOURCES = ['jsonpath', 'header', 'status']
 
-const inputCls = [
-  'bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1',
-  'text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)] transition-colors',
-].join(' ')
-
-const selectCls = cn(inputCls, 'cursor-pointer')
+const inputCls = cn(baseInputCls, 'px-2 py-1')
+const selectCls = cn(baseSelectCls, 'px-2 py-1')
 
 function AssertionRow({ assertion, onChange, onRemove }: {
   assertion: AssertionDetail
