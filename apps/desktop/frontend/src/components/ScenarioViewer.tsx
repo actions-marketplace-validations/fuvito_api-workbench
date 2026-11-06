@@ -41,6 +41,25 @@ function serializeScenarioToYAML(d: ScenarioDetail): string {
         lines.push('    request:')
         if (step.method) lines.push(`      method: ${step.method}`)
         if (step.url) lines.push(`      url: ${yamlScalar(step.url)}`)
+        if (step.headers?.length) {
+          lines.push('      headers:')
+          for (const h of step.headers) {
+            lines.push(`        - name: ${yamlScalar(h.name)}`)
+            lines.push(`          value: ${yamlScalar(h.value)}`)
+          }
+        }
+        if (step.queryParams?.length) {
+          lines.push('      queryParams:')
+          for (const q of step.queryParams) {
+            lines.push(`        - name: ${yamlScalar(q.name)}`)
+            lines.push(`          value: ${yamlScalar(q.value)}`)
+          }
+        }
+        if (step.bodyType && step.bodyType !== 'none') {
+          lines.push('      body:')
+          lines.push(`        type: ${step.bodyType}`)
+          if (step.bodyContent) lines.push(`        content: ${yamlScalar(step.bodyContent)}`)
+        }
       }
       if (step.failPolicy && step.failPolicy !== 'stop') {
         lines.push(`    failPolicy: ${step.failPolicy}`)
@@ -82,9 +101,12 @@ function serializeScenarioToYAML(d: ScenarioDetail): string {
 
 // ---- Visual editor sub-components ----
 
+const BODY_TYPES = ['none', 'json', 'raw', 'form-urlencoded']
+
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 const ASSERTION_TYPES = ['status', 'jsonpath', 'header', 'schema']
-const ASSERTION_OPERATORS = ['eq', 'ne', 'gt', 'lt', 'contains', 'matches']
+const STATUS_OPERATORS = ['eq', 'ne', 'gt', 'lt']
+const ALL_OPERATORS = ['eq', 'ne', 'gt', 'lt', 'contains', 'matches']
 const EXTRACTION_SOURCES = ['jsonpath', 'header', 'status']
 
 const inputCls = [
@@ -100,11 +122,15 @@ function AssertionRow({ assertion, onChange, onRemove }: {
   onRemove: () => void
 }) {
   const needsPath = assertion.type === 'jsonpath' || assertion.type === 'header'
+  const isSchema = assertion.type === 'schema'
+  const availableOperators = assertion.type === 'status' ? STATUS_OPERATORS : ALL_OPERATORS
+
   return (
     <div className="flex items-center gap-1 mb-1 flex-wrap">
       <select
+        aria-label="Assertion type"
         value={assertion.type}
-        onChange={e => onChange({ type: e.target.value, path: '', expected: '' })}
+        onChange={e => onChange({ type: e.target.value, path: '', expected: '', schema: '', operator: 'eq' })}
         className={selectCls}
       >
         {ASSERTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -117,23 +143,36 @@ function AssertionRow({ assertion, onChange, onRemove }: {
           className={cn(inputCls, 'w-28 flex-1 min-w-[5rem]')}
         />
       )}
-      <select
-        value={assertion.operator ?? 'eq'}
-        onChange={e => onChange({ operator: e.target.value })}
-        className={selectCls}
-      >
-        {ASSERTION_OPERATORS.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <input
-        value={assertion.expected !== undefined && assertion.expected !== null ? String(assertion.expected) : ''}
-        onChange={e => {
-          const raw = e.target.value
-          const num = Number(raw)
-          onChange({ expected: raw === '' ? '' : (!isNaN(num) && raw.trim() !== '' ? num : raw) })
-        }}
-        placeholder="expected"
-        className={cn(inputCls, 'w-24 flex-1 min-w-[4rem]')}
-      />
+      {isSchema ? (
+        <input
+          value={assertion.schema ?? ''}
+          onChange={e => onChange({ schema: e.target.value })}
+          placeholder="OpenAPI operation ID or spec path"
+          className={cn(inputCls, 'flex-1 min-w-[8rem]')}
+          aria-label="Schema value"
+        />
+      ) : (
+        <>
+          <select
+            aria-label="Assertion operator"
+            value={assertion.operator ?? 'eq'}
+            onChange={e => onChange({ operator: e.target.value })}
+            className={selectCls}
+          >
+            {availableOperators.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <input
+            value={assertion.expected !== undefined && assertion.expected !== null ? String(assertion.expected) : ''}
+            onChange={e => {
+              const raw = e.target.value
+              const num = Number(raw)
+              onChange({ expected: raw === '' ? '' : (!isNaN(num) && raw.trim() !== '' ? num : raw) })
+            }}
+            placeholder="expected"
+            className={cn(inputCls, 'w-24 flex-1 min-w-[4rem]')}
+          />
+        </>
+      )}
       <button
         type="button"
         onClick={onRemove}
@@ -187,6 +226,39 @@ function ExtractionRow({ extraction, onChange, onRemove }: {
   )
 }
 
+function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'name', valuePlaceholder = 'value' }: {
+  pair: { name: string; value: string }
+  onChange: (u: { name?: string; value?: string }) => void
+  onRemove: () => void
+  keyPlaceholder?: string
+  valuePlaceholder?: string
+}) {
+  return (
+    <div className="flex items-center gap-1 mb-1">
+      <input
+        value={pair.name}
+        onChange={e => onChange({ name: e.target.value })}
+        placeholder={keyPlaceholder}
+        className={cn(inputCls, 'flex-1 min-w-0')}
+      />
+      <input
+        value={pair.value}
+        onChange={e => onChange({ value: e.target.value })}
+        placeholder={valuePlaceholder}
+        className={cn(inputCls, 'flex-1 min-w-0')}
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        title="Remove"
+        className="p-1 shrink-0 text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+      >
+        <Trash2 size={11} />
+      </button>
+    </div>
+  )
+}
+
 const sectionLabelCls = 'text-[10px] font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)] mb-1.5'
 const addBtnCls = 'flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors mt-1'
 
@@ -200,6 +272,26 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
   onMoveUp: () => void
   onMoveDown: () => void
 }) {
+  function updateHeader(i: number, u: { name?: string; value?: string }) {
+    onChange({ headers: (step.headers ?? []).map((h, hi) => hi === i ? { ...h, ...u } : h) })
+  }
+  function removeHeader(i: number) {
+    onChange({ headers: (step.headers ?? []).filter((_, hi) => hi !== i) })
+  }
+  function addHeader() {
+    onChange({ headers: [...(step.headers ?? []), { name: '', value: '' }] })
+  }
+
+  function updateQueryParam(i: number, u: { name?: string; value?: string }) {
+    onChange({ queryParams: (step.queryParams ?? []).map((q, qi) => qi === i ? { ...q, ...u } : q) })
+  }
+  function removeQueryParam(i: number) {
+    onChange({ queryParams: (step.queryParams ?? []).filter((_, qi) => qi !== i) })
+  }
+  function addQueryParam() {
+    onChange({ queryParams: [...(step.queryParams ?? []), { name: '', value: '' }] })
+  }
+
   function updateAssertion(i: number, u: Partial<AssertionDetail>) {
     onChange({ assertions: step.assertions.map((a, ai) => ai === i ? { ...a, ...u } : a) })
   }
@@ -274,7 +366,7 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
       {/* Request */}
       <div className="px-3 py-2 border-b border-[var(--color-border)]">
         <div className={sectionLabelCls}>Request</div>
-        <div className="flex gap-1.5 items-center">
+        <div className="flex gap-1.5 items-center mb-1.5">
           <select
             value={step.method ?? 'GET'}
             onChange={e => onChange({ method: e.target.value })}
@@ -289,6 +381,84 @@ function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMo
             className={cn(inputCls, 'flex-1 min-w-0 font-mono')}
           />
         </div>
+        <div className="flex items-center gap-1.5">
+          <select
+            value={step.bodyType ?? 'none'}
+            onChange={e => onChange({ bodyType: e.target.value })}
+            className={cn(selectCls, 'text-[10px]')}
+            title="Request body type"
+          >
+            {BODY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          {(step.bodyType === 'json' || step.bodyType === 'raw' || step.bodyType === 'form-urlencoded') && (
+            <button
+              type="button"
+              title="Format JSON"
+              disabled={step.bodyType !== 'json'}
+              onClick={() => {
+                try {
+                  onChange({ bodyContent: JSON.stringify(JSON.parse(step.bodyContent ?? ''), null, 2) })
+                } catch { /* invalid JSON — leave as-is */ }
+              }}
+              className={cn('shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--color-border)] transition-colors',
+                step.bodyType === 'json'
+                  ? 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
+                  : 'opacity-30 cursor-not-allowed text-[var(--color-muted-foreground)]'
+              )}
+            >
+              Format
+            </button>
+          )}
+        </div>
+        {(step.bodyType === 'json' || step.bodyType === 'raw' || step.bodyType === 'form-urlencoded') && (
+          <textarea
+            value={step.bodyContent ?? ''}
+            onChange={e => onChange({ bodyContent: e.target.value })}
+            placeholder={
+              step.bodyType === 'json' ? '{"key": "value"}'
+              : step.bodyType === 'form-urlencoded' ? 'key=value&other=value'
+              : 'Raw body content'
+            }
+            rows={4}
+            className={cn(inputCls, 'w-full mt-1.5 font-mono resize-y')}
+          />
+        )}
+      </div>
+
+      {/* Headers */}
+      <div className="px-3 py-2 border-b border-[var(--color-border)]">
+        <div className={sectionLabelCls}>Headers</div>
+        {(step.headers ?? []).map((h, i) => (
+          <KVRow
+            key={i}
+            pair={h}
+            onChange={u => updateHeader(i, u)}
+            onRemove={() => removeHeader(i)}
+            keyPlaceholder="Header-Name"
+            valuePlaceholder="value"
+          />
+        ))}
+        <button type="button" onClick={addHeader} className={addBtnCls}>
+          <Plus size={10} /> Add header
+        </button>
+      </div>
+
+      {/* Query Params */}
+      <div className="px-3 py-2 border-b border-[var(--color-border)]">
+        <div className={sectionLabelCls}>Query Params</div>
+        {(step.queryParams ?? []).map((q, i) => (
+          <KVRow
+            key={i}
+            pair={q}
+            onChange={u => updateQueryParam(i, u)}
+            onRemove={() => removeQueryParam(i)}
+            keyPlaceholder="param"
+            valuePlaceholder="value"
+          />
+        ))}
+        <button type="button" onClick={addQueryParam} className={addBtnCls}>
+          <Plus size={10} /> Add param
+        </button>
       </div>
 
       {/* Assertions */}
@@ -392,6 +562,10 @@ function VisualEditor({ value, onChange }: { value: ScenarioDetail; onChange: (d
       description: '',
       method: 'GET',
       url: '',
+      headers: [],
+      queryParams: [],
+      bodyType: 'none',
+      bodyContent: '',
       assertions: [{ type: 'status', operator: 'eq', expected: 200 }],
       extractions: [],
       timeoutMs: 0,
@@ -478,11 +652,11 @@ const OPERATOR_LABEL: Record<string, string> = {
   eq: '=', ne: '≠', contains: '∋', matches: '~', gt: '>', lt: '<',
 }
 
-function assertionSummary(a: { type: string; path?: string; operator?: string; expected?: unknown }): string {
+function assertionSummary(a: { type: string; path?: string; operator?: string; expected?: unknown; schema?: string }): string {
   const op = OPERATOR_LABEL[a.operator ?? 'eq'] ?? a.operator ?? '='
   const exp = a.expected !== undefined && a.expected !== null ? String(a.expected) : ''
   if (a.type === 'status') return `status ${op} ${exp}`
-  if (a.type === 'schema') return `schema`
+  if (a.type === 'schema') return a.schema ? `schema: ${a.schema}` : 'schema'
   const path = a.path ? a.path.replace(/^\$\./, '') : ''
   return `${a.type === 'jsonpath' ? '$.'+path : path} ${op} ${exp}`.trim()
 }
@@ -522,8 +696,31 @@ function StepCard({ step, index, result }: {
             <p className="flex items-center gap-1 truncate">
               <span className={cn('font-mono font-bold text-[10px] shrink-0', badge)}>{step.method}</span>
               <span className="text-[var(--color-muted-foreground)] truncate">{step.url}</span>
+              {step.bodyType && step.bodyType !== 'none' && (
+                <span className="shrink-0 rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)]">
+                  {step.bodyType}
+                </span>
+              )}
             </p>
           ) : null}
+          {step.headers && step.headers.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {step.headers.map((h, i) => (
+                <span key={i} className="rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)] font-mono">
+                  {h.name}: {h.value}
+                </span>
+              ))}
+            </div>
+          )}
+          {step.queryParams && step.queryParams.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {step.queryParams.map((q, i) => (
+                <span key={i} className="rounded bg-[var(--color-background)] border border-[var(--color-border)] px-1 py-0.5 text-[10px] text-[var(--color-muted-foreground)] font-mono">
+                  ?{q.name}={q.value}
+                </span>
+              ))}
+            </div>
+          )}
           {step.assertions.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {step.assertions.map((a, i) => (
@@ -708,6 +905,10 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       steps: detail.steps.map(s => ({
         ...s,
         description: s.description ?? '',
+        headers: s.headers ? [...s.headers] : [],
+        queryParams: s.queryParams ? [...s.queryParams] : [],
+        bodyType: s.bodyType ?? 'none',
+        bodyContent: s.bodyContent ?? '',
         assertions: [...(s.assertions ?? [])],
         extractions: [...(s.extractions ?? [])],
         timeoutMs: s.timeoutMs ?? 0,

@@ -830,3 +830,283 @@ test.describe('Scenario view mode — description and step notes', () => {
     expect(savedYaml).toContain('description: My step note')
   })
 })
+
+test.describe('Scenario visual editor — request body', () => {
+  async function openInEditMode(page: Page) {
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  }
+
+  test('body type selector defaults to none', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    const bodySelects = page.getByTitle('Request body type')
+    await expect(bodySelects.first()).toHaveValue('none')
+  })
+
+  test('selecting json body type shows the content textarea', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByTitle('Request body type').first().selectOption('json')
+    await expect(page.getByPlaceholder('{"key": "value"}')).toBeVisible()
+  })
+
+  test('selecting form-urlencoded shows form placeholder', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByTitle('Request body type').first().selectOption('form-urlencoded')
+    await expect(page.getByPlaceholder('key=value&other=value')).toBeVisible()
+  })
+
+  test('selecting none hides the textarea', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByTitle('Request body type').first().selectOption('json')
+    await expect(page.getByPlaceholder('{"key": "value"}')).toBeVisible()
+    await page.getByTitle('Request body type').first().selectOption('none')
+    await expect(page.getByPlaceholder('{"key": "value"}')).not.toBeVisible()
+  })
+
+  test('Format button is enabled only for json type', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByTitle('Request body type').first().selectOption('raw')
+    await expect(page.getByTitle('Format JSON').first()).toBeDisabled()
+    await page.getByTitle('Request body type').first().selectOption('json')
+    await expect(page.getByTitle('Format JSON').first()).toBeEnabled()
+  })
+
+  test('Format button pretty-prints valid JSON content', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByTitle('Request body type').first().selectOption('json')
+    const textarea = page.getByPlaceholder('{"key": "value"}').first()
+    await textarea.fill('{"name":"Alice","age":30}')
+    await page.getByTitle('Format JSON').first().click()
+    await expect(textarea).toHaveValue('{\n  "name": "Alice",\n  "age": 30\n}')
+  })
+
+  test('saving with a json body emits body block in the YAML', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByTitle('Request body type').first().selectOption('json')
+    await page.getByPlaceholder('{"key": "value"}').first().fill('{"name":"Alice"}')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const savedYaml = await page.evaluate(() => (window as any).__bridge.scenarioRaw)
+    expect(savedYaml).toContain('body:')
+    expect(savedYaml).toContain('type: json')
+    // body content is quoted by the YAML serializer; check the key data is present
+    expect(savedYaml).toContain('Alice')
+  })
+
+  test('body type badge shown in view mode when body is non-none', async ({ page }) => {
+    const detailWithBody = {
+      ...SCENARIO_DETAIL,
+      steps: SCENARIO_DETAIL.steps.map((s, i) => i === 0 ? { ...s, bodyType: 'json', bodyContent: '{}' } : s),
+    }
+    await withScenarios(page, { detail: detailWithBody })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await expect(page.getByText('json').first()).toBeVisible()
+  })
+})
+
+test.describe('Scenario visual editor — headers and query params', () => {
+  async function openInEditMode(page: Page) {
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  }
+
+  test('Headers section is present in visual editor', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await expect(page.getByRole('button', { name: 'Add header' }).first()).toBeVisible()
+  })
+
+  test('Add header button inserts a new header row', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await expect(page.getByPlaceholder('Header-Name')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Add header' }).first().click()
+    await expect(page.getByPlaceholder('Header-Name').first()).toBeVisible()
+  })
+
+  test('Query Params section is present in visual editor', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await expect(page.getByRole('button', { name: 'Add param' }).first()).toBeVisible()
+  })
+
+  test('Add param button inserts a new query param row', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByRole('button', { name: 'Add param' }).first().click()
+    await expect(page.getByPlaceholder('param').first()).toBeVisible()
+  })
+
+  test('saving with a header emits headers block in the YAML', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByRole('button', { name: 'Add header' }).first().click()
+    await page.getByPlaceholder('Header-Name').first().fill('Authorization')
+    await page.getByPlaceholder('value').first().fill('Bearer {{token}}')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const savedYaml = await page.evaluate(() => (window as any).__bridge.scenarioRaw)
+    expect(savedYaml).toContain('headers:')
+    expect(savedYaml).toContain('Authorization')
+    expect(savedYaml).toContain('token')
+  })
+
+  test('saving with a query param emits queryParams block in the YAML', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByRole('button', { name: 'Add param' }).first().click()
+    await page.getByPlaceholder('param').first().fill('page')
+    // the value input follows the param input in the same row
+    await page.getByPlaceholder('value').first().fill('1')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const savedYaml = await page.evaluate(() => (window as any).__bridge.scenarioRaw)
+    expect(savedYaml).toContain('queryParams:')
+    expect(savedYaml).toContain('page')
+  })
+
+  test('headers are shown as chips in view mode', async ({ page }) => {
+    const detailWithHeaders = {
+      ...SCENARIO_DETAIL,
+      steps: SCENARIO_DETAIL.steps.map((s, i) =>
+        i === 0 ? { ...s, headers: [{ name: 'Content-Type', value: 'application/json' }] } : s
+      ),
+    }
+    await withScenarios(page, { detail: detailWithHeaders })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await expect(page.getByText('Content-Type: application/json').first()).toBeVisible()
+  })
+
+  test('query params are shown as chips in view mode', async ({ page }) => {
+    const detailWithParams = {
+      ...SCENARIO_DETAIL,
+      steps: SCENARIO_DETAIL.steps.map((s, i) =>
+        i === 1 ? { ...s, queryParams: [{ name: 'include', value: 'roles' }] } : s
+      ),
+    }
+    await withScenarios(page, { detail: detailWithParams })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Fetch user').first()).toBeVisible()
+    await expect(page.getByText('?include=roles').first()).toBeVisible()
+  })
+})
+
+test.describe('Scenario visual editor — assertions', () => {
+  async function openInEditMode(page: Page) {
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  }
+
+  test('selecting schema type shows schema input instead of operator and expected', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    // SCENARIO_DETAIL has 3 assertion rows total → 3 operator selects before change
+    await expect(page.getByLabel('Assertion operator')).toHaveCount(3)
+    await page.getByLabel('Assertion type').first().selectOption('schema')
+    // Schema type hides operator + expected for that row → 2 operator selects remain
+    await expect(page.getByLabel('Assertion operator')).toHaveCount(2)
+    await expect(page.getByLabel('Schema value').first()).toBeVisible()
+  })
+
+  test('schema input accepts a text value', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByLabel('Assertion type').first().selectOption('schema')
+    await page.getByLabel('Schema value').first().fill('getUserById')
+    await expect(page.getByLabel('Schema value').first()).toHaveValue('getUserById')
+  })
+
+  test('saving with a schema assertion emits schema field in YAML', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    await page.getByLabel('Assertion type').first().selectOption('schema')
+    await page.getByLabel('Schema value').first().fill('listUsers')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const savedYaml = await page.evaluate(() => (window as any).__bridge.scenarioRaw)
+    expect(savedYaml).toContain('type: schema')
+    expect(savedYaml).toContain('schema: listUsers')
+  })
+
+  test('status type operator select has only 4 options (eq/ne/gt/lt)', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    // First assertion is status type — check its operator select
+    const optionCount = await page.getByLabel('Assertion operator').first().evaluate(
+      (el: HTMLSelectElement) => el.options.length
+    )
+    expect(optionCount).toBe(4)
+  })
+
+  test('jsonpath type operator select has all 6 options', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    // Step 2 has a jsonpath assertion — it's the 3rd assertion row overall
+    const optionCount = await page.getByLabel('Assertion operator').nth(2).evaluate(
+      (el: HTMLSelectElement) => el.options.length
+    )
+    expect(optionCount).toBe(6)
+  })
+
+  test('switching assertion type resets path and expected', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openInEditMode(page)
+    // Step 2, assertion 2 is jsonpath with path=$.name and expected=Alice
+    await expect(page.getByPlaceholder('expected').nth(2)).toHaveValue('Alice')
+    // Switch to status type — expected should reset to empty
+    await page.getByLabel('Assertion type').nth(2).selectOption('status')
+    await expect(page.getByPlaceholder('expected').nth(2)).toHaveValue('')
+  })
+
+  test('schema assertion shown with schema label in view mode', async ({ page }) => {
+    const detailWithSchema = {
+      ...SCENARIO_DETAIL,
+      steps: SCENARIO_DETAIL.steps.map((s, i) =>
+        i === 0 ? { ...s, assertions: [{ type: 'schema', schema: 'createUser', operator: 'eq', expected: null }] } : s
+      ),
+    }
+    await withScenarios(page, { detail: detailWithSchema })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await expect(page.getByText('schema: createUser').first()).toBeVisible()
+  })
+})

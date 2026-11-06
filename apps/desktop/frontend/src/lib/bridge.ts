@@ -435,6 +435,10 @@ export interface StepDetail {
   description?: string
   method?: string
   url?: string
+  headers?: Array<{ name: string; value: string }>
+  queryParams?: Array<{ name: string; value: string }>
+  bodyType?: string
+  bodyContent?: string
   requestRef?: string
   assertions: AssertionDetail[]
   extractions: ExtractionDetail[]

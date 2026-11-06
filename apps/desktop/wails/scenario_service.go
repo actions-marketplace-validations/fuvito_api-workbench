@@ -22,6 +22,11 @@ type ScenarioInfoIO struct {
 	StepCount int    `json:"stepCount"`
 }
 
+type KVPairIO struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type AssertionDetailIO struct {
 	Type     string      `json:"type"`
 	Path     string      `json:"path,omitempty"`
@@ -41,6 +46,10 @@ type StepDetailIO struct {
 	Description       string               `json:"description,omitempty"`
 	Method            string               `json:"method,omitempty"`
 	URL               string               `json:"url,omitempty"`
+	Headers           []KVPairIO           `json:"headers"`
+	QueryParams       []KVPairIO           `json:"queryParams"`
+	BodyType          string               `json:"bodyType,omitempty"`
+	BodyContent       string               `json:"bodyContent,omitempty"`
 	RequestRef        string               `json:"requestRef,omitempty"`
 	Assertions        []AssertionDetailIO  `json:"assertions"`
 	Extractions       []ExtractionDetailIO `json:"extractions"`
@@ -200,6 +209,8 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 			RequestRef:  step.RequestRef,
 			FailPolicy:  string(step.FailPolicy),
 			TimeoutMs:   step.TimeoutMs,
+			Headers:     []KVPairIO{},
+			QueryParams: []KVPairIO{},
 		}
 		if step.Retry != nil && step.Retry.MaxAttempts > 0 {
 			sd.RetryMaxAttempts = step.Retry.MaxAttempts
@@ -208,6 +219,16 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		if step.Request != nil {
 			sd.Method = string(step.Request.Method)
 			sd.URL = step.Request.URL
+			for _, h := range step.Request.Headers {
+				sd.Headers = append(sd.Headers, KVPairIO{Name: h.Name, Value: h.Value})
+			}
+			for _, q := range step.Request.QueryParams {
+				sd.QueryParams = append(sd.QueryParams, KVPairIO{Name: q.Name, Value: q.Value})
+			}
+			if step.Request.Body != nil && step.Request.Body.Type != "" {
+				sd.BodyType = string(step.Request.Body.Type)
+				sd.BodyContent = step.Request.Body.Content
+			}
 		}
 		for _, a := range step.Assertions {
 			sd.Assertions = append(sd.Assertions, AssertionDetailIO{
