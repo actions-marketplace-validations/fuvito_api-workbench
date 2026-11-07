@@ -29,10 +29,13 @@ const (
 var (
 	mu      sync.Mutex
 	users   = []User{
-		{ID: 1, Name: "Alice Smith", Email: "alice@example.com", CreatedAt: "2026-01-01T00:00:00Z"},
-		{ID: 2, Name: "Bob Jones", Email: "bob@example.com", CreatedAt: "2026-01-02T00:00:00Z"},
+		{ID: 1, Name: "Alice Smith",   Email: "alice@example.com",   CreatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Name: "Bob Jones",     Email: "bob@example.com",     CreatedAt: "2026-01-02T00:00:00Z"},
+		{ID: 3, Name: "Carol White",   Email: "carol@example.com",   CreatedAt: "2026-01-03T00:00:00Z"},
+		{ID: 4, Name: "David Brown",   Email: "david@example.com",   CreatedAt: "2026-01-04T00:00:00Z"},
+		{ID: 5, Name: "Eva Green",     Email: "eva@example.com",     CreatedAt: "2026-01-05T00:00:00Z"},
 	}
-	nextID     = 3
+	nextID     = 6
 	validToken = "demo-token-12345"
 
 	loginMu          sync.Mutex
@@ -104,6 +107,14 @@ func methodNotAllowed(w http.ResponseWriter, allowed string) {
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w, "GET")
+		return
+	}
+	// Content negotiation: honour Accept header for JSON vs plain text.
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "text/plain") && !strings.Contains(accept, "application/json") {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "status=ok time=%s\n", time.Now().UTC().Format(time.RFC3339))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "time": time.Now().UTC().Format(time.RFC3339)})
@@ -203,7 +214,54 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		mu.Lock()
 		defer mu.Unlock()
-		writeJSON(w, http.StatusOK, users)
+
+		// Parse pagination params: ?page=1&limit=1  (1-based page, default limit 100)
+		page := 1
+		limit := 100
+		if v := r.URL.Query().Get("page"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 1 {
+				page = n
+			}
+		}
+		if v := r.URL.Query().Get("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 100 {
+				limit = n
+			}
+		}
+
+		total := len(users)
+		start := (page - 1) * limit
+		if start > total {
+			start = total
+		}
+		end := start + limit
+		if end > total {
+			end = total
+		}
+		page_users := users[start:end]
+
+		w.Header().Set("X-Total-Count", strconv.Itoa(total))
+
+		// Build Link header (RFC 8288)
+		base := "http://localhost:8080/users"
+		var links []string
+		if page > 1 {
+			links = append(links, fmt.Sprintf(`<%s?page=%d&limit=%d>; rel="prev"`, base, page-1, limit))
+			links = append(links, fmt.Sprintf(`<%s?page=1&limit=%d>; rel="first"`, base, limit))
+		}
+		totalPages := (total + limit - 1) / limit
+		if totalPages == 0 {
+			totalPages = 1
+		}
+		if page < totalPages {
+			links = append(links, fmt.Sprintf(`<%s?page=%d&limit=%d>; rel="next"`, base, page+1, limit))
+			links = append(links, fmt.Sprintf(`<%s?page=%d&limit=%d>; rel="last"`, base, totalPages, limit))
+		}
+		if len(links) > 0 {
+			w.Header().Set("Link", strings.Join(links, ", "))
+		}
+
+		writeJSON(w, http.StatusOK, page_users)
 
 	case http.MethodPost:
 		var body struct {
