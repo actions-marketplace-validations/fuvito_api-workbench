@@ -1,4 +1,4 @@
-# ApiDesk User Guide
+# Clear Signal User Guide
 
 **Version:** 1.0 (MVP)
 
@@ -25,11 +25,11 @@
 
 ## 1. Opening or creating a workspace
 
-A **workspace** is an ordinary folder on your filesystem. ApiDesk reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
+A **workspace** is an ordinary folder on your filesystem. Clear Signal reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
 
 **To open an existing workspace:** click **Open Existing** in the sidebar, or use the folder icon in the workspace panel header.
 
-**To create a new workspace:** click **New Workspace**, then pick an empty folder. ApiDesk creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
+**To create a new workspace:** click **New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
 
 The last-used workspace and active environment are remembered between sessions.
 
@@ -97,7 +97,7 @@ If you try to open a different file, create a new request, or close a tab while 
 
 ### Tabs
 
-ApiDesk supports multiple request tabs. Each tab maintains independent state (URL, method, body, headers, response). Click the `+` icon in the tab bar or press **Ctrl+N** to open a new tab. The close button appears on hover.
+Clear Signal supports multiple request tabs. Each tab maintains independent state (URL, method, body, headers, response). Click the `+` icon in the tab bar or press **Ctrl+N** to open a new tab. The close button appears on hover.
 
 ---
 
@@ -199,7 +199,7 @@ Click the **History** tab in the sidebar to see your last 100 requests. Clicking
 1. Open or create a workspace.
 2. Click the **Import OpenAPI** button (upload icon) in the workspace panel header.
 3. Select a `.yaml` or `.json` OpenAPI 3.0 or 3.1 file.
-4. ApiDesk generates one request file per operation, placed in `requests/{spec-title}/`.
+4. Clear Signal generates one request file per operation, placed in `requests/{spec-title}/`.
 
 Path parameters become `{{paramName}}` placeholders. POST/PUT/PATCH operations get a JSON body stub based on the request schema. Operations with security requirements get an `Authorization: Bearer {{token}}` header hint.
 
@@ -321,7 +321,7 @@ The CLI uses the same Go execution engine as the desktop application. Build it o
 
 ```bash
 cd apps/cli
-go build -o apidesk .
+go build -o clrsig .
 ```
 
 Or run directly without building:
@@ -330,14 +330,14 @@ Or run directly without building:
 go run ./apps/cli run <scenario-file>
 ```
 
-### `apidesk run`
+### `clrsig run`
 
 Executes a scenario file and prints results.
 
 ```bash
-apidesk run ./scenarios/user-lifecycle.yaml
-apidesk run ./scenarios/user-lifecycle.yaml --env ./environments/dev.yaml
-apidesk run ./scenarios/user-lifecycle.yaml --format json
+clrsig run ./scenarios/user-lifecycle.yaml
+clrsig run ./scenarios/user-lifecycle.yaml --env ./environments/dev.yaml
+clrsig run ./scenarios/user-lifecycle.yaml --format json
 ```
 
 | Flag | Default | Description |
@@ -422,15 +422,15 @@ jobs:
         with:
           go-version: "1.26"
 
-      - name: Build ApiDesk CLI
-        run: go build -o apidesk ./apps/cli
+      - name: Build Clear Signal CLI
+        run: go build -o clrsig ./apps/cli
 
       - name: Run contract tests
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          ./apidesk run ./scenarios/user-lifecycle.yaml \
+          ./clrsig run ./scenarios/user-lifecycle.yaml \
             --env ./environments/ci.yaml \
             --format json > results.json
 
@@ -477,7 +477,7 @@ Open via the gear icon in the toolbar.
 
 Changes preview immediately. Click **Save** to persist; **Cancel** reverts to the last saved values.
 
-Settings are stored in `~/.apidesk/settings.json`.
+Settings are stored in `~/.clrsig/settings.json`.
 
 ---
 

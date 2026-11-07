@@ -1,6 +1,6 @@
-# ApiDesk CI/CD Integration Guide
+# Clear Signal CI/CD Integration Guide
 
-ApiDesk CLI (`apidesk`) is designed to drop into any CI/CD pipeline without plugins or adapters. Its three commands produce machine-readable output and return meaningful exit codes that most CI systems understand natively.
+Clear Signal CLI (`clrsig`) is designed to drop into any CI/CD pipeline without plugins or adapters. Its three commands produce machine-readable output and return meaningful exit codes that most CI systems understand natively.
 
 ---
 
@@ -8,9 +8,9 @@ ApiDesk CLI (`apidesk`) is designed to drop into any CI/CD pipeline without plug
 
 | Command | Purpose |
 |---|---|
-| `apidesk run <scenario.yaml>` | Execute a multi-step API scenario and assert results |
-| `apidesk conform <spec.yaml> --base-url <url>` | Run every operation in an OpenAPI spec against a live server |
-| `apidesk diff <base.yaml> <revision.yaml>` | Detect breaking changes between two OpenAPI spec versions |
+| `clrsig run <scenario.yaml>` | Execute a multi-step API scenario and assert results |
+| `clrsig conform <spec.yaml> --base-url <url>` | Run every operation in an OpenAPI spec against a live server |
+| `clrsig diff <base.yaml> <revision.yaml>` | Detect breaking changes between two OpenAPI spec versions |
 
 ---
 
@@ -31,21 +31,21 @@ All three commands accept `--format` and `--output` flags.
 
 ### Exit Codes
 
-#### `apidesk run`
+#### `clrsig run`
 | Code | Meaning |
 |---|---|
 | 0 | All steps passed |
 | 1 | One or more assertions failed |
 | 2 | Parse error, file not found, or execution error |
 
-#### `apidesk conform`
+#### `clrsig conform`
 | Code | Meaning |
 |---|---|
 | 0 | All operations conform to the spec |
 | 1 | One or more operations returned violations |
 | 2 | Error loading spec, connecting to server, or invalid arguments |
 
-#### `apidesk diff`
+#### `clrsig diff`
 | Code | Meaning |
 |---|---|
 | 0 | No breaking changes detected |
@@ -78,15 +78,15 @@ jobs:
         with:
           go-version: '1.23'
 
-      - name: Build apidesk CLI
-        run: go build -o apidesk ./apps/cli
+      - name: Build clrsig CLI
+        run: go build -o clrsig ./apps/cli
 
       - name: Run API scenarios
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          ./apidesk run examples/scenarios/user-lifecycle.yaml \
+          ./clrsig run examples/scenarios/user-lifecycle.yaml \
             --env environments/ci.yaml \
             --format junit \
             --output results/scenario-results.xml
@@ -107,7 +107,7 @@ jobs:
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
-          ./apidesk conform openapi.yaml \
+          ./clrsig conform openapi.yaml \
             --base-url $API_BASE_URL \
             --format junit \
             --output results/conform-results.xml
@@ -126,7 +126,7 @@ jobs:
 ```yaml
       - name: Check for breaking API changes
         run: |
-          ./apidesk diff openapi-base.yaml openapi.yaml --format text
+          ./clrsig diff openapi-base.yaml openapi.yaml --format text
         # Exit code 1 = breaking changes found → PR is blocked
 ```
 
@@ -148,14 +148,14 @@ pipeline {
     stages {
         stage('Build CLI') {
             steps {
-                sh 'go build -o apidesk ./apps/cli'
+                sh 'go build -o clrsig ./apps/cli'
             }
         }
 
         stage('Run API Scenarios') {
             steps {
                 sh '''
-                    ./apidesk run examples/scenarios/user-lifecycle.yaml \
+                    ./clrsig run examples/scenarios/user-lifecycle.yaml \
                         --env environments/ci.yaml \
                         --format junit \
                         --output results/scenario-results.xml
@@ -171,7 +171,7 @@ pipeline {
         stage('Spec Conformance') {
             steps {
                 sh '''
-                    ./apidesk conform openapi.yaml \
+                    ./clrsig conform openapi.yaml \
                         --base-url ${API_BASE_URL} \
                         --format junit \
                         --output results/conform-results.xml
@@ -189,7 +189,7 @@ pipeline {
                 changeRequest()
             }
             steps {
-                sh './apidesk diff openapi-base.yaml openapi.yaml'
+                sh './clrsig diff openapi-base.yaml openapi.yaml'
                 // Non-zero exit code fails the stage and blocks the PR
             }
         }
@@ -223,17 +223,17 @@ stages:
 build-cli:
   stage: build
   script:
-    - go build -o apidesk ./apps/cli
+    - go build -o clrsig ./apps/cli
   artifacts:
     paths:
-      - apidesk
+      - clrsig
 
 api-scenarios:
   stage: test
   needs: [build-cli]
   script:
     - |
-      ./apidesk run examples/scenarios/user-lifecycle.yaml \
+      ./clrsig run examples/scenarios/user-lifecycle.yaml \
         --env environments/ci.yaml \
         --format junit \
         --output results/scenario-results.xml
@@ -249,7 +249,7 @@ spec-conformance:
   needs: [build-cli]
   script:
     - |
-      ./apidesk conform openapi.yaml \
+      ./clrsig conform openapi.yaml \
         --base-url $API_BASE_URL \
         --format junit \
         --output results/conform-results.xml
@@ -264,7 +264,7 @@ breaking-changes:
   only:
     - merge_requests
   script:
-    - ./apidesk diff openapi-base.yaml openapi.yaml
+    - ./clrsig diff openapi-base.yaml openapi.yaml
   allow_failure: false
 ```
 
@@ -286,14 +286,14 @@ jobs:
       - checkout
 
       - run:
-          name: Build apidesk CLI
-          command: go build -o apidesk ./apps/cli
+          name: Build clrsig CLI
+          command: go build -o clrsig ./apps/cli
 
       - run:
           name: Run API scenarios
           command: |
             mkdir -p results
-            ./apidesk run examples/scenarios/user-lifecycle.yaml \
+            ./clrsig run examples/scenarios/user-lifecycle.yaml \
               --env environments/ci.yaml \
               --format junit \
               --output results/scenario-results.xml
@@ -303,7 +303,7 @@ jobs:
       - run:
           name: Spec conformance
           command: |
-            ./apidesk conform openapi.yaml \
+            ./clrsig conform openapi.yaml \
               --base-url $API_BASE_URL \
               --format junit \
               --output results/conform-results.xml
@@ -326,7 +326,7 @@ The `store_test_results` step tells CircleCI to parse JUnit XML and display resu
 
 ## Secrets and Environment Variables
 
-ApiDesk environments use `{{variableName}}` placeholders in request files. In CI, sensitive values are injected via environment files rather than hardcoded.
+Clear Signal environments use `{{variableName}}` placeholders in request files. In CI, sensitive values are injected via environment files rather than hardcoded.
 
 ### CI environment file pattern
 
@@ -346,7 +346,7 @@ variables:
 Then generate a populated file at runtime (never commit this):
 
 ```bash
-# In your CI script, before running apidesk:
+# In your CI script, before running clrsig:
 cat > environments/ci-runtime.yaml << EOF
 schemaVersion: "1"
 name: CI
@@ -358,12 +358,12 @@ variables:
     secret: true
 EOF
 
-./apidesk run scenario.yaml --env environments/ci-runtime.yaml
+./clrsig run scenario.yaml --env environments/ci-runtime.yaml
 ```
 
 **Security notes:**
-- ApiDesk never writes `secret: true` variable values to request history or JUnit output — they are redacted at the executor layer.
-- Do not commit environment files containing real values. The workspace `.gitignore` created by `apidesk new-workspace` already excludes `environments/`.
+- Clear Signal never writes `secret: true` variable values to request history or JUnit output — they are redacted at the executor layer.
+- Do not commit environment files containing real values. The workspace `.gitignore` created by `clrsig new-workspace` already excludes `environments/`.
 - Use your CI platform's native secret store (GitHub Secrets, Jenkins Credentials, GitLab CI/CD Variables, CircleCI Environment Variables) rather than `.env` files in the repo.
 
 ---
@@ -377,8 +377,8 @@ The repo ships with a demo server and scenario for end-to-end testing:
 cd examples/server && go run .
 
 # Terminal 2: run the scenario against it
-apidesk run examples/scenarios/user-lifecycle.yaml \
+clrsig run examples/scenarios/user-lifecycle.yaml \
   --env examples/environments/local.yaml
 ```
 
-This same pattern works in CI: start your application server as a service container (GitHub Actions `services:`, GitLab CI `services:`, CircleCI secondary Docker image), then run `apidesk conform` or `apidesk run` against `http://localhost:<port>`.
+This same pattern works in CI: start your application server as a service container (GitHub Actions `services:`, GitLab CI `services:`, CircleCI secondary Docker image), then run `clrsig conform` or `clrsig run` against `http://localhost:<port>`.

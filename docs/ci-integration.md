@@ -1,13 +1,13 @@
 # CI/CD Integration Guide
 
-ApiDesk's CLI (`apidesk`) is designed to run in any CI/CD pipeline without configuration beyond the scenario file and an optional environment file.
+Clear Signal's CLI (`clrsig`) is designed to run in any CI/CD pipeline without configuration beyond the scenario file and an optional environment file.
 
 ---
 
 ## How it works
 
 ```
-apidesk run <scenario.yaml> [--env <env.yaml>] [--format text|json|junit]
+clrsig run <scenario.yaml> [--env <env.yaml>] [--format text|json|junit]
 ```
 
 **Exit codes** — the universal CI signal:
@@ -52,17 +52,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download apidesk CLI
+      - name: Download clrsig CLI
         run: |
-          curl -sSL https://github.com/fuvito/api-workbench/releases/latest/download/apidesk-linux-amd64 \
-            -o /usr/local/bin/apidesk && chmod +x /usr/local/bin/apidesk
+          curl -sSL https://github.com/fuvito/api-workbench/releases/latest/download/clrsig-linux-amd64 \
+            -o /usr/local/bin/clrsig && chmod +x /usr/local/bin/clrsig
 
       - name: Run scenario
         env:
           API_BASE_URL: ${{ vars.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          apidesk run examples/scenarios/user-lifecycle.yaml \
+          clrsig run examples/scenarios/user-lifecycle.yaml \
             --env examples/environments/ci.yaml \
             --format junit > test-results.xml
 
@@ -95,7 +95,7 @@ pipeline {
         stage('API Conformance') {
             steps {
                 sh '''
-                    apidesk run scenarios/user-lifecycle.yaml \
+                    clrsig run scenarios/user-lifecycle.yaml \
                         --env environments/staging.yaml \
                         --format junit > junit-results.xml
                 '''
@@ -120,7 +120,7 @@ pipeline {
 
 1. Add a **Execute shell** build step:
    ```sh
-   apidesk run scenarios/smoke.yaml --format junit > results.xml
+   clrsig run scenarios/smoke.yaml --format junit > results.xml
    ```
 2. Add a **Post-build action → Publish JUnit test result report**, pattern: `results.xml`
 3. Jenkins will show pass/fail trends on the job page automatically.
@@ -130,7 +130,7 @@ pipeline {
 If you want warnings rather than hard failures (e.g. for non-critical checks):
 
 ```sh
-apidesk run scenarios/optional-checks.yaml --format junit > results.xml || true
+clrsig run scenarios/optional-checks.yaml --format junit > results.xml || true
 ```
 
 The `|| true` prevents the shell step from failing the build; Jenkins still records the test failures in the results report.
@@ -144,9 +144,9 @@ api-conformance:
   image: ubuntu:22.04
   stage: test
   before_script:
-    - curl -sSL $APIDESK_DOWNLOAD_URL -o /usr/local/bin/apidesk && chmod +x /usr/local/bin/apidesk
+    - curl -sSL $APIDESK_DOWNLOAD_URL -o /usr/local/bin/clrsig && chmod +x /usr/local/bin/clrsig
   script:
-    - apidesk run scenarios/smoke.yaml --env environments/ci.yaml --format junit > results.xml
+    - clrsig run scenarios/smoke.yaml --env environments/ci.yaml --format junit > results.xml
   artifacts:
     when: always
     reports:
@@ -174,15 +174,15 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install apidesk
+          name: Install clrsig
           command: |
-            curl -sSL $APIDESK_DOWNLOAD_URL -o /usr/local/bin/apidesk
-            chmod +x /usr/local/bin/apidesk
+            curl -sSL $CLRSIG_DOWNLOAD_URL -o /usr/local/bin/clrsig
+            chmod +x /usr/local/bin/clrsig
       - run:
           name: Run scenarios
           command: |
             mkdir -p test-results
-            apidesk run scenarios/smoke.yaml \
+            clrsig run scenarios/smoke.yaml \
               --env environments/ci.yaml \
               --format junit > test-results/results.xml
       - store_test_results:
@@ -204,7 +204,7 @@ workflows:
 steps:
   - label: "API conformance"
     command: |
-      apidesk run scenarios/smoke.yaml \
+      clrsig run scenarios/smoke.yaml \
         --env environments/ci.yaml \
         --format junit > junit.xml
     artifact_paths: "junit.xml"
@@ -226,7 +226,7 @@ mkdir -p results
 
 for scenario in scenarios/*.yaml; do
   name=$(basename "$scenario" .yaml)
-  apidesk run "$scenario" \
+  clrsig run "$scenario" \
     --env environments/ci.yaml \
     --format junit > "results/${name}.xml"
 done
@@ -238,7 +238,7 @@ GitHub Actions `dorny/test-reporter` and Jenkins' `junit` post-build action both
 
 ## Injecting secrets and environment variables
 
-ApiDesk resolves `{{VARIABLE_NAME}}` placeholders at run time from the active environment file.
+Clear Signal resolves `{{VARIABLE_NAME}}` placeholders at run time from the active environment file.
 
 **Environment file** (`environments/ci.yaml`):
 
@@ -262,7 +262,7 @@ The double-brace syntax passes through unresolved if no environment variable wit
 ## JSON format for custom reporting
 
 ```sh
-apidesk run scenarios/smoke.yaml --format json | jq '
+clrsig run scenarios/smoke.yaml --format json | jq '
   {
     scenario: .scenario,
     passed: .passed,

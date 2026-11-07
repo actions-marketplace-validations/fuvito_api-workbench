@@ -1,11 +1,11 @@
-# ApiDesk
+# Clear Signal
 
 **API Contract Validation & Spec Conformance Testing**
 
 A local-first, open-source platform for building, running, and validating API requests — from interactive exploration to fully automated CI/CD conformance gates.
 
 - Desktop app (Windows, macOS, Linux)
-- Headless CLI (`apidesk`)
+- Headless CLI (`clrsig`)
 - Zero accounts, zero cloud dependency
 
 ---
@@ -226,7 +226,7 @@ steps:
 
 ## HTTP RFC Conformance Scenarios
 
-A correct HTTP status code is only part of the contract. Several RFCs mandate specific accompanying headers — headers that implementations routinely omit. ApiDesk ships ready-to-run example scenarios for each pattern.
+A correct HTTP status code is only part of the contract. Several RFCs mandate specific accompanying headers — headers that implementations routinely omit. Clear Signal ships ready-to-run example scenarios for each pattern.
 
 ### Why headers matter alongside status codes
 
@@ -320,10 +320,10 @@ Each scenario in `examples/scenarios/` tests the full header contract, not just 
 go run ./examples/server
 
 # Run all RFC conformance scenarios
-apidesk run examples/scenarios/401-www-authenticate.yaml  --env examples/environments/local.yaml
-apidesk run examples/scenarios/405-method-not-allowed.yaml --env examples/environments/local.yaml
-apidesk run examples/scenarios/429-rate-limit.yaml         --env examples/environments/local.yaml
-apidesk run examples/scenarios/503-service-unavailable.yaml --env examples/environments/local.yaml
+clrsig run examples/scenarios/401-www-authenticate.yaml  --env examples/environments/local.yaml
+clrsig run examples/scenarios/405-method-not-allowed.yaml --env examples/environments/local.yaml
+clrsig run examples/scenarios/429-rate-limit.yaml         --env examples/environments/local.yaml
+clrsig run examples/scenarios/503-service-unavailable.yaml --env examples/environments/local.yaml
 ```
 
 These are plain YAML scenario files — copy them into your own workspace and point them at your API.
@@ -335,7 +335,7 @@ These are plain YAML scenario files — copy them into your own workspace and po
 **Import a spec** from the desktop UI (⇡ button in the workspace panel) or from the CLI:
 
 ```bash
-apidesk generate openapi.yaml --base-url https://api.example.com
+clrsig generate openapi.yaml --base-url https://api.example.com
 ```
 
 This generates one YAML request file per operation:
@@ -343,12 +343,12 @@ This generates one YAML request file per operation:
 - POST / PUT / PATCH operations get a JSON body stub
 - Operations with security requirements get a `Bearer {{token}}` auth hint
 
-**Response validation** runs automatically in `apidesk conform` and in any scenario with `specFile:` set. Validation uses kin-openapi and checks the response body against the declared schema for the matched status code.
+**Response validation** runs automatically in `clrsig conform` and in any scenario with `specFile:` set. Validation uses kin-openapi and checks the response body against the declared schema for the matched status code.
 
 **Breaking change detection:**
 
 ```bash
-apidesk diff openapi-v1.yaml openapi-v2.yaml
+clrsig diff openapi-v1.yaml openapi-v2.yaml
 ```
 
 Classifies every change as `ERR` (breaking), `WARN` (potentially breaking), or `INFO` (non-breaking). Breaking changes include: removed endpoints, added required parameters, removed response fields, changed field types, removed enum values, added auth requirements.
@@ -357,11 +357,11 @@ Classifies every change as `ERR` (breaking), `WARN` (potentially breaking), or `
 
 ## API Contract Validation
 
-ApiDesk's primary purpose is verifying that an API's actual runtime behaviour matches its declared OpenAPI contract. Three complementary tools cover the full conformance workflow.
+Clear Signal's primary purpose is verifying that an API's actual runtime behaviour matches its declared OpenAPI contract. Three complementary tools cover the full conformance workflow.
 
 ---
 
-### 1 — Automatic Spec Conformance (`apidesk conform`)
+### 1 — Automatic Spec Conformance (`clrsig conform`)
 
 Parses a spec, executes every declared operation against a live server, and validates each response against the declared response schema — without writing a single test file.
 
@@ -399,7 +399,7 @@ Not covered:  GET /protected
 Filter by tag or path prefix to run conformance against a subset of the spec:
 
 ```bash
-apidesk conform openapi.yaml --base-url https://api.example.com \
+clrsig conform openapi.yaml --base-url https://api.example.com \
   --tags users,auth \
   --env environments/ci.yaml \
   --coverage \
@@ -437,12 +437,12 @@ When `specFile` is set, the scenario runner calls `ValidateResponseByPath` after
 
 ---
 
-### 3 — Breaking Change Detection (`apidesk diff`)
+### 3 — Breaking Change Detection (`clrsig diff`)
 
 Compares two spec versions and classifies every change. Used as a CI gate to prevent spec regressions from reaching consumers.
 
 ```bash
-apidesk diff openapi-base.yaml openapi-pr.yaml
+clrsig diff openapi-base.yaml openapi-pr.yaml
 ```
 
 ```
@@ -478,19 +478,19 @@ Exit code `1` when breaking changes are found — the PR is blocked automaticall
 ```
 On every PR
 ────────────────────────────────────────────────────────────
-  apidesk diff main-spec.yaml pr-spec.yaml
+  clrsig diff main-spec.yaml pr-spec.yaml
   └── exit 1 if breaking → PR blocked before tests run
 
 On merge to main (or nightly)
 ────────────────────────────────────────────────────────────
-  apidesk conform openapi.yaml --base-url $STAGING_URL \
+  clrsig conform openapi.yaml --base-url $STAGING_URL \
     --env environments/ci.yaml --coverage --format junit
   └── exit 1 if violations → build fails
   └── JUnit report published to CI dashboard
 
 Scenario suite (per-service integration tests)
 ────────────────────────────────────────────────────────────
-  apidesk run scenarios/user-lifecycle.yaml \
+  clrsig run scenarios/user-lifecycle.yaml \
     --env environments/ci.yaml --format junit
   └── exit 1 if assertion failures → build fails
 ```
@@ -501,12 +501,12 @@ All three produce JUnit XML consumed natively by Jenkins, GitHub Actions, GitLab
 
 ## CLI
 
-The `apidesk` CLI is the same Go core with a terminal interface. All three main commands produce machine-readable output and return meaningful exit codes.
+The `clrsig` CLI is the same Go core with a terminal interface. All three main commands produce machine-readable output and return meaningful exit codes.
 
-### `apidesk run` — Execute a scenario
+### `clrsig run` — Execute a scenario
 
 ```bash
-apidesk run scenarios/user-lifecycle.yaml \
+clrsig run scenarios/user-lifecycle.yaml \
   --env environments/ci.yaml \
   --format junit \
   --output results/scenario.xml
@@ -527,10 +527,10 @@ Exit codes: `0` = all passed · `1` = assertion failures · `2` = parse or execu
 
 ---
 
-### `apidesk conform` — Spec conformance run
+### `clrsig conform` — Spec conformance run
 
 ```bash
-apidesk conform openapi.yaml \
+clrsig conform openapi.yaml \
   --base-url https://api.example.com \
   --env environments/ci.yaml \
   --tags users,auth \
@@ -540,7 +540,7 @@ apidesk conform openapi.yaml \
 ```
 
 ```
-ApiDesk Example API  1.0.0
+Clear Signal Example API  1.0.0
 Base URL: http://localhost:8080
 
   PASS  POST    /auth/login         200  14ms
@@ -572,10 +572,10 @@ Exit codes: `0` = all conform · `1` = violations found · `2` = spec/config err
 
 ---
 
-### `apidesk diff` — Breaking change detection
+### `clrsig diff` — Breaking change detection
 
 ```bash
-apidesk diff openapi-base.yaml openapi.yaml --breaking-only
+clrsig diff openapi-base.yaml openapi.yaml --breaking-only
 ```
 
 ```
@@ -590,22 +590,22 @@ Exit codes: `0` = no breaking changes · `1` = breaking changes found · `2` = p
 
 ---
 
-### `apidesk generate` — Generate request files from a spec
+### `clrsig generate` — Generate request files from a spec
 
 ```bash
-apidesk generate openapi.yaml --base-url https://api.example.com --output ./requests
+clrsig generate openapi.yaml --base-url https://api.example.com --output ./requests
 ```
 
-### `apidesk request` — Execute a single saved request file
+### `clrsig request` — Execute a single saved request file
 
 ```bash
-apidesk request requests/users/list-users.yaml --env environments/local.yaml --format json
+clrsig request requests/users/list-users.yaml --env environments/local.yaml --format json
 ```
 
-### `apidesk validate` — Check scenario files for errors without running them
+### `clrsig validate` — Check scenario files for errors without running them
 
 ```bash
-apidesk validate scenarios/*.yaml --format json
+clrsig validate scenarios/*.yaml --format json
 ```
 
 ---
@@ -619,7 +619,7 @@ All three commands accept `--format junit` and `--output <file>`. JUnit XML is c
 ```yaml
 - name: Run API scenarios
   run: |
-    ./apidesk run scenarios/user-lifecycle.yaml \
+    ./clrsig run scenarios/user-lifecycle.yaml \
       --env environments/ci.yaml \
       --format junit \
       --output results/scenario.xml
@@ -635,7 +635,7 @@ All three commands accept `--format junit` and `--output <file>`. JUnit XML is c
     reporter: java-junit
 
 - name: Check for breaking changes
-  run: ./apidesk diff openapi-base.yaml openapi.yaml
+  run: ./clrsig diff openapi-base.yaml openapi.yaml
   # Exit code 1 blocks the PR
 ```
 
@@ -644,7 +644,7 @@ All three commands accept `--format junit` and `--output <file>`. JUnit XML is c
 ```groovy
 stage('API Conformance') {
     steps {
-        sh './apidesk conform openapi.yaml --base-url ${API_BASE_URL} --format junit --output results/conform.xml'
+        sh './clrsig conform openapi.yaml --base-url ${API_BASE_URL} --format junit --output results/conform.xml'
     }
     post {
         always { junit 'results/conform.xml' }
@@ -657,7 +657,7 @@ stage('API Conformance') {
 ```yaml
 api-scenarios:
   script:
-    - ./apidesk run scenarios/user-lifecycle.yaml --env environments/ci.yaml --format junit --output results/scenario.xml
+    - ./clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml --format junit --output results/scenario.xml
   artifacts:
     when: always
     reports:
@@ -680,10 +680,10 @@ variables:
     secret: true
 EOF
 
-./apidesk run scenario.yaml --env environments/ci-runtime.yaml
+./clrsig run scenario.yaml --env environments/ci-runtime.yaml
 ```
 
-ApiDesk never writes `secret: true` values to request history, logs, or reports.
+Clear Signal never writes `secret: true` values to request history, logs, or reports.
 
 ---
 
@@ -691,21 +691,21 @@ ApiDesk never writes `secret: true` values to request history, logs, or reports.
 
 | Feature | Desktop | CLI |
 |---|---|---|
-| Send HTTP requests | ✓ | ✓ (`apidesk request`) |
+| Send HTTP requests | ✓ | ✓ (`clrsig request`) |
 | Params, headers, body, auth | ✓ | ✓ |
 | Response timing breakdown | ✓ | — |
 | Workspaces & collections | ✓ | — |
 | Environments & variables | ✓ | ✓ (`--env`) |
 | Request history | ✓ | — |
-| Multi-step scenarios | ✓ | ✓ (`apidesk run`) |
+| Multi-step scenarios | ✓ | ✓ (`clrsig run`) |
 | Variable extraction between steps | ✓ | ✓ |
 | Assertions (status, header, jsonpath, schema) | ✓ | ✓ |
 | RFC conformance scenarios (401/405/429/503) | — | ✓ (example scenarios) |
-| Import OpenAPI spec | ✓ | ✓ (`apidesk generate`) |
+| Import OpenAPI spec | ✓ | ✓ (`clrsig generate`) |
 | Generate request files from spec | ✓ | ✓ |
-| Spec conformance run | — | ✓ (`apidesk conform`) |
+| Spec conformance run | — | ✓ (`clrsig conform`) |
 | Coverage tracking | — | ✓ (`--coverage`) |
-| Breaking change detection | — | ✓ (`apidesk diff`) |
+| Breaking change detection | — | ✓ (`clrsig diff`) |
 | JUnit XML output | — | ✓ |
-| Scenario validation (dry run) | — | ✓ (`apidesk validate`) |
+| Scenario validation (dry run) | — | ✓ (`clrsig validate`) |
 | Settings (theme, proxy, TLS, timeout) | ✓ | flags |

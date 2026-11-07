@@ -1,4 +1,4 @@
-# ApiDesk User Guide
+# Clear Signal User Guide
 
 This file has been superseded. The current user guide is at:
 
