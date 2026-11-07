@@ -47,6 +47,7 @@ func main() {
 	mux.HandleFunc("/users/", handleUser)
 	mux.HandleFunc("/protected", handleProtected)
 	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/maintenance", handleMaintenance)
 	mux.HandleFunc("/admin/reset", handleAdminReset)
 
 	fmt.Println("ApiDesk example server")
@@ -60,6 +61,7 @@ func main() {
 	fmt.Println("  PUT    /users/:id            { \"name\": \"...\", \"email\": \"...\" }")
 	fmt.Println("  DELETE /users/:id")
 	fmt.Println("  GET    /protected            requires Authorization: Bearer demo-token-12345")
+	fmt.Println("  GET    /maintenance          always 503 with Retry-After (conformance testing)")
 	fmt.Println("  POST   /admin/reset          reset rate limit counters (testing only)")
 	fmt.Println()
 
@@ -78,9 +80,15 @@ func errJSON(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+// methodNotAllowed sets the Allow header (RFC 9110 §15.5.6) before writing 405.
+func methodNotAllowed(w http.ResponseWriter, allowed string) {
+	w.Header().Set("Allow", allowed)
+	errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+}
+
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		methodNotAllowed(w, "GET")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -91,7 +99,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		methodNotAllowed(w, "POST")
 		return
 	}
 	var body struct {
@@ -139,9 +147,18 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func handleMaintenance(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, "GET")
+		return
+	}
+	w.Header().Set("Retry-After", "120")
+	errJSON(w, http.StatusServiceUnavailable, "service temporarily unavailable")
+}
+
 func handleAdminReset(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		methodNotAllowed(w, "POST")
 		return
 	}
 	loginMu.Lock()
@@ -153,11 +170,12 @@ func handleAdminReset(w http.ResponseWriter, r *http.Request) {
 
 func handleProtected(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		methodNotAllowed(w, "GET")
 		return
 	}
 	auth := r.Header.Get("Authorization")
 	if auth != "Bearer "+validToken {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="api"`)
 		errJSON(w, http.StatusUnauthorized, "missing or invalid token")
 		return
 	}
@@ -200,7 +218,7 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, u)
 
 	default:
-		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		methodNotAllowed(w, "GET, POST")
 	}
 }
 
@@ -261,6 +279,6 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
-		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		methodNotAllowed(w, "GET, PUT, DELETE")
 	}
 }

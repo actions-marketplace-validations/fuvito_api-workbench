@@ -1,0 +1,44 @@
+schemaVersion: "1"
+title: 401 WWW-Authenticate conformance
+description: >
+  RFC 9110 §11.6.1 requires a 401 response to include a WWW-Authenticate
+  header that tells the client which authentication scheme to use.
+  Verify the protected endpoint conforms.
+
+steps:
+  - title: Request without token — expect 401 with WWW-Authenticate
+    request:
+      method: GET
+      url: "{{baseUrl}}/protected"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "401"
+      - type: header
+        path: "WWW-Authenticate"
+        operator: ne
+        expected: ""
+      - type: header
+        path: "WWW-Authenticate"
+        operator: contains
+        expected: "Bearer"
+      - type: jsonpath
+        path: "$.error"
+        operator: ne
+        expected: ""
+
+  - title: Request with wrong token — same 401 rules apply
+    request:
+      method: GET
+      url: "{{baseUrl}}/protected"
+      headers:
+        - name: Authorization
+          value: "Bearer invalid-token"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "401"
+      - type: header
+        path: "WWW-Authenticate"
+        operator: contains
+        expected: "Bearer"
