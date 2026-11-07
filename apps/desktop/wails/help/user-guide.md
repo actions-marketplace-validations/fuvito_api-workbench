@@ -1,9 +1,5 @@
 # Clear Signal User Guide
 
-<!-- This file is embedded into the desktop binary via //go:embed.
-     Keep it in sync with docs/user-guide.md — that copy is the canonical
-     source for GitHub viewing. -->
-
 **Version:** 1.0 (MVP)
 
 ---
