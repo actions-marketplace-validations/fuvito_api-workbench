@@ -84,7 +84,7 @@ func (d *DemoService) StartDemo() DemoResult {
 
 	mux := newDemoMux()
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", port),
+		Addr:         fmt.Sprintf("localhost:%d", port),
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 20 * time.Second,
@@ -143,7 +143,7 @@ func (d *DemoService) StopDemo() {
 
 func findFreePort(start int) (int, error) {
 	for port := start; port < start+30; port++ {
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 		if err == nil {
 			ln.Close()
 			return port, nil
