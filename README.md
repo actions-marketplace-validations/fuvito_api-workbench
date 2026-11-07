@@ -246,6 +246,25 @@ The GUI and CLI must never implement their own HTTP execution, assertion, or sce
 
 ---
 
+## Releasing
+
+Releases are fully automated via GitHub Actions. To cut a new release:
+
+```bash
+# Tag the commit you want to ship (semantic versioning)
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Pushing a `v*` tag triggers the release workflow, which:
+1. Builds the desktop app for **Windows** (amd64), **macOS** (arm64 + amd64), and **Linux** (amd64)
+2. Cross-compiles the **CLI** for all three platforms
+3. Creates a **GitHub Release** with all binaries attached
+
+Pre-release builds (tags containing `-`, e.g. `v0.2.0-beta.1`) are automatically marked as pre-release on GitHub.
+
+---
+
 ## Roadmap
 
 | Phase | Focus | Status |
