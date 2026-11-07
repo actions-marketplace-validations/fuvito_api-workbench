@@ -246,6 +246,35 @@ The GUI and CLI must never implement their own HTTP execution, assertion, or sce
 
 ---
 
+## Pre-release Checklist
+
+Run these before tagging a release. All commands from the repo root unless noted.
+
+```bash
+# 1 — Go core tests
+go test ./packages/core/...
+
+# 2 — CLI builds
+go build -o /tmp/clrsig-check ./apps/cli/...
+
+# 3 — Frontend type check
+cd apps/desktop/frontend && npx tsc --noEmit -p tsconfig.app.json
+
+# 4 — Frontend unit tests
+pnpm test
+
+# 5 — E2E screenshot tests (also regenerates docs/images/)
+cd apps/desktop/e2e && npx playwright test --grep "@screenshot"
+```
+
+Then verify manually:
+
+- [ ] Version bumped in `apps/desktop/frontend/src/components/AboutDialog.tsx`, `docs/user-guide.md`, and `apps/desktop/wails/help/user-guide.md`
+- [ ] Release notes entry added in `AboutDialog.tsx` (`RELEASE_NOTES` array)
+- [ ] Screenshots in `docs/images/` look correct in the README
+
+---
+
 ## Releasing
 
 Releases are fully automated via GitHub Actions. To cut a new release:
