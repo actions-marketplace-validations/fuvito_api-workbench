@@ -2,15 +2,9 @@
   <!-- Background -->
   <rect width="256" height="256" rx="52" fill="#09090b"/>
 
-  <!-- A glyph: white sides + mid crossbar, blue top cap -->
-  <rect x="42" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
-  <rect x="100" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
-  <rect x="42" y="121" width="72" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="42" y="56" width="72" height="14" rx="3" fill="#3b82f6"/>
-
-  <!-- D glyph: white letterform, blue right bar -->
-  <rect x="138" y="56" width="14" height="144" rx="3" fill="#f4f4f5"/>
-  <rect x="138" y="56" width="76" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="138" y="186" width="76" height="14" rx="3" fill="#f4f4f5"/>
-  <rect x="200" y="56" width="14" height="144" rx="3" fill="#3b82f6"/>
+  <!-- Signal bars — 4 bars, increasing height, bottom-aligned at y=206 -->
+  <rect x="48"  y="156" width="28" height="50"  rx="4" fill="#f4f4f5"/>
+  <rect x="92"  y="116" width="28" height="90"  rx="4" fill="#f4f4f5"/>
+  <rect x="136" y="86"  width="28" height="120" rx="4" fill="#f4f4f5"/>
+  <rect x="180" y="56"  width="28" height="150" rx="4" fill="#3b82f6"/>
 </svg>

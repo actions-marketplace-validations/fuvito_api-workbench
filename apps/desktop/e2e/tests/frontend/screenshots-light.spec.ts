@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const IMAGES_DIR = path.join(__dirname, '..', '..', '..', '..', '..', 'docs', 'images')
 
-const VIEWPORT = { width: 1920, height: 1080 }
+const VIEWPORT = { width: 1280, height: 800 }
 
 function shot(name: string) {
   return path.join(IMAGES_DIR, name)
