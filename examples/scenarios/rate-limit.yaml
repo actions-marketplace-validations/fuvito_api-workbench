@@ -1,0 +1,78 @@
+schemaVersion: "1"
+title: Rate limit conformance
+description: >
+  Verify that the login endpoint enforces rate limiting: after 2 failed
+  attempts the third returns 429 with Retry-After and X-RateLimit-* headers.
+
+steps:
+  - title: Reset rate limit counters
+    request:
+      method: POST
+      url: "{{baseUrl}}/admin/reset"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+    failPolicy: stop
+
+  - title: First failed login — expect 401
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"bad","password":"wrong"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "401"
+      - type: header
+        path: "X-RateLimit-Remaining"
+        operator: eq
+        expected: "1"
+    failPolicy: continue
+
+  - title: Second failed login — expect 401
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"bad","password":"wrong"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "401"
+      - type: header
+        path: "X-RateLimit-Remaining"
+        operator: eq
+        expected: "0"
+    failPolicy: continue
+
+  - title: Third failed login — expect 429 with rate limit headers
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"bad","password":"wrong"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "429"
+      - type: header
+        path: "Retry-After"
+        operator: eq
+        expected: "60"
+      - type: header
+        path: "X-RateLimit-Limit"
+        operator: eq
+        expected: "2"
+      - type: header
+        path: "X-RateLimit-Remaining"
+        operator: eq
+        expected: "0"
+      - type: jsonpath
+        path: "$.error"
+        operator: ne
+        expected: ""

@@ -20,14 +20,23 @@ type User struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+const (
+	rateLimitMax    = 2             // failed login attempts before 429
+	rateLimitWindow = time.Minute
+)
+
 var (
 	mu      sync.Mutex
 	users   = []User{
 		{ID: 1, Name: "Alice Smith", Email: "alice@example.com", CreatedAt: "2026-01-01T00:00:00Z"},
 		{ID: 2, Name: "Bob Jones", Email: "bob@example.com", CreatedAt: "2026-01-02T00:00:00Z"},
 	}
-	nextID  = 3
+	nextID     = 3
 	validToken = "demo-token-12345"
+
+	loginMu          sync.Mutex
+	loginAttempts    int
+	loginWindowStart = time.Now()
 )
 
 func main() {
@@ -38,6 +47,7 @@ func main() {
 	mux.HandleFunc("/users/", handleUser)
 	mux.HandleFunc("/protected", handleProtected)
 	mux.HandleFunc("/health", handleHealth)
+	mux.HandleFunc("/admin/reset", handleAdminReset)
 
 	fmt.Println("ApiDesk example server")
 	fmt.Println("Listening on http://localhost:8080")
@@ -50,6 +60,7 @@ func main() {
 	fmt.Println("  PUT    /users/:id            { \"name\": \"...\", \"email\": \"...\" }")
 	fmt.Println("  DELETE /users/:id")
 	fmt.Println("  GET    /protected            requires Authorization: Bearer demo-token-12345")
+	fmt.Println("  POST   /admin/reset          reset rate limit counters (testing only)")
 	fmt.Println()
 
 	if err := http.ListenAndServe(":8080", mux); err != nil {
@@ -92,13 +103,52 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Username != "admin" || body.Password != "secret" {
+		loginMu.Lock()
+		now := time.Now()
+		if now.Sub(loginWindowStart) > rateLimitWindow {
+			loginAttempts = 0
+			loginWindowStart = now
+		}
+		loginAttempts++
+		count := loginAttempts
+		reset := loginWindowStart.Add(rateLimitWindow).Unix()
+		loginMu.Unlock()
+
+		if count > rateLimitMax {
+			w.Header().Set("Retry-After", "60")
+			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(rateLimitMax))
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
+			errJSON(w, http.StatusTooManyRequests, "too many failed login attempts")
+			return
+		}
+		remaining := rateLimitMax - count
+		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(rateLimitMax))
+		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
 		errJSON(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
+	loginMu.Lock()
+	loginAttempts = 0
+	loginWindowStart = time.Now()
+	loginMu.Unlock()
 	writeJSON(w, http.StatusOK, map[string]string{
 		"token":   validToken,
 		"message": "Login successful",
 	})
+}
+
+func handleAdminReset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	loginMu.Lock()
+	loginAttempts = 0
+	loginWindowStart = time.Now()
+	loginMu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]string{"message": "rate limit counters reset"})
 }
 
 func handleProtected(w http.ResponseWriter, r *http.Request) {
