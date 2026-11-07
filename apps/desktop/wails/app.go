@@ -68,5 +68,8 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	if err != nil {
 		return false // allow close if dialog fails
 	}
-	return result != "Exit"
+	// On Windows the native QuestionDialog returns "Yes"/"No" regardless of custom
+	// button labels; on macOS it returns the label text. Cancel the close only when
+	// the user explicitly declined — anything else (Yes, Exit, unknown) allows exit.
+	return result == "Cancel" || result == "No"
 }
