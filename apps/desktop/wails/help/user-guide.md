@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 1.0 (MVP)
+**Version:** 0.1.0 (Public MVP)
 
 ---
 
