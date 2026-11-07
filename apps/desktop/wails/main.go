@@ -36,6 +36,7 @@ func main() {
 			app.settingsService,
 			app.demoService,
 			app.scenarioService,
+			app.helpService,
 		},
 	})
 	if err != nil {

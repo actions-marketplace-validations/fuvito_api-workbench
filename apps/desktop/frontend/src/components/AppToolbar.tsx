@@ -1,4 +1,4 @@
-import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus } from 'lucide-react'
+import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SnippetButton } from '@/components/SnippetButton'
 import { isTabDirty } from '@/lib/tabState'
@@ -20,6 +20,7 @@ type AppToolbarProps = {
   onNewRequest: () => void
   onDuplicateTab: () => void
   onShowSettings: () => void
+  onShowHelp: () => void
   onEnvChange: (path: string) => void
   onEditEnv: () => void
   onStopDemo: () => void
@@ -30,7 +31,7 @@ export function AppToolbar({
   environments, activeEnv, workspacePath,
   demoRunning, demoPort,
   onOpenRequest, onSaveRequest, onNewRequest, onDuplicateTab,
-  onShowSettings, onEnvChange, onEditEnv, onStopDemo,
+  onShowSettings, onShowHelp, onEnvChange, onEditEnv, onStopDemo,
 }: AppToolbarProps) {
   return (
     <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
@@ -112,6 +113,10 @@ export function AppToolbar({
         <button type="button" onClick={onShowSettings} title="Settings"
           className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <Settings size={13} />
+        </button>
+        <button type="button" onClick={onShowHelp} title="User guide"
+          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
+          <HelpCircle size={13} />
         </button>
 
         {environments.length > 0 && (

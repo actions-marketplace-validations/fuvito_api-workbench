@@ -4,6 +4,7 @@ import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
 import { AppToolbar } from '@/components/AppToolbar'
 import { SettingsPanel } from '@/components/SettingsPanel'
+import { HelpPanel } from '@/components/HelpPanel'
 import { EnvironmentEditor } from '@/components/EnvironmentEditor'
 import { RequestEditor } from '@/components/RequestEditor'
 import { ResponseViewer } from '@/components/ResponseViewer'
@@ -56,6 +57,7 @@ export default function App() {
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('workspace')
   const [showAbout, setShowAbout] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
 
@@ -269,6 +271,8 @@ export default function App() {
           disabled: demo.demoStarting,
         },
         { kind: 'separator' },
+        { kind: 'action', label: 'User Guide', onClick: () => setShowHelp(true) },
+        { kind: 'separator' },
         { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
       ],
     },
@@ -297,6 +301,7 @@ export default function App() {
       )}
 
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
 
       {workspace.importFromURLDialog && (
         <ImportFromURLDialog
@@ -477,6 +482,7 @@ export default function App() {
             onNewRequest={tabs.handleNewTab}
             onDuplicateTab={tabs.handleDuplicateTab}
             onShowSettings={() => settings.setShowSettings(true)}
+            onShowHelp={() => setShowHelp(true)}
             onEnvChange={workspace.handleEnvChange}
             onEditEnv={() => { setEditingEnvPath(workspace.activeEnv?.path ?? null); setShowEnvEditor(true) }}
             onStopDemo={demo.handleStopDemo}

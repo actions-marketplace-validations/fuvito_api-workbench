@@ -14,6 +14,7 @@ type App struct {
 	settingsService  *SettingsService
 	demoService      *DemoService
 	scenarioService  *ScenarioService
+	helpService      *HelpService
 	hasDirtyTabs     bool
 }
 
@@ -29,6 +30,7 @@ func NewApp() *App {
 		settingsService:  ss,
 		demoService:      NewDemoService(ws),
 		scenarioService:  NewScenarioService(ws, ss),
+		helpService:      NewHelpService(),
 	}
 }
 

@@ -65,6 +65,7 @@ import {
   SaveScenarioResult as WailsSaveScenarioResult,
   LoadScenarioResult as WailsLoadScenarioResult,
 } from '@wailsjs/go/main/ScenarioService'
+import { GetUserGuide as WailsGetUserGuide } from '@wailsjs/go/main/HelpService'
 
 // ---- Shared I/O types ----
 
@@ -547,4 +548,10 @@ export async function deleteScenario(path: string): Promise<string> {
 // Returns the new file path on success, or a string starting with "error:" on failure.
 export async function renameScenario(path: string, newName: string): Promise<string> {
   return (await WailsRenameScenario(path, newName)) as unknown as string
+}
+
+// ---- Help ----
+
+export async function getUserGuide(): Promise<string> {
+  return (await WailsGetUserGuide()) as unknown as string
 }
