@@ -224,6 +224,112 @@ steps:
 
 ---
 
+## HTTP RFC Conformance Scenarios
+
+A correct HTTP status code is only part of the contract. Several RFCs mandate specific accompanying headers — headers that implementations routinely omit. ApiDesk ships ready-to-run example scenarios for each pattern.
+
+### Why headers matter alongside status codes
+
+| Status | RFC mandate | Missing header means… |
+|---|---|---|
+| `401 Unauthorized` | `WWW-Authenticate` (RFC 9110 §11.6.1) | Client can't determine which auth scheme to use |
+| `405 Method Not Allowed` | `Allow` (RFC 9110 §15.5.6) | Client can't discover permitted methods |
+| `429 Too Many Requests` | `Retry-After` + `X-RateLimit-*` (RFC 6585) | Client has no signal for when to retry |
+| `503 Service Unavailable` | `Retry-After` (RFC 9110 §15.6.4) | Client retries blindly with no backoff hint |
+
+### What the scenarios assert
+
+Each scenario in `examples/scenarios/` tests the full header contract, not just the status code:
+
+**401 — `WWW-Authenticate` required**
+```yaml
+- title: Request without token — expect 401 with WWW-Authenticate
+  request:
+    method: GET
+    url: "{{baseUrl}}/protected"
+  assertions:
+    - type: status
+      operator: eq
+      expected: "401"
+    - type: header
+      path: "WWW-Authenticate"
+      operator: contains
+      expected: "Bearer"
+```
+
+**405 — `Allow` lists permitted methods**
+```yaml
+- title: GET on login endpoint — expect 405 with Allow header
+  request:
+    method: GET
+    url: "{{baseUrl}}/auth/login"
+  assertions:
+    - type: status
+      operator: eq
+      expected: "405"
+    - type: header
+      path: "Allow"
+      operator: contains
+      expected: "POST"
+```
+
+**429 — Rate limit budget tracked across steps**
+```yaml
+- title: First failed login — expect 401 with remaining budget
+  assertions:
+    - type: status
+      operator: eq
+      expected: "401"
+    - type: header
+      path: "X-RateLimit-Remaining"
+      operator: eq
+      expected: "1"
+
+- title: Third attempt — expect 429 with full header set
+  assertions:
+    - type: status
+      operator: eq
+      expected: "429"
+    - type: header
+      path: "Retry-After"
+      operator: eq
+      expected: "60"
+    - type: header
+      path: "X-RateLimit-Limit"
+      operator: eq
+      expected: "2"
+```
+
+**503 — Retry-After communicates backoff**
+```yaml
+- title: Maintenance endpoint — expect 503 with Retry-After
+  assertions:
+    - type: status
+      operator: eq
+      expected: "503"
+    - type: header
+      path: "Retry-After"
+      operator: ne
+      expected: ""
+```
+
+### Running the full conformance suite
+
+```bash
+# Start the included example server
+go run ./examples/server
+
+# Run all RFC conformance scenarios
+apidesk run examples/scenarios/401-www-authenticate.yaml  --env examples/environments/local.yaml
+apidesk run examples/scenarios/405-method-not-allowed.yaml --env examples/environments/local.yaml
+apidesk run examples/scenarios/429-rate-limit.yaml         --env examples/environments/local.yaml
+apidesk run examples/scenarios/503-service-unavailable.yaml --env examples/environments/local.yaml
+```
+
+These are plain YAML scenario files — copy them into your own workspace and point them at your API.
+
+---
+
 ## OpenAPI Integration
 
 **Import a spec** from the desktop UI (⇡ button in the workspace panel) or from the CLI:
@@ -594,6 +700,7 @@ ApiDesk never writes `secret: true` values to request history, logs, or reports.
 | Multi-step scenarios | ✓ | ✓ (`apidesk run`) |
 | Variable extraction between steps | ✓ | ✓ |
 | Assertions (status, header, jsonpath, schema) | ✓ | ✓ |
+| RFC conformance scenarios (401/405/429/503) | — | ✓ (example scenarios) |
 | Import OpenAPI spec | ✓ | ✓ (`apidesk generate`) |
 | Generate request files from spec | ✓ | ✓ |
 | Spec conformance run | — | ✓ (`apidesk conform`) |
