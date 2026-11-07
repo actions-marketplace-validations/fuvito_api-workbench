@@ -75,20 +75,27 @@ jobs:
         run: wails build -platform darwin/arm64
         working-directory: apps/desktop/wails
 
+      - name: Zip arm64 app bundle
+        run: ditto -c -k --sequesterRsrc --keepParent apps/desktop/wails/build/bin/clrsig.app clrsig-darwin-arm64.zip
+
       - name: Build desktop (macOS amd64)
         run: wails build -platform darwin/amd64
         working-directory: apps/desktop/wails
 
-      - name: Rename artifacts
-        run: |
-          mv apps/desktop/wails/build/bin/clrsig.app apps/desktop/wails/build/bin/clrsig-arm64.app || true
-          cp apps/desktop/wails/build/bin/clrsig-arm64.app apps/desktop/wails/build/bin/clrsig-amd64.app || true
+      - name: Zip amd64 app bundle
+        run: ditto -c -k --sequesterRsrc --keepParent apps/desktop/wails/build/bin/clrsig.app clrsig-darwin-amd64.zip
 
-      - name: Upload macOS artifact
+      - name: Upload macOS arm64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: clrsig-macos
-          path: apps/desktop/wails/build/bin/
+          name: clrsig-darwin-arm64
+          path: clrsig-darwin-arm64.zip
+
+      - name: Upload macOS amd64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clrsig-darwin-amd64
+          path: clrsig-darwin-amd64.zip
 
   release-linux:
     name: Desktop — Linux
@@ -191,6 +198,8 @@ jobs:
           generate_release_notes: true
           files: |
             dist/clrsig-windows-amd64/clrsig.exe
+            dist/clrsig-darwin-arm64/clrsig-darwin-arm64.zip
+            dist/clrsig-darwin-amd64/clrsig-darwin-amd64.zip
             dist/clrsig-linux-amd64/clrsig
             dist/clrsig-cli-windows-amd64/clrsig-windows-amd64.exe
             dist/clrsig-cli-darwin-arm64/clrsig-darwin-arm64
