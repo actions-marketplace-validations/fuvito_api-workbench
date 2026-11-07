@@ -76,14 +76,14 @@ jobs:
         working-directory: apps/desktop/wails
 
       - name: Zip arm64 app bundle
-        run: ditto -c -k --sequesterRsrc --keepParent apps/desktop/wails/build/bin/clrsig.app clrsig-darwin-arm64.zip
+        run: ditto -c -k --sequesterRsrc --keepParent "apps/desktop/wails/build/bin/Clear Signal.app" clrsig-darwin-arm64.zip
 
       - name: Build desktop (macOS amd64)
         run: wails build -platform darwin/amd64
         working-directory: apps/desktop/wails
 
       - name: Zip amd64 app bundle
-        run: ditto -c -k --sequesterRsrc --keepParent apps/desktop/wails/build/bin/clrsig.app clrsig-darwin-amd64.zip
+        run: ditto -c -k --sequesterRsrc --keepParent "apps/desktop/wails/build/bin/Clear Signal.app" clrsig-darwin-amd64.zip
 
       - name: Upload macOS arm64 artifact
         uses: actions/upload-artifact@v4
