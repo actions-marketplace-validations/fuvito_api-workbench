@@ -1,0 +1,67 @@
+schemaVersion: "1"
+title: ETag conditional request conformance
+description: >
+  RFC 7232 defines conditional requests. A GET response should include an ETag.
+  A subsequent GET with If-None-Match matching that ETag must return 304 Not Modified
+  (no body, no redundant transfer). A request with a stale ETag must return 200
+  with the full response and an updated ETag.
+
+steps:
+  - title: Fetch user — server must return ETag
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "ETag"
+        operator: ne
+        expected: ""
+      - type: jsonpath
+        path: "$.id"
+        operator: eq
+        expected: "1"
+    extractions:
+      - name: etag
+        source: header
+        path: "ETag"
+    failPolicy: stop
+
+  - title: Conditional GET with matching ETag — expect 304 Not Modified
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+      headers:
+        - name: If-None-Match
+          value: "{{etag}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "304"
+    failPolicy: continue
+
+  - title: Conditional GET with stale ETag — expect 200 with full response
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+      headers:
+        - name: If-None-Match
+          value: '"stale-etag-value"'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "ETag"
+        operator: ne
+        expected: ""
+      - type: jsonpath
+        path: "$.id"
+        operator: eq
+        expected: "1"
+      - type: jsonpath
+        path: "$.name"
+        operator: ne
+        expected: ""

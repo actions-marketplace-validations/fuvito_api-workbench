@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"net/http"
 	"strconv"
 	"strings"
@@ -74,6 +75,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
+}
+
+// userETag returns a quoted ETag derived from the user's JSON representation.
+func userETag(u User) string {
+	data, _ := json.Marshal(u)
+	return fmt.Sprintf(`"%x"`, crc32.ChecksumIEEE(data))
 }
 
 // problemJSON writes an RFC 7807 Problem Details response (application/problem+json).
@@ -253,6 +260,12 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 			problemJSON(w, http.StatusNotFound, "/errors/not-found", "Not Found", "user not found")
 			return
 		}
+		etag := userETag(users[idx])
+		w.Header().Set("ETag", etag)
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
 		writeJSON(w, http.StatusOK, users[idx])
 
 	case http.MethodPut:
@@ -274,6 +287,7 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 		if body.Email != "" {
 			users[idx].Email = body.Email
 		}
+		w.Header().Set("ETag", userETag(users[idx]))
 		writeJSON(w, http.StatusOK, users[idx])
 
 	case http.MethodDelete:
