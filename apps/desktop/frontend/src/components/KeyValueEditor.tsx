@@ -64,7 +64,7 @@ export function KeyValueEditor({
         </div>
       )}
       {pairs.map(pair => (
-        <div key={pair.id} className="flex items-center gap-1.5">
+        <div key={pair.id} className="flex items-center gap-1.5 rounded px-1 -mx-1 hover:bg-[var(--color-muted)] transition-colors group">
           <input
             type="checkbox"
             checked={pair.enabled}
@@ -90,7 +90,7 @@ export function KeyValueEditor({
             type="button"
             onClick={() => remove(pair.id)}
             aria-label="Remove row"
-            className="shrink-0 w-4 flex items-center justify-center text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)] transition-colors"
+            className="shrink-0 w-4 flex items-center justify-center text-[var(--color-muted-foreground)] hover:text-[var(--color-destructive)] transition-colors opacity-0 group-hover:opacity-100"
           >
             <X size={11} />
           </button>

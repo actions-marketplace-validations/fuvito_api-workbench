@@ -407,18 +407,18 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--color-border)] shrink-0 flex-wrap">
         {response && !response.error && response.statusCode > 0 ? (
           <>
-            <span data-testid="response-status" className={cn('text-xs font-mono font-semibold', statusColor(response.statusCode))}>
+            <span data-testid="response-status" className={cn('text-sm font-mono font-bold', statusColor(response.statusCode))}>
               {response.statusCode}
             </span>
             <span className="text-xs text-[var(--color-muted-foreground)]">{response.status}</span>
-            <span className="ml-auto text-xs text-[var(--color-muted-foreground)]">{response.durationMs} ms</span>
-            <span className="text-xs text-[var(--color-muted-foreground)]">{formatSize(response.size)}</span>
+            <span className="ml-auto text-xs font-mono text-[var(--color-muted-foreground)]">{response.durationMs} ms</span>
+            <span className="text-xs font-mono text-[var(--color-muted-foreground)]">{formatSize(response.size)}</span>
             <button
               type="button"
               onClick={openSearch}
               title="Search body (Ctrl+F)"
               aria-label="Search body"
-              className="flex items-center gap-1 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              className="p-1 rounded flex items-center gap-1 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
             >
               <Search size={12} />
               <span className="text-[10px] font-mono opacity-60 hidden sm:inline">Ctrl+F</span>
@@ -428,7 +428,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
               onClick={() => setRawMode(m => !m)}
               title={rawMode ? 'Switch to pretty view' : 'Switch to raw view'}
               aria-label={rawMode ? 'Switch to pretty view' : 'Switch to raw view'}
-              className={cn('transition-colors', rawMode ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}
+              className={cn('p-1 rounded transition-colors', rawMode ? 'text-[var(--color-accent)] bg-[var(--color-muted)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]')}
             >
               {rawMode ? <Code2 size={12} /> : <AlignLeft size={12} />}
             </button>
@@ -438,7 +438,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
                 onClick={handleCopy}
                 title={copied ? 'Copied!' : 'Copy response body'}
                 aria-label="Copy response body"
-                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                className="p-1 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
               >
                 {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
               </button>
@@ -453,7 +453,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
               onClick={handleOpenExternal}
               title="Open in system viewer"
               aria-label="Open in system viewer"
-              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+              className="p-1 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
             >
               <ExternalLink size={12} />
             </button>
@@ -463,7 +463,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
                 onClick={onClear}
                 title="Clear response"
                 aria-label="Clear response"
-                className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+                className="p-1 rounded text-[var(--color-muted-foreground)] hover:text-red-400 hover:bg-[var(--color-muted)] transition-colors"
               >
                 <Trash2 size={12} />
               </button>
@@ -478,7 +478,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
                 onClick={onClear}
                 title="Clear response"
                 aria-label="Clear response"
-                className="ml-auto text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+                className="ml-auto p-1 rounded text-[var(--color-muted-foreground)] hover:text-red-400 hover:bg-[var(--color-muted)] transition-colors"
               >
                 <Trash2 size={12} />
               </button>

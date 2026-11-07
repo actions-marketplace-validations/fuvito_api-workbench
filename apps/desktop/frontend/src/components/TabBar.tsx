@@ -34,7 +34,7 @@ type TabBarProps = {
 
 export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarProps) {
   return (
-    <div className="flex items-stretch shrink-0 bg-[var(--color-background)] border-b border-[var(--color-border)] overflow-x-auto">
+    <div className="flex items-stretch shrink-0 bg-[var(--color-muted)] border-b border-[var(--color-border)] overflow-x-auto">
       {tabs.map(tab => {
         const isActive = tab.id === activeTabId
         return (
@@ -44,24 +44,24 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
             aria-selected={isActive}
             onClick={() => onSelect(tab.id)}
             className={cn(
-              'group flex items-center gap-1.5 px-3 h-8 text-xs shrink-0 max-w-[200px] min-w-[80px]',
-              'border-t-2 cursor-pointer select-none transition-colors',
+              'group flex items-center gap-1.5 px-3 h-9 text-xs shrink-0 max-w-[200px] min-w-[80px]',
+              'border-t-[3px] cursor-pointer select-none transition-colors',
               isActive
-                ? 'bg-[var(--color-card)] border-t-[var(--color-accent)] text-[var(--color-foreground)]'
-                : 'bg-transparent border-t-transparent text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)] hover:text-[var(--color-foreground)]',
+                ? 'bg-[var(--color-card)] border-t-[var(--color-accent)] border-l border-r border-[var(--color-border)] text-[var(--color-foreground)]'
+                : 'bg-transparent border-t-transparent text-[var(--color-muted-foreground)] hover:bg-[var(--color-border)] hover:text-[var(--color-foreground)]',
             )}
           >
             {tab.isDirty && (
               <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
             )}
             {tab.kind === 'scenario' ? (
-              <span className="shrink-0 font-mono font-bold text-[10px] text-violet-400">SCN</span>
+              <span className="shrink-0 font-mono font-bold text-label text-violet-400">SCN</span>
             ) : (
-              <span className={cn('shrink-0 font-mono font-bold text-[10px]', TAB_METHOD_COLOR[tab.method] ?? '')}>
+              <span className={cn('shrink-0 font-mono font-bold text-label', TAB_METHOD_COLOR[tab.method] ?? '')}>
                 {TAB_METHOD_ABBR[tab.method] ?? tab.method.slice(0, 3)}
               </span>
             )}
-            <span className="truncate flex-1 text-[11px]">
+            <span className="truncate flex-1 text-xs">
               {tab.kind === 'scenario' ? (tab.name ?? 'Scenario') : (tab.name ?? 'New Request')}
             </span>
             <button
@@ -83,7 +83,7 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
         type="button"
         onClick={onNew}
         title="New request tab"
-        className="h-8 px-3 shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+        className="h-9 px-3 shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
       >
         <Plus size={12} />
       </button>

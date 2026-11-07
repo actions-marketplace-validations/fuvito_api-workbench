@@ -976,7 +976,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [leftPanelWidth, setLeftPanelWidth] = useState(240)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320)
   const [showStats, setShowStats] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const stepListRef = useRef<HTMLDivElement>(null)
@@ -988,7 +988,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     const startX = e.clientX
     const startWidth = leftPanelWidth
     function onMouseMove(ev: MouseEvent) {
-      setLeftPanelWidth(Math.max(160, Math.min(480, startWidth + (ev.clientX - startX))))
+      setLeftPanelWidth(Math.max(200, Math.min(600, startWidth + (ev.clientX - startX))))
     }
     function onMouseUp() {
       document.removeEventListener('mousemove', onMouseMove)

@@ -91,26 +91,26 @@ export function AppToolbar({
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-2 shrink-0">
+      <div className="ml-auto flex items-center gap-1 shrink-0">
         <button type="button" onClick={onOpenRequest} title="Open request file"
-          className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <FolderOpen size={13} />
         </button>
         <button type="button" onClick={onSaveRequest} title="Save request (Ctrl+S)"
-          className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <Save size={13} />
         </button>
         <button type="button" onClick={onNewRequest} title="New request tab (Ctrl+N)"
-          className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <FilePlus size={13} />
         </button>
         <button type="button" onClick={onDuplicateTab} title="Duplicate tab"
-          className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <CopyPlus size={13} />
         </button>
         <SnippetButton tab={activeTab} />
         <button type="button" onClick={onShowSettings} title="Settings"
-          className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <Settings size={13} />
         </button>
 
@@ -138,7 +138,7 @@ export function AppToolbar({
         {workspacePath && (
           <button type="button" onClick={onEditEnv}
             title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'Create environment'}
-            className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+            className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
             <Pencil size={13} />
           </button>
         )}

@@ -168,7 +168,7 @@ export function RequestEditor({
           <button
             type="button"
             onClick={onCancel}
-            className="bg-[var(--color-muted)] border border-[var(--color-border)] text-red-400 hover:text-red-300 text-xs font-semibold rounded px-4 py-1 transition-colors shrink-0"
+            className="bg-[var(--color-muted)] border border-[var(--color-border)] text-red-400 hover:text-red-300 text-xs font-semibold rounded px-4 py-1.5 transition-colors shrink-0"
           >
             Cancel
           </button>
@@ -179,7 +179,7 @@ export function RequestEditor({
             disabled={!url.trim()}
             title="Send (Ctrl+Enter)"
             className={cn(
-              'bg-[var(--color-accent)] text-white text-xs font-semibold rounded px-4 py-1',
+              'bg-[var(--color-accent)] text-white text-xs font-semibold rounded px-4 py-1.5',
               'transition-opacity disabled:opacity-40 hover:opacity-90 shrink-0',
             )}
           >

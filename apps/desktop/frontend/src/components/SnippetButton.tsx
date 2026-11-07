@@ -103,7 +103,7 @@ export function SnippetButton({ tab }: { tab: TabState }) {
         type="button"
         onClick={() => setOpen(true)}
         title="Copy as code snippet"
-        className="flex items-center gap-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+        className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
       >
         <Code2 size={13} />
       </button>

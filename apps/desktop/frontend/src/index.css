@@ -110,3 +110,22 @@ button svg, a svg {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(400%); }
 }
+
+/* Custom scrollbars — thin and theme-aware */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

@@ -8,6 +8,16 @@ ApiDesk is an open-source, local-first desktop application that lets you verify 
 
 ---
 
+## Screenshots
+
+| Dark mode | Light mode |
+|---|---|
+| ![Request editor — dark](docs/images/04-response-viewer.png) | ![Request editor — light](docs/images/04-response-viewer-light.png) |
+| ![Scenario results — dark](docs/images/07-scenario-result.png) | ![Scenario results — light](docs/images/07-scenario-result-light.png) |
+| ![Settings — dark](docs/images/09-settings.png) | ![Settings — light](docs/images/09-settings-light.png) |
+
+---
+
 ## Why ApiDesk
 
 Most API tools focus on exploration. ApiDesk focuses on **contract verification**: does your API actually honour its OpenAPI specification? Can you prove it, repeatably, in a pipeline?
@@ -221,9 +231,10 @@ api-workbench/
 │   └── scenarios/          # Sample scenarios (user-lifecycle.yaml)
 │
 ├── docs/                   # Architecture and product documentation
-├── .github/workflows/
-│   ├── ci.yml              # Push/PR: core tests → CLI build → desktop build
-│   └── release.yml         # Tag push: cross-platform builds → GitHub Release
+├── .github/
+│   └── workflows/
+│       ├── ci.yml          # Push/PR: core tests → CLI build → desktop build
+│       └── release.yml     # Tag push: cross-platform builds → GitHub Release
 ├── go.work                 # Go workspace (ties core + cli + desktop + examples/server)
 ├── pnpm-workspace.yaml
 └── CLAUDE.md               # Engineering rules and changelog
