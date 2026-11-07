@@ -1,9 +1,9 @@
 openapi: "3.0.3"
 info:
-  title: ApiDesk Example API
+  title: Clear Signal Example API
   version: "1.0.0"
   description: >
-    A simple users API used to demonstrate ApiDesk features:
+    A simple users API used to demonstrate Clear Signal features:
     request execution, variable extraction, assertion evaluation,
     and OpenAPI spec import.
 

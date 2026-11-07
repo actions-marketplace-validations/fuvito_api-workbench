@@ -24,8 +24,8 @@ import (
 
 func main() {
 	root := &cobra.Command{
-		Use:   "apidesk",
-		Short: "ApiDesk — API Contract Validation and Spec Conformance Testing",
+		Use:   "clrsig",
+		Short: "Clear Signal — API Contract Validation and Spec Conformance Testing",
 	}
 
 	root.AddCommand(runCmd())

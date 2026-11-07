@@ -13,7 +13,7 @@ const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> =
       'Full HTTP execution with DNS/TCP/TLS/TTFB/transfer timing breakdown',
       'OpenAPI 3.0/3.1 spec import — generates request collections automatically',
       'Scenario engine: multi-step execution, variable extraction, assertions',
-      'CLI — apidesk run for scenario execution in CI/CD pipelines',
+      'CLI — clrsig run for scenario execution in CI/CD pipelines',
       'Request and execution history via SQLite',
       'Settings: theme, font size, timeout, proxy URL, TLS skip-verify',
       'Cross-platform release builds (Windows, macOS, Linux) via GitHub Actions',
@@ -37,12 +37,12 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
         <div className="flex flex-col items-center gap-4 px-8 pt-8 pb-6 border-b border-[var(--color-border)] shrink-0">
           <img
             src="/appicon.png"
-            alt="ApiDesk icon"
+            alt="Clear Signal icon"
             className="w-24 h-24 rounded-2xl shadow-lg select-none"
             draggable={false}
           />
           <div className="flex flex-col items-center gap-1">
-            <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">ApiDesk</h2>
+            <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
             <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.1.0 — Public MVP</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">

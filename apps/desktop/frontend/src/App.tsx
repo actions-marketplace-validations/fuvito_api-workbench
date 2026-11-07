@@ -269,7 +269,7 @@ export default function App() {
           disabled: demo.demoStarting,
         },
         { kind: 'separator' },
-        { kind: 'action', label: 'About ApiDesk', onClick: () => setShowAbout(true) },
+        { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
       ],
     },
   ]

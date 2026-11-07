@@ -9,7 +9,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 )
 
-// SettingsService persists user preferences to ~/.apidesk/settings.json.
+// SettingsService persists user preferences to ~/.clrsig/settings.json.
 type SettingsService struct {
 	ctx             context.Context
 	settings        domain.Settings
@@ -63,7 +63,7 @@ func settingsPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(home, ".apidesk")
+	dir := filepath.Join(home, ".clrsig")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}

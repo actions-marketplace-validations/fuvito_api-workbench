@@ -1,4 +1,4 @@
-# CLAUDE.md — API Workbench (ApiDesk)
+# CLAUDE.md — API Workbench (Clear Signal)
 
 This file is Claude Code's operating contract for this repository. Read it fully before touching any code.
 
@@ -6,7 +6,7 @@ This file is Claude Code's operating contract for this repository. Read it fully
 
 ## 1. Project Identity
 
-**Name:** ApiDesk (working title: api-workbench)
+**Name:** Clear Signal (working title: api-workbench)
 **Primary type:** Open-source, local-first **API contract testing platform**
 **Secondary:** Full API development and testing workbench (interactive client, collections, environments, scenarios)
 **Status:** Pre-implementation — engineering foundation phase (Phase 0)
@@ -74,7 +74,7 @@ Do not introduce dependencies outside this list without explicit user approval.
 ## 4. Planned Directory Structure
 
 ```
-apidesk/
+clrsig/
 ├── apps/
 │   ├── desktop/
 │   │   ├── frontend/       # React + TypeScript + Vite
@@ -243,17 +243,17 @@ Do not implement or stub any of these without explicit user direction.
 - **`packages/core/scenario/runner.go`** — `Runner` executes all steps sequentially. `StepResult` captures request, response, assertion results, extracted variables, pass/skip/error state. `FailPolicy` semantics: `stop`/`""` (default) skips remaining steps; `continue` keeps going; `skip` skips this step if prev failed. Variable extraction feeds `resolver.Set()` so subsequent steps see extracted values. `Result.Counts()` and `AssertionCounts()` for reporting. 6 tests; all pass.
 - **`packages/core/serialization/scenario.go`** — `ScenarioFile`, `StepFile`, `AssertionFile`, `ExtractionFile` DTOs with YAML/JSON tags. `ParseScenario` / `ParseScenarioFile` / `WriteScenario`. Handles inline requests and `requestRef` paths. 3 new tests added to `serialization_test.go` (parse YAML, round-trip, requestRef); all pass.
 - **`packages/core/reporting/report.go`** — `Text(result)` (plain ASCII, CI-safe) and `JSON(result) ([]byte, error)`. `assertionLabel` formats human-readable assertion descriptions (`status eq 200`, `header Content-Type contains json`, `jsonpath $.name eq Alice`). `JSONReport` / `JSONStep` / `JSONAssertion` structs for machine-readable output.
-- **`apps/cli/main.go`** — Cobra CLI. `apidesk run <scenario-file> [--env <env-file>] [--format text|json]`. Exit code 0 = all pass, 1 = assertion failures, 2 = execution/parse error. Reads scenario and env files, runs via `scenario.Runner`, outputs `reporting.Text` or `reporting.JSON`.
+- **`apps/cli/main.go`** — Cobra CLI. `clrsig run <scenario-file> [--env <env-file>] [--format text|json]`. Exit code 0 = all pass, 1 = assertion failures, 2 = execution/parse error. Reads scenario and env files, runs via `scenario.Runner`, outputs `reporting.Text` or `reporting.JSON`.
 - **`apps/cli/go.mod`** — added `replace github.com/fuvito/api-workbench/packages/core => ../../packages/core`; added `PaesslerAG/jsonpath`, `yaml.v3` as indirect deps.
 - **UI: URL param extraction on paste** — pasting a URL containing `?` (e.g. `https://api.example.com/items?page=1&limit=20`) automatically strips the query string from the URL field and merges the extracted params into the Params tab. Same-named existing params are replaced; new ones are appended. No change to typing behavior.
-- **Phase 3 acceptance criteria met**: multi-step scenarios run end-to-end; variable extraction propagates between steps; assertions evaluated with 6 operators; scenarios saved/loaded as YAML or JSON; `apidesk run` CLI command with text/JSON output and proper exit codes; 44+ Go tests all pass.
+- **Phase 3 acceptance criteria met**: multi-step scenarios run end-to-end; variable extraction propagates between steps; assertions evaluated with 6 operators; scenarios saved/loaded as YAML or JSON; `clrsig run` CLI command with text/JSON output and proper exit codes; 44+ Go tests all pass.
 
 ### 2026-11-03 — Phase 2: Workspace + API client
 
 - **`packages/core/serialization`** — new package. `ParseRequest` / `ParseRequestFile` / `WriteRequest` for domain.Request; `ParseEnvironment` / `WriteEnvironment` for domain.Environment. Format detected from file extension (`.yaml`/`.yml`/`.json`). Full round-trip fidelity. 6 tests (YAML parse, JSON parse, file extension detect, request round-trip, environment parse, environment round-trip).
 - **`packages/core/go.mod`** — added `gopkg.in/yaml.v3 v3.0.1` and `modernc.org/sqlite v1.61.1`.
 - **`apps/desktop/wails/workspace_service.go`** — new Wails-bound service. Methods: `OpenWorkspace` (dialog → sets path), `NewWorkspace` (dialog + creates example structure if empty), `GetWorkspacePath`, `ListRequests` (file tree, skips `environments/` dir), `ListEnvironments` (scans `workspacePath/environments/`), `SelectEnvironment` (loads env, sets active), `GetActiveEnvironment`, `LoadRequest` (parse file → `RequestFileIO`), `SaveRequest` (Wails save dialog → atomic write), `OpenRequest` (Wails open dialog → `RequestFileIO`).
-- **Config persistence** — `~/.apidesk/config.json` persists workspace path and active environment path across restarts (atomic write). Loaded on `NewWorkspaceService()` startup; active environment re-loaded from file at startup.
+- **Config persistence** — `~/.clrsig/config.json` persists workspace path and active environment path across restarts (atomic write). Loaded on `NewWorkspaceService()` startup; active environment re-loaded from file at startup.
 - **Variable interpolation** — `RequestService.Execute` now reads `WorkspaceService.ActiveEnvironment()` and passes it to `variables.NewResolver(env)`. Switching environments in the UI immediately affects variable resolution in the next request.
 - **Example workspace** — `NewWorkspace` on an empty directory auto-creates `environments/local.yaml` and `requests/health-check.yaml` as a starting point.
 - **UI: sidebar tabs** — `Workspace` and `History` tabs; Workspace tab shows the `WorkspacePanel` component; History tab shows the existing history list.
@@ -261,7 +261,7 @@ Do not implement or stub any of these without explicit user direction.
 - **UI: environment selector** — `<select>` in the top bar; hidden when no workspace has environments; `No environment` option; selecting an env calls `selectEnvironment` on Go side.
 - **UI: toolbar buttons** — Open (folder icon, opens file dialog), Save (saves current request via dialog), New (clears editor).
 - **`bridge.ts`** — 10 new bridge functions wrapping the workspace service Wails bindings.
-- All 37 Go tests pass. Full `wails build` succeeds producing `apidesk.exe`.
+- All 37 Go tests pass. Full `wails build` succeeds producing `clrsig.exe`.
 - **Phase 2 acceptance criteria met**: collections (file-based), environments (selectable, active env drives variable resolution), request history (Phase 1), restart-safe (config.json persists workspace + env between sessions).
 
 ### 2026-11-03 — Phase 1: HTTP execution engine + request editor fully wired
@@ -274,13 +274,13 @@ Do not implement or stub any of these without explicit user direction.
 - **History sidebar** — left sidebar now shows the last 100 requests (most recent first) with method badge, URL, status code, and duration. Clicking an entry pre-fills the method and URL in the request editor.
 - **History state management** — `App` loads history on mount via `useEffect` and refreshes after every request via `useCallback`+`refreshHistory`.
 - **`packages/core/history`** — new package. `Store` wraps a SQLite database (`modernc.org/sqlite` v1.61.1, pure Go). `Open(path)` → `migrate()` → `Record(...)` → `Recent(limit)` → `Close()`. Auth tokens and request bodies are **never written** to protect secrets. 4 tests: record + recent, limit, empty store, `DefaultPath` directory creation.
-- **`history.DefaultPath()`** — resolves to `~/.apidesk/history.db`; creates the directory if absent.
+- **`history.DefaultPath()`** — resolves to `~/.clrsig/history.db`; creates the directory if absent.
 - **`RequestService.GetHistory()`** — new Wails-bound method returning `[]HistoryEntryIO`; maps `history.Entry` to JSON-serializable struct.
 - **`RequestService.recordHistory()`** — private helper called on every successful execution; silently skips on error so a broken history DB never blocks requests.
 - **`app.shutdown`** hook added → calls `requestService.close()` → closes SQLite connection cleanly.
 - **`bridge.ts`** — `AuthPayload` exported as a named type; `getHistory()` added, wraps `WailsGetHistory`.
 - **`src/types.ts`** — new file: `KVPair`, `BodyState`/`BodyType`, `AuthState`/`AuthType` discriminated union.
-- Wails build regenerates bindings with `GetHistory` and produces clean `apidesk.exe`.
+- Wails build regenerates bindings with `GetHistory` and produces clean `clrsig.exe`.
 - All 31 Go tests pass (`core`, `domain`, `executor`, `history`, `variables`).
 - **Phase 1 acceptance criteria met**: all 7 HTTP methods work, custom params/headers/body/auth flow end-to-end through the UI, response status and duration displayed, executor tested against local mock servers (13 tests).
 
@@ -289,7 +289,7 @@ Do not implement or stub any of these without explicit user direction.
 - Updated `app.go` — `App` holds `RequestService`; app context propagated to service on `startup`.
 - Updated `main.go` — `app.requestService` bound to Wails alongside `app`.
 - Added `replace github.com/fuvito/api-workbench/packages/core => ../../../packages/core` to `apps/desktop/wails/go.mod` — required because Wails's binding generator runs in a temp directory outside the Go workspace and cannot see `go.work`.
-- `wails build` runs successfully: generates TypeScript bindings → builds React → compiles Go → produces `build/bin/apidesk.exe`.
+- `wails build` runs successfully: generates TypeScript bindings → builds React → compiles Go → produces `build/bin/clrsig.exe`.
 - Generated `wailsjs/` added to `.gitignore` (regenerated by `wails build` / `wails dev`).
 - `src/lib/bridge.ts` — typed wrapper around Wails-generated bindings using plain interfaces (`RequestPayload`, `ResponseData`). Isolates the `as any` cast in one place; avoids Wails class types at call sites.
 - Updated `tsconfig.app.json` — `erasableSyntaxOnly: false` (Wails-generated `models.ts` uses `namespace`, which TypeScript 7 otherwise rejects). Added `@wailsjs` path alias.
@@ -317,7 +317,7 @@ Do not implement or stub any of these without explicit user direction.
 
 - **API timing breakdown** — `domain.Timing` struct (`DNSMs`, `ConnectMs`, `TLSMs`, `TTFBMs`, `TransferMs`, `TotalMs()`). `executor.go` attaches `net/http/httptrace.ClientTrace` to the request context; timestamps captured at DNS start/done, connect done, TLS done, first-byte, body read complete. `TimingIO` added to `ResponseOutput` in Wails service. `TimingBar` React component renders a 5-segment stacked bar (DNS=purple, Connect=blue, TLS=yellow, TTFB=emerald, Transfer=cyan) in the response panel.
 - **TLS skip-verify and proxy support** — `executor.Options` gains `ProxyURL string` and `TLSSkipVerify bool`. `New()` builds an `http.Transport` with `crypto/tls.Config{InsecureSkipVerify: ...}` and `http.ProxyFromEnvironment` / `url.Parse` proxy. `RebuildExecutor()` on `RequestService` re-creates the transport when settings change.
-- **Settings** — `domain.Settings` (`Theme`, `FontSize`, `DefaultTimeoutMs`, `ProxyURL`, `TLSSkipVerify`), `DefaultSettings()`. `SettingsService` persists to `~/.apidesk/settings.json` via `atomicWrite`; `load()` fills zero values with defaults; `onSave func()` callback triggers executor rebuild. `GetSettings`, `SaveSettings`, `ResetSettings` Wails-bound methods. `app.go` wires `ss.onSave = rs.RebuildExecutor`.
+- **Settings** — `domain.Settings` (`Theme`, `FontSize`, `DefaultTimeoutMs`, `ProxyURL`, `TLSSkipVerify`), `DefaultSettings()`. `SettingsService` persists to `~/.clrsig/settings.json` via `atomicWrite`; `load()` fills zero values with defaults; `onSave func()` callback triggers executor rebuild. `GetSettings`, `SaveSettings`, `ResetSettings` Wails-bound methods. `app.go` wires `ss.onSave = rs.RebuildExecutor`.
 - **Settings UI** — `SettingsPanel` React component: modal overlay, Appearance section (theme select, font-size range), Network section (timeout, proxy URL, TLS skip checkbox). Gear icon in top bar → `setShowSettings(true)`. Settings loaded on mount via `getSettings()`.
 - **Theme + font-size** — `applySettings(s)` sets `--font-size-code` CSS variable and toggles `document.documentElement.classList` between `dark` and `light`. `:root.light` block in `index.css` overrides all colour tokens for the light theme.
 - **CI** — `.github/workflows/ci.yml` updated to `go test -v`.

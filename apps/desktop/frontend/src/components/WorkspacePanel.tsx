@@ -121,7 +121,7 @@ function TreeNode({
         onDrop={e => {
           e.preventDefault(); e.stopPropagation()
           setIsDragOver(false)
-          const src = e.dataTransfer.getData('application/x-apideskrequest')
+          const src = e.dataTransfer.getData('application/x-clrsigrequest')
           if (src && src !== node.path) onMoveFile?.(src, node.path)
         }}
       >
@@ -231,7 +231,7 @@ function TreeNode({
     <div
       draggable
       onDragStart={e => {
-        e.dataTransfer.setData('application/x-apideskrequest', node.path)
+        e.dataTransfer.setData('application/x-clrsigrequest', node.path)
         e.dataTransfer.effectAllowed = 'move'
       }}
       className={cn(

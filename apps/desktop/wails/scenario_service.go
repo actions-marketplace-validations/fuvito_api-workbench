@@ -121,7 +121,7 @@ func (s *ScenarioService) resultCachePath(scenarioPath string) (string, error) {
 		return "", fmt.Errorf("path is outside the current workspace")
 	}
 	base := strings.TrimSuffix(strings.TrimSuffix(rel, ".yaml"), ".yml")
-	return filepath.Join(wsPath, ".apideskcache", base+".result.json"), nil
+	return filepath.Join(wsPath, ".clrsigcache", base+".result.json"), nil
 }
 
 // SaveScenarioResult persists the last run result for a scenario file.

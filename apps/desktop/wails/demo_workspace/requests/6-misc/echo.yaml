@@ -7,7 +7,7 @@ queryParams:
     value: "true"
 headers:
   - name: X-Custom-Header
-    value: hello-from-apidesk
+    value: hello-from-clrsig
 body:
   type: json
   content: |

@@ -287,7 +287,7 @@ func handleDemoBasicAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	user, pass, ok := r.BasicAuth()
 	if !ok || user != "demo" || pass != "demo" {
-		w.Header().Set("WWW-Authenticate", `Basic realm="ApiDesk Demo"`)
+		w.Header().Set("WWW-Authenticate", `Basic realm="Clear Signal Demo"`)
 		demoErrJSON(w, http.StatusUnauthorized, "Basic auth required — username: demo, password: demo")
 		return
 	}
@@ -507,7 +507,7 @@ func handleDemoPosts(w http.ResponseWriter, r *http.Request) {
 		posts = append(posts, map[string]any{
 			"id":         n,
 			"title":      fmt.Sprintf("Post #%d: %s", n, []string{"Getting Started", "Advanced Patterns", "Best Practices", "Deep Dive", "Quick Tips"}[n%5]),
-			"body":       fmt.Sprintf("This is the full content of post #%d. It demonstrates how the ApiDesk demo server generates realistic paginated data for testing.", n),
+			"body":       fmt.Sprintf("This is the full content of post #%d. It demonstrates how the Clear Signal demo server generates realistic paginated data for testing.", n),
 			"author":     authors[n%len(authors)],
 			"tags":       tags[n%len(tags)],
 			"views":      (n * 137) % 10000,
@@ -594,39 +594,39 @@ func handleDemoFeed(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>ApiDesk Demo Feed</title>
+  <title>Clear Signal Demo Feed</title>
   <subtitle>Sample Atom feed for testing XML response handling</subtitle>
   <link href="http://localhost/feed" rel="self"/>
-  <id>urn:uuid:demo-feed-apiDesk</id>
+  <id>urn:uuid:demo-feed-clrsig</id>
   <updated>%s</updated>
   <author>
-    <name>ApiDesk Demo Server</name>
-    <email>demo@apidesk.dev</email>
+    <name>Clear Signal Demo Server</name>
+    <email>demo@clrsig.dev</email>
   </author>
   <entry>
     <id>urn:uuid:entry-001</id>
-    <title>Getting Started with ApiDesk</title>
+    <title>Getting Started with Clear Signal</title>
     <link href="http://localhost/posts/1"/>
     <updated>%s</updated>
     <summary>Learn how to import OpenAPI specs, run requests, and build multi-step scenarios.</summary>
     <category term="tutorial" scheme="http://localhost/categories"/>
-    <content type="html">&lt;p&gt;ApiDesk is an &lt;strong&gt;open-source&lt;/strong&gt; API contract testing platform.&lt;/p&gt;</content>
+    <content type="html">&lt;p&gt;Clear Signal is an &lt;strong&gt;open-source&lt;/strong&gt; API contract testing platform.&lt;/p&gt;</content>
   </entry>
   <entry>
     <id>urn:uuid:entry-002</id>
     <title>Contract Validation Deep Dive</title>
     <link href="http://localhost/posts/2"/>
     <updated>2026-10-15T09:00:00Z</updated>
-    <summary>How ApiDesk validates API responses against OpenAPI 3.1 schemas automatically.</summary>
+    <summary>How Clear Signal validates API responses against OpenAPI 3.1 schemas automatically.</summary>
     <category term="api-testing" scheme="http://localhost/categories"/>
-    <content type="text">ApiDesk supports both OpenAPI 3.0 and 3.1 for schema-based response validation.</content>
+    <content type="text">Clear Signal supports both OpenAPI 3.0 and 3.1 for schema-based response validation.</content>
   </entry>
   <entry>
     <id>urn:uuid:entry-003</id>
     <title>CLI Integration for CI/CD</title>
     <link href="http://localhost/posts/3"/>
     <updated>2026-09-20T14:30:00Z</updated>
-    <summary>Run your API scenarios in GitHub Actions with apidesk run and proper exit codes.</summary>
+    <summary>Run your API scenarios in GitHub Actions with clrsig run and proper exit codes.</summary>
     <category term="devops" scheme="http://localhost/categories"/>
     <content type="text">Exit code 0 = all pass, 1 = assertion failures, 2 = execution errors.</content>
   </entry>
@@ -727,7 +727,7 @@ func handleDemoHTMLPage(w http.ResponseWriter, r *http.Request) {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ApiDesk Demo — Welcome</title>
+  <title>Clear Signal Demo — Welcome</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
     h1 { color: #7c3aed; }
@@ -741,7 +741,7 @@ func handleDemoHTMLPage(w http.ResponseWriter, r *http.Request) {
 </head>
 <body>
   <header>
-    <h1>ApiDesk Demo Server</h1>
+    <h1>Clear Signal Demo Server</h1>
     <nav>
       <a href="/health">Health</a>
       <a href="/users">Users</a>
@@ -753,7 +753,7 @@ func handleDemoHTMLPage(w http.ResponseWriter, r *http.Request) {
     </nav>
   </header>
   <main>
-    <p>This server demonstrates <strong>multiple response formats</strong> for testing ApiDesk's response viewer.</p>
+    <p>This server demonstrates <strong>multiple response formats</strong> for testing Clear Signal's response viewer.</p>
     <ul>
       <li>Status: <span class="badge ok">Running</span></li>
       <li>Users in store: <span class="badge info">%d</span></li>
@@ -778,7 +778,7 @@ func handleDemoHTMLPage(w http.ResponseWriter, r *http.Request) {
 curl http://localhost:%d/data.xml
 curl -H "Accept: text/html" http://localhost:%d/report.html</pre>
   </main>
-  <footer>ApiDesk Demo Server &mdash; generated at %s</footer>
+  <footer>Clear Signal Demo Server &mdash; generated at %s</footer>
 </body>
 </html>
 `, userCount, demoReqCount.Load(), demoStartedAt.UTC().Format(time.RFC3339),
@@ -801,7 +801,7 @@ func handleDemoHTMLReport(w http.ResponseWriter, r *http.Request) {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>User Report — ApiDesk Demo</title>
+  <title>User Report — Clear Signal Demo</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 1.5rem; color: #111; }
     h1 { font-size: 1.25rem; color: #374151; }
@@ -837,7 +837,7 @@ func handleDemoHTMLReport(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(w, `    </tbody>
   </table>
-  <p class="meta">%d user(s) &mdash; generated at %s &mdash; ApiDesk Demo Server</p>
+  <p class="meta">%d user(s) &mdash; generated at %s &mdash; Clear Signal Demo Server</p>
 </body>
 </html>
 `, len(users), time.Now().UTC().Format(time.RFC3339))

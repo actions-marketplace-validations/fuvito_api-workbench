@@ -1,6 +1,6 @@
-# ApiDesk — Frontend
+# Clear Signal — Frontend
 
-React 19 + TypeScript 7 + Vite 8 frontend for the ApiDesk desktop application. Runs inside a [Wails](https://wails.io) shell; communicates with the Go backend exclusively through Wails IPC bindings.
+React 19 + TypeScript 7 + Vite 8 frontend for the Clear Signal desktop application. Runs inside a [Wails](https://wails.io) shell; communicates with the Go backend exclusively through Wails IPC bindings.
 
 ## Development
 

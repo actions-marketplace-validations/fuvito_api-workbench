@@ -28,7 +28,7 @@ func configPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(home, ".apidesk")
+	dir := filepath.Join(home, ".clrsig")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}
@@ -755,7 +755,7 @@ headers:
 	}
 
 	// Gitignore environment files (secrets) and the response cache.
-	if err := writeFile(filepath.Join(dir, ".gitignore"), ".apideskcache/\n"); err != nil {
+	if err := writeFile(filepath.Join(dir, ".gitignore"), ".clrsigcache/\n"); err != nil {
 		return err
 	}
 	if err := writeFile(filepath.Join(dir, "environments", ".gitignore"), "*\n"); err != nil {
@@ -795,7 +795,7 @@ func (w *WorkspaceService) NewWorkspace() (string, error) {
 
 // ---- Response cache ----
 
-// ResponseCacheIO holds the last response for a request file, persisted to .apideskcache/.
+// ResponseCacheIO holds the last response for a request file, persisted to .clrsigcache/.
 type ResponseCacheIO struct {
 	CachedAt   string     `json:"cachedAt"`
 	StatusCode int        `json:"statusCode"`
@@ -816,7 +816,7 @@ func (w *WorkspaceService) cachePath(reqPath string) (string, error) {
 		return "", fmt.Errorf("path is outside the current workspace")
 	}
 	base := strings.TrimSuffix(strings.TrimSuffix(rel, ".yaml"), ".yml")
-	return filepath.Join(w.workspacePath, ".apideskcache", base+".json"), nil
+	return filepath.Join(w.workspacePath, ".clrsigcache", base+".json"), nil
 }
 
 // SaveResponseCache persists the last response for a request file.

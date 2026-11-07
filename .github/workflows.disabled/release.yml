@@ -44,8 +44,8 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apidesk-windows-amd64
-          path: apps/desktop/wails/build/bin/apidesk.exe
+          name: clrsig-windows-amd64
+          path: apps/desktop/wails/build/bin/clrsig.exe
 
   release-macos:
     name: Desktop — macOS
@@ -85,13 +85,13 @@ jobs:
 
       - name: Rename artifacts
         run: |
-          mv apps/desktop/wails/build/bin/apidesk.app apps/desktop/wails/build/bin/apidesk-arm64.app || true
-          cp apps/desktop/wails/build/bin/apidesk-arm64.app apps/desktop/wails/build/bin/apidesk-amd64.app || true
+          mv apps/desktop/wails/build/bin/clrsig.app apps/desktop/wails/build/bin/clrsig-arm64.app || true
+          cp apps/desktop/wails/build/bin/clrsig-arm64.app apps/desktop/wails/build/bin/clrsig-amd64.app || true
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apidesk-macos
+          name: clrsig-macos
           path: apps/desktop/wails/build/bin/
 
   release-linux:
@@ -134,8 +134,8 @@ jobs:
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apidesk-linux-amd64
-          path: apps/desktop/wails/build/bin/apidesk
+          name: clrsig-linux-amd64
+          path: apps/desktop/wails/build/bin/clrsig
 
   cli-binaries:
     name: CLI — all platforms
@@ -167,14 +167,14 @@ jobs:
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
             go build -ldflags="-X main.version=${{ github.ref_name }}" \
-            -o apidesk-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} ./...
+            -o clrsig-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} ./...
         working-directory: apps/cli
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apidesk-cli-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: apps/cli/apidesk-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
+          name: clrsig-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: apps/cli/clrsig-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
 
   publish:
     name: Publish GitHub Release
@@ -191,14 +191,14 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ApiDesk ${{ github.ref_name }}
+          name: Clear Signal ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: |
-            dist/apidesk-windows-amd64/apidesk.exe
-            dist/apidesk-linux-amd64/apidesk
-            dist/apidesk-cli-windows-amd64/apidesk-windows-amd64.exe
-            dist/apidesk-cli-darwin-arm64/apidesk-darwin-arm64
-            dist/apidesk-cli-darwin-amd64/apidesk-darwin-amd64
-            dist/apidesk-cli-linux-amd64/apidesk-linux-amd64
+            dist/clrsig-windows-amd64/clrsig.exe
+            dist/clrsig-linux-amd64/clrsig
+            dist/clrsig-cli-windows-amd64/clrsig-windows-amd64.exe
+            dist/clrsig-cli-darwin-arm64/clrsig-darwin-arm64
+            dist/clrsig-cli-darwin-amd64/clrsig-darwin-amd64
+            dist/clrsig-cli-linux-amd64/clrsig-linux-amd64

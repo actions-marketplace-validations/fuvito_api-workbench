@@ -13,7 +13,7 @@ import (
 // Returns a non-empty error string on failure.
 func (s *WorkspaceService) OpenInSystemViewer(content, format string) string {
 	ext := formatToExtension(format)
-	f, err := os.CreateTemp("", "apidesk-preview-*"+ext)
+	f, err := os.CreateTemp("", "clrsig-preview-*"+ext)
 	if err != nil {
 		return "could not create temp file: " + err.Error()
 	}

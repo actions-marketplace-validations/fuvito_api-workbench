@@ -70,7 +70,7 @@ func (d *DemoService) StartDemo() DemoResult {
 		return DemoResult{Error: "could not find free port: " + err.Error()}
 	}
 
-	tmpDir, err := os.MkdirTemp("", "apidesk-demo-*")
+	tmpDir, err := os.MkdirTemp("", "clrsig-demo-*")
 	if err != nil {
 		return DemoResult{Error: "could not create temp directory: " + err.Error()}
 	}

@@ -1,4 +1,4 @@
-// Example server for end-to-end testing of ApiDesk.
+// Example server for end-to-end testing of Clear Signal.
 // Run: go run ./examples/server
 // Listens on :8080 and prints all available endpoints on startup.
 package main
@@ -54,7 +54,7 @@ func main() {
 	mux.HandleFunc("/maintenance", handleMaintenance)
 	mux.HandleFunc("/admin/reset", handleAdminReset)
 
-	fmt.Println("ApiDesk example server")
+	fmt.Println("Clear Signal example server")
 	fmt.Println("Listening on http://localhost:8080")
 	fmt.Println()
 	fmt.Println("  POST   /auth/login           { \"username\": \"admin\", \"password\": \"secret\" }")

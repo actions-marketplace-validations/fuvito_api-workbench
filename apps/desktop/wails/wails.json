@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "ApiDesk",
-  "outputfilename": "apidesk",
+  "name": "Clear Signal",
+  "outputfilename": "clrsig",
   "frontend:dir": "../frontend",
   "frontend:install": "pnpm install",
   "frontend:build": "pnpm build",

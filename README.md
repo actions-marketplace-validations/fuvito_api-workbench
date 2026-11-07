@@ -1,8 +1,8 @@
-# ApiDesk
+# Clear Signal
 
 **API Contract Validation and Spec Conformance Testing — with a full API development workbench.**
 
-ApiDesk is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
+Clear Signal is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
 
 > **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working.
 
@@ -18,9 +18,9 @@ ApiDesk is an open-source, local-first desktop application that lets you verify 
 
 ---
 
-## Why ApiDesk
+## Why Clear Signal
 
-Most API tools focus on exploration. ApiDesk focuses on **contract verification**: does your API actually honour its OpenAPI specification? Can you prove it, repeatably, in a pipeline?
+Most API tools focus on exploration. Clear Signal focuses on **contract verification**: does your API actually honour its OpenAPI specification? Can you prove it, repeatably, in a pipeline?
 
 - **API Contract Validation** — validate that actual HTTP responses match declared OpenAPI schemas.
 - **Spec Conformance Testing** — run scenario-based tests that enforce your API contract across a full user workflow.
@@ -99,7 +99,7 @@ Open the desktop app → open a workspace → click **Import OpenAPI** in the wo
 
 ## How Workspaces Work
 
-ApiDesk organises requests as **plain YAML files on disk** — not in a proprietary binary format, not in a database. This means your collection is fully version-controllable with git, diffable in any editor, and portable across machines.
+Clear Signal organises requests as **plain YAML files on disk** — not in a proprietary binary format, not in a database. This means your collection is fully version-controllable with git, diffable in any editor, and portable across machines.
 
 ### Folder structure
 
@@ -193,8 +193,8 @@ E2E_SMOKE=1 pnpm test:smoke
 ```bash
 cd apps/desktop/wails
 wails build
-# Binary: apps/desktop/wails/build/bin/apidesk.exe  (Windows)
-#         apps/desktop/wails/build/bin/apidesk       (macOS / Linux)
+# Binary: apps/desktop/wails/build/bin/clrsig.exe  (Windows)
+#         apps/desktop/wails/build/bin/clrsig       (macOS / Linux)
 ```
 
 ### Regenerate TypeScript bindings
@@ -211,7 +211,7 @@ api-workbench/
 │   ├── desktop/
 │   │   ├── frontend/       # React + TypeScript + Vite (pnpm workspace)
 │   │   └── wails/          # Wails app, Go services (request, workspace, openapi, settings)
-│   └── cli/                # Cobra CLI — apidesk run
+│   └── cli/                # Cobra CLI — clrsig run
 │
 ├── packages/
 │   └── core/               # Shared Go execution engine
