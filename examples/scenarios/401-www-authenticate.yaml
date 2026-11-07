@@ -23,7 +23,7 @@ steps:
         operator: contains
         expected: "Bearer"
       - type: jsonpath
-        path: "$.error"
+        path: "$.detail"
         operator: ne
         expected: ""
 

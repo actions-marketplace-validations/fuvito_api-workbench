@@ -73,6 +73,6 @@ steps:
         operator: eq
         expected: "0"
       - type: jsonpath
-        path: "$.error"
+        path: "$.detail"
         operator: ne
         expected: ""

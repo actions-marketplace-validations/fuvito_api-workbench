@@ -76,14 +76,22 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-func errJSON(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+// problemJSON writes an RFC 7807 Problem Details response (application/problem+json).
+func problemJSON(w http.ResponseWriter, status int, problemType, title, detail string) {
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]any{
+		"type":   problemType,
+		"title":  title,
+		"status": status,
+		"detail": detail,
+	})
 }
 
 // methodNotAllowed sets the Allow header (RFC 9110 §15.5.6) before writing 405.
 func methodNotAllowed(w http.ResponseWriter, allowed string) {
 	w.Header().Set("Allow", allowed)
-	errJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+	problemJSON(w, http.StatusMethodNotAllowed, "/errors/method-not-allowed", "Method Not Allowed", "allowed methods: "+allowed)
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -91,10 +99,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w, "GET")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status": "ok",
-		"time":   time.Now().UTC().Format(time.RFC3339),
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "time": time.Now().UTC().Format(time.RFC3339)})
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +112,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		errJSON(w, http.StatusBadRequest, "invalid JSON")
+		problemJSON(w, http.StatusBadRequest, "/errors/bad-request", "Bad Request", "request body must be valid JSON")
 		return
 	}
 	if body.Username != "admin" || body.Password != "secret" {
@@ -127,14 +132,15 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(rateLimitMax))
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
-			errJSON(w, http.StatusTooManyRequests, "too many failed login attempts")
+			problemJSON(w, http.StatusTooManyRequests, "/errors/rate-limit-exceeded", "Too Many Requests", "too many failed login attempts, retry after 60 seconds")
 			return
 		}
 		remaining := rateLimitMax - count
 		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(rateLimitMax))
 		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
-		errJSON(w, http.StatusUnauthorized, "invalid credentials")
+		w.Header().Set("WWW-Authenticate", `Bearer realm="api"`)
+		problemJSON(w, http.StatusUnauthorized, "/errors/unauthorized", "Unauthorized", "invalid credentials")
 		return
 	}
 	loginMu.Lock()
@@ -153,7 +159,7 @@ func handleMaintenance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Retry-After", "120")
-	errJSON(w, http.StatusServiceUnavailable, "service temporarily unavailable")
+	problemJSON(w, http.StatusServiceUnavailable, "/errors/service-unavailable", "Service Unavailable", "service is temporarily unavailable, retry after 120 seconds")
 }
 
 func handleAdminReset(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +182,7 @@ func handleProtected(w http.ResponseWriter, r *http.Request) {
 	auth := r.Header.Get("Authorization")
 	if auth != "Bearer "+validToken {
 		w.Header().Set("WWW-Authenticate", `Bearer realm="api"`)
-		errJSON(w, http.StatusUnauthorized, "missing or invalid token")
+		problemJSON(w, http.StatusUnauthorized, "/errors/unauthorized", "Unauthorized", "missing or invalid authentication token")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
@@ -198,11 +204,11 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 			Email string `json:"email"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			errJSON(w, http.StatusBadRequest, "invalid JSON")
+			problemJSON(w, http.StatusBadRequest, "/errors/bad-request", "Bad Request", "request body must be valid JSON")
 			return
 		}
 		if body.Name == "" || body.Email == "" {
-			errJSON(w, http.StatusUnprocessableEntity, "name and email are required")
+			problemJSON(w, http.StatusUnprocessableEntity, "/errors/validation-error", "Unprocessable Entity", "name and email are required")
 			return
 		}
 		mu.Lock()
@@ -226,7 +232,7 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/users/")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id < 1 {
-		errJSON(w, http.StatusBadRequest, "invalid user id")
+		problemJSON(w, http.StatusBadRequest, "/errors/bad-request", "Bad Request", "user id must be a positive integer")
 		return
 	}
 
@@ -244,14 +250,14 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if idx == -1 {
-			errJSON(w, http.StatusNotFound, "user not found")
+			problemJSON(w, http.StatusNotFound, "/errors/not-found", "Not Found", "user not found")
 			return
 		}
 		writeJSON(w, http.StatusOK, users[idx])
 
 	case http.MethodPut:
 		if idx == -1 {
-			errJSON(w, http.StatusNotFound, "user not found")
+			problemJSON(w, http.StatusNotFound, "/errors/not-found", "Not Found", "user not found")
 			return
 		}
 		var body struct {
@@ -259,7 +265,7 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 			Email string `json:"email"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			errJSON(w, http.StatusBadRequest, "invalid JSON")
+			problemJSON(w, http.StatusBadRequest, "/errors/bad-request", "Bad Request", "request body must be valid JSON")
 			return
 		}
 		if body.Name != "" {
@@ -272,7 +278,7 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodDelete:
 		if idx == -1 {
-			errJSON(w, http.StatusNotFound, "user not found")
+			problemJSON(w, http.StatusNotFound, "/errors/not-found", "Not Found", "user not found")
 			return
 		}
 		users = append(users[:idx], users[idx+1:]...)

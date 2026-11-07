@@ -22,6 +22,6 @@ steps:
         operator: eq
         expected: "120"
       - type: jsonpath
-        path: "$.error"
+        path: "$.detail"
         operator: ne
         expected: ""
