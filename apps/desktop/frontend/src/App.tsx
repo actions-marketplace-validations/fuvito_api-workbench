@@ -49,7 +49,7 @@ export default function App() {
 
   // Wire cross-dependency after both hooks are initialized
   // eslint-disable-next-line react/refs
-  refreshWorkspaceRef.current = workspace.refreshWorkspace
+  refreshWorkspaceRef.current = workspace.refreshFileTree
 
   // Local UI state
   const [sidebarWidth, setSidebarWidth] = useState(224)

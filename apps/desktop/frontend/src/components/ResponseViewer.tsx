@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { Search, X, Clock, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
@@ -253,31 +253,37 @@ function countMatches(text: string, query: string): number {
 
 // ---- Body component ----
 
-function BodyContent({ body, headers, search, activeMatch, raw }: {
+const BodyContent = memo(function BodyContent({ body, headers, search, activeMatch, raw }: {
   body: string
   headers: Array<{ name: string; value: string }>
   search: string
   activeMatch: number
   raw?: boolean
 }) {
-  const ct = headers.find(h => h.name.toLowerCase() === 'content-type')?.value
-  const displayBody = raw ? body : prettyBody(body)
-  const fmt = detectFormat(body, ct)
+  const ct = useMemo(
+    () => headers.find(h => h.name.toLowerCase() === 'content-type')?.value,
+    [headers]
+  )
 
-  const lines = displayBody.split('\n')
-  // Don't count a trailing empty entry from a trailing newline as an extra line
-  const lineCount = lines.length > 1 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
-  const showLineNumbers = lineCount > 1
-  const gutterWidth = `${String(lineCount).length + 1}ch`
+  const displayBody = useMemo(() => raw ? body : prettyBody(body), [body, raw])
 
-  let highlighted: React.ReactNode
-  if (!search) {
-    if (!raw && fmt === 'json' && body.length < 500_000) highlighted = highlightJSON(displayBody)
-    else if (!raw && (fmt === 'xml' || fmt === 'html')) highlighted = highlightXML(displayBody)
-    else highlighted = displayBody
-  } else {
-    highlighted = highlightSearch(displayBody, search, activeMatch)
-  }
+  const fmt = useMemo(() => detectFormat(body, ct), [body, ct])
+
+  const { lineCount, showLineNumbers, gutterWidth } = useMemo(() => {
+    const ls = displayBody.split('\n')
+    // Don't count a trailing empty entry from a trailing newline as an extra line
+    const lc = ls.length > 1 && ls[ls.length - 1] === '' ? ls.length - 1 : ls.length
+    return { lineCount: lc, showLineNumbers: lc > 1, gutterWidth: `${String(lc).length + 1}ch` }
+  }, [displayBody])
+
+  const highlighted = useMemo<React.ReactNode>(() => {
+    if (!search) {
+      if (!raw && fmt === 'json' && body.length < 500_000) return highlightJSON(displayBody)
+      if (!raw && (fmt === 'xml' || fmt === 'html')) return highlightXML(displayBody)
+      return displayBody
+    }
+    return highlightSearch(displayBody, search, activeMatch)
+  }, [displayBody, search, activeMatch, raw, fmt, body.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!showLineNumbers) {
     return (
@@ -304,7 +310,7 @@ function BodyContent({ body, headers, search, activeMatch, raw }: {
       </pre>
     </div>
   )
-}
+})
 
 // ---- Time ago ----
 
@@ -331,6 +337,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
   const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [activeMatch, setActiveMatch] = useState(0)
   const [showTimingDialog, setShowTimingDialog] = useState(false)
   const [rawMode, setRawMode] = useState(false)
@@ -338,7 +345,25 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
   const searchRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
-  const bodyText = response && !response.error ? (rawMode ? response.body : prettyBody(response.body)) : ''
+  const bodyText = useMemo(
+    () => response && !response.error ? (rawMode ? response.body : prettyBody(response.body)) : '',
+    [response, rawMode]
+  )
+
+  const bodyFormat = useMemo(() =>
+    response && !response.error
+      ? detectFormat(response.body, response.headers.find(h => h.name.toLowerCase() === 'content-type')?.value)
+      : null,
+    [response]
+  )
+
+  // Debounce search so highlight/count recomputation doesn't block every keystroke
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 150)
+    return () => clearTimeout(id)
+  }, [searchQuery])
+
+  const matchCount = useMemo(() => countMatches(bodyText, debouncedSearch), [bodyText, debouncedSearch])
 
   async function handleCopy() {
     if (!bodyText) return
@@ -349,16 +374,11 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
     } catch { /* ignore */ }
   }
 
-  const bodyFormat = response && !response.error
-    ? detectFormat(response.body, response.headers.find(h => h.name.toLowerCase() === 'content-type')?.value)
-    : null
-
   async function handleOpenExternal() {
     if (!response?.body || !bodyFormat) return
     const displayBody = rawMode ? response.body : prettyBody(response.body)
     await openInSystemViewer(displayBody, bodyFormat)
   }
-  const matchCount = countMatches(bodyText, searchQuery)
 
   const openSearch = useCallback(() => {
     setShowSearch(true)
@@ -550,7 +570,7 @@ export function ResponseViewer({ response, loading, cachedAt, onClear }: Respons
           <div className="text-xs text-red-400 font-mono whitespace-pre-wrap break-all">{response.error}</div>
         )}
         {!loading && response && !response.error && activeTab === 'Body' && (
-          <BodyContent body={response.body} headers={response.headers} search={searchQuery} activeMatch={activeMatch} raw={rawMode} />
+          <BodyContent body={response.body} headers={response.headers} search={debouncedSearch} activeMatch={activeMatch} raw={rawMode} />
         )}
         {!loading && response && !response.error && activeTab === 'Headers' && (
           <table className="w-full text-xs font-mono">

@@ -48,6 +48,13 @@ export function useWorkspace(deps: {
     } catch { setEnvVarMap({}) }
   }
 
+  const refreshFileTree = useCallback(async () => {
+    try {
+      const tree = await listRequests()
+      setFileTree(tree ?? [])
+    } catch { /* best-effort */ }
+  }, [])
+
   const refreshWorkspace = useCallback(async () => {
     try {
       const [path, tree, envs, activeE, scenarios] = await Promise.all([
@@ -188,7 +195,7 @@ export function useWorkspace(deps: {
       const lastSep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
       const targetDir = lastSep !== -1 ? path.slice(0, lastSep) : ''
       await saveRequest({ ...req, title: (req.title || 'request') + ' Copy', filePath: '', targetDir })
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       console.error('duplicate request:', err)
     }
@@ -217,7 +224,7 @@ export function useWorkspace(deps: {
           activeTabId: activeStillExists ? prev.activeTabId : remaining[remaining.length - 1].id,
         }
       })
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       console.error('delete request:', err)
     }
@@ -239,7 +246,7 @@ export function useWorkspace(deps: {
       setNewFolderDialog(null)
       setNewFolderName('')
       setNewFolderError('')
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       setNewFolderError(err instanceof Error ? err.message : String(err))
     }
@@ -255,7 +262,7 @@ export function useWorkspace(deps: {
     setDeletingFolderPath(null)
     try {
       await deleteFolder(path)
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       console.error('delete folder:', err)
     }
@@ -280,7 +287,7 @@ export function useWorkspace(deps: {
           return { ...t, name: newName, filePath: newPath, savedKey }
         }),
       }))
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       console.error('rename request:', err)
     }
@@ -299,7 +306,7 @@ export function useWorkspace(deps: {
           return { ...t, filePath: fp, targetDir: td }
         }),
       }))
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       console.error('rename folder:', err)
     }
@@ -313,7 +320,7 @@ export function useWorkspace(deps: {
         ...prev,
         tabs: prev.tabs.map(t => t.filePath === srcPath ? { ...t, filePath: newPath } : t),
       }))
-      await refreshWorkspace()
+      await refreshFileTree()
     } catch (err) {
       console.error('move file:', err)
     }
@@ -326,7 +333,7 @@ export function useWorkspace(deps: {
       if (result.error) {
         console.error('import error:', result.error)
       } else {
-        await refreshWorkspace()
+        await refreshFileTree()
       }
     } catch (err) {
       console.error('import failed:', err)
@@ -348,7 +355,7 @@ export function useWorkspace(deps: {
         setImportFromURLDialog(true)
       } else {
         setImportFromURLInput('')
-        await refreshWorkspace()
+        await refreshFileTree()
       }
     } catch (err) {
       console.error('import from URL failed:', err)
@@ -359,7 +366,7 @@ export function useWorkspace(deps: {
 
   return {
     workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history, scenarioList,
-    refreshWorkspace, refreshHistory,
+    refreshFileTree, refreshWorkspace, refreshHistory,
     handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace,
     handleSelectFile, handleOpenRequest, handleEnvChange,
     handleClearHistory, handleDuplicateFile, handleMoveFile,
