@@ -348,6 +348,7 @@ type WorkspacePanelProps = {
   importing?: boolean
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
+  scenarioError?: string | null
 }
 
 export function WorkspacePanel({
@@ -378,6 +379,7 @@ export function WorkspacePanel({
   importing,
   activeFilePath,
   dirtyFilePaths,
+  scenarioError,
 }: WorkspacePanelProps) {
   const folderName = workspacePath
     ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
@@ -557,6 +559,11 @@ export function WorkspacePanel({
                   onToggleCollapse={handleToggleCollapse}
                 />
               ))
+            )}
+            {scenarioError && (
+              <div className="mx-2 mt-2 px-2 py-1 text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded truncate" title={scenarioError}>
+                {scenarioError}
+              </div>
             )}
             {(scenarios.length > 0 || onNewScenario) && (
               <>

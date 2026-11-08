@@ -1,4 +1,5 @@
-import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus, HelpCircle } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus, HelpCircle, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SnippetButton } from '@/components/SnippetButton'
 import { isTabDirty } from '@/lib/tabState'
@@ -33,6 +34,20 @@ export function AppToolbar({
   onOpenRequest, onSaveRequest, onNewRequest, onDuplicateTab,
   onShowSettings, onShowHelp, onEnvChange, onEditEnv, onStopDemo,
 }: AppToolbarProps) {
+  const [overflowOpen, setOverflowOpen] = useState(false)
+  const overflowRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!overflowOpen) return
+    function handleClick(e: MouseEvent) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [overflowOpen])
+
   return (
     <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -98,26 +113,56 @@ export function AppToolbar({
           <FolderOpen size={13} />
         </button>
         <button type="button" onClick={onSaveRequest} title="Save request (Ctrl+S)"
-          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <Save size={13} />
+          <span>Save</span>
         </button>
         <button type="button" onClick={onNewRequest} title="New request tab (Ctrl+N)"
-          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <FilePlus size={13} />
+          <span>New</span>
         </button>
         <button type="button" onClick={onDuplicateTab} title="Duplicate tab"
           className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
           <CopyPlus size={13} />
         </button>
         <SnippetButton tab={activeTab} />
-        <button type="button" onClick={onShowSettings} title="Settings"
-          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
-          <Settings size={13} />
-        </button>
-        <button type="button" onClick={onShowHelp} title="User guide"
-          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
-          <HelpCircle size={13} />
-        </button>
+
+        {/* Overflow menu: Settings + Help */}
+        <div ref={overflowRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setOverflowOpen(o => !o)}
+            title="More actions"
+            className={cn('p-1.5 rounded transition-colors',
+              overflowOpen
+                ? 'text-[var(--color-foreground)] bg-[var(--color-muted)]'
+                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]'
+            )}
+          >
+            <MoreHorizontal size={13} />
+          </button>
+          {overflowOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1">
+              <button
+                type="button"
+                onClick={() => { setOverflowOpen(false); onShowSettings() }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+              >
+                <Settings size={12} />
+                Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => { setOverflowOpen(false); onShowHelp() }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+              >
+                <HelpCircle size={12} />
+                User Guide
+              </button>
+            </div>
+          )}
+        </div>
 
         {environments.length > 0 && (
           <div className="w-px h-4 bg-[var(--color-border)]" />

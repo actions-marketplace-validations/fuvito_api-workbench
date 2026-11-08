@@ -26,6 +26,8 @@ export function useTabsState(deps: {
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0]
 
   const [closingDirtyTabId, setClosingDirtyTabId] = useState<string | null>(null)
+  const [closingDirtyScenarioTabId, setClosingDirtyScenarioTabId] = useState<string | null>(null)
+  const [pendingBulkClose, setPendingBulkClose] = useState<{ tabIds: string[]; returnToId?: string } | null>(null)
 
   const hasAnyDirtyTab = tabs.some(t => isTabDirty(t))
   useEffect(() => {
@@ -90,9 +92,7 @@ export function useTabsState(deps: {
     const tab = currentTabs.find(t => t.id === id)
     if (!tab) return
     if (tab.kind === 'scenario' && tab.scenarioDirty) {
-      if (window.confirm(`"${tab.name ?? 'Scenario'}" has unsaved changes. Close anyway?`)) {
-        removeTab(id)
-      }
+      setClosingDirtyScenarioTabId(id)
       return
     }
     if (isTabDirty(tab)) {
@@ -106,10 +106,10 @@ export function useTabsState(deps: {
     const { tabs: currentTabs } = tabsStateRef.current
     const toClose = currentTabs.filter(t => t.id !== tabId)
     if (toClose.length === 0) return
-    const dirtyCount = toClose.filter(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty)).length
-    if (dirtyCount > 0) {
-      const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
-      if (!window.confirm(`${dirtyCount} ${noun} unsaved changes. Close and discard?`)) return
+    const hasDirty = toClose.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingBulkClose({ tabIds: toClose.map(t => t.id), returnToId: tabId })
+      return
     }
     toClose.forEach(t => removeTab(t.id))
     switchTo(tabId)
@@ -121,12 +121,20 @@ export function useTabsState(deps: {
     if (idx === -1) return
     const toClose = currentTabs.slice(idx + 1)
     if (toClose.length === 0) return
-    const dirtyCount = toClose.filter(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty)).length
-    if (dirtyCount > 0) {
-      const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
-      if (!window.confirm(`${dirtyCount} ${noun} unsaved changes. Close and discard?`)) return
+    const hasDirty = toClose.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingBulkClose({ tabIds: toClose.map(t => t.id) })
+      return
     }
     toClose.forEach(t => removeTab(t.id))
+  }
+
+  function confirmBulkClose() {
+    if (!pendingBulkClose) return
+    const { tabIds, returnToId } = pendingBulkClose
+    tabIds.forEach(id => removeTab(id))
+    if (returnToId) switchTo(returnToId)
+    setPendingBulkClose(null)
   }
 
   function openFileAsTab(r: RequestFileIO, path: string): string {
@@ -355,13 +363,15 @@ export function useTabsState(deps: {
     tabs, activeTabId, activeTab,
     setTabsState, tabsStateRef,
     updateTab, switchTo, removeTab,
-    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight,
+    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight, confirmBulkClose,
     openFileAsTab, loadCacheIntoTab,
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest, handleSaveAll,
     handleSelectHistory, handleNewRequestInFolder,
     openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,
+    closingDirtyScenarioTabId, setClosingDirtyScenarioTabId,
+    pendingBulkClose, setPendingBulkClose,
     dirtyFilePaths,
   }
 }

@@ -229,6 +229,101 @@ export function ImportFromURLDialog({
   )
 }
 
+export function DiscardChangesDialog({
+  title = 'Discard changes?',
+  message,
+  onCancel,
+  onDiscard,
+}: {
+  title?: string
+  message: string
+  onCancel: () => void
+  onDiscard: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-foreground)]">{title}</h3>
+          <p className="text-xs text-[var(--color-muted-foreground)] mt-1">{message}</p>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            Discard
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function DeleteScenarioDialog({
+  name,
+  isDirty,
+  onCancel,
+  onConfirm,
+}: {
+  name: string
+  isDirty: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-foreground)]">Delete scenario</h3>
+          <p className="text-xs text-[var(--color-muted-foreground)] mt-1">
+            {isDirty && (
+              <span className="block text-amber-400 mb-1">This scenario has unsaved changes.</span>
+            )}
+            Delete <span className="font-medium text-[var(--color-foreground)]">{name}</span>? This cannot be undone.
+          </p>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CloseDirtyTabDialog({
   tabName,
   onCancel,

@@ -17,6 +17,8 @@ import {
   DeleteFolderDialog,
   NewFolderDialog,
   CloseDirtyTabDialog,
+  DiscardChangesDialog,
+  DeleteScenarioDialog,
   ImportFromURLDialog,
 } from '@/components/ConfirmDialogs'
 import { useTabsState } from '@/hooks/useTabsState'
@@ -60,6 +62,8 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
+  const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
+  const [scenarioRenameError, setScenarioRenameError] = useState<string | null>(null)
 
   // Run All Scenarios state
   const [runAllState, setRunAllState] = useState<import('@/components/Sidebar').RunAllState | null>(null)
@@ -350,6 +354,52 @@ export default function App() {
         />
       )}
 
+      {tabs.closingDirtyScenarioTabId && (() => {
+        const t = tabList.find(x => x.id === tabs.closingDirtyScenarioTabId)
+        return t ? (
+          <DiscardChangesDialog
+            title="Close scenario"
+            message={`"${t.name ?? 'This scenario'}" has unsaved changes. Close and discard them?`}
+            onCancel={() => tabs.setClosingDirtyScenarioTabId(null)}
+            onDiscard={() => { tabs.removeTab(t.id); tabs.setClosingDirtyScenarioTabId(null) }}
+          />
+        ) : null
+      })()}
+
+      {tabs.pendingBulkClose && (() => {
+        const dirtyCount = tabs.pendingBulkClose.tabIds.filter(id => {
+          const t = tabList.find(x => x.id === id)
+          return t && (isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+        }).length
+        const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
+        return (
+          <DiscardChangesDialog
+            title="Close tabs"
+            message={`${dirtyCount} ${noun} unsaved changes. Close and discard them?`}
+            onCancel={() => tabs.setPendingBulkClose(null)}
+            onDiscard={tabs.confirmBulkClose}
+          />
+        )
+      })()}
+
+      {deletingScenario && (
+        <DeleteScenarioDialog
+          name={deletingScenario.name}
+          isDirty={deletingScenario.isDirty}
+          onCancel={() => setDeletingScenario(null)}
+          onConfirm={async () => {
+            const { path } = deletingScenario
+            setDeletingScenario(null)
+            const matchTab = tabList.find(t => t.kind === 'scenario' && t.scenarioPath === path)
+            const err = await deleteScenario(path)
+            if (!err) {
+              if (matchTab) tabs.removeTab(matchTab.id)
+              await workspace.refreshWorkspace()
+            }
+          }}
+        />
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {settings.showSettings && (
           <SettingsPanel
@@ -406,6 +456,7 @@ export default function App() {
           dirtyFilePaths={tabs.dirtyFilePaths}
           scenarios={workspace.scenarioList}
           onSelectScenario={tabs.openScenarioAsTab}
+          scenarioError={scenarioRenameError}
           runAllState={runAllState ?? undefined}
           onRunAllScenarios={handleRunAll}
           onDismissRunAll={() => setRunAllState(null)}
@@ -424,17 +475,10 @@ export default function App() {
               tabs.openScenarioAsTab(result.path, name)
             }
           }}
-          onDeleteScenario={async (path) => {
+          onDeleteScenario={(path) => {
             const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
-            const msg = matchTab?.scenarioDirty
-              ? 'This scenario has unsaved changes. Delete anyway? This cannot be undone.'
-              : 'Delete this scenario? This cannot be undone.'
-            if (!window.confirm(msg)) return
-            const err = await deleteScenario(path)
-            if (!err) {
-              if (matchTab) tabs.removeTab(matchTab.id)
-              await workspace.refreshWorkspace()
-            }
+            const name = workspace.scenarioList.find(s => s.path === path)?.title ?? path.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? 'scenario'
+            setDeletingScenario({ path, name, isDirty: matchTab?.scenarioDirty ?? false })
           }}
           onRenameScenario={async (path, newName) => {
             const result = await renameScenario(path, newName)
@@ -450,7 +494,8 @@ export default function App() {
               }))
               await workspace.refreshWorkspace()
             } else {
-              window.alert(result.replace(/^error:\s*/i, ''))
+              setScenarioRenameError(result.replace(/^error:\s*/i, ''))
+              setTimeout(() => setScenarioRenameError(null), 4000)
             }
           }}
         />

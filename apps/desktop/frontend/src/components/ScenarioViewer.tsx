@@ -5,6 +5,7 @@ import { yaml } from '@codemirror/lang-yaml'
 import { cn } from '@/lib/utils'
 import { inputCls as baseInputCls, selectCls as baseSelectCls } from '@/lib/styles'
 import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult } from '@/lib/bridge'
+import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, AssertionDetail, ExtractionDetail, EnvInfo, StepResult } from '@/lib/bridge'
 import { METHOD_BADGE } from '@/lib/httpUtils'
 
@@ -975,6 +976,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   const [leftPanelWidth, setLeftPanelWidth] = useState(320)
   const [showStats, setShowStats] = useState(false)
@@ -1224,12 +1226,16 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     }
   }
 
-  function handleDiscard() {
-    if (isDirty && !window.confirm('Discard unsaved changes?')) return
+  function doDiscard() {
     if (mode === 'yaml') setEditorContent(rawContent)
     setVisualDirty(false)
     setSaveError(null)
     setMode('view')
+  }
+
+  function handleDiscard() {
+    if (isDirty) { setShowDiscardConfirm(true); return }
+    doDiscard()
   }
 
   const isEditing = mode === 'visual' || mode === 'yaml'
@@ -1533,6 +1539,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
           </div>
 
         </div>
+      )}
+
+      {showDiscardConfirm && (
+        <DiscardChangesDialog
+          onCancel={() => setShowDiscardConfirm(false)}
+          onDiscard={() => { setShowDiscardConfirm(false); doDiscard() }}
+        />
       )}
 
       {/* Stats dialog */}

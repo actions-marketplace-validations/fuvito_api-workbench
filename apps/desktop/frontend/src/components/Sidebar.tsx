@@ -55,6 +55,7 @@ export type SidebarProps = {
   runAllState?: RunAllState
   onRunAllScenarios?: () => void
   onDismissRunAll?: () => void
+  scenarioError?: string | null
 }
 
 export function Sidebar({
@@ -75,6 +76,7 @@ export function Sidebar({
   runAllState,
   onRunAllScenarios,
   onDismissRunAll,
+  scenarioError,
 }: SidebarProps) {
   return (
     <aside
@@ -130,6 +132,7 @@ export function Sidebar({
             runAllState={runAllState}
             onRunAllScenarios={onRunAllScenarios}
             onDismissRunAll={onDismissRunAll}
+            scenarioError={scenarioError}
           />
         )}
 
