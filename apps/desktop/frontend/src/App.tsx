@@ -23,7 +23,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, quitApp } from '@/lib/bridge'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
 import { isTabDirty } from '@/lib/tabState'
@@ -208,7 +208,10 @@ export default function App() {
   // Keyboard shortcuts — registered once, reads from refs
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'S' && e.shiftKey) {
+        e.preventDefault()
+        tabs.handleSaveAll()
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
         e.preventDefault()
         tabs.saveTabByIdRef.current(tabs.tabsStateRef.current.activeTabId)
       }
@@ -242,8 +245,9 @@ export default function App() {
       items: [
         { kind: 'action', label: 'New Tab',                  shortcut: 'Ctrl+N', onClick: tabs.handleNewTab },
         { kind: 'action', label: 'Open Request…',            shortcut: 'Ctrl+O', onClick: workspace.handleOpenRequest },
-        { kind: 'action', label: 'Save Request',             shortcut: 'Ctrl+S', onClick: tabs.handleSaveRequest },
-        { kind: 'action', label: 'Save As…',                                     onClick: tabs.handleSaveAsRequest },
+        { kind: 'action', label: 'Save Request',             shortcut: 'Ctrl+S',       onClick: tabs.handleSaveRequest },
+        { kind: 'action', label: 'Save All',               shortcut: 'Ctrl+Shift+S', onClick: tabs.handleSaveAll, disabled: tabs.dirtyFilePaths.size === 0 },
+        { kind: 'action', label: 'Save As…',                                          onClick: tabs.handleSaveAsRequest },
         { kind: 'separator' },
         { kind: 'action', label: 'Import OpenAPI Spec…',     onClick: workspace.handleImportOpenAPI, disabled: !workspace.workspacePath },
         { kind: 'action', label: 'Import OpenAPI from URL…', onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) }, disabled: !workspace.workspacePath },
@@ -251,6 +255,8 @@ export default function App() {
         { kind: 'action', label: 'Open Workspace…',          onClick: workspace.handleOpenWorkspace },
         { kind: 'action', label: 'New Workspace…',           onClick: workspace.handleNewWorkspace },
         { kind: 'action', label: 'Close Workspace',          onClick: workspace.handleCloseWorkspace, disabled: !workspace.workspacePath },
+        { kind: 'separator' },
+        { kind: 'action', label: 'Exit',                     onClick: quitApp },
       ],
     },
     {
@@ -466,6 +472,9 @@ export default function App() {
             onSelect={tabs.handleSelectTab}
             onClose={tabs.handleCloseTab}
             onNew={tabs.handleNewTab}
+            onSave={tabs.saveTabById}
+            onCloseOthers={tabs.handleCloseOthers}
+            onCloseToRight={tabs.handleCloseToRight}
           />
 
           <AppToolbar

@@ -102,6 +102,33 @@ export function useTabsState(deps: {
     }
   }
 
+  function handleCloseOthers(tabId: string) {
+    const { tabs: currentTabs } = tabsStateRef.current
+    const toClose = currentTabs.filter(t => t.id !== tabId)
+    if (toClose.length === 0) return
+    const dirtyCount = toClose.filter(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty)).length
+    if (dirtyCount > 0) {
+      const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
+      if (!window.confirm(`${dirtyCount} ${noun} unsaved changes. Close and discard?`)) return
+    }
+    toClose.forEach(t => removeTab(t.id))
+    switchTo(tabId)
+  }
+
+  function handleCloseToRight(tabId: string) {
+    const { tabs: currentTabs } = tabsStateRef.current
+    const idx = currentTabs.findIndex(t => t.id === tabId)
+    if (idx === -1) return
+    const toClose = currentTabs.slice(idx + 1)
+    if (toClose.length === 0) return
+    const dirtyCount = toClose.filter(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty)).length
+    if (dirtyCount > 0) {
+      const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
+      if (!window.confirm(`${dirtyCount} ${noun} unsaved changes. Close and discard?`)) return
+    }
+    toClose.forEach(t => removeTab(t.id))
+  }
+
   function openFileAsTab(r: RequestFileIO, path: string): string {
     const state = requestFileIOToState(r)
     const timeoutMs = r.timeoutMs ?? 0
@@ -317,14 +344,21 @@ export function useTabsState(deps: {
 
   const dirtyFilePaths = new Set(tabs.filter(t => t.filePath && isTabDirty(t)).map(t => t.filePath!))
 
+  async function handleSaveAll(): Promise<void> {
+    const dirtyTabs = tabsStateRef.current.tabs.filter(t => t.filePath && isTabDirty(t))
+    for (const tab of dirtyTabs) {
+      await saveTabById(tab.id)
+    }
+  }
+
   return {
     tabs, activeTabId, activeTab,
     setTabsState, tabsStateRef,
     updateTab, switchTo, removeTab,
-    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab,
+    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight,
     openFileAsTab, loadCacheIntoTab,
     saveTabById, saveTabByIdRef,
-    handleSaveRequest, handleSaveAsRequest,
+    handleSaveRequest, handleSaveAsRequest, handleSaveAll,
     handleSelectHistory, handleNewRequestInFolder,
     openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,

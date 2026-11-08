@@ -54,6 +54,11 @@ func (a *App) SetHasDirtyTabs(dirty bool) {
 	a.hasDirtyTabs = dirty
 }
 
+// Exit is called by the File > Exit menu item. OnBeforeClose handles the dirty-tab check.
+func (a *App) Exit() {
+	runtime.Quit(a.ctx)
+}
+
 // beforeClose is registered as OnBeforeClose; returns true to cancel the close.
 func (a *App) beforeClose(ctx context.Context) bool {
 	if !a.hasDirtyTabs {

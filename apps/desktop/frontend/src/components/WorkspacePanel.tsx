@@ -9,6 +9,27 @@ import type { RunAllState } from '@/components/Sidebar'
 import { openInExplorer } from '@/lib/bridge'
 import { ContextMenu, type ContextMenuAction } from '@/components/ContextMenu'
 
+// ---- Method badge ----
+
+const METHOD_COLORS: Record<string, string> = {
+  GET:     'text-emerald-400',
+  POST:    'text-blue-400',
+  PUT:     'text-amber-400',
+  PATCH:   'text-violet-400',
+  DELETE:  'text-red-400',
+  HEAD:    'text-cyan-400',
+  OPTIONS: 'text-slate-400',
+}
+
+function MethodBadge({ method }: { method: string }) {
+  const color = METHOD_COLORS[method] ?? 'text-[var(--color-muted-foreground)]'
+  return (
+    <span className={cn('shrink-0 font-mono text-[9px] font-semibold leading-none', color)}>
+      {method}
+    </span>
+  )
+}
+
 // ---- Tree filter ----
 
 function filterTree(nodes: FileNode[], query: string): FileNode[] {
@@ -263,6 +284,7 @@ function TreeNode({
           >
             {displayName}
           </span>
+          {node.method && <MethodBadge method={node.method} />}
           {dirtyFilePaths?.has(node.path) && (
             <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
           )}

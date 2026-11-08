@@ -14,6 +14,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"gopkg.in/yaml.v3"
 )
 
 // ---- Config persistence ----
@@ -67,6 +68,7 @@ type FileNodeIO struct {
 	Name     string       `json:"name"`
 	Path     string       `json:"path"`
 	IsDir    bool         `json:"isDir"`
+	Method   string       `json:"method,omitempty"`
 	Children []FileNodeIO `json:"children,omitempty"`
 }
 
@@ -630,6 +632,28 @@ func isRequestFile(path string) bool {
 	return isDataFile(filepath.Base(path))
 }
 
+// peekMethod reads just the method field from a request file without full parsing.
+func peekMethod(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var out struct {
+		Method string `yaml:"method" json:"method"`
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".json" {
+		if err := json.Unmarshal(data, &out); err != nil {
+			return ""
+		}
+	} else {
+		if err := yaml.Unmarshal(data, &out); err != nil {
+			return ""
+		}
+	}
+	return strings.ToUpper(out.Method)
+}
+
 func buildFileTree(root, dir string, skipSpecialDirs bool) ([]FileNodeIO, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -654,7 +678,7 @@ func buildFileTree(root, dir string, skipSpecialDirs bool) ([]FileNodeIO, error)
 			}
 			nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: true, Children: children})
 		} else if isRequestFile(path) {
-			nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: false})
+			nodes = append(nodes, FileNodeIO{Name: name, Path: path, IsDir: false, Method: peekMethod(path)})
 		}
 	}
 	return nodes, nil

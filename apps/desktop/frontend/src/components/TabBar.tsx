@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { X, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ContextMenu } from '@/components/ContextMenu'
 
 export type TabInfo = {
   id: string
@@ -30,9 +32,23 @@ type TabBarProps = {
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onNew: () => void
+  onSave?: (id: string) => void
+  onCloseOthers?: (id: string) => void
+  onCloseToRight?: (id: string) => void
 }
 
-export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, onCloseOthers, onCloseToRight }: TabBarProps) {
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
+
+  function handleContextMenu(e: React.MouseEvent, tabId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setCtxMenu({ x: e.clientX, y: e.clientY, tabId })
+  }
+
+  const ctxTab = ctxMenu ? tabs.find(t => t.id === ctxMenu.tabId) : null
+  const ctxTabIndex = ctxMenu ? tabs.findIndex(t => t.id === ctxMenu.tabId) : -1
+
   return (
     <div className="flex items-stretch shrink-0 bg-[var(--color-muted)] border-b border-[var(--color-border)] overflow-x-auto">
       {tabs.map(tab => {
@@ -43,6 +59,7 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
             role="tab"
             aria-selected={isActive}
             onClick={() => onSelect(tab.id)}
+            onContextMenu={e => handleContextMenu(e, tab.id)}
             className={cn(
               'group flex items-center gap-1.5 px-3 h-9 text-xs shrink-0 max-w-[200px] min-w-[80px]',
               'border-t-[3px] cursor-pointer select-none transition-colors',
@@ -87,6 +104,40 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew }: TabBarPr
       >
         <Plus size={12} />
       </button>
+
+      {ctxMenu && ctxTab && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={() => setCtxMenu(null)}
+          items={[
+            {
+              kind: 'action',
+              label: 'Save',
+              disabled: ctxTab.kind === 'scenario' || !onSave,
+              onClick: () => onSave?.(ctxMenu.tabId),
+            },
+            { kind: 'separator' },
+            {
+              kind: 'action',
+              label: 'Close Tab',
+              onClick: () => onClose(ctxMenu.tabId),
+            },
+            {
+              kind: 'action',
+              label: 'Close Others',
+              disabled: tabs.length <= 1 || !onCloseOthers,
+              onClick: () => onCloseOthers?.(ctxMenu.tabId),
+            },
+            {
+              kind: 'action',
+              label: 'Close to the Right',
+              disabled: ctxTabIndex >= tabs.length - 1 || !onCloseToRight,
+              onClick: () => onCloseToRight?.(ctxMenu.tabId),
+            },
+          ]}
+        />
+      )}
     </div>
   )
 }

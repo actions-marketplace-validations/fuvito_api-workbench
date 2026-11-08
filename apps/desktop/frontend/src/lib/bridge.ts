@@ -2,7 +2,7 @@
 // Uses plain interfaces for ergonomic object creation at call sites.
 // The generated wailsjs classes use 'namespace' (not erasable syntax in TS7),
 // so all Wails imports are isolated here.
-import { SetHasDirtyTabs as WailsSetHasDirtyTabs } from '@wailsjs/go/main/App'
+import { SetHasDirtyTabs as WailsSetHasDirtyTabs, Exit as WailsExit } from '@wailsjs/go/main/App'
 import {
   Execute as WailsExecute,
   GetHistory as WailsGetHistory,
@@ -131,6 +131,7 @@ export interface FileNode {
   name: string
   path: string
   isDir: boolean
+  method?: string
   children?: FileNode[]
 }
 
@@ -158,6 +159,10 @@ export interface RequestFileIO {
 
 export async function setHasDirtyTabs(dirty: boolean): Promise<void> {
   await WailsSetHasDirtyTabs(dirty)
+}
+
+export async function quitApp(): Promise<void> {
+  await WailsExit()
 }
 
 // ---- Request execution ----
