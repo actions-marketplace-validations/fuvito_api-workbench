@@ -542,21 +542,31 @@ export default function App() {
             onStopDemo={demo.handleStopDemo}
           />
 
-          <div className="flex-1 flex overflow-hidden">
-            {activeTab.kind === 'scenario' ? (
-              <ScenarioViewer
-                scenarioPath={activeTab.scenarioPath ?? ''}
-                scenarioName={activeTab.scenarioName ?? ''}
-                result={activeTab.scenarioResult ?? null}
-                running={activeTab.scenarioRunning ?? false}
-                theme={settings.settings.theme}
-                environments={workspace.environments}
-                activeEnvPath={workspace.activeEnv?.path ?? ''}
-                onResultChange={r => updateTab(activeTabId, { scenarioResult: r })}
-                onRunningChange={running => updateTab(activeTabId, { scenarioRunning: running })}
-                onDirtyChange={dirty => updateTab(activeTabId, { scenarioDirty: dirty })}
-              />
-            ) : (
+          <div className="flex-1 flex overflow-hidden relative">
+            {/* Scenario viewers: keep mounted once opened so edit state survives tab switches */}
+            {tabList.filter(t => t.kind === 'scenario').map(t => (
+              <div
+                key={t.id}
+                className="absolute inset-0 overflow-hidden"
+                style={{ display: t.id === activeTabId ? 'flex' : 'none' }}
+              >
+                <ScenarioViewer
+                  scenarioPath={t.scenarioPath ?? ''}
+                  scenarioName={t.scenarioName ?? ''}
+                  result={t.scenarioResult ?? null}
+                  running={t.scenarioRunning ?? false}
+                  theme={settings.settings.theme}
+                  environments={workspace.environments}
+                  activeEnvPath={workspace.activeEnv?.path ?? ''}
+                  onResultChange={r => updateTab(t.id, { scenarioResult: r })}
+                  onRunningChange={running => updateTab(t.id, { scenarioRunning: running })}
+                  onDirtyChange={dirty => updateTab(t.id, { scenarioDirty: dirty })}
+                />
+              </div>
+            ))}
+
+            {/* Request panel: only mount when active tab is a request */}
+            {activeTab.kind !== 'scenario' && (
               <>
                 <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                   <RequestEditor

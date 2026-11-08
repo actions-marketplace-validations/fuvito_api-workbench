@@ -630,7 +630,7 @@ function CollapsibleSection({ title, badge, defaultOpen = true, children }: {
 
 // ---- StepListRow (compact left-panel row, shared between view and edit modes) ----
 
-function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onToggleDisabled, onRunFrom, running = false }: {
+function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onDuplicate, onToggleDisabled, onRunFrom, running = false }: {
   step: StepDetail
   index: number
   result: StepResult | null
@@ -642,6 +642,7 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
   onMoveUp?: () => void
   onMoveDown?: () => void
   onRemove?: () => void
+  onDuplicate?: () => void
   onToggleDisabled?: () => void
   onRunFrom?: () => void
   running?: boolean
@@ -709,6 +710,10 @@ function StepListRow({ step, index, result, selected, onSelect, editMode = false
             title={isDisabled ? 'Enable step' : 'Disable step'}
             className={cn('p-1 transition-colors', isDisabled ? 'text-amber-400 hover:text-amber-300' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
             {isDisabled ? <EyeOff size={11} /> : <Eye size={11} />}
+          </button>
+          <button type="button" onClick={e => { e.stopPropagation(); onDuplicate?.() }} title="Duplicate step"
+            className="p-1 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+            <Copy size={11} />
           </button>
           <button type="button" onClick={e => { e.stopPropagation(); onMoveUp?.() }} disabled={isFirst} title="Move up (Alt+↑)"
             className={cn('p-1 transition-colors', isFirst ? 'opacity-20 cursor-not-allowed text-[var(--color-muted-foreground)]' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
@@ -976,6 +981,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [savedFlash, setSavedFlash] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   const [leftPanelWidth, setLeftPanelWidth] = useState(320)
@@ -1180,6 +1186,16 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     })
   }
 
+  function duplicateVisualStep(i: number) {
+    if (!visualDetail) return
+    const src = visualDetail.steps[i]
+    const copy: StepDetail = { ...src, title: `${src.title} copy`, assertions: [...src.assertions], extractions: [...src.extractions], headers: [...(src.headers ?? [])], queryParams: [...(src.queryParams ?? [])] }
+    const newSteps = [...visualDetail.steps.slice(0, i + 1), copy, ...visualDetail.steps.slice(i + 1)]
+    setVisualDetail({ ...visualDetail, steps: newSteps })
+    setVisualDirty(true)
+    setSelectedStepIndex(i + 1)
+  }
+
   function toggleVisualStepDisabled(i: number) {
     setVisualDetail(prev => {
       if (!prev) return prev
@@ -1218,7 +1234,9 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       const d = await loadScenario(scenarioPath)
       if (d.error) setLoadError(d.error); else setDetail(d)
       onResultChange(null)
-      setMode('view')
+      setVisualDirty(false)
+      setSavedFlash(true)
+      setTimeout(() => { setSavedFlash(false); setMode('view') }, 1500)
     } catch (e) {
       setSaveError(String(e))
     } finally {
@@ -1325,16 +1343,24 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         ) : (
           <>
             {saveError && <span className="text-xs text-red-400 shrink-0 max-w-[200px] truncate" title={saveError}>{saveError}</span>}
-            <button type="button" onClick={handleDiscard} disabled={saving}
-              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
-              <X size={11} /> Discard
-            </button>
-            <button type="button" onClick={handleSave} disabled={saving || (mode === 'yaml' && !isDirty)}
-              className={cn('shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
-                'bg-[var(--color-accent)] text-white',
-                (saving || (mode === 'yaml' && !isDirty)) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90')}>
-              {saving ? <><Loader2 size={12} className="animate-spin" /> Saving…</> : <><Save size={12} /> Save</>}
-            </button>
+            {savedFlash ? (
+              <span className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-emerald-400 bg-emerald-500/10">
+                <CheckCircle2 size={12} /> Saved
+              </span>
+            ) : (
+              <>
+                <button type="button" onClick={handleDiscard} disabled={saving}
+                  className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
+                  <X size={11} /> Discard
+                </button>
+                <button type="button" onClick={handleSave} disabled={saving || (mode === 'yaml' && !isDirty)}
+                  className={cn('shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
+                    'bg-[var(--color-accent)] text-white',
+                    (saving || (mode === 'yaml' && !isDirty)) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90')}>
+                  {saving ? <><Loader2 size={12} className="animate-spin" /> Saving…</> : <><Save size={12} /> Save</>}
+                </button>
+              </>
+            )}
           </>
         )}
       </div>
@@ -1456,6 +1482,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
                       onMoveUp={() => moveVisualStep(i, -1)}
                       onMoveDown={() => moveVisualStep(i, 1)}
                       onRemove={() => removeVisualStep(i)}
+                      onDuplicate={() => duplicateVisualStep(i)}
                       onToggleDisabled={() => toggleVisualStepDisabled(i)}
                     />
                   ))

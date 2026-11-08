@@ -69,6 +69,7 @@ export function useTabsState(deps: {
     const { tabs: currentTabs, activeTabId: currentActiveId } = tabsStateRef.current
     const tab = currentTabs.find(t => t.id === currentActiveId)
     if (!tab) return
+    if (tab.kind === 'scenario') return
     const newTab: TabState = {
       ...tab,
       id: crypto.randomUUID(),
@@ -210,6 +211,7 @@ export function useTabsState(deps: {
   async function saveTabById(tabId: string): Promise<boolean> {
     const tab = tabsStateRef.current.tabs.find(t => t.id === tabId)
     if (!tab) return false
+    if (tab.kind === 'scenario') return false
     updateTab(tabId, { saveError: null })
     const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
     try {
