@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/fuvito/api-workbench/packages/core v0.0.0-00010101000000-000000000000
 	github.com/wailsapp/wails/v2 v2.17.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -58,7 +59,6 @@ require (
 	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
