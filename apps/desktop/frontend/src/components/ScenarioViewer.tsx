@@ -1543,6 +1543,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
       {showDiscardConfirm && (
         <DiscardChangesDialog
+          message="Discard unsaved changes to this scenario?"
           onCancel={() => setShowDiscardConfirm(false)}
           onDiscard={() => { setShowDiscardConfirm(false); doDiscard() }}
         />
