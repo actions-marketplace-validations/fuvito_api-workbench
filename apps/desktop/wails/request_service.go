@@ -69,14 +69,17 @@ type ResponseOutput struct {
 }
 
 type HistoryEntryIO struct {
-	ID         int64  `json:"id"`
-	ExecutedAt string `json:"executedAt"`
-	Method     string `json:"method"`
-	URL        string `json:"url"`
-	StatusCode int    `json:"statusCode"`
-	StatusText string `json:"statusText"`
-	DurationMs int64  `json:"durationMs"`
-	SizeBytes  int64  `json:"sizeBytes"`
+	ID          int64      `json:"id"`
+	ExecutedAt  string     `json:"executedAt"`
+	Method      string     `json:"method"`
+	URL         string     `json:"url"`
+	StatusCode  int        `json:"statusCode"`
+	StatusText  string     `json:"statusText"`
+	DurationMs  int64      `json:"durationMs"`
+	SizeBytes   int64      `json:"sizeBytes"`
+	Headers     []HeaderIO `json:"headers"`
+	BodyType    string     `json:"bodyType"`
+	BodyContent string     `json:"bodyContent"`
 }
 
 // ---- Service ----
@@ -210,15 +213,22 @@ func (s *RequestService) GetHistory() []HistoryEntryIO {
 	}
 	out := make([]HistoryEntryIO, len(entries))
 	for i, e := range entries {
+		headers := make([]HeaderIO, len(e.Headers))
+		for j, h := range e.Headers {
+			headers[j] = HeaderIO{Name: h.Name, Value: h.Value}
+		}
 		out[i] = HistoryEntryIO{
-			ID:         e.ID,
-			ExecutedAt: e.ExecutedAt.Format(time.RFC3339),
-			Method:     e.Method,
-			URL:        e.URL,
-			StatusCode: e.StatusCode,
-			StatusText: e.StatusText,
-			DurationMs: e.DurationMs,
-			SizeBytes:  e.SizeBytes,
+			ID:          e.ID,
+			ExecutedAt:  e.ExecutedAt.Format(time.RFC3339),
+			Method:      e.Method,
+			URL:         e.URL,
+			StatusCode:  e.StatusCode,
+			StatusText:  e.StatusText,
+			DurationMs:  e.DurationMs,
+			SizeBytes:   e.SizeBytes,
+			Headers:     headers,
+			BodyType:    e.BodyType,
+			BodyContent: e.BodyContent,
 		}
 	}
 	return out
@@ -248,7 +258,16 @@ func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {
 	if s.store == nil || out.Error != "" {
 		return
 	}
-	if _, err := s.store.Record(input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size); err != nil {
+	headers := make([]history.Header, len(input.Headers))
+	for i, h := range input.Headers {
+		headers[i] = history.Header{Name: h.Name, Value: h.Value}
+	}
+	bodyType, bodyContent := "none", ""
+	if input.Body != nil {
+		bodyType = input.Body.Type
+		bodyContent = input.Body.Content
+	}
+	if _, err := s.store.Record(input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size, headers, bodyType, bodyContent); err != nil {
 		log.Printf("writing history: %v", err)
 	}
 }

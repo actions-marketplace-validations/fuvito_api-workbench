@@ -6,6 +6,7 @@ import type { TabState } from '@/lib/tabState'
 import { authStateToPayload, requestFileIOToState, HTTP_METHODS } from '@/lib/httpUtils'
 import type { HttpMethod } from '@/lib/httpUtils'
 import type { HistoryEntry } from '@/lib/bridge'
+import type { BodyState } from '@/types'
 
 export type TabsStateTuple = { tabs: TabState[]; activeTabId: string }
 
@@ -263,14 +264,20 @@ export function useTabsState(deps: {
   function handleSelectHistory(entry: HistoryEntry) {
     const method = (HTTP_METHODS as readonly string[]).includes(entry.method)
       ? entry.method as HttpMethod : 'GET'
-    const savedKey = computeStateKey(method, entry.url, [], [], { type: 'none', content: '' }, { type: 'none' }, null)
+    const headers = (entry.headers ?? []).map(h => ({
+      id: crypto.randomUUID(), name: h.name, value: h.value, enabled: true,
+    }))
+    const bodyType = (['none', 'json', 'raw', 'form-urlencoded', 'multipart'] as const).includes(entry.bodyType as never)
+      ? entry.bodyType as BodyState['type'] : 'none'
+    const body: BodyState = { type: bodyType, content: entry.bodyContent ?? '' }
+    const savedKey = computeStateKey(method, entry.url, [], headers, body, { type: 'none' }, null, 0)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       method,
       url: entry.url,
       queryParams: [],
-      headers: [],
-      body: { type: 'none', content: '' },
+      headers,
+      body,
       auth: { type: 'none' },
       timeoutMs: 0,
       name: null,

@@ -3,6 +3,7 @@ package history_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/history"
@@ -16,11 +17,12 @@ func TestStoreRecordAndRecent(t *testing.T) {
 	}
 	defer store.Close()
 
-	id1, err := store.Record("GET", "https://example.com/api/users", 200, "200 OK", 123, 456)
+	headers := []history.Header{{Name: "Accept", Value: "application/json"}, {Name: "Authorization", Value: "Bearer secret"}}
+	id1, err := store.Record("GET", "https://example.com/api/users", 200, "200 OK", 123, 456, headers, "none", "")
 	if err != nil {
 		t.Fatalf("Record 1: %v", err)
 	}
-	id2, err := store.Record("POST", "https://example.com/api/items", 201, "201 Created", 50, 128)
+	id2, err := store.Record("POST", "https://example.com/api/items", 201, "201 Created", 50, 128, nil, "json", `{"name":"test"}`)
 	if err != nil {
 		t.Fatalf("Record 2: %v", err)
 	}
@@ -40,8 +42,20 @@ func TestStoreRecordAndRecent(t *testing.T) {
 	if entries[0].Method != "POST" || entries[0].StatusCode != 201 {
 		t.Errorf("first entry: got %+v", entries[0])
 	}
+	if entries[0].BodyType != "json" || entries[0].BodyContent != `{"name":"test"}` {
+		t.Errorf("first entry body: got type=%q content=%q", entries[0].BodyType, entries[0].BodyContent)
+	}
 	if entries[1].Method != "GET" || entries[1].DurationMs != 123 {
 		t.Errorf("second entry: got %+v", entries[1])
+	}
+	// Authorization header should be redacted
+	if len(entries[1].Headers) != 2 {
+		t.Fatalf("second entry headers: expected 2, got %d", len(entries[1].Headers))
+	}
+	for _, h := range entries[1].Headers {
+		if strings.EqualFold(h.Name, "Authorization") && h.Value != "[redacted]" {
+			t.Errorf("Authorization header not redacted: %q", h.Value)
+		}
 	}
 }
 
@@ -54,7 +68,7 @@ func TestStoreRecentLimit(t *testing.T) {
 	defer store.Close()
 
 	for i := range 5 {
-		if _, err := store.Record("GET", "https://example.com", 200, "200 OK", int64(i), 0); err != nil {
+		if _, err := store.Record("GET", "https://example.com", 200, "200 OK", int64(i), 0, nil, "none", ""); err != nil {
 			t.Fatalf("Record %d: %v", i, err)
 		}
 	}

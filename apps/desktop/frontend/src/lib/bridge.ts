@@ -135,6 +135,9 @@ export interface HistoryEntry {
   statusText: string
   durationMs: number
   sizeBytes: number
+  headers: { name: string; value: string }[]
+  bodyType: string
+  bodyContent: string
 }
 
 export interface FileNode {

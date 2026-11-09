@@ -49,7 +49,7 @@ This is a genuinely well-built MVP. The Postman-style three-pane layout is immed
 
 ### Minor
 
-- [ ] History restores only method+URL (acknowledged in UI). Since history is SQLite-backed anyway, restoring headers/body too would make it genuinely useful for redoing complex requests.
+- [x] History restores only method+URL (acknowledged in UI). Since history is SQLite-backed anyway, restoring headers/body too would make it genuinely useful for redoing complex requests.
 - [ ] Multipart body supports text fields only — no file picker. Users will hit this quickly when testing upload endpoints; it's a common API task.
 
 ---
@@ -100,7 +100,7 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 
 1. [x] **Publish a GitHub Action on the Marketplace** — `uses: fuvito/clrsig-action@v1`. This is the highest-ROI move: it puts your name in every workflow file that adopts it, drives organic discovery, and matches the CI-first pitch perfectly.
 2. [x] **Install channels** — Homebrew tap, Scoop/winget, `go install`, and a Docker image for CI. Releases already build binaries; packaging is the remaining friction.
-3. [ ] **Postman collection + environment import** — turns "interesting project" into "I can try it on my actual API in 2 minutes." Conversion funnel gold.
+3. [x] **Postman collection + environment import** — turns "interesting project" into "I can try it on my actual API in 2 minutes." Conversion funnel gold.
 4. [x] **Comparison page** — honest table vs. Postman/Newman/Bruno/Schemathesis on: local files, git-diffability, spec conformance, CI output formats, account requirement.
 5. [x] **A 30-second demo GIF in the README** — import spec → run scenario → CLI in CI → green check. Screenshots are good but a GIF of a scenario run is what gets stars.
 6. [x] **Scenario template gallery** — ready-made scenarios for common public APIs (GitHub, Stripe-mock) so new users see value before writing YAML.
