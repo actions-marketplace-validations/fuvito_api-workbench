@@ -44,6 +44,10 @@ import {
   ImportOpenAPISpecFromURL as WailsImportOpenAPISpecFromURL,
 } from '@wailsjs/go/main/OpenAPIService'
 import {
+  ImportPostmanCollection as WailsImportPostmanCollection,
+  ImportInsomniaExport as WailsImportInsomniaExport,
+} from '@wailsjs/go/main/ImportService'
+import {
   GetSettings as WailsGetSettings,
   SaveSettings as WailsSaveSettings,
   ResetSettings as WailsResetSettings,
@@ -349,6 +353,25 @@ export async function importOpenAPISpecFromPath(path: string, baseURL = ''): Pro
 export async function importOpenAPISpecFromURL(url: string, baseURL = ''): Promise<ImportResult> {
   const result = await WailsImportOpenAPISpecFromURL(url, baseURL)
   return result as unknown as ImportResult
+}
+
+// ---- Collection import (Postman / Insomnia) ----
+
+export interface CollectionImportResult {
+  collectionName: string
+  imported: ImportedRequest[]
+  skipped: number
+  error?: string
+}
+
+export async function importPostmanCollection(): Promise<CollectionImportResult> {
+  const result = await WailsImportPostmanCollection()
+  return result as unknown as CollectionImportResult
+}
+
+export async function importInsomniaExport(): Promise<CollectionImportResult> {
+  const result = await WailsImportInsomniaExport()
+  return result as unknown as CollectionImportResult
 }
 
 // ---- Settings ----

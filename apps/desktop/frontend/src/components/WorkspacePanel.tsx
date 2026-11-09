@@ -344,6 +344,8 @@ type WorkspacePanelProps = {
   onRenameFolder?: (path: string, newName: string) => void
   onMoveFile?: (srcPath: string, destDir: string) => void
   onImportOpenAPI: () => void
+  onImportPostman?: () => void
+  onImportInsomnia?: () => void
   onRefresh?: () => void
   importing?: boolean
   activeFilePath?: string
@@ -375,6 +377,8 @@ export function WorkspacePanel({
   onRenameFolder,
   onMoveFile,
   onImportOpenAPI,
+  onImportPostman,
+  onImportInsomnia,
   onRefresh,
   importing,
   activeFilePath,
@@ -401,6 +405,18 @@ export function WorkspacePanel({
       return next
     })
   }
+
+  // ---- Import dropdown ----
+  const [importMenuOpen, setImportMenuOpen] = useState(false)
+  const importMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!importMenuOpen) return
+    function onDown(e: MouseEvent) {
+      if (importMenuRef.current && !importMenuRef.current.contains(e.target as Node)) setImportMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [importMenuOpen])
 
   // ---- Context menu ----
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
@@ -477,15 +493,40 @@ export function WorkspacePanel({
                   <FolderPlus size={12} />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={onImportOpenAPI}
-                disabled={importing}
-                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-40"
-                title="Import OpenAPI spec"
-              >
-                {importing ? <span className="text-label">…</span> : <Upload size={12} />}
-              </button>
+              <div ref={importMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setImportMenuOpen(v => !v)}
+                  disabled={importing}
+                  className="flex items-center gap-0.5 text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors disabled:opacity-40"
+                  title="Import collection"
+                >
+                  {importing ? <span className="text-label">…</span> : <Upload size={12} />}
+                  <ChevronDown size={9} />
+                </button>
+                {importMenuOpen && (
+                  <ul className="absolute right-0 top-full mt-1 w-44 bg-[var(--color-card)] border border-[var(--color-border)] rounded shadow-xl py-1 z-50">
+                    <li>
+                      <button type="button" onMouseDown={() => { setImportMenuOpen(false); onImportOpenAPI() }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer">
+                        OpenAPI spec
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" onMouseDown={() => { setImportMenuOpen(false); onImportPostman?.() }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer">
+                        Postman collection
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" onMouseDown={() => { setImportMenuOpen(false); onImportInsomnia?.() }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer">
+                        Insomnia export
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </div>
               {onRefresh && (
                 <button
                   type="button"

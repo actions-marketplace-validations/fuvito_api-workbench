@@ -38,6 +38,10 @@ export function GetEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['GetEnvironment'](arg1);
 }
 
+export function GetRecentWorkspaces() {
+  return window['go']['main']['WorkspaceService']['GetRecentWorkspaces']();
+}
+
 export function GetWorkspacePath() {
   return window['go']['main']['WorkspaceService']['GetWorkspacePath']();
 }
@@ -80,6 +84,10 @@ export function OpenRequest() {
 
 export function OpenWorkspace() {
   return window['go']['main']['WorkspaceService']['OpenWorkspace']();
+}
+
+export function OpenWorkspaceByPath(arg1) {
+  return window['go']['main']['WorkspaceService']['OpenWorkspaceByPath'](arg1);
 }
 
 export function RenameFolder(arg1, arg2) {

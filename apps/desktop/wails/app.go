@@ -11,6 +11,7 @@ type App struct {
 	workspaceService *WorkspaceService
 	requestService   *RequestService
 	openapiService   *OpenAPIService
+	importService    *ImportService
 	settingsService  *SettingsService
 	demoService      *DemoService
 	scenarioService  *ScenarioService
@@ -27,6 +28,7 @@ func NewApp() *App {
 		workspaceService: ws,
 		requestService:   rs,
 		openapiService:   NewOpenAPIService(ws),
+		importService:    NewImportService(ws),
 		settingsService:  ss,
 		demoService:      NewDemoService(ws),
 		scenarioService:  NewScenarioService(ws, ss),
@@ -39,6 +41,7 @@ func (a *App) startup(ctx context.Context) {
 	a.workspaceService.setContext(ctx)
 	a.requestService.setContext(ctx)
 	a.openapiService.setContext(ctx)
+	a.importService.setContext(ctx)
 	a.settingsService.setContext(ctx)
 	a.demoService.setContext(ctx)
 	a.scenarioService.setContext(ctx)

@@ -54,9 +54,19 @@ export default function App() {
   refreshWorkspaceRef.current = workspace.refreshFileTree
 
   // Local UI state
-  const [sidebarWidth, setSidebarWidth] = useState(224)
-  const [responseWidth, setResponseWidth] = useState(0)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const v = parseInt(localStorage.getItem('ui.sidebarWidth') ?? '')
+    return isNaN(v) ? 224 : Math.max(160, Math.min(480, v))
+  })
+  const [responseWidth, setResponseWidth] = useState(() => {
+    const v = parseInt(localStorage.getItem('ui.responseWidth') ?? '')
+    return isNaN(v) ? 0 : Math.max(0, v)
+  })
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
+  const sidebarWidthRef = useRef(sidebarWidth)
+  const responseWidthRef = useRef(responseWidth)
+  useEffect(() => { sidebarWidthRef.current = sidebarWidth }, [sidebarWidth])
+  useEffect(() => { responseWidthRef.current = responseWidth }, [responseWidth])
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('workspace')
   const [showAbout, setShowAbout] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -115,6 +125,11 @@ export default function App() {
       }
     }
     function onMouseUp() {
+      if (draggingRef.current === 'sidebar') {
+        localStorage.setItem('ui.sidebarWidth', String(sidebarWidthRef.current))
+      } else if (draggingRef.current === 'response') {
+        localStorage.setItem('ui.responseWidth', String(responseWidthRef.current))
+      }
       draggingRef.current = null
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
@@ -461,6 +476,8 @@ export default function App() {
           onSelectHistory={tabs.handleSelectHistory}
           onClearHistory={workspace.handleClearHistory}
           onImportOpenAPI={workspace.handleImportOpenAPI}
+          onImportPostman={workspace.handleImportPostman}
+          onImportInsomnia={workspace.handleImportInsomnia}
           onRefresh={workspace.refreshWorkspace}
           importing={workspace.importing}
           activeFilePath={activeTab.filePath ?? undefined}

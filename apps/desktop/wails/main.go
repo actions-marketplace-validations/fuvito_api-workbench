@@ -33,6 +33,7 @@ func main() {
 			app.requestService,
 			app.workspaceService,
 			app.openapiService,
+			app.importService,
 			app.settingsService,
 			app.demoService,
 			app.scenarioService,

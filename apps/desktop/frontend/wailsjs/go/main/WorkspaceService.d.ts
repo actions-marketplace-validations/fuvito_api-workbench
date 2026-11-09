@@ -21,6 +21,8 @@ export function GetActiveEnvironment():Promise<main.EnvironmentInfoIO>;
 
 export function GetEnvironment(arg1:string):Promise<main.EnvironmentIO>;
 
+export function GetRecentWorkspaces():Promise<Array<string>>;
+
 export function GetWorkspacePath():Promise<string>;
 
 export function ListEnvironments():Promise<Array<main.EnvironmentInfoIO>>;
@@ -42,6 +44,8 @@ export function OpenInSystemViewer(arg1:string,arg2:string):Promise<string>;
 export function OpenRequest():Promise<main.RequestFileIO>;
 
 export function OpenWorkspace():Promise<string>;
+
+export function OpenWorkspaceByPath(arg1:string):Promise<string>;
 
 export function RenameFolder(arg1:string,arg2:string):Promise<string>;
 

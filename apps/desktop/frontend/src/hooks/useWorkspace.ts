@@ -5,6 +5,7 @@ import {
   createFolder, deleteFolder, renameFolder, renameRequest, moveRequest,
   listEnvironments, selectEnvironment, getActiveEnvironment, getEnvironment,
   importOpenAPISpec, importOpenAPISpecFromURL,
+  importPostmanCollection, importInsomniaExport,
   getHistory, clearHistory, listScenarios,
   getRecentWorkspaces, openWorkspaceByPath,
 } from '@/lib/bridge'
@@ -380,6 +381,30 @@ export function useWorkspace(deps: {
     }
   }
 
+  async function handleImportPostman() {
+    setImporting(true)
+    try {
+      const result = await importPostmanCollection()
+      if (!result.error) await refreshFileTree()
+    } catch (err) {
+      console.error('postman import failed:', err)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function handleImportInsomnia() {
+    setImporting(true)
+    try {
+      const result = await importInsomniaExport()
+      if (!result.error) await refreshFileTree()
+    } catch (err) {
+      console.error('insomnia import failed:', err)
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return {
     workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history, scenarioList, recentWorkspaces,
     refreshFileTree, refreshWorkspace, refreshHistory,
@@ -394,7 +419,7 @@ export function useWorkspace(deps: {
     confirmCreateFolder, handleDeleteFolder,
     deletingFolderPath, setDeletingFolderPath, confirmDeleteFolder,
     handleRenameFile, handleRenameFolder,
-    handleImportOpenAPI,
+    handleImportOpenAPI, handleImportPostman, handleImportInsomnia,
     importFromURLDialog, setImportFromURLDialog,
     importFromURLInput, setImportFromURLInput,
     importFromURLError, setImportFromURLError,
