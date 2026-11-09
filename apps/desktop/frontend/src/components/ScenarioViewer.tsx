@@ -56,6 +56,23 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const stepListRef = useRef<HTMLDivElement>(null)
   const selectedStepIndexRef = useRef<number | null>(null)
   useEffect(() => { selectedStepIndexRef.current = selectedStepIndex }, [selectedStepIndex])
+  const moveVisualStepRef = useRef<((from: number, dir: -1 | 1) => void) | null>(null)
+
+  const [prevScenarioPath, setPrevScenarioPath] = useState(scenarioPath)
+  if (prevScenarioPath !== scenarioPath) {
+    setPrevScenarioPath(scenarioPath)
+    setDetail(null)
+    setLoadError(null)
+    setMode('view')
+    setRawContent('')
+    setEditorContent('')
+    setRawError(null)
+    setSaveError(null)
+    setVisualDetail(null)
+    setVisualDirty(false)
+    setSelectedEnvPath(activeEnvPath)
+    setSelectedStepIndex(null)
+  }
 
   function handleDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault()
@@ -72,33 +89,21 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     document.addEventListener('mouseup', onMouseUp)
   }
 
-  // Reset when scenario changes
+  // Load scenario data when path changes
   useEffect(() => {
-    setDetail(null)
-    setLoadError(null)
-    setMode('view')
-    setRawContent('')
-    setEditorContent('')
-    setRawError(null)
-    setSaveError(null)
-    setVisualDetail(null)
-    setVisualDirty(false)
-    setSelectedEnvPath(activeEnvPath)
-    setSelectedStepIndex(null)
     loadScenario(scenarioPath)
-      .then(d => { if (d.error) setLoadError(d.error); else setDetail(d) })
+      .then(d => {
+        if (d.error) setLoadError(d.error)
+        else {
+          setDetail(d)
+          if (d.steps.length > 0) setSelectedStepIndex(0)
+        }
+      })
       .catch(e => setLoadError(String(e)))
     loadScenarioResult(scenarioPath)
       .then(cached => { if (cached) onResultChange(cached) })
       .catch(() => {})
   }, [scenarioPath]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-select first step once detail loads
-  useEffect(() => {
-    if (detail && selectedStepIndex === null && detail.steps.length > 0) {
-      setSelectedStepIndex(0)
-    }
-  }, [detail]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll selected step into view and focus the row for keyboard users
   useEffect(() => {
@@ -115,11 +120,11 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       e.preventDefault()
       const idx = selectedStepIndexRef.current
       if (idx === null) return
-      moveVisualStep(idx, e.key === 'ArrowUp' ? -1 : 1)
+      moveVisualStepRef.current?.(idx, e.key === 'ArrowUp' ? -1 : 1)
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode])
 
   async function handleRun() {
     onRunningChange(true)
@@ -251,6 +256,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       return prev
     })
   }
+  useEffect(() => { moveVisualStepRef.current = moveVisualStep })
 
   function duplicateVisualStep(i: number) {
     if (!visualDetail) return
