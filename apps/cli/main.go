@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,10 +23,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// version is set at build time via -ldflags="-X main.version=v0.1.0".
+var version = "dev"
+
+// exitError is returned from cobra RunE to signal a non-zero exit code.
+// Using a sentinel avoids calling os.Exit inside a handler, which would
+// bypass any future deferred cleanup.
+type exitError struct{ code int }
+
+func (e *exitError) Error() string { return "" }
+
 func main() {
 	root := &cobra.Command{
-		Use:   "clrsig",
-		Short: "Clear Signal — API Contract Validation and Spec Conformance Testing",
+		Use:     "clrsig",
+		Short:   "Clear Signal — API Contract Validation and Spec Conformance Testing",
+		Version: version,
+		SilenceErrors: true,
+		SilenceUsage:  true,
 	}
 
 	root.AddCommand(runCmd())
@@ -36,6 +50,11 @@ func main() {
 	root.AddCommand(diffCmd())
 
 	if err := root.Execute(); err != nil {
+		var xe *exitError
+		if errors.As(err, &xe) {
+			os.Exit(xe.code)
+		}
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(2)
 	}
 }
@@ -97,7 +116,7 @@ func requestCmd() *cobra.Command {
 			}
 
 			if execErr != nil {
-				os.Exit(1)
+				return &exitError{1}
 			}
 			return nil
 		},
@@ -218,7 +237,7 @@ func validateCmd() *cobra.Command {
 			}
 
 			if !allValid {
-				os.Exit(1)
+				return &exitError{1}
 			}
 			return nil
 		},
@@ -324,7 +343,7 @@ func runCmd() *cobra.Command {
 			}
 
 			if !result.Passed {
-				os.Exit(1)
+				return &exitError{1}
 			}
 			return nil
 		},
@@ -582,7 +601,7 @@ Exit codes:
 
 			_, failed, _ := result.Counts()
 			if failed > 0 {
-				os.Exit(1)
+				return &exitError{1}
 			}
 			return nil
 		},
@@ -688,6 +707,11 @@ Exit codes:
 
 			var reportBytes []byte
 			switch strings.ToLower(format) {
+			case "junit":
+				reportBytes, err = reporting.DiffJUnit(result)
+				if err != nil {
+					return fmt.Errorf("generating JUnit report: %w", err)
+				}
 			case "json":
 				type jsonChange struct {
 					ID       string `json:"id"`
@@ -754,13 +778,13 @@ Exit codes:
 			}
 
 			if result.HasBreaking {
-				os.Exit(1)
+				return &exitError{1}
 			}
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().BoolVar(&breakingOnly, "breaking-only", false, "Show only breaking changes")
 	return cmd

@@ -14,21 +14,22 @@ import (
 
 // OperationResult holds the outcome of running and validating one spec operation.
 type OperationResult struct {
-	OperationID string
-	Summary     string
-	Tags        []string
-	Method      string
-	Path        string
-	StatusCode  int
-	DurationMs  int64
-	Violations  []openapi.ValidationError
-	Error       string
-	Skipped     bool
+	OperationID      string
+	Summary          string
+	Tags             []string
+	Method           string
+	Path             string
+	StatusCode       int
+	DurationMs       int64
+	RequestViolations []openapi.ValidationError
+	Violations       []openapi.ValidationError
+	Error            string
+	Skipped          bool
 }
 
 // Passed reports whether the operation executed and conformed to the spec.
 func (r OperationResult) Passed() bool {
-	return !r.Skipped && r.Error == "" && len(r.Violations) == 0
+	return !r.Skipped && r.Error == "" && len(r.RequestViolations) == 0 && len(r.Violations) == 0
 }
 
 // ConformResult holds the aggregate outcome of a conformance run.
@@ -147,6 +148,13 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		resolved := resolver.InterpolateRequest(gr.Request)
 		if opts.RequestTimeoutMs > 0 {
 			resolved.Timeout = time.Duration(opts.RequestTimeoutMs) * time.Millisecond
+		}
+
+		// Skip request validation when path parameters are still unresolved.
+		// An unresolved {{placeholder}} in the URL means the request will fail
+		// for the wrong reason; the server error should not be attributed to us.
+		if !strings.Contains(resolved.URL, "{{") {
+			or.RequestViolations = openapi.ValidateRequest(spec, resolved)
 		}
 
 		resp, execErr := r.exec.Execute(ctx, resolved)

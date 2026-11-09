@@ -8,6 +8,7 @@ import (
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 )
 
@@ -258,6 +259,9 @@ func ConformText(result *conformance.ConformResult, coverage *conformance.Covera
 		if op.Error != "" {
 			fmt.Fprintf(&b, "         error: %s\n", op.Error)
 		}
+		for _, v := range op.RequestViolations {
+			fmt.Fprintf(&b, "         ✗ request: %s\n", v.Error())
+		}
 		for _, v := range op.Violations {
 			fmt.Fprintf(&b, "         ✗ %s\n", v.Error())
 		}
@@ -308,15 +312,16 @@ type JSONConformReport struct {
 }
 
 type JSONConformOp struct {
-	OperationID string   `json:"operationId,omitempty"`
-	Method      string   `json:"method"`
-	Path        string   `json:"path"`
-	StatusCode  int      `json:"statusCode,omitempty"`
-	DurationMs  int64    `json:"durationMs,omitempty"`
-	Passed      bool     `json:"passed"`
-	Skipped     bool     `json:"skipped,omitempty"`
-	Error       string   `json:"error,omitempty"`
-	Violations  []string `json:"violations,omitempty"`
+	OperationID       string   `json:"operationId,omitempty"`
+	Method            string   `json:"method"`
+	Path              string   `json:"path"`
+	StatusCode        int      `json:"statusCode,omitempty"`
+	DurationMs        int64    `json:"durationMs,omitempty"`
+	Passed            bool     `json:"passed"`
+	Skipped           bool     `json:"skipped,omitempty"`
+	Error             string   `json:"error,omitempty"`
+	RequestViolations []string `json:"requestViolations,omitempty"`
+	Violations        []string `json:"violations,omitempty"`
 }
 
 // JSONCoverage is the machine-readable coverage summary.
@@ -357,6 +362,9 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			Passed:      op.Passed(),
 			Skipped:     op.Skipped,
 			Error:       op.Error,
+		}
+		for _, v := range op.RequestViolations {
+			jo.RequestViolations = append(jo.RequestViolations, v.Error())
 		}
 		for _, v := range op.Violations {
 			jo.Violations = append(jo.Violations, v.Error())
@@ -408,12 +416,15 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 			suite.Errors++
 			tc.Error = &jUnitError{Message: op.Error, Text: op.Error}
 		case !op.Passed():
-			msgs := make([]string, len(op.Violations))
-			for i, v := range op.Violations {
-				msgs[i] = "  ✗ " + v.Error()
+			var msgs []string
+			for _, v := range op.RequestViolations {
+				msgs = append(msgs, "  ✗ request: "+v.Error())
+			}
+			for _, v := range op.Violations {
+				msgs = append(msgs, "  ✗ "+v.Error())
 			}
 			tc.Failure = &jUnitFailure{
-				Message: fmt.Sprintf("%d violation(s)", len(op.Violations)),
+				Message: fmt.Sprintf("%d violation(s)", len(msgs)),
 				Text:    strings.Join(msgs, "\n"),
 			}
 		}
@@ -425,6 +436,60 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 		Tests:      suite.Tests,
 		Failures:   suite.Failures,
 		Errors:     suite.Errors,
+		Time:       suite.Time,
+		TestSuites: []jUnitSuite{suite},
+	}
+
+	out, err := xml.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(xml.Header), out...), nil
+}
+
+// DiffJUnit returns a JUnit XML report for a spec diff result.
+// Each change is emitted as a test case; breaking changes (ERR level) are
+// marked as failures so PR annotation tools can surface them inline.
+func DiffJUnit(result *openapi.DiffResult) ([]byte, error) {
+	breaking := 0
+	for _, c := range result.Changes {
+		if c.Breaking {
+			breaking++
+		}
+	}
+
+	var cases []jUnitCase
+	if len(result.Changes) == 0 {
+		cases = append(cases, jUnitCase{
+			Name:      "No breaking changes",
+			ClassName: "openapi.diff",
+			Time:      "0.000",
+		})
+	} else {
+		for _, c := range result.Changes {
+			tc := jUnitCase{
+				Name:      fmt.Sprintf("[%s] %s", c.Level, c.ID),
+				ClassName: "openapi.diff",
+				Time:      "0.000",
+			}
+			if c.Breaking {
+				tc.Failure = &jUnitFailure{Message: c.Text, Text: c.Text}
+			}
+			cases = append(cases, tc)
+		}
+	}
+
+	suite := jUnitSuite{
+		Name:     "API Spec Diff",
+		Tests:    len(cases),
+		Failures: breaking,
+		Time:     "0.000",
+		Cases:    cases,
+	}
+	report := jUnitTestSuites{
+		Name:       "API Spec Diff",
+		Tests:      suite.Tests,
+		Failures:   suite.Failures,
 		Time:       suite.Time,
 		TestSuites: []jUnitSuite{suite},
 	}

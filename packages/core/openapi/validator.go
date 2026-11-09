@@ -169,14 +169,20 @@ func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
 		httpReq.ContentLength = int64(len(b))
 	}
 
-	route, _, err := router.FindRoute(httpReq)
+	route, pathParams, err := router.FindRoute(httpReq)
 	if err != nil {
 		return nil // path not in spec — skip
 	}
 
 	input := &openapi3filter.RequestValidationInput{
-		Request: httpReq,
-		Route:   route,
+		Request:    httpReq,
+		PathParams: pathParams,
+		Route:      route,
+		Options: &openapi3filter.Options{
+			// Skip security-scheme checks — the conformance runner handles auth
+			// via env-variable interpolation, not spec-level security validators.
+			AuthenticationFunc: openapi3filter.NoopAuthenticationFunc,
+		},
 	}
 
 	if err := openapi3filter.ValidateRequest(context.Background(), input); err != nil {

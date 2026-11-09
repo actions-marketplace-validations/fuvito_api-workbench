@@ -19,8 +19,8 @@ Re-review after two days of rapid iteration. The previous report ([check-2026-11
 ### Remaining / minor
 
 - [x] **ScenarioViewer.tsx** — further split into 7 focused files (~17 KB shell). See §4.
-- [ ] **`Ctrl+1–9` direct tab jump** — cycling exists; index-based jumps don't. Nice-to-have for heavy keyboard users.
-- [ ] **macOS Gatekeeper friction** — release builds are unsigned `.app` zips; first launch on macOS requires `xattr -d com.apple.quarantine` or right-click → Open. Worth a README note until signing exists — it's the first thing a macOS evaluator hits.
+- [x] **`Ctrl+1–9` direct tab jump** — already implemented in `App.tsx` lines 282–286; checkbox was stale.
+- [x] **macOS Gatekeeper friction** — README now includes `xattr -d` command and right-click → Open instructions directly under the download table.
 
 ---
 
@@ -43,9 +43,9 @@ Re-review after two days of rapid iteration. The previous report ([check-2026-11
 ### Remaining / new findings
 
 - [ ] **Coverage is single-run only** — `conformance.ComputeCoverage` and `ScenarioCoverage` both measure one run. The roadmap's "longer term" item — aggregating covered operations across runs via `history.db` — is still open and is the version that creates the durable "finish the job" loop.
-- [ ] **`clrsig diff` has no `junit` format** — text/json only. Fine for a pass/fail gate, but a JUnit report would let PR annotations show which change is breaking without parsing text. Low effort given `ConformJUnit` exists.
-- [ ] **`conform` request validation is response-only** — generated requests aren't checked against the spec before sending (roadmap Gap 3, `ValidateRequest`). A malformed generated request can produce a misleading "server violation" instead of a "request didn't match spec" signal. Cheap to add — kin-openapi already does it.
-- [ ] **`os.Exit` inside cobra `RunE`** — `main.go` calls `os.Exit(1)` mid-handler in `run`/`conform`/`diff`/`validate`. Output is flushed first so behaviour is correct, but any future `defer` (file close, cleanup) will silently not run. Prefer returning a sentinel error and exiting in `main`.
+- [x] **`clrsig diff` has no `junit` format** — `reporting.DiffJUnit` added; `diffCmd` wired with `--format junit`; each change is a test case, breaking changes become `<failure>` elements.
+- [x] **`conform` request validation is response-only** — `OperationResult.RequestViolations` field added; conformance runner calls `openapi.ValidateRequest` before executing each request; request violations surface in text/JSON/JUnit reports with a `request:` prefix.
+- [x] **`os.Exit` inside cobra `RunE`** — refactored to `exitError` sentinel returned from `RunE`; `main()` detects it via `errors.As` and calls `os.Exit(code)` there, leaving all deferred cleanup intact.
 - [ ] **`conform` auth story untested end-to-end** — `--env` variable resolution is wired, but specs declaring `security:` beyond Bearer hints may send unauthenticated requests and report 401s as violations. Worth an example template or doc showing an authed conform run.
 
 ---
@@ -63,7 +63,7 @@ Re-review after two days of rapid iteration. The previous report ([check-2026-11
 
 ### Still open
 
-- [ ] **Docker image referenced but never published** — a root `Dockerfile` exists and the README documents `docker run ghcr.io/fuvito/api-workbench:latest`, but `release.yml` has no docker build/push job. **Anyone running the documented command gets nothing.** Either add a `docker` job to `release.yml` or remove the README section until it's real — a broken install path is worse than none.
+- [x] **Docker image referenced but never published** — `release.yml` now has a `docker` job that builds and pushes to `ghcr.io/${{ github.repository }}` with `:latest` and version tags on every tag push. `publish` now depends on `docker` completing.
 - [ ] **No package-manager install channels** — still binary-download only. Homebrew tap, Scoop/winget, `go install` remain the remaining friction. Note: `go install` won't work today anyway because `apps/cli/go.mod` has a `replace` directive — needs a published module or the tap route.
 - [ ] **Action is a repo-path action, not Marketplace-listed** — `uses: fuvito/api-workbench/clrsig-action@main` works, but it won't surface in Marketplace search until it's a tagged release in its own repo (or the listing requirements are met). Marketplace visibility was the point of that lever.
 - [ ] **Content wedge** — deferred by choice (marked "will be done later" in the 11-07 report). Still the highest-leverage untapped channel: posts targeting "newman alternative", "openapi contract testing ci" problem-searches. Playbook exists; it just needs execution time.
@@ -88,15 +88,15 @@ Large-component extraction, verified by `tsc --noEmit`, `oxlint`, and `vitest ru
 
 ## Suggested priority order
 
-- [ ] **Add a `docker` job to `release.yml`** (or cut the README Docker section) — fixes a broken documented install path today.
-- [ ] **Homebrew tap + Scoop manifest** — the last real install friction; binary downloads are table stakes for a CLI pitching CI adoption.
-- [ ] **`ValidateRequest` in conform/spec-bound steps** — closes the last roadmap gap that can produce misleading results.
-- [ ] **Marketplace-publish `clrsig-action`** — extract or tag so `uses:` appears in Marketplace search; small effort, compounding visibility.
-- [ ] **macOS signing (or README quarantine note)** — cheap interim: one line in the install docs.
+- [x] **Add a `docker` job to `release.yml`** — done; `ghcr.io/${{ github.repository }}` now published on every tag push.
+- [x] **`ValidateRequest` in conform/spec-bound steps** — done; request violations now surface separately from response violations.
+- [x] **`clrsig diff --format junit`** — done; breaking changes become `<failure>` elements for PR annotation.
+- [x] **macOS signing (or README quarantine note)** — interim note added to README install section.
+- [x] **Refactor `os.Exit` out of cobra handlers** — done via `exitError` sentinel.
+- [x] **Homebrew tap + Scoop manifest** — `Formula/clrsig.rb` and `bucket/clrsig.json` added; `brew tap fuvito/api-workbench && brew install clrsig` and `scoop bucket add clrsig … && scoop install clrsig` now work from the main repo. `scripts/update-tap.py` updates both files after a release. `release.yml` gains an `update-tap` job that runs the script and auto-commits after every tag. SHA256 sidecar files now published alongside CLI binaries. `clrsig --version` works via cobra `Version` field set by ldflags.
+- [x] **Marketplace-publish `clrsig-action`** — root `action.yml` added (GitHub requires it at repo root for Marketplace listing); all examples updated to `uses: fuvito/api-workbench@v1`. Final step: visit `github.com/fuvito/api-workbench` → **Use this GitHub Action with your project** to submit the Marketplace listing (one-time manual step, no code changes needed).
 - [ ] **Cross-run coverage aggregation via `history.db`** — the durable retention hook.
-- [ ] **`clrsig diff --format junit`** — nice-to-have for PR annotation workflows.
-- [ ] **Content wedge execution** — write the first two posts ("Contract testing your API in CI in 10 minutes", "Newman alternative") once packaging above is done, so the posts can end with a working `docker run`/`brew install` command.
-- [ ] **Refactor `os.Exit` out of cobra handlers** — hygiene, not urgent.
+- [ ] **Content wedge execution** — write the first two posts ("Contract testing your API in CI in 10 minutes", "Newman alternative") once packaging above is done.
 
 ---
 

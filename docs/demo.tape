@@ -29,7 +29,10 @@ Sleep 5s
 Type "clrsig conform examples/server/openapi.yaml \\"
 Sleep 400ms
 Enter
-Type "  --base-url http://localhost:8080 --coverage"
+Type "  --base-url http://localhost:8080 --coverage \\"
+Sleep 400ms
+Enter
+Type "  --env examples/environments/demo-conform.yaml"
 Sleep 600ms
 Enter
 Sleep 6s

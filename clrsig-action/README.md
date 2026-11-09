@@ -3,7 +3,7 @@
 Run API scenarios, validate spec conformance, or detect breaking API changes in CI.
 
 ```yaml
-- uses: fuvito/api-workbench/clrsig-action@main
+- uses: fuvito/api-workbench@v1   # pinned release (recommended)
   with:
     command: run
     scenario: tests/my-scenario.yaml
@@ -11,6 +11,8 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
     format: junit
     output: test-results/results.xml
 ```
+
+> **Tip:** `fuvito/api-workbench@v1` resolves from the repo root `action.yml` and is the form that appears in GitHub Actions Marketplace search. The subdirectory form `fuvito/api-workbench/clrsig-action@main` also works and is kept for backward compatibility.
 
 ## Commands
 
@@ -51,7 +53,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 ### Run a scenario and produce a JUnit report
 
 ```yaml
-- uses: fuvito/api-workbench/clrsig-action@main
+- uses: fuvito/api-workbench@v1
   with:
     command: run
     scenario: tests/api-tests.yaml
@@ -69,7 +71,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 ### Validate spec conformance
 
 ```yaml
-- uses: fuvito/api-workbench/clrsig-action@main
+- uses: fuvito/api-workbench@v1
   with:
     command: conform
     spec: openapi.yaml
@@ -83,7 +85,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 
 ```yaml
 - name: Check for breaking changes
-  uses: fuvito/api-workbench/clrsig-action@main
+  uses: fuvito/api-workbench@v1
   with:
     command: diff
     base-spec: https://raw.githubusercontent.com/${{ github.repository }}/main/openapi.yaml

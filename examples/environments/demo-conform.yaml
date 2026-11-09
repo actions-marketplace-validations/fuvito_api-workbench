@@ -1,0 +1,17 @@
+schemaVersion: "1"
+name: demo-conform
+variables:
+  - name: token
+    value: demo-token-12345
+    secret: true
+  - name: id
+    value: "1"
+  - name: username
+    value: admin
+  - name: password
+    value: secret
+    secret: true
+  - name: name
+    value: Alice Test
+  - name: email
+    value: alice.test@example.com

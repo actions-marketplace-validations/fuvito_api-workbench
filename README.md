@@ -60,6 +60,20 @@ Clear Signal's differentiators over Bruno (the closest alternative): spec confor
 
 The `clrsig` CLI works independently of the desktop app.
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap fuvito/api-workbench
+brew install clrsig
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add clrsig https://github.com/fuvito/api-workbench
+scoop install clrsig
+```
+
 ### Download a binary
 
 Download the latest release from [GitHub Releases](https://github.com/fuvito/api-workbench/releases/latest):
@@ -70,6 +84,14 @@ Download the latest release from [GitHub Releases](https://github.com/fuvito/api
 | macOS (Intel) | `clrsig-darwin-amd64` |
 | macOS (Apple Silicon) | `clrsig-darwin-arm64` |
 | Windows (amd64) | `clrsig-windows-amd64.exe` |
+
+> **macOS note:** release binaries are unsigned. On first launch, macOS Gatekeeper will block the binary with *"cannot be opened because the developer cannot be verified."*
+> To allow it, run:
+> ```bash
+> xattr -d com.apple.quarantine clrsig-darwin-arm64   # or amd64
+> chmod +x clrsig-darwin-arm64
+> ```
+> Alternatively, right-click the file in Finder → **Open** → **Open** to approve it once.
 
 ### Docker
 
@@ -83,7 +105,7 @@ docker run --rm \
 ### GitHub Actions
 
 ```yaml
-- uses: fuvito/api-workbench/clrsig-action@main
+- uses: fuvito/api-workbench@v1
   with:
     command: conform
     spec: openapi.yaml
