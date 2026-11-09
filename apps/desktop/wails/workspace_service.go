@@ -955,3 +955,15 @@ func (w *WorkspaceService) SaveContentToFile(content, defaultName string) (strin
 	}
 	return path, nil
 }
+
+// PickFile opens a native file dialog and returns the selected path.
+// Returns an empty string if the user cancels.
+func (w *WorkspaceService) PickFile(title string) string {
+	path, err := runtime.OpenFileDialog(w.ctx, runtime.OpenDialogOptions{
+		Title: title,
+	})
+	if err != nil {
+		return ""
+	}
+	return path
+}

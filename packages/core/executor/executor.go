@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/http/cookiejar"
 	"net/http/httptrace"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -218,26 +223,78 @@ func buildHTTPRequest(ctx context.Context, req *domain.Request) (*http.Request, 
 	return httpReq, nil
 }
 
+// multipartField is the JSON encoding used when multipart has file fields.
+// Content that starts with '[' is parsed as []multipartField; otherwise the
+// legacy url-encoded format (text fields only) is used for backward compat.
+type multipartField struct {
+	N string `json:"n"` // field name
+	T string `json:"t"` // "text" or "file"
+	V string `json:"v"` // text value or absolute file path
+}
+
 func buildMultipartBody(content string) (io.Reader, string, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
+
 	if content != "" {
-		values, err := url.ParseQuery(content)
-		if err != nil {
-			return nil, "", err
-		}
-		for name, vals := range values {
-			for _, v := range vals {
-				if err := mw.WriteField(name, v); err != nil {
-					return nil, "", err
+		if len(content) > 0 && content[0] == '[' {
+			// New JSON encoding: supports both text and file fields.
+			var fields []multipartField
+			if err := json.Unmarshal([]byte(content), &fields); err != nil {
+				return nil, "", fmt.Errorf("parsing multipart fields: %w", err)
+			}
+			for _, f := range fields {
+				if f.T == "file" {
+					if err := addFileField(mw, f.N, f.V); err != nil {
+						return nil, "", err
+					}
+				} else {
+					if err := mw.WriteField(f.N, f.V); err != nil {
+						return nil, "", err
+					}
+				}
+			}
+		} else {
+			// Legacy url-encoded format (text fields only).
+			values, err := url.ParseQuery(content)
+			if err != nil {
+				return nil, "", err
+			}
+			for name, vals := range values {
+				for _, v := range vals {
+					if err := mw.WriteField(name, v); err != nil {
+						return nil, "", err
+					}
 				}
 			}
 		}
 	}
+
 	if err := mw.Close(); err != nil {
 		return nil, "", err
 	}
 	return &buf, mw.FormDataContentType(), nil
+}
+
+func addFileField(mw *multipart.Writer, fieldName, filePath string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("reading file %q for multipart field %q: %w", filePath, fieldName, err)
+	}
+	filename := filepath.Base(filePath)
+	ct := mime.TypeByExtension(filepath.Ext(filePath))
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name=%q; filename=%q`, fieldName, filename))
+	h.Set("Content-Type", ct)
+	part, err := mw.CreatePart(h)
+	if err != nil {
+		return err
+	}
+	_, err = part.Write(data)
+	return err
 }
 
 func buildResponse(resp *http.Response, duration time.Duration, maxBodySize int64) (*domain.Response, error) {

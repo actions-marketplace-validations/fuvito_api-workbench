@@ -88,6 +88,7 @@ export type RequestEditorProps = {
   onBodyChange: (b: BodyState) => void
   onAuthChange: (a: AuthState) => void
   onTimeoutChange: (ms: number) => void
+  onPickFile?: () => Promise<string>
   onSend: () => void
   onCancel?: () => void
 }
@@ -97,7 +98,7 @@ export function RequestEditor({
   queryParams, headers, body, auth, timeoutMs, envVarMap,
   onMethodChange, onUrlChange, onUrlPaste,
   onQueryParamsChange, onHeadersChange, onBodyChange, onAuthChange,
-  onTimeoutChange, onSend, onCancel,
+  onTimeoutChange, onPickFile, onSend, onCancel,
 }: RequestEditorProps) {
   const [activeTab, setActiveTab] = useState<RequestEditorTab>('Params')
 
@@ -259,7 +260,7 @@ export function RequestEditor({
         )}
         {activeTab === 'Body' && (
           <div className="flex-1 overflow-hidden flex flex-col p-3">
-            <BodyEditor body={body} onChange={onBodyChange} />
+            <BodyEditor body={body} onChange={onBodyChange} onPickFile={onPickFile} />
           </div>
         )}
         {activeTab === 'Auth' && (

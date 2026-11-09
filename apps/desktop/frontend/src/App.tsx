@@ -25,7 +25,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile } from '@/lib/bridge'
 import type { FolderRunState } from '@/components/Sidebar'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
@@ -678,6 +678,7 @@ export default function App() {
                     onHeadersChange={h => updateTab(activeTabId, { headers: h })}
                     onBodyChange={b => updateTab(activeTabId, { body: b })}
                     onAuthChange={a => updateTab(activeTabId, { auth: a })}
+                    onPickFile={pickFile}
                     timeoutMs={activeTab.timeoutMs}
                     onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
                     envVarMap={workspace.envVarMap}

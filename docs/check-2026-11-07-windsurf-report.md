@@ -50,7 +50,7 @@ This is a genuinely well-built MVP. The Postman-style three-pane layout is immed
 ### Minor
 
 - [x] History restores only method+URL (acknowledged in UI). Since history is SQLite-backed anyway, restoring headers/body too would make it genuinely useful for redoing complex requests.
-- [ ] Multipart body supports text fields only — no file picker. Users will hit this quickly when testing upload endpoints; it's a common API task.
+- [x] Multipart body supports text fields only — no file picker. Users will hit this quickly when testing upload endpoints; it's a common API task.
 
 ---
 

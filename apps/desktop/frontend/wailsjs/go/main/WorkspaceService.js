@@ -117,3 +117,7 @@ export function SaveResponseCache(arg1, arg2) {
 export function SelectEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['SelectEnvironment'](arg1);
 }
+
+export function PickFile(arg1) {
+  return window['go']['main']['WorkspaceService']['PickFile'](arg1);
+}

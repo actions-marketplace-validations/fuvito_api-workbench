@@ -38,6 +38,7 @@ import {
   GetRecentWorkspaces as WailsGetRecentWorkspaces,
   OpenWorkspaceByPath as WailsOpenWorkspaceByPath,
   SaveContentToFile as WailsSaveContentToFile,
+  PickFile as WailsPickFile,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -232,6 +233,11 @@ export async function openWorkspaceByPath(path: string): Promise<string> {
 
 export async function saveContentToFile(content: string, defaultName: string): Promise<string> {
   const result = await WailsSaveContentToFile(content, defaultName)
+  return result as unknown as string
+}
+
+export async function pickFile(title = 'Select file'): Promise<string> {
+  const result = await WailsPickFile(title)
   return result as unknown as string
 }
 

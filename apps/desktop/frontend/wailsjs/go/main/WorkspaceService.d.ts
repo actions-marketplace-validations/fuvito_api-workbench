@@ -60,3 +60,5 @@ export function SaveRequest(arg1:main.RequestFileIO):Promise<string>;
 export function SaveResponseCache(arg1:string,arg2:main.ResponseCacheIO):Promise<void>;
 
 export function SelectEnvironment(arg1:string):Promise<void>;
+
+export function PickFile(arg1:string):Promise<string>;
