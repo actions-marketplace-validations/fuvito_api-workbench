@@ -1,0 +1,27 @@
+schemaVersion: "1"
+title: 503 Service Unavailable conformance
+description: >
+  RFC 9110 §15.6.4 recommends a Retry-After header with 503 to tell
+  clients when to retry. Verify the maintenance endpoint conforms.
+
+steps:
+  - title: Request maintenance endpoint — expect 503 with Retry-After
+    request:
+      method: GET
+      url: "{{baseUrl}}/maintenance"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "503"
+      - type: header
+        path: "Retry-After"
+        operator: ne
+        expected: ""
+      - type: header
+        path: "Retry-After"
+        operator: eq
+        expected: "120"
+      - type: jsonpath
+        path: "$.detail"
+        operator: ne
+        expected: ""

@@ -56,6 +56,7 @@ export type SidebarProps = {
   dirtyFilePaths?: Set<string>
   onSelectScenario?: (path: string, name: string) => void
   onNewScenario?: (name: string) => void
+  onNewScenarioFile?: (path: string, name: string) => void
   onDuplicateScenario?: (path: string) => void
   onDeleteScenario?: (path: string) => void
   onRenameScenario?: (path: string, newName: string) => void
@@ -80,6 +81,7 @@ export function Sidebar({
   activeFilePath, dirtyFilePaths,
   onSelectScenario,
   onNewScenario,
+  onNewScenarioFile,
   onDuplicateScenario,
   onDeleteScenario,
   onRenameScenario,
@@ -143,6 +145,7 @@ export function Sidebar({
             scenarios={scenarios}
             onSelectScenario={onSelectScenario}
             onNewScenario={onNewScenario}
+            onNewScenarioFile={onNewScenarioFile}
             onDuplicateScenario={onDuplicateScenario}
             onDeleteScenario={onDeleteScenario}
             onRenameScenario={onRenameScenario}

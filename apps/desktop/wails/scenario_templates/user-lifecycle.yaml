@@ -1,0 +1,86 @@
+schemaVersion: "1"
+title: User lifecycle
+description: Login, create a user, fetch it back, verify it, then delete it.
+
+steps:
+  - title: Login
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"{{username}}","password":"{{password}}"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.token"
+        operator: ne
+        expected: ""
+    extractions:
+      - name: token
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - title: Create user
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+      body:
+        type: json
+        content: '{"name":"Diana Prince","email":"diana@example.com"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "201"
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Diana Prince"
+      - type: jsonpath
+        path: "$.id"
+        operator: gt
+        expected: "0"
+    extractions:
+      - name: userId
+        source: jsonpath
+        path: "$.id"
+    failPolicy: stop
+
+  - title: Fetch user
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/{{userId}}"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Diana Prince"
+      - type: jsonpath
+        path: "$.email"
+        operator: eq
+        expected: "diana@example.com"
+    failPolicy: continue
+
+  - title: Delete user
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/users/{{userId}}"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "204"

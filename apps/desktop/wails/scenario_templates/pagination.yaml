@@ -1,0 +1,77 @@
+schemaVersion: "1"
+title: Pagination conformance
+description: >
+  RFC 8288 defines the Link header for web linking. Paginated list endpoints
+  should include X-Total-Count for the full collection size and a Link header
+  with rel="next"/"prev"/"first"/"last" so clients can navigate pages without
+  constructing URLs manually.
+
+steps:
+  - title: First page — expect Link rel=next and total count
+    request:
+      method: GET
+      url: "{{baseUrl}}/users?page=1&limit=2"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "X-Total-Count"
+        operator: eq
+        expected: "5"
+      - type: header
+        path: "Link"
+        operator: contains
+        expected: 'rel="next"'
+      - type: header
+        path: "Link"
+        operator: contains
+        expected: 'rel="last"'
+      - type: jsonpath
+        path: "$"
+        operator: ne
+        expected: ""
+    failPolicy: continue
+
+  - title: Middle page — expect both rel=prev and rel=next
+    request:
+      method: GET
+      url: "{{baseUrl}}/users?page=2&limit=2"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "X-Total-Count"
+        operator: eq
+        expected: "5"
+      - type: header
+        path: "Link"
+        operator: contains
+        expected: 'rel="prev"'
+      - type: header
+        path: "Link"
+        operator: contains
+        expected: 'rel="next"'
+    failPolicy: continue
+
+  - title: Last page — expect rel=prev but no rel=next
+    request:
+      method: GET
+      url: "{{baseUrl}}/users?page=3&limit=2"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "X-Total-Count"
+        operator: eq
+        expected: "5"
+      - type: header
+        path: "Link"
+        operator: contains
+        expected: 'rel="prev"'
+      - type: header
+        path: "Link"
+        operator: ne
+        expected: 'rel="next"'

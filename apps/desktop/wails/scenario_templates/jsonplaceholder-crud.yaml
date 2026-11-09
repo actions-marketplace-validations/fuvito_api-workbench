@@ -1,0 +1,103 @@
+schemaVersion: "1"
+title: JSONPlaceholder CRUD
+description: >
+  Create, read, update, and delete a post against the free JSONPlaceholder
+  fake REST API (https://jsonplaceholder.typicode.com). No authentication
+  required. Demonstrates a full resource lifecycle with jsonpath assertions.
+
+steps:
+  - title: List posts
+    request:
+      method: GET
+      url: https://jsonplaceholder.typicode.com/posts
+      headers:
+        - name: Accept
+          value: application/json
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: application/json
+      - type: jsonpath
+        path: "$[0].id"
+        operator: ne
+        expected: ""
+    failPolicy: stop
+
+  - title: Get single post
+    request:
+      method: GET
+      url: https://jsonplaceholder.typicode.com/posts/1
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.id"
+        operator: eq
+        expected: "1"
+      - type: jsonpath
+        path: "$.title"
+        operator: ne
+        expected: ""
+    failPolicy: stop
+
+  - title: Create post
+    request:
+      method: POST
+      url: https://jsonplaceholder.typicode.com/posts
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        content: '{"title":"Test post","body":"Hello from Clear Signal","userId":1}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "201"
+      - type: jsonpath
+        path: "$.id"
+        operator: ne
+        expected: ""
+      - type: jsonpath
+        path: "$.title"
+        operator: eq
+        expected: "Test post"
+    extractions:
+      - name: postId
+        source: jsonpath
+        path: "$.id"
+    failPolicy: continue
+
+  - title: Update post
+    request:
+      method: PUT
+      url: https://jsonplaceholder.typicode.com/posts/1
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        content: '{"id":1,"title":"Updated title","body":"Updated body","userId":1}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.title"
+        operator: eq
+        expected: "Updated title"
+    failPolicy: continue
+
+  - title: Delete post
+    request:
+      method: DELETE
+      url: https://jsonplaceholder.typicode.com/posts/1
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"

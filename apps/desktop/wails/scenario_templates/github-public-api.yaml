@@ -1,0 +1,78 @@
+schemaVersion: "1"
+title: GitHub public API
+description: >
+  Explore GitHub's public REST API without authentication. Demonstrates
+  jsonpath assertions against a real production API. Unauthenticated requests
+  are rate-limited to 60/hour — add a GitHub token to Authorization to increase
+  this limit.
+
+steps:
+  - title: Get octocat user profile
+    request:
+      method: GET
+      url: https://api.github.com/users/octocat
+      headers:
+        - name: Accept
+          value: application/vnd.github+json
+        - name: X-GitHub-Api-Version
+          value: "2022-11-28"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.login"
+        operator: eq
+        expected: "octocat"
+      - type: jsonpath
+        path: "$.public_repos"
+        operator: gt
+        expected: "0"
+    extractions:
+      - name: avatar_url
+        source: jsonpath
+        path: "$.avatar_url"
+    failPolicy: stop
+
+  - title: List user repositories
+    request:
+      method: GET
+      url: https://api.github.com/users/octocat/repos
+      headers:
+        - name: Accept
+          value: application/vnd.github+json
+        - name: X-GitHub-Api-Version
+          value: "2022-11-28"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: application/json
+      - type: jsonpath
+        path: "$[0].full_name"
+        operator: ne
+        expected: ""
+    failPolicy: continue
+
+  - title: Check rate limit status
+    request:
+      method: GET
+      url: https://api.github.com/rate_limit
+      headers:
+        - name: Accept
+          value: application/vnd.github+json
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: jsonpath
+        path: "$.rate.limit"
+        operator: gt
+        expected: "0"
+      - type: jsonpath
+        path: "$.rate.remaining"
+        operator: gt
+        expected: "0"

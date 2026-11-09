@@ -72,6 +72,8 @@ import {
   RenameScenario as WailsRenameScenario,
   SaveScenarioResult as WailsSaveScenarioResult,
   LoadScenarioResult as WailsLoadScenarioResult,
+  ListTemplates as WailsListTemplates,
+  CreateFromTemplate as WailsCreateFromTemplate,
 } from '@wailsjs/go/main/ScenarioService'
 import { GetUserGuide as WailsGetUserGuide } from '@wailsjs/go/main/HelpService'
 
@@ -595,6 +597,28 @@ export async function deleteScenario(path: string): Promise<string> {
 // Returns the new file path on success, or a string starting with "error:" on failure.
 export async function renameScenario(path: string, newName: string): Promise<string> {
   return (await WailsRenameScenario(path, newName)) as unknown as string
+}
+
+// ---- Scenario templates ----
+
+export interface TemplateInfo {
+  id: string
+  title: string
+  description: string
+  category: string
+  tags: string[]
+  stepCount: number
+  note?: string
+}
+
+export async function listTemplates(): Promise<TemplateInfo[]> {
+  const result = await WailsListTemplates()
+  return (result ?? []) as unknown as TemplateInfo[]
+}
+
+export async function createFromTemplate(templateID: string, name: string): Promise<CreateScenarioResult> {
+  const result = await WailsCreateFromTemplate(templateID, name)
+  return result as unknown as CreateScenarioResult
 }
 
 // ---- Folder run ----

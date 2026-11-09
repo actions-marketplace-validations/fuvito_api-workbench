@@ -1,0 +1,56 @@
+schemaVersion: "1"
+title: Content negotiation conformance
+description: >
+  RFC 9110 §12 defines content negotiation: clients express format preferences
+  via the Accept header and servers must respond with a matching Content-Type.
+  Verify the health endpoint honours JSON and plain-text requests correctly.
+
+steps:
+  - title: Request JSON explicitly — Content-Type must be application/json
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+      headers:
+        - name: Accept
+          value: "application/json"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "Content-Type"
+        operator: contains
+        expected: "application/json"
+      - type: jsonpath
+        path: "$.status"
+        operator: eq
+        expected: "ok"
+
+  - title: Request plain text — Content-Type must be text/plain
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+      headers:
+        - name: Accept
+          value: "text/plain"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "Content-Type"
+        operator: contains
+        expected: "text/plain"
+
+  - title: No Accept header — server defaults to JSON
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: header
+        path: "Content-Type"
+        operator: contains
+        expected: "application/json"

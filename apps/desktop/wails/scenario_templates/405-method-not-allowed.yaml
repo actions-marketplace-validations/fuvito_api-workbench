@@ -1,0 +1,57 @@
+schemaVersion: "1"
+title: 405 Method Not Allowed conformance
+description: >
+  RFC 9110 §15.5.6 requires a 405 response to include an Allow header
+  listing the methods the resource does support. Verify this across
+  endpoints that restrict HTTP methods.
+
+steps:
+  - title: GET on login endpoint — expect 405 with Allow header
+    request:
+      method: GET
+      url: "{{baseUrl}}/auth/login"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "405"
+      - type: header
+        path: "Allow"
+        operator: ne
+        expected: ""
+      - type: header
+        path: "Allow"
+        operator: contains
+        expected: "POST"
+
+  - title: DELETE on users collection — expect 405 with Allow header
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/users"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "405"
+      - type: header
+        path: "Allow"
+        operator: contains
+        expected: "GET"
+      - type: header
+        path: "Allow"
+        operator: contains
+        expected: "POST"
+
+  - title: POST on health endpoint — expect 405 with Allow header
+    request:
+      method: POST
+      url: "{{baseUrl}}/health"
+      body:
+        type: json
+        content: '{}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "405"
+      - type: header
+        path: "Allow"
+        operator: eq
+        expected: "GET"

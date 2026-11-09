@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
-  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X, RefreshCw, Play, Plus, PlayCircle, CheckCircle2, XCircle, Loader2,
+  FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X, RefreshCw, Play, Plus, PlayCircle, CheckCircle2, XCircle, Loader2, LayoutTemplate,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { FileNode, ScenarioInfo, FolderRunItem } from '@/lib/bridge'
+import type { FileNode, ScenarioInfo, FolderRunItem, TemplateInfo } from '@/lib/bridge'
+import { listTemplates, createFromTemplate, openInExplorer } from '@/lib/bridge'
 import type { RunAllState } from '@/components/Sidebar'
+import { ContextMenu, type ContextMenuAction } from '@/components/ContextMenu'
+import { ScenarioTemplateGallery } from '@/components/ScenarioTemplateGallery'
 
 export interface FolderRunState {
   folderPath: string
@@ -13,8 +16,6 @@ export interface FolderRunState {
   running: boolean
   results: FolderRunItem[]
 }
-import { openInExplorer } from '@/lib/bridge'
-import { ContextMenu, type ContextMenuAction } from '@/components/ContextMenu'
 
 // ---- Method badge ----
 
@@ -336,6 +337,7 @@ type WorkspacePanelProps = {
   onSelectFile: (path: string) => void
   onSelectScenario?: (path: string, name: string) => void
   onNewScenario?: (name: string) => void
+  onNewScenarioFile?: (path: string, name: string) => void
   onDuplicateScenario?: (path: string) => void
   onDeleteScenario?: (path: string) => void
   onRenameScenario?: (path: string, newName: string) => void
@@ -374,6 +376,7 @@ export function WorkspacePanel({
   onSelectFile,
   onSelectScenario,
   onNewScenario,
+  onNewScenarioFile,
   onDuplicateScenario,
   onDeleteScenario,
   onRenameScenario,
@@ -409,6 +412,27 @@ export function WorkspacePanel({
   const filteredTree = filterTree(fileTree, searchQuery)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
   const [creatingScenario, setCreatingScenario] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [templates, setTemplates] = useState<TemplateInfo[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+
+  async function openTemplateGallery() {
+    setShowTemplates(true)
+    if (templates.length === 0) {
+      setTemplatesLoading(true)
+      const list = await listTemplates()
+      setTemplates(list)
+      setTemplatesLoading(false)
+    }
+  }
+
+  async function handleUseTemplate(templateID: string, name: string) {
+    setShowTemplates(false)
+    const result = await createFromTemplate(templateID, name)
+    if (!result.error && result.path) {
+      onNewScenarioFile?.(result.path, name)
+    }
+  }
   const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
   const [scenarioQuery, setScenarioQuery] = useState('')
   const filteredScenarios = scenarioQuery
@@ -689,6 +713,14 @@ export function WorkspacePanel({
                           : <PlayCircle size={11} />}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={openTemplateGallery}
+                      title="New scenario from template"
+                      className="text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors"
+                    >
+                      <LayoutTemplate size={11} />
+                    </button>
                     {onNewScenario && (
                       <button
                         type="button"
@@ -905,6 +937,15 @@ export function WorkspacePanel({
             { kind: 'action', label: 'Delete', danger: true, disabled: !onDeleteScenario, onClick: () => { onDeleteScenario?.(scenarioCtxMenu.path); setScenarioCtxMenu(null) } },
           ]}
           onClose={() => setScenarioCtxMenu(null)}
+        />
+      )}
+
+      {showTemplates && (
+        <ScenarioTemplateGallery
+          templates={templates}
+          loading={templatesLoading}
+          onUse={handleUseTemplate}
+          onClose={() => setShowTemplates(false)}
         />
       )}
     </div>

@@ -557,6 +557,10 @@ export default function App() {
               tabs.openScenarioAsTab(result.path, name)
             }
           }}
+          onNewScenarioFile={async (path, name) => {
+            await workspace.refreshWorkspace()
+            tabs.openScenarioAsTab(path, name)
+          }}
           onDuplicateScenario={async (path) => {
             const result = await duplicateScenario(path)
             if (!result.error && result.path) {
