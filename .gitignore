@@ -40,6 +40,9 @@ package-lock.json
 apps/desktop/e2e/playwright-report/
 test-results/
 
+# Vitest coverage output
+apps/desktop/frontend/coverage/
+
 # Frontend build integrity check (generated)
 apps/desktop/frontend/package.json.md5
 
