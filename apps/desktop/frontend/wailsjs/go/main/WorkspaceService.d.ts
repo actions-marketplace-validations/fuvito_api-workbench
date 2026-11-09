@@ -51,6 +51,8 @@ export function RenameFolder(arg1:string,arg2:string):Promise<string>;
 
 export function RenameRequest(arg1:string,arg2:string):Promise<string>;
 
+export function SaveContentToFile(arg1:string,arg2:string):Promise<string>;
+
 export function SaveEnvironment(arg1:main.EnvironmentIO):Promise<main.EnvironmentInfoIO>;
 
 export function SaveRequest(arg1:main.RequestFileIO):Promise<string>;

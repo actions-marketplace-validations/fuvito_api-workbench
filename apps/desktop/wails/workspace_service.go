@@ -939,3 +939,19 @@ func (w *WorkspaceService) LoadResponseCache(reqPath string) (*ResponseCacheIO, 
 	}
 	return &cache, nil
 }
+
+// SaveContentToFile opens a system save dialog and writes content to the chosen path.
+// Returns the saved path, or an empty string if the user cancelled.
+func (w *WorkspaceService) SaveContentToFile(content, defaultName string) (string, error) {
+	path, err := runtime.SaveFileDialog(w.ctx, runtime.SaveDialogOptions{
+		Title:           "Save File",
+		DefaultFilename: defaultName,
+	})
+	if err != nil || path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("writing file: %w", err)
+	}
+	return path, nil
+}

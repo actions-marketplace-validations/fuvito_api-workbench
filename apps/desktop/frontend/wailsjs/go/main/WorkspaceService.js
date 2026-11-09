@@ -98,6 +98,10 @@ export function RenameRequest(arg1, arg2) {
   return window['go']['main']['WorkspaceService']['RenameRequest'](arg1, arg2);
 }
 
+export function SaveContentToFile(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['SaveContentToFile'](arg1, arg2);
+}
+
 export function SaveEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['SaveEnvironment'](arg1);
 }

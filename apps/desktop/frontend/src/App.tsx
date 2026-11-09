@@ -25,7 +25,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, quitApp } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, quitApp, saveContentToFile } from '@/lib/bridge'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
 import { isTabDirty } from '@/lib/tabState'
@@ -262,18 +262,9 @@ export default function App() {
     {
       label: 'File',
       items: [
-        { kind: 'action', label: 'New Tab',                  shortcut: 'Ctrl+N', onClick: tabs.handleNewTab },
-        { kind: 'action', label: 'Open Request…',            shortcut: 'Ctrl+O', onClick: workspace.handleOpenRequest },
-        { kind: 'action', label: 'Save Request',             shortcut: 'Ctrl+S',       onClick: tabs.handleSaveRequest },
-        { kind: 'action', label: 'Save All',               shortcut: 'Ctrl+Shift+S', onClick: tabs.handleSaveAll, disabled: tabs.dirtyFilePaths.size === 0 },
-        { kind: 'action', label: 'Save As…',                                          onClick: tabs.handleSaveAsRequest },
-        { kind: 'separator' },
-        { kind: 'action', label: 'Import OpenAPI Spec…',     onClick: workspace.handleImportOpenAPI, disabled: !workspace.workspacePath },
-        { kind: 'action', label: 'Import OpenAPI from URL…', onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) }, disabled: !workspace.workspacePath },
-        { kind: 'separator' },
-        { kind: 'action', label: 'Open Workspace…',          onClick: workspace.handleOpenWorkspace },
-        { kind: 'action', label: 'New Workspace…',           onClick: workspace.handleNewWorkspace },
-        { kind: 'action', label: 'Close Workspace',          onClick: workspace.handleCloseWorkspace, disabled: !workspace.workspacePath },
+        { kind: 'action', label: 'Open Workspace…',  onClick: workspace.handleOpenWorkspace },
+        { kind: 'action', label: 'New Workspace…',   onClick: workspace.handleNewWorkspace },
+        { kind: 'action', label: 'Close Workspace',  onClick: workspace.handleCloseWorkspace, disabled: !workspace.workspacePath },
         {
           kind: 'submenu',
           label: 'Recent Workspaces',
@@ -286,7 +277,42 @@ export default function App() {
           })),
         },
         { kind: 'separator' },
-        { kind: 'action', label: 'Exit',                     onClick: quitApp },
+        { kind: 'action', label: 'New Tab',    shortcut: 'Ctrl+N',       onClick: tabs.handleNewTab },
+        { kind: 'action', label: 'Open Request…', shortcut: 'Ctrl+O',    onClick: workspace.handleOpenRequest },
+        { kind: 'action', label: 'Save Request',  shortcut: 'Ctrl+S',    onClick: tabs.handleSaveRequest },
+        { kind: 'action', label: 'Save All',      shortcut: 'Ctrl+Shift+S', onClick: tabs.handleSaveAll, disabled: tabs.dirtyFilePaths.size === 0 },
+        { kind: 'action', label: 'Save As…',                              onClick: tabs.handleSaveAsRequest },
+        { kind: 'separator' },
+        {
+          kind: 'submenu',
+          label: 'Import',
+          disabled: !workspace.workspacePath,
+          items: [
+            { kind: 'action', label: 'OpenAPI Spec…',      onClick: workspace.handleImportOpenAPI },
+            { kind: 'action', label: 'OpenAPI from URL…',  onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) } },
+            { kind: 'separator' },
+            { kind: 'action', label: 'Postman Collection…', onClick: workspace.handleImportPostman },
+            { kind: 'action', label: 'Insomnia Export…',    onClick: workspace.handleImportInsomnia },
+          ],
+        },
+        {
+          kind: 'submenu',
+          label: 'Export',
+          disabled: !activeTab.response,
+          items: [
+            {
+              kind: 'action',
+              label: 'Save Response Body…',
+              onClick: () => {
+                const body = activeTab.response?.body ?? ''
+                const ext = body.trimStart().startsWith('{') || body.trimStart().startsWith('[') ? '.json' : '.txt'
+                saveContentToFile(body, `response${ext}`)
+              },
+            },
+          ],
+        },
+        { kind: 'separator' },
+        { kind: 'action', label: 'Exit', onClick: quitApp },
       ],
     },
     {
