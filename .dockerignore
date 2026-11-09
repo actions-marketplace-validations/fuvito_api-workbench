@@ -1,0 +1,11 @@
+apps/desktop/
+docs/
+examples/
+scripts/
+.github/
+clrsig-action/
+*.md
+*.tape
+*.gif
+go.work
+go.work.sum

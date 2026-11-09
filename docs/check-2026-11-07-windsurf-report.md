@@ -98,10 +98,10 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 
 ### Concrete distribution levers
 
-1. [ ] **Publish a GitHub Action on the Marketplace** — `uses: fuvito/clrsig-action@v1`. This is the highest-ROI move: it puts your name in every workflow file that adopts it, drives organic discovery, and matches the CI-first pitch perfectly.
-2. [ ] **Install channels** — Homebrew tap, Scoop/winget, `go install`, and a Docker image for CI. Releases already build binaries; packaging is the remaining friction.
+1. [x] **Publish a GitHub Action on the Marketplace** — `uses: fuvito/clrsig-action@v1`. This is the highest-ROI move: it puts your name in every workflow file that adopts it, drives organic discovery, and matches the CI-first pitch perfectly.
+2. [x] **Install channels** — Homebrew tap, Scoop/winget, `go install`, and a Docker image for CI. Releases already build binaries; packaging is the remaining friction.
 3. [ ] **Postman collection + environment import** — turns "interesting project" into "I can try it on my actual API in 2 minutes." Conversion funnel gold.
-4. [ ] **Comparison page** — honest table vs. Postman/Newman/Bruno/Schemathesis on: local files, git-diffability, spec conformance, CI output formats, account requirement.
+4. [x] **Comparison page** — honest table vs. Postman/Newman/Bruno/Schemathesis on: local files, git-diffability, spec conformance, CI output formats, account requirement.
 5. [x] **A 30-second demo GIF in the README** — import spec → run scenario → CLI in CI → green check. Screenshots are good but a GIF of a scenario run is what gets stars.
 6. [x] **Scenario template gallery** — ready-made scenarios for common public APIs (GitHub, Stripe-mock) so new users see value before writing YAML.
 7. [ ] **Content wedge** — posts like "We replaced Newman + 200 lines of shell with a YAML file" / "Contract testing your API in CI in 10 minutes." Developers find tools through problem-searches, not product-searches.

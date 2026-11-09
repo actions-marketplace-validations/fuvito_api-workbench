@@ -38,6 +38,63 @@ Most API tools focus on exploration. Clear Signal focuses on **contract verifica
 
 ---
 
+## How Clear Signal compares
+
+| | Clear Signal | Bruno | Postman/Newman | Schemathesis |
+|---|:---:|:---:|:---:|:---:|
+| No account required | ✓ | ✓ | free tier | ✓ |
+| Local-first, file-based | ✓ | ✓ | — | ✓ |
+| Git-diffable tests | ✓ | ✓ | partial | ✓ |
+| Desktop GUI | ✓ | ✓ | ✓ | — |
+| Multi-step scenarios | ✓ | ✓ | ✓ | — |
+| OpenAPI response validation | ✓ | — | — | ✓ |
+| Breaking change detection (`diff`) | ✓ | — | — | — |
+| JUnit / CI output | ✓ | ✓ | via Newman | ✓ |
+| GitHub Action | ✓ | — | via Newman | ✓ |
+
+Clear Signal's differentiators over Bruno (the closest alternative): spec conformance validation and explicit breaking-change detection, while keeping the same local-first, git-native philosophy. Over Schemathesis: a full GUI, human-authored scenarios, and variable extraction — without the property-based fuzzing noise.
+
+---
+
+## Install the CLI
+
+The `clrsig` CLI works independently of the desktop app.
+
+### Download a binary
+
+Download the latest release from [GitHub Releases](https://github.com/fuvito/api-workbench/releases/latest):
+
+| Platform | File |
+|---|---|
+| Linux (amd64) | `clrsig-linux-amd64` |
+| macOS (Intel) | `clrsig-darwin-amd64` |
+| macOS (Apple Silicon) | `clrsig-darwin-arm64` |
+| Windows (amd64) | `clrsig-windows-amd64.exe` |
+
+### Docker
+
+```bash
+docker run --rm \
+  -v "$PWD:/workspace" \
+  ghcr.io/fuvito/api-workbench:latest \
+  run /workspace/tests/my-scenario.yaml --env /workspace/environments/ci.yaml
+```
+
+### GitHub Actions
+
+```yaml
+- uses: fuvito/api-workbench/clrsig-action@main
+  with:
+    command: conform
+    spec: openapi.yaml
+    base-url: http://localhost:8080
+    coverage: 'true'
+```
+
+See [`clrsig-action/README.md`](clrsig-action/README.md) for all commands, inputs, and examples.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
