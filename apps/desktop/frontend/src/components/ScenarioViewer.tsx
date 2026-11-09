@@ -447,6 +447,35 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         </div>
       )}
 
+      {/* Coverage banner — shown when scenario has a specFile and run produced coverage data */}
+      {result?.coverage && !running && (
+        <div className="shrink-0 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-card)] flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">Spec Coverage</span>
+            <span className={cn('text-xs font-semibold',
+              result.coverage.percent >= 100 ? 'text-emerald-400'
+              : result.coverage.percent >= 50 ? 'text-amber-400'
+              : 'text-red-400')}>
+              {result.coverage.covered} / {result.coverage.total} operations ({Math.round(result.coverage.percent)}%)
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--color-muted)] overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all',
+                result.coverage.percent >= 100 ? 'bg-emerald-500'
+                : result.coverage.percent >= 50 ? 'bg-amber-500'
+                : 'bg-red-500')}
+              style={{ width: `${result.coverage.percent}%` }}
+            />
+          </div>
+          {result.coverage.missed.length > 0 && (
+            <p className="text-[10px] text-[var(--color-muted-foreground)]">
+              Not exercised: {result.coverage.missed.join(', ')}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Body */}
       {mode === 'yaml' ? (
         <div className="flex-1 overflow-hidden">

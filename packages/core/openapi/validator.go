@@ -250,3 +250,75 @@ func (nopCloserReader) Close() error { return nil }
 func nopCloser(data []byte) *nopCloserReader {
 	return &nopCloserReader{strings.NewReader(string(data))}
 }
+
+// ExecutedRequest is a (method, full URL) pair from an executed scenario step.
+type ExecutedRequest struct {
+	Method string
+	URL    string
+}
+
+// CoveredOperation identifies a spec operation (method + path pattern) exercised or missed.
+type CoveredOperation struct {
+	Method string
+	Path   string
+}
+
+func (o CoveredOperation) String() string { return o.Method + " " + o.Path }
+
+// ScenarioCoverageResult is the coverage computed from matching executed requests
+// against an OpenAPI spec's declared operations.
+type ScenarioCoverageResult struct {
+	Covered   int
+	Total     int
+	Percent   float64
+	Exercised []CoveredOperation
+	Missed    []CoveredOperation
+}
+
+// ScenarioCoverage matches each executed request against the spec's declared operations
+// and returns a coverage summary.
+func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageResult {
+	router, err := gorillamux.NewRouter(s.doc)
+	if err != nil {
+		return nil
+	}
+
+	// Build the full set of spec operations as a set.
+	type opKey struct{ method, path string }
+	all := make(map[opKey]struct{})
+	for path, item := range s.doc.Paths.Map() {
+		for method := range item.Operations() {
+			all[opKey{strings.ToUpper(method), path}] = struct{}{}
+		}
+	}
+
+	exercised := make(map[opKey]struct{})
+	for _, ex := range executed {
+		req, err := http.NewRequest(strings.ToUpper(ex.Method), ex.URL, nil)
+		if err != nil {
+			continue
+		}
+		route, _, err := router.FindRoute(req)
+		if err != nil {
+			continue
+		}
+		exercised[opKey{strings.ToUpper(ex.Method), route.Path}] = struct{}{}
+	}
+
+	cr := &ScenarioCoverageResult{Total: len(all)}
+	for k := range exercised {
+		if _, ok := all[k]; ok {
+			cr.Covered++
+			cr.Exercised = append(cr.Exercised, CoveredOperation{Method: k.method, Path: k.path})
+		}
+	}
+	for k := range all {
+		if _, ok := exercised[k]; !ok {
+			cr.Missed = append(cr.Missed, CoveredOperation{Method: k.method, Path: k.path})
+		}
+	}
+	if cr.Total > 0 {
+		cr.Percent = float64(cr.Covered) / float64(cr.Total) * 100
+	}
+	return cr
+}

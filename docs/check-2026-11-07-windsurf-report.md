@@ -108,7 +108,7 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 
 ### Retention hooks (in-product)
 
-- [ ] Surface **coverage** ("you've tested 6/8 declared operations") — your roadmap already proposes this; it creates a "finish the job" loop.
+- [x] Surface **coverage** ("you've tested 6/8 declared operations") — your roadmap already proposes this; it creates a "finish the job" loop.
 - [ ] **Response diffing** (compare current response vs. cached/previous run) — natural fit given you already cache responses to disk.
 - [ ] The demo server promotion mentioned above — shorten time-to-first-request to seconds.
 

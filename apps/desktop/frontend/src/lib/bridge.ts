@@ -540,12 +540,21 @@ export interface StepResult {
   responseHeaders?: Array<{ name: string; value: string }>
 }
 
+export interface ScenarioCoverage {
+  covered: number
+  total: number
+  percent: number
+  exercised: string[]
+  missed: string[]
+}
+
 export interface ScenarioResult {
   title: string
   passed: boolean
   durationMs: number
   steps: StepResult[]
   error?: string
+  coverage?: ScenarioCoverage
 }
 
 export async function listScenarios(): Promise<ScenarioInfo[]> {

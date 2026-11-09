@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/fuvito/api-workbench/packages/core/variables"
@@ -92,12 +93,21 @@ type StepResultIO struct {
 	ResponseHeaders []HeaderIO          `json:"responseHeaders,omitempty"`
 }
 
+type CoverageIO struct {
+	Covered   int      `json:"covered"`
+	Total     int      `json:"total"`
+	Percent   float64  `json:"percent"`
+	Exercised []string `json:"exercised"`
+	Missed    []string `json:"missed"`
+}
+
 type ScenarioResultIO struct {
 	Title      string         `json:"title"`
 	Passed     bool           `json:"passed"`
 	DurationMs int64          `json:"durationMs"`
 	Steps      []StepResultIO `json:"steps"`
 	Error      string         `json:"error,omitempty"`
+	Coverage   *CoverageIO    `json:"coverage,omitempty"`
 }
 
 // ---- Service ----
@@ -574,6 +584,47 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 		out.Steps = append(out.Steps, step)
 	}
+
+	// Compute spec coverage if the scenario declares a specFile.
+	if sc.SpecFile != "" {
+		specPath := sc.SpecFile
+		if !filepath.IsAbs(specPath) {
+			specPath = filepath.Join(filepath.Dir(path), specPath)
+		}
+		if specData, err := os.ReadFile(specPath); err == nil {
+			ext := strings.ToLower(filepath.Ext(specPath))
+			if ext == "" {
+				ext = "yaml"
+			}
+			if spec, err := openapi.ParseBytes(specData, strings.TrimPrefix(ext, ".")); err == nil {
+				var executed []openapi.ExecutedRequest
+				for _, sr := range result.Steps {
+					if sr.Skipped || sr.Request == nil {
+						continue
+					}
+					executed = append(executed, openapi.ExecutedRequest{
+						Method: string(sr.Request.Method),
+						URL:    sr.Request.URL,
+					})
+				}
+				if cr := spec.ScenarioCoverage(executed); cr != nil {
+					cov := &CoverageIO{
+						Covered: cr.Covered,
+						Total:   cr.Total,
+						Percent: cr.Percent,
+					}
+					for _, op := range cr.Exercised {
+						cov.Exercised = append(cov.Exercised, op.String())
+					}
+					for _, op := range cr.Missed {
+						cov.Missed = append(cov.Missed, op.String())
+					}
+					out.Coverage = cov
+				}
+			}
+		}
+	}
+
 	return out
 }
 
