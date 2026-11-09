@@ -63,6 +63,7 @@ import {
   ListScenarios as WailsListScenarios,
   LoadScenario as WailsLoadScenario,
   RunScenario as WailsRunScenario,
+  RunFolder as WailsRunFolder,
   LoadScenarioRaw as WailsLoadScenarioRaw,
   SaveScenarioRaw as WailsSaveScenarioRaw,
   CreateScenario as WailsCreateScenario,
@@ -594,6 +595,23 @@ export async function deleteScenario(path: string): Promise<string> {
 // Returns the new file path on success, or a string starting with "error:" on failure.
 export async function renameScenario(path: string, newName: string): Promise<string> {
   return (await WailsRenameScenario(path, newName)) as unknown as string
+}
+
+// ---- Folder run ----
+
+export interface FolderRunItem {
+  name: string
+  path: string
+  method: string
+  statusCode: number
+  durationMs: number
+  error?: string
+  passed: boolean
+}
+
+export async function runFolder(folderPath: string): Promise<FolderRunItem[]> {
+  const result = await WailsRunFolder(folderPath)
+  return (result ?? []) as unknown as FolderRunItem[]
 }
 
 // ---- Help ----

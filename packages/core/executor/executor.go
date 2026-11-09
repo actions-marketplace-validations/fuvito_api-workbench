@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptrace"
 	"net/url"
 	"sync"
@@ -35,6 +36,10 @@ type Options struct {
 	MaxBodySize    int64
 	ProxyURL       string
 	TLSSkipVerify  bool
+	// WithCookies attaches an in-memory cookie jar so Set-Cookie headers are
+	// automatically replayed on subsequent requests. Use for scenario runs;
+	// leave false for stateless single-request execution.
+	WithCookies bool
 }
 
 func New(opts Options) *Executor {
@@ -56,8 +61,14 @@ func New(opts Options) *Executor {
 		}
 	}
 
+	client := &http.Client{Transport: transport}
+	if opts.WithCookies {
+		jar, _ := cookiejar.New(nil)
+		client.Jar = jar
+	}
+
 	return &Executor{
-		client:         &http.Client{Transport: transport},
+		client:         client,
 		defaultTimeout: timeout,
 		maxBodySize:    maxBody,
 	}

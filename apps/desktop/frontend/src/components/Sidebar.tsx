@@ -1,7 +1,10 @@
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
+import type { FolderRunState } from '@/components/WorkspacePanel'
 import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
+
+export type { FolderRunState }
 
 export type SidebarTab = 'workspace' | 'history'
 
@@ -60,6 +63,9 @@ export type SidebarProps = {
   onRunAllScenarios?: () => void
   onDismissRunAll?: () => void
   scenarioError?: string | null
+  onRunFolder?: (folderPath: string) => void
+  folderRunState?: FolderRunState | null
+  onDismissFolderRun?: () => void
 }
 
 export function Sidebar({
@@ -81,6 +87,9 @@ export function Sidebar({
   onRunAllScenarios,
   onDismissRunAll,
   scenarioError,
+  onRunFolder,
+  folderRunState,
+  onDismissFolderRun,
 }: SidebarProps) {
   return (
     <aside
@@ -141,6 +150,9 @@ export function Sidebar({
             onRunAllScenarios={onRunAllScenarios}
             onDismissRunAll={onDismissRunAll}
             scenarioError={scenarioError}
+            onRunFolder={onRunFolder}
+            folderRunState={folderRunState}
+            onDismissFolderRun={onDismissFolderRun}
           />
         )}
 

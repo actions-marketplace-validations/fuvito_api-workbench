@@ -107,13 +107,22 @@ func NewRequestService(ws *WorkspaceService, ss *SettingsService) *RequestServic
 }
 
 func buildExecutor(ss *SettingsService) *executor.Executor {
+	return buildExecutorOpts(ss, false)
+}
+
+func buildExecutorWithCookies(ss *SettingsService) *executor.Executor {
+	return buildExecutorOpts(ss, true)
+}
+
+func buildExecutorOpts(ss *SettingsService, withCookies bool) *executor.Executor {
 	if ss == nil {
-		return executor.New(executor.Options{})
+		return executor.New(executor.Options{WithCookies: withCookies})
 	}
 	cfg := ss.GetSettings()
 	opts := executor.Options{
 		TLSSkipVerify: cfg.TLSSkipVerify,
 		ProxyURL:      cfg.ProxyURL,
+		WithCookies:   withCookies,
 	}
 	if cfg.DefaultTimeoutMs > 0 {
 		opts.DefaultTimeout = time.Duration(cfg.DefaultTimeoutMs) * time.Millisecond

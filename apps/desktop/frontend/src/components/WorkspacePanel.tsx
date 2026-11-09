@@ -4,8 +4,15 @@ import {
   FolderSymlink, FolderPlus, FilePlus, Upload, Trash2, CopyPlus, Search, X, RefreshCw, Play, Plus, PlayCircle, CheckCircle2, XCircle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { FileNode, ScenarioInfo } from '@/lib/bridge'
+import type { FileNode, ScenarioInfo, FolderRunItem } from '@/lib/bridge'
 import type { RunAllState } from '@/components/Sidebar'
+
+export interface FolderRunState {
+  folderPath: string
+  folderName: string
+  running: boolean
+  results: FolderRunItem[]
+}
 import { openInExplorer } from '@/lib/bridge'
 import { ContextMenu, type ContextMenuAction } from '@/components/ContextMenu'
 
@@ -353,6 +360,9 @@ type WorkspacePanelProps = {
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
   scenarioError?: string | null
+  onRunFolder?: (folderPath: string) => void
+  folderRunState?: FolderRunState | null
+  onDismissFolderRun?: () => void
 }
 
 export function WorkspacePanel({
@@ -388,6 +398,9 @@ export function WorkspacePanel({
   activeFilePath,
   dirtyFilePaths,
   scenarioError,
+  onRunFolder,
+  folderRunState,
+  onDismissFolderRun,
 }: WorkspacePanelProps) {
   const folderName = workspacePath
     ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
@@ -445,9 +458,14 @@ export function WorkspacePanel({
   function buildCtxItems(node: FileNode): ContextMenuAction[] {
     if (node.isDir) {
       const isEmpty = !node.children?.some(c => !c.name.startsWith('.'))
+      const hasRequests = node.children?.some(c => !c.isDir) ?? false
       return [
         ...(onNewRequestInFolder ? [{ kind: 'action' as const, label: 'New Request in Folder', onClick: () => onNewRequestInFolder(node.path) }] : []),
         ...(onCreateFolder ? [{ kind: 'action' as const, label: 'New Subfolder', onClick: () => onCreateFolder(node.path) }] : []),
+        ...(onRunFolder && hasRequests ? [
+          { kind: 'separator' as const },
+          { kind: 'action' as const, label: 'Run all requests', onClick: () => onRunFolder(node.path) },
+        ] : []),
         { kind: 'separator' },
         { kind: 'action', label: 'Rename', onClick: () => setRenamingPath(node.path) },
         { kind: 'action', label: 'Open in Explorer', onClick: () => handleOpenInExplorer(node.path) },
@@ -605,6 +623,47 @@ export function WorkspacePanel({
                 />
               ))
             )}
+            {folderRunState && (
+              <div className="mx-2 mt-2 mb-1 rounded border border-[var(--color-border)] bg-[var(--color-muted)] text-xs overflow-hidden">
+                <div className="flex items-center justify-between px-2 py-1.5 border-b border-[var(--color-border)]">
+                  <span className="font-semibold text-[var(--color-foreground)] truncate flex-1 min-w-0 mr-2" title={folderRunState.folderName}>
+                    {folderRunState.running
+                      ? <span className="flex items-center gap-1.5"><Loader2 size={10} className="animate-spin" /> Running {folderRunState.folderName}…</span>
+                      : <span className="flex items-center gap-1"><span className="truncate">{folderRunState.folderName}</span> <span className="shrink-0 text-[var(--color-muted-foreground)]">— {folderRunState.results.filter(r => r.passed).length}/{folderRunState.results.length} ok</span></span>}
+                  </span>
+                  {!folderRunState.running && onDismissFolderRun && (
+                    <button type="button" onClick={onDismissFolderRun} className="shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
+                      <X size={10} />
+                    </button>
+                  )}
+                </div>
+                {folderRunState.results.map(r => (
+                  <button
+                    key={r.path}
+                    type="button"
+                    onClick={() => onSelectFile(r.path)}
+                    className="w-full flex items-center gap-1.5 px-2 py-1 text-left hover:bg-[var(--color-border)] transition-colors"
+                    title={r.error || undefined}
+                  >
+                    {r.error
+                      ? <XCircle size={10} className="shrink-0 text-red-400" />
+                      : r.passed
+                        ? <CheckCircle2 size={10} className="shrink-0 text-emerald-400" />
+                        : <XCircle size={10} className="shrink-0 text-amber-400" />}
+                    {r.method && (
+                      <span className={cn('shrink-0 font-mono text-[9px] font-semibold', METHOD_COLORS[r.method] ?? 'text-[var(--color-muted-foreground)]')}>
+                        {r.method}
+                      </span>
+                    )}
+                    <span className="flex-1 truncate text-[var(--color-foreground)]">{r.name}</span>
+                    {r.error
+                      ? <span className="shrink-0 text-[10px] text-red-400 truncate max-w-[80px]" title={r.error}>err</span>
+                      : <span className="shrink-0 text-[var(--color-muted-foreground)] text-[10px]">{r.statusCode} · {r.durationMs}ms</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {scenarioError && (
               <div className="mx-2 mt-2 px-2 py-1 text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded truncate" title={scenarioError}>
                 {scenarioError}

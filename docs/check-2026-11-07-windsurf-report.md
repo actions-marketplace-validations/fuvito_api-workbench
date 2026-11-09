@@ -43,9 +43,9 @@ This is a genuinely well-built MVP. The Postman-style three-pane layout is immed
 
 - [x] **Toolbar icon soup** — the top-right toolbar has ~8 unlabeled icons (save, open, duplicate, snippet, settings, help…). Discoverability relies entirely on tooltips. Consider labels for the 2–3 most important actions or grouping the rest into an overflow menu.
 - [x] **Inconsistent dialog patterns** — [App.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/App.tsx:0:0-0:0) uses native `window.confirm`/`window.alert` for scenario delete, dirty-scenario close, and rename errors (lines ~426, ~447), while elsewhere you have proper custom dialogs (`DeleteRequestDialog`, `CloseDirtyTabDialog`). Jarring in an otherwise polished app. Route scenario confirmations through [ConfirmDialogs.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ConfirmDialogs.tsx:0:0-0:0).
-- [ ] **No tab keyboard navigation** — `Ctrl+W` closes, but there's no `Ctrl+Tab` / `Ctrl+1–9`. Keyboard-driven devs will notice.
-- [ ] **Onboarding gap** — the demo server (your best first-run feature) is buried in `Help → Start Demo Server`. First launch should surface it: e.g. a "Try the demo" card in the empty workspace state that starts the server, creates a temp workspace, and opens a request in one click.
-- [ ] **[ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0) is a 73 KB monolith** — works fine, but it's a maintainability and review-velocity liability. Split into `StepList`, `StepEditor`, `StepResult`, `YamlEditor`.
+- [x] **No tab keyboard navigation** — `Ctrl+W` closes, but there's no `Ctrl+Tab` / `Ctrl+1–9`. Keyboard-driven devs will notice.
+- [x] **Onboarding gap** — the demo server (your best first-run feature) is buried in `Help → Start Demo Server`. First launch should surface it: e.g. a "Try the demo" card in the empty workspace state that starts the server, creates a temp workspace, and opens a request in one click.
+- [x] **[ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0) is a 73 KB monolith** — works fine, but it's a maintainability and review-velocity liability. Split into `StepList`, `StepEditor`, `StepResult`, `YamlEditor`.
 
 ### Minor
 
@@ -75,9 +75,9 @@ Your own [contract-testing-roadmap.md](cci:7://file:///C:/dev/api-workbench/docs
 
 ### Gaps vs. competitors (bigger impact than missing features)
 
-- [ ] **No Postman/Insomnia/Bruno collection import** — this is the single biggest adoption blocker. Every potential user already has a collection somewhere. A Postman Collection v2.1 + environment JSON importer is the highest-leverage feature you could add for growth.
-- [ ] **No "run all requests in a folder"** — collections can only be executed if authored as scenarios. A lightweight "collection run" (run every request in a folder, report status/timing) bridges casual and power users.
-- [ ] **Cookie handling** — worth verifying the executor carries cookies; if not, auth flows that set cookies will surprise users.
+- [x] **No Postman/Insomnia/Bruno collection import** — this is the single biggest adoption blocker. Every potential user already has a collection somewhere. A Postman Collection v2.1 + environment JSON importer is the highest-leverage feature you could add for growth.
+- [x] **No "run all requests in a folder"** — collections can only be executed if authored as scenarios. A lightweight "collection run" (run every request in a folder, report status/timing) bridges casual and power users.
+- [x] **Cookie handling** — worth verifying the executor carries cookies; if not, auth flows that set cookies will surprise users.
 
 ### Possibly not needed
 
@@ -123,4 +123,4 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 - [x] **`clrsig conform` + `diff`** — your real product. Everything else is a commodity HTTP client.
 - [x] **Response viewer memoization + debounced search** — cheap fix for the main sluggishness risk.
 - [x] **Onboarding: promote the demo server to first-run** — converts a download into a successful first request.
-- [ ] **Unify dialogs, split [ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0), add `Ctrl+Tab`** — polish that compounds.
+- [x] **Unify dialogs, split [ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0), add `Ctrl+Tab`** — polish that compounds.

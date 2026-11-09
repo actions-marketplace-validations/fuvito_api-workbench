@@ -18,6 +18,8 @@ export function LoadScenarioResult(arg1:string):Promise<main.ScenarioResultIO>;
 
 export function RenameScenario(arg1:string,arg2:string):Promise<string>;
 
+export function RunFolder(arg1:string):Promise<Array<main.FolderRunItemIO>>;
+
 export function RunScenario(arg1:string,arg2:string,arg3:number):Promise<main.ScenarioResultIO>;
 
 export function SaveScenarioRaw(arg1:string,arg2:string):Promise<string>;

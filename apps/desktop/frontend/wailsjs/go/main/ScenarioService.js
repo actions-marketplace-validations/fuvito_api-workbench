@@ -34,6 +34,10 @@ export function RenameScenario(arg1, arg2) {
   return window['go']['main']['ScenarioService']['RenameScenario'](arg1, arg2);
 }
 
+export function RunFolder(arg1) {
+  return window['go']['main']['ScenarioService']['RunFolder'](arg1);
+}
+
 export function RunScenario(arg1, arg2, arg3) {
   return window['go']['main']['ScenarioService']['RunScenario'](arg1, arg2, arg3);
 }

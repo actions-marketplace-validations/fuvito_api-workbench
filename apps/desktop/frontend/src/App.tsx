@@ -25,7 +25,8 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, quitApp, saveContentToFile } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile } from '@/lib/bridge'
+import type { FolderRunState } from '@/components/Sidebar'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
 import { isTabDirty } from '@/lib/tabState'
@@ -77,6 +78,20 @@ export default function App() {
 
   // Run All Scenarios state
   const [runAllState, setRunAllState] = useState<import('@/components/Sidebar').RunAllState | null>(null)
+
+  // Run all requests in a folder
+  const [folderRunState, setFolderRunState] = useState<FolderRunState | null>(null)
+
+  async function handleRunFolder(folderPath: string) {
+    const folderName = folderPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? folderPath
+    setFolderRunState({ folderPath, folderName, running: true, results: [] })
+    try {
+      const results = await runFolder(folderPath)
+      setFolderRunState({ folderPath, folderName, running: false, results })
+    } catch (e) {
+      setFolderRunState({ folderPath, folderName, running: false, results: [{ name: 'Error', path: '', method: '', statusCode: 0, durationMs: 0, error: String(e), passed: false }] })
+    }
+  }
 
   async function handleRunAll() {
     const list = workspace.scenarioList
@@ -532,6 +547,9 @@ export default function App() {
           runAllState={runAllState ?? undefined}
           onRunAllScenarios={handleRunAll}
           onDismissRunAll={() => setRunAllState(null)}
+          onRunFolder={handleRunFolder}
+          folderRunState={folderRunState}
+          onDismissFolderRun={() => setFolderRunState(null)}
           onNewScenario={async (name) => {
             const result = await createScenario(name)
             if (!result.error && result.path) {

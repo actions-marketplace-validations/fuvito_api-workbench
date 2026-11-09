@@ -12,6 +12,7 @@ import (
 
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
+	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
 // ---- I/O types ----
@@ -405,6 +406,76 @@ func (s *ScenarioService) RenameScenario(path, newName string) string {
 	return newPath
 }
 
+// FolderRunItemIO is a single request result from a folder run.
+type FolderRunItemIO struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	Method     string `json:"method"`
+	StatusCode int    `json:"statusCode"`
+	DurationMs int64  `json:"durationMs"`
+	Error      string `json:"error,omitempty"`
+	Passed     bool   `json:"passed"` // true when status is 2xx and no network error
+}
+
+// RunFolder executes every request file directly under folderPath (non-recursive)
+// using the active workspace environment. Results are returned in directory order.
+func (s *ScenarioService) RunFolder(folderPath string) []FolderRunItemIO {
+	entries, err := os.ReadDir(folderPath)
+	if err != nil {
+		return []FolderRunItemIO{{Error: err.Error()}}
+	}
+
+	env := s.workspace.ActiveEnvironment()
+	exec := buildExecutor(s.settings)
+
+	var results []FolderRunItemIO
+	for _, e := range entries {
+		if e.IsDir() || !isDataFile(e.Name()) {
+			continue
+		}
+		path := filepath.Join(folderPath, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			results = append(results, FolderRunItemIO{Name: e.Name(), Path: path, Error: err.Error()})
+			continue
+		}
+		req, err := serialization.ParseRequestFile(data, e.Name())
+		if err != nil {
+			results = append(results, FolderRunItemIO{Name: e.Name(), Path: path, Error: "parse: " + err.Error()})
+			continue
+		}
+
+		name := req.Title
+		if name == "" {
+			name = strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))
+		}
+
+		// Apply variable interpolation with the active environment.
+		resolver := variables.NewResolver(env)
+		resolved := resolver.InterpolateRequest(req)
+
+		resp, execErr := exec.Execute(s.ctx, resolved)
+		if execErr != nil {
+			results = append(results, FolderRunItemIO{
+				Name:   name,
+				Path:   path,
+				Method: string(req.Method),
+				Error:  execErr.Error(),
+			})
+			continue
+		}
+		results = append(results, FolderRunItemIO{
+			Name:       name,
+			Path:       path,
+			Method:     string(req.Method),
+			StatusCode: resp.StatusCode,
+			DurationMs: resp.Duration.Milliseconds(),
+			Passed:     resp.StatusCode >= 200 && resp.StatusCode < 300,
+		})
+	}
+	return results
+}
+
 // RunScenario executes a scenario file and returns the full result.
 // envPath overrides the workspace active environment; pass "" to use the active env.
 // fromStep is the 0-based index of the first step to execute; pass 0 to run all steps.
@@ -446,7 +517,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 	}
 
-	exec := buildExecutor(s.settings)
+	exec := buildExecutorWithCookies(s.settings)
 	runner := scenario.New(exec)
 
 	env := s.workspace.ActiveEnvironment()
