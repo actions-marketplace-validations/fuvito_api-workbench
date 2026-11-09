@@ -98,8 +98,8 @@ export function TimingDialog({ timing, total, onClose }: {
 // ---- Timing bar (mini, clickable) ----
 
 export function TimingBar({ timing, total, onClick }: { timing: ResponseData['timing']; total: number; onClick: () => void }) {
+  const segments = useMemo(() => (timing ? buildSegments(timing) : []), [timing])
   if (!timing || total === 0) return null
-  const segments = useMemo(() => buildSegments(timing!), [timing]) // eslint-disable-line react-hooks/exhaustive-deps
   if (segments.length === 0) {
     return <p className="text-xs text-[var(--color-muted-foreground)] mt-1 italic">No timing breakdown available.</p>
   }

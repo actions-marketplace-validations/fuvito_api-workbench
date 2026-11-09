@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "pnpm --filter desktop dev",
     "build": "pnpm --filter desktop build",
-    "test": "pnpm --filter desktop test"
+    "test": "pnpm --filter desktop test",
+    "test:coverage": "pnpm --filter desktop test:coverage",
+    "lint": "pnpm --filter desktop lint"
   }
 }
