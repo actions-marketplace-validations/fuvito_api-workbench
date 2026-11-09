@@ -298,13 +298,13 @@ export default function App() {
         {
           kind: 'submenu',
           label: 'Export',
-          disabled: !activeTab.response,
+          disabled: !tabs.activeTab.response,
           items: [
             {
               kind: 'action',
               label: 'Save Response Body…',
               onClick: () => {
-                const body = activeTab.response?.body ?? ''
+                const body = tabs.activeTab.response?.body ?? ''
                 const ext = body.trimStart().startsWith('{') || body.trimStart().startsWith('[') ? '.json' : '.txt'
                 saveContentToFile(body, `response${ext}`)
               },
