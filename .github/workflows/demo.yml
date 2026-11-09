@@ -1,0 +1,48 @@
+name: Regenerate demo GIF
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/demo.tape'
+      - 'apps/cli/**'
+      - 'examples/**'
+      - 'packages/core/**'
+  workflow_dispatch:
+
+jobs:
+  vhs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Build CLI binary
+        run: go build -o /usr/local/bin/clrsig ./apps/cli
+
+      - name: Build example server
+        run: go build -o /usr/local/bin/demo-server ./examples/server
+
+      - name: Start example server
+        run: demo-server &
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 10); do
+            curl -sf http://localhost:8080/health && break || sleep 1
+          done
+
+      - uses: charmbracelet/vhs-action@v2
+        with:
+          path: docs/demo.tape
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: regenerate demo GIF [skip ci]"
+          file_pattern: docs/demo.gif
