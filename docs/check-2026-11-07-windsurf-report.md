@@ -115,9 +115,12 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 ---
 
 ## Suggested priority order
-
-1. [ ] **Postman/Insomnia import + GitHub Action** — pure growth, removes the two biggest adoption barriers.
-2. [ ] **`clrsig conform` + `diff`** — your real product. Everything else is a commodity HTTP client.
-3. [x] **Response viewer memoization + debounced search** — cheap fix for the main sluggishness risk.
-4. [ ] **Onboarding: promote the demo server to first-run** — converts a download into a successful first request.
-5. [ ] **Unify dialogs, split [ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0), add `Ctrl+Tab`** — polish that compounds.
+- [x] **Tab Switch Error:** When I switch between jobs: the fields on those tabs are resetting, and for example i am editing a scenario, i go to a request tab, when i come back, the scenario displays view tab, abd all ny edits are gone
+- [x] **Scenario Step Duplicate:** Can I duplicate scenario Steps
+- [x] **Scenario and Request confusion:** After a Creat a scenario and saved a same name request shows up on the requests panel, and also Scenario top bar also display the method GET and the scenairo title, i can provide screen shots if needed
+- [x] **Recent Work Spaces: ** please add to fiel menu: recent workspaces: under a submenu maybe max 10 display
+- [ ] **Postman/Insomnia import + GitHub Action** — pure growth, removes the two biggest adoption barriers.
+- [ ] **`clrsig conform` + `diff`** — your real product. Everything else is a commodity HTTP client.
+- [x] **Response viewer memoization + debounced search** — cheap fix for the main sluggishness risk.
+- [ ] **Onboarding: promote the demo server to first-run** — converts a download into a successful first request.
+- [ ] **Unify dialogs, split [ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0), add `Ctrl+Tab`** — polish that compounds.

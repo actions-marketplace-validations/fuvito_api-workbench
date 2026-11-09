@@ -259,6 +259,17 @@ export default function App() {
         { kind: 'action', label: 'Open Workspace…',          onClick: workspace.handleOpenWorkspace },
         { kind: 'action', label: 'New Workspace…',           onClick: workspace.handleNewWorkspace },
         { kind: 'action', label: 'Close Workspace',          onClick: workspace.handleCloseWorkspace, disabled: !workspace.workspacePath },
+        {
+          kind: 'submenu',
+          label: 'Recent Workspaces',
+          disabled: workspace.recentWorkspaces.length === 0,
+          items: workspace.recentWorkspaces.map(p => ({
+            kind: 'action' as const,
+            label: p.split(/[\\/]/).pop() ?? p,
+            title: p,
+            onClick: () => workspace.handleOpenWorkspaceByPath(p),
+          })),
+        },
         { kind: 'separator' },
         { kind: 'action', label: 'Exit',                     onClick: quitApp },
       ],

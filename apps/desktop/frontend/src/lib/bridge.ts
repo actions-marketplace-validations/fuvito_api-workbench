@@ -35,6 +35,8 @@ import {
   OpenInSystemViewer as WailsOpenInSystemViewer,
   OpenInExplorer as WailsOpenInExplorer,
   MoveRequest as WailsMoveRequest,
+  GetRecentWorkspaces as WailsGetRecentWorkspaces,
+  OpenWorkspaceByPath as WailsOpenWorkspaceByPath,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -205,6 +207,16 @@ export async function newWorkspace(): Promise<string> {
 
 export async function closeWorkspace(): Promise<void> {
   await WailsCloseWorkspace()
+}
+
+export async function getRecentWorkspaces(): Promise<string[]> {
+  const result = await WailsGetRecentWorkspaces()
+  return result as unknown as string[]
+}
+
+export async function openWorkspaceByPath(path: string): Promise<string> {
+  const result = await WailsOpenWorkspaceByPath(path)
+  return result as unknown as string
 }
 
 export async function getWorkspacePath(): Promise<string> {

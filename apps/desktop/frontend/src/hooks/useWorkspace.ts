@@ -6,6 +6,7 @@ import {
   listEnvironments, selectEnvironment, getActiveEnvironment, getEnvironment,
   importOpenAPISpec, importOpenAPISpecFromURL,
   getHistory, clearHistory, listScenarios,
+  getRecentWorkspaces, openWorkspaceByPath,
 } from '@/lib/bridge'
 import type { HistoryEntry, FileNode, EnvInfo, RequestFileIO, ScenarioInfo } from '@/lib/bridge'
 import { createBlankTab, computeStateKey } from '@/lib/tabState'
@@ -27,6 +28,7 @@ export function useWorkspace(deps: {
   const [importing, setImporting] = useState(false)
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [scenarioList, setScenarioList] = useState<ScenarioInfo[]>([])
+  const [recentWorkspaces, setRecentWorkspaces] = useState<string[]>([])
 
   // Dialog state
   const [deletingFilePath, setDeletingFilePath] = useState<string | null>(null)
@@ -57,18 +59,20 @@ export function useWorkspace(deps: {
 
   const refreshWorkspace = useCallback(async () => {
     try {
-      const [path, tree, envs, activeE, scenarios] = await Promise.all([
+      const [path, tree, envs, activeE, scenarios, recent] = await Promise.all([
         getWorkspacePath() as Promise<string>,
         listRequests(),
         listEnvironments(),
         getActiveEnvironment(),
         listScenarios(),
+        getRecentWorkspaces(),
       ])
       setWorkspacePath(path ?? '')
       setFileTree(tree ?? [])
       setEnvironments(envs ?? [])
       setActiveEnv(activeE)
       setScenarioList(scenarios ?? [])
+      setRecentWorkspaces(recent ?? [])
       await loadEnvVars(activeE?.path)
     } catch { /* best-effort */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -98,6 +102,18 @@ export function useWorkspace(deps: {
       }
     } catch (err) {
       console.error('new workspace:', err)
+    }
+  }
+
+  async function handleOpenWorkspaceByPath(path: string) {
+    try {
+      const opened = await openWorkspaceByPath(path)
+      if (opened) {
+        setWorkspacePath(opened)
+        await refreshWorkspace()
+      }
+    } catch (err) {
+      console.error('open workspace by path:', err)
     }
   }
 
@@ -365,9 +381,9 @@ export function useWorkspace(deps: {
   }
 
   return {
-    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history, scenarioList,
+    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history, scenarioList, recentWorkspaces,
     refreshFileTree, refreshWorkspace, refreshHistory,
-    handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace,
+    handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace, handleOpenWorkspaceByPath,
     handleSelectFile, handleOpenRequest, handleEnvChange,
     handleClearHistory, handleDuplicateFile, handleMoveFile,
     deletingFilePath, setDeletingFilePath, confirmDeleteFile, handleDeleteFile,

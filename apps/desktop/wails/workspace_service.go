@@ -20,8 +20,9 @@ import (
 // ---- Config persistence ----
 
 type workspaceConfig struct {
-	WorkspacePath string `json:"workspacePath"`
-	ActiveEnvPath string `json:"activeEnvPath"`
+	WorkspacePath    string   `json:"workspacePath"`
+	ActiveEnvPath    string   `json:"activeEnvPath"`
+	RecentWorkspaces []string `json:"recentWorkspaces,omitempty"`
 }
 
 func configPath() (string, error) {
@@ -109,18 +110,20 @@ type RequestFileIO struct {
 // ---- WorkspaceService ----
 
 type WorkspaceService struct {
-	ctx           context.Context
-	workspacePath string
-	activeEnvPath string
-	activeEnv     *domain.Environment
+	ctx              context.Context
+	workspacePath    string
+	activeEnvPath    string
+	activeEnv        *domain.Environment
+	recentWorkspaces []string
 }
 
 func NewWorkspaceService() *WorkspaceService {
 	cfg := loadConfig()
 	ws := &WorkspaceService{
-		ctx:           context.Background(),
-		workspacePath: cfg.WorkspacePath,
-		activeEnvPath: cfg.ActiveEnvPath,
+		ctx:              context.Background(),
+		workspacePath:    cfg.WorkspacePath,
+		activeEnvPath:    cfg.ActiveEnvPath,
+		recentWorkspaces: cfg.RecentWorkspaces,
 	}
 	if cfg.ActiveEnvPath != "" {
 		if env, err := ws.loadEnvFile(cfg.ActiveEnvPath); err == nil {
@@ -166,6 +169,7 @@ func (w *WorkspaceService) OpenWorkspace() (string, error) {
 		return w.workspacePath, nil // user cancelled
 	}
 	w.workspacePath = dir
+	w.addRecentWorkspace(dir)
 	w.persistConfig()
 	return dir, nil
 }
@@ -608,9 +612,51 @@ func (w *WorkspaceService) OpenRequest() (*RequestFileIO, error) {
 
 func (w *WorkspaceService) persistConfig() {
 	saveConfig(workspaceConfig{
-		WorkspacePath: w.workspacePath,
-		ActiveEnvPath: w.activeEnvPath,
+		WorkspacePath:    w.workspacePath,
+		ActiveEnvPath:    w.activeEnvPath,
+		RecentWorkspaces: w.recentWorkspaces,
 	})
+}
+
+func (w *WorkspaceService) addRecentWorkspace(path string) {
+	if path == "" {
+		return
+	}
+	seen := make(map[string]bool)
+	recent := []string{path}
+	seen[path] = true
+	for _, p := range w.recentWorkspaces {
+		if !seen[p] {
+			seen[p] = true
+			recent = append(recent, p)
+		}
+	}
+	if len(recent) > 10 {
+		recent = recent[:10]
+	}
+	w.recentWorkspaces = recent
+}
+
+// GetRecentWorkspaces returns the list of recently opened workspace paths (most recent first).
+func (w *WorkspaceService) GetRecentWorkspaces() []string {
+	if len(w.recentWorkspaces) == 0 {
+		return []string{}
+	}
+	return w.recentWorkspaces
+}
+
+// OpenWorkspaceByPath opens a workspace directly by path without a dialog.
+func (w *WorkspaceService) OpenWorkspaceByPath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("path is required")
+	}
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("workspace not found: %s", path)
+	}
+	w.workspacePath = path
+	w.addRecentWorkspace(path)
+	w.persistConfig()
+	return path, nil
 }
 
 func (w *WorkspaceService) loadEnvFile(path string) (*domain.Environment, error) {
@@ -813,6 +859,7 @@ func (w *WorkspaceService) NewWorkspace() (string, error) {
 		}
 	}
 	w.workspacePath = dir
+	w.addRecentWorkspace(dir)
 	w.persistConfig()
 	return dir, nil
 }

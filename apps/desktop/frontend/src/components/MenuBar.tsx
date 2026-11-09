@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+type SubMenuItem =
+  | { kind: 'action'; label: string; onClick: () => void; title?: string }
+  | { kind: 'separator' }
 
 type MenuItem =
   | { kind: 'action'; label: string; shortcut?: string; onClick: () => void; disabled?: boolean }
   | { kind: 'separator' }
+  | { kind: 'submenu'; label: string; items: SubMenuItem[]; disabled?: boolean }
 
 export type MenuDef = {
   label: string
@@ -61,6 +67,42 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
               {menu.items.map((item, i) =>
                 item.kind === 'separator' ? (
                   <li key={i} role="separator" className="h-px bg-[var(--color-border)] my-1 mx-2" />
+                ) : item.kind === 'submenu' ? (
+                  <li key={i} className="relative group">
+                    <button
+                      type="button"
+                      disabled={item.disabled || item.items.length === 0}
+                      className={cn(
+                        'w-full flex items-center justify-between px-3 py-1 text-xs',
+                        item.disabled || item.items.length === 0
+                          ? 'opacity-40 cursor-default text-[var(--color-muted-foreground)]'
+                          : 'text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer',
+                      )}
+                    >
+                      <span>{item.label}</span>
+                      <ChevronRight size={11} className="text-[var(--color-muted-foreground)] shrink-0" />
+                    </button>
+                    {!item.disabled && item.items.length > 0 && (
+                      <ul className="absolute left-full top-0 min-w-[220px] max-h-72 overflow-y-auto bg-[var(--color-card)] border border-[var(--color-border)] rounded shadow-xl py-1 hidden group-hover:block">
+                        {item.items.map((sub, si) =>
+                          sub.kind === 'separator' ? (
+                            <li key={si} role="separator" className="h-px bg-[var(--color-border)] my-1 mx-2" />
+                          ) : (
+                            <li key={si}>
+                              <button
+                                type="button"
+                                title={sub.title}
+                                onMouseDown={() => { setOpen(null); sub.onClick() }}
+                                className="w-full flex items-center px-3 py-1 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer truncate"
+                              >
+                                {sub.label}
+                              </button>
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    )}
+                  </li>
                 ) : (
                   <li key={i}>
                     <button
