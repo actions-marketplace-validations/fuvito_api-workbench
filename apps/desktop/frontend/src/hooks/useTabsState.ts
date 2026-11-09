@@ -185,7 +185,7 @@ export function useTabsState(deps: {
         ...prev,
         tabs: prev.tabs.map(t =>
           t.id === tabId && t.response === null
-            ? { ...t, response, responseCachedAt: cachedAt }
+            ? { ...t, response, previousResponse: null, responseCachedAt: cachedAt }
             : t,
         ),
       }))

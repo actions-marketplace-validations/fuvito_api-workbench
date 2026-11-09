@@ -172,7 +172,8 @@ export default function App() {
     const { activeTab, activeTabId, updateTab, tabsStateRef } = tabs
     if (!activeTab.url.trim() || activeTab.loading) return
     const tabId = activeTabId
-    updateTab(tabId, { loading: true, response: null, responseCachedAt: null })
+    const prevResponse = activeTab.response
+    updateTab(tabId, { loading: true, response: null, responseCachedAt: null, previousResponse: prevResponse })
     try {
       const result = await executeRequest({
         method: activeTab.method,
@@ -701,7 +702,7 @@ export default function App() {
                   className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
                   style={responseWidth > 0 ? { width: responseWidth } : {}}
                 >
-                  <ResponseViewer response={activeTab.response} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} />
+                  <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} />
                 </div>
               </>
             )}
