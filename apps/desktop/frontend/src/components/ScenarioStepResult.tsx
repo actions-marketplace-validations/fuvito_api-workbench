@@ -11,7 +11,7 @@ const OPERATOR_LABEL: Record<string, string> = {
 
 const sectionLabelCls = 'text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)] mb-1.5'
 
-export function assertionSummary(a: { type: string; path?: string; operator?: string; expected?: unknown; schema?: string }): string {
+function assertionSummary(a: { type: string; path?: string; operator?: string; expected?: unknown; schema?: string }): string {
   const op = OPERATOR_LABEL[a.operator ?? 'eq'] ?? a.operator ?? '='
   const exp = a.expected !== undefined && a.expected !== null ? String(a.expected) : ''
   if (a.type === 'status') return `status ${op} ${exp}`
@@ -20,11 +20,11 @@ export function assertionSummary(a: { type: string; path?: string; operator?: st
   return `${a.type === 'jsonpath' ? '$.'+path : path} ${op} ${exp}`.trim()
 }
 
-export function tryPrettyJSON(s: string): string {
+function tryPrettyJSON(s: string): string {
   try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
 }
 
-export function statusColor(code: number): string {
+function statusColor(code: number): string {
   if (code < 300) return 'text-emerald-400'
   if (code < 400) return 'text-blue-400'
   if (code < 500) return 'text-amber-400'

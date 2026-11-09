@@ -27,22 +27,6 @@ export function MethodBadge({ method }: { method: string }) {
   )
 }
 
-// ---- Tree filter ----
-
-export function filterTree(nodes: FileNode[], query: string): FileNode[] {
-  if (!query) return nodes
-  const q = query.toLowerCase()
-  return nodes.flatMap(node => {
-    if (node.isDir) {
-      const filteredChildren = filterTree(node.children ?? [], q)
-      if (filteredChildren.length > 0) return [{ ...node, children: filteredChildren }]
-      if (node.name.toLowerCase().includes(q)) return [{ ...node }]
-      return []
-    }
-    const displayName = node.name.replace(/\.(yaml|yml|json)$/i, '')
-    return displayName.toLowerCase().includes(q) ? [node] : []
-  })
-}
 
 // ---- Inline rename input ----
 

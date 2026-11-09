@@ -5,12 +5,26 @@ import { listTemplates, createFromTemplate, openInExplorer } from '@/lib/bridge'
 import type { RunAllState } from '@/components/Sidebar'
 import { ContextMenu } from '@/components/ContextMenu'
 import { ScenarioTemplateGallery } from '@/components/ScenarioTemplateGallery'
-import { filterTree, TreeNode } from './WorkspaceFileTree'
+import { TreeNode } from './WorkspaceFileTree'
 import { buildFileMenuItems, buildScenarioMenuItems } from './workspaceMenus'
 import { WorkspacePanelHeader } from './WorkspacePanelHeader'
 import { WorkspaceEmptyState } from './WorkspaceEmptyState'
 import { FolderRunResults, RunAllResults } from './WorkspaceRunResults'
 import { WorkspaceScenarioSection } from './WorkspaceScenarioSection'
+
+function filterTree(nodes: FileNode[], query: string): FileNode[] {
+  if (!query) return nodes
+  const q = query.toLowerCase()
+  return nodes.flatMap(node => {
+    if (node.isDir) {
+      const filtered = filterTree(node.children ?? [], q)
+      if (filtered.length > 0) return [{ ...node, children: filtered }]
+      if (node.name.toLowerCase().includes(q)) return [{ ...node }]
+      return []
+    }
+    return node.name.replace(/\.(yaml|yml|json)$/i, '').toLowerCase().includes(q) ? [node] : []
+  })
+}
 
 export interface FolderRunState {
   folderPath: string

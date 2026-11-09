@@ -3,7 +3,7 @@ import type { ScenarioDetail } from '@/lib/bridge'
 function yamlScalar(s: string): string {
   if (s === '') return '""'
   if (
-    /[:#\[\]{},&*!|>'"%@`\n\r\t]/.test(s) ||
+    /[:#[]{},&*!|>'"%@`\n\r\t]/.test(s) ||
     s.startsWith(' ') || s.endsWith(' ') ||
     s === 'true' || s === 'false' || s === 'null'
   ) return JSON.stringify(s)
