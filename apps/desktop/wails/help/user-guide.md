@@ -603,6 +603,10 @@ replace github.com/fuvito/api-workbench/packages/core => ../../../packages/core
 
 The frontend may have failed to compile. Check the terminal for Vite or TypeScript errors. The most common cause is a stale `wailsjs/` directory — restart `wails dev`.
 
+### `Dev server request rejected: Host "wails.localhost" is not an allowed host`
+
+The Wails devserver (port 34115) allows only `localhost`, IP literals, and its own bind host; the WebView requests `wails.localhost`. Set `WAILS_DEV_ALLOWED_HOSTS=wails.localhost` in the shell before `wails dev` (or persist it with `setx WAILS_DEV_ALLOWED_HOSTS wails.localhost` on Windows, then open a new terminal).
+
 ### Go tests fail in CI but pass locally
 
 The executor tests use `httptest.NewServer` and require a free port. No external network access is required; all tests run against `localhost`. If the CI runner restricts networking, the tests will fail — ensure the runner allows loopback connections.

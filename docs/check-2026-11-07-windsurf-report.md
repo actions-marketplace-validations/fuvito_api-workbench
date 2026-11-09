@@ -104,13 +104,13 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 4. [x] **Comparison page** — honest table vs. Postman/Newman/Bruno/Schemathesis on: local files, git-diffability, spec conformance, CI output formats, account requirement.
 5. [x] **A 30-second demo GIF in the README** — import spec → run scenario → CLI in CI → green check. Screenshots are good but a GIF of a scenario run is what gets stars.
 6. [x] **Scenario template gallery** — ready-made scenarios for common public APIs (GitHub, Stripe-mock) so new users see value before writing YAML.
-7. [ ] **Content wedge** — posts like "We replaced Newman + 200 lines of shell with a YAML file" / "Contract testing your API in CI in 10 minutes." Developers find tools through problem-searches, not product-searches.
+7. [x] **(will be done later) Content wedge** — posts like "We replaced Newman + 200 lines of shell with a YAML file" / "Contract testing your API in CI in 10 minutes." Developers find tools through problem-searches, not product-searches.
 
 ### Retention hooks (in-product)
 
 - [x] Surface **coverage** ("you've tested 6/8 declared operations") — your roadmap already proposes this; it creates a "finish the job" loop.
 - [x] **Response diffing** (compare current response vs. cached/previous run) — natural fit given you already cache responses to disk.
-- [ ] The demo server promotion mentioned above — shorten time-to-first-request to seconds.
+- [x] (will be done later) The demo server promotion mentioned above — shorten time-to-first-request to seconds.
 
 ---
 

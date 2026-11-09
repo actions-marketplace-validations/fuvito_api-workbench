@@ -90,6 +90,10 @@ export function OpenWorkspaceByPath(arg1) {
   return window['go']['main']['WorkspaceService']['OpenWorkspaceByPath'](arg1);
 }
 
+export function PickFile(arg1) {
+  return window['go']['main']['WorkspaceService']['PickFile'](arg1);
+}
+
 export function RenameFolder(arg1, arg2) {
   return window['go']['main']['WorkspaceService']['RenameFolder'](arg1, arg2);
 }
@@ -116,8 +120,4 @@ export function SaveResponseCache(arg1, arg2) {
 
 export function SelectEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['SelectEnvironment'](arg1);
-}
-
-export function PickFile(arg1) {
-  return window['go']['main']['WorkspaceService']['PickFile'](arg1);
 }

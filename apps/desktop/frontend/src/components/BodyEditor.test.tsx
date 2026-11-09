@@ -46,9 +46,13 @@ describe('BodyEditor', () => {
     expect(screen.getByDisplayValue('admin')).toBeInTheDocument()
   })
 
-  it('shows KeyValueEditor for multipart type', () => {
+  it('shows MultipartEditor for multipart type', () => {
     render(<BodyEditor body={multipart} onChange={() => {}} />)
-    expect(screen.getByText('+ Add row')).toBeInTheDocument()
+    // MultipartEditor renders an "Add field" button
+    expect(screen.getByText('Add field')).toBeInTheDocument()
+    // Legacy url-encoded content parses to a pre-populated text field
+    expect(screen.getByDisplayValue('file')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('doc.pdf')).toBeInTheDocument()
   })
 
   it('shows textarea for raw type', () => {

@@ -47,6 +47,8 @@ export function OpenWorkspace():Promise<string>;
 
 export function OpenWorkspaceByPath(arg1:string):Promise<string>;
 
+export function PickFile(arg1:string):Promise<string>;
+
 export function RenameFolder(arg1:string,arg2:string):Promise<string>;
 
 export function RenameRequest(arg1:string,arg2:string):Promise<string>;
@@ -60,5 +62,3 @@ export function SaveRequest(arg1:main.RequestFileIO):Promise<string>;
 export function SaveResponseCache(arg1:string,arg2:main.ResponseCacheIO):Promise<void>;
 
 export function SelectEnvironment(arg1:string):Promise<void>;
-
-export function PickFile(arg1:string):Promise<string>;

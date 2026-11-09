@@ -31,6 +31,9 @@ dist/
 # pnpm temp lock files (created during concurrent write protection)
 pnpm-lock.yaml.*
 
+# npm lock file — project uses pnpm; prevent accidental npm install artifacts
+package-lock.json
+
 # ---- Testing ----
 
 # Playwright generated reports and results
