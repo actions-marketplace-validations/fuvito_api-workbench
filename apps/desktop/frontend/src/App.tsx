@@ -252,6 +252,22 @@ export default function App() {
         e.preventDefault()
         workspace.handleOpenRequest()
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+        e.preventDefault()
+        const { tabs: tList, activeTabId } = tabs.tabsStateRef.current
+        if (tList.length < 2) return
+        const idx = tList.findIndex(t => t.id === activeTabId)
+        const next = e.shiftKey
+          ? (idx - 1 + tList.length) % tList.length
+          : (idx + 1) % tList.length
+        tabs.switchTo(tList[next].id)
+      }
+      const digit = parseInt(e.key)
+      if ((e.ctrlKey || e.metaKey) && digit >= 1 && digit <= 9) {
+        const { tabs: tList } = tabs.tabsStateRef.current
+        const target = tList[digit - 1]
+        if (target) { e.preventDefault(); tabs.switchTo(target.id) }
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
