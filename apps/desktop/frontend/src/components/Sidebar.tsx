@@ -45,6 +45,8 @@ export type SidebarProps = {
   onImportOpenAPI: () => void
   onImportPostman?: () => void
   onImportInsomnia?: () => void
+  onTryDemo?: () => void
+  demoStarting?: boolean
   onRefresh?: () => void
   importing?: boolean
   activeFilePath?: string
@@ -68,7 +70,7 @@ export function Sidebar({
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder, onMoveFile,
   onSelectHistory, onClearHistory,
-  onImportOpenAPI, onImportPostman, onImportInsomnia, onRefresh, importing,
+  onImportOpenAPI, onImportPostman, onImportInsomnia, onTryDemo, demoStarting, onRefresh, importing,
   activeFilePath, dirtyFilePaths,
   onSelectScenario,
   onNewScenario,
@@ -123,6 +125,8 @@ export function Sidebar({
             onImportOpenAPI={onImportOpenAPI}
             onImportPostman={onImportPostman}
             onImportInsomnia={onImportInsomnia}
+            onTryDemo={onTryDemo}
+            demoStarting={demoStarting}
             onRefresh={onRefresh}
             importing={importing}
             activeFilePath={activeFilePath}

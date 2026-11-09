@@ -478,6 +478,8 @@ export default function App() {
           onImportOpenAPI={workspace.handleImportOpenAPI}
           onImportPostman={workspace.handleImportPostman}
           onImportInsomnia={workspace.handleImportInsomnia}
+          onTryDemo={demo.handleStartDemo}
+          demoStarting={demo.demoStarting}
           onRefresh={workspace.refreshWorkspace}
           importing={workspace.importing}
           activeFilePath={activeTab.filePath ?? undefined}

@@ -1,0 +1,169 @@
+name: 'Clear Signal — API Contract Validation'
+description: 'Run API scenarios, validate spec conformance, or detect breaking changes with clrsig'
+author: 'fuvito'
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  command:
+    description: 'Command to run: run | conform | diff | request | validate'
+    required: true
+    default: 'run'
+
+  # --- run / validate ---
+  scenario:
+    description: 'Path to scenario file (run, validate)'
+    required: false
+
+  # --- conform ---
+  spec:
+    description: 'Path or URL to OpenAPI spec (conform)'
+    required: false
+
+  # --- diff ---
+  base-spec:
+    description: 'Path or URL to the base (older) spec (diff)'
+    required: false
+  revision-spec:
+    description: 'Path or URL to the revision (newer) spec (diff)'
+    required: false
+
+  # --- shared ---
+  env:
+    description: 'Path to environment YAML/JSON file for variable resolution'
+    required: false
+  base-url:
+    description: 'Base URL to send requests to, overrides spec servers[] (conform)'
+    required: false
+  format:
+    description: 'Output format: text | json | junit'
+    required: false
+    default: 'text'
+  output:
+    description: 'Write report to this file path'
+    required: false
+  fail-fast:
+    description: 'Stop after the first failure (conform)'
+    required: false
+    default: 'false'
+  coverage:
+    description: 'Append an operation coverage summary (conform)'
+    required: false
+    default: 'false'
+  breaking-only:
+    description: 'Report only breaking changes (diff)'
+    required: false
+    default: 'false'
+  version:
+    description: 'clrsig release tag to use, e.g. v1.2.0 (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  result:
+    description: 'Exit code of the clrsig command (0 = all checks passed)'
+    value: ${{ steps.run.outputs.exit_code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install clrsig CLI
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+
+        VERSION="${{ inputs.version }}"
+
+        # Resolve 'latest' to an actual tag via the GitHub API
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/fuvito/api-workbench/releases/latest" \
+            | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+        fi
+
+        # Map runner OS/arch to binary name
+        OS="${RUNNER_OS,,}"   # lowercase: linux / macos / windows
+        ARCH="${RUNNER_ARCH,,}"  # amd64 / arm64 / x86 / x64
+        case "$ARCH" in
+          x64)   ARCH=amd64  ;;
+          x86)   ARCH=amd64  ;;
+          arm64) ARCH=arm64  ;;
+        esac
+        case "$OS" in
+          macos)   OS=darwin  ;;
+          windows) OS=windows ;;
+        esac
+
+        if [ "$OS" = "windows" ]; then
+          BINARY="clrsig-windows-${ARCH}.exe"
+          DEST="clrsig.exe"
+        else
+          BINARY="clrsig-${OS}-${ARCH}"
+          DEST="clrsig"
+        fi
+
+        URL="https://github.com/fuvito/api-workbench/releases/download/${VERSION}/${BINARY}"
+        echo "Downloading ${BINARY} from ${VERSION}..."
+        curl -fsSL -o "$DEST" "$URL"
+        chmod +x "$DEST"
+
+        echo "$PWD" >> "$GITHUB_PATH"
+        echo "clrsig ${VERSION} installed."
+
+    - name: Run clrsig
+      id: run
+      shell: bash
+      run: |
+        set +e   # don't exit on failure — we capture exit code
+
+        CMD="${{ inputs.command }}"
+        ARGS=()
+
+        case "$CMD" in
+          run)
+            ARGS+=( "${{ inputs.scenario }}" )
+            [ -n "${{ inputs.env }}"    ] && ARGS+=( -e "${{ inputs.env }}" )
+            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
+            [ -n "${{ inputs.output }}" ] && ARGS+=( -o "${{ inputs.output }}" )
+            ;;
+          conform)
+            ARGS+=( "${{ inputs.spec }}" )
+            [ -n "${{ inputs.base-url }}" ] && ARGS+=( -b "${{ inputs.base-url }}" )
+            [ -n "${{ inputs.env }}"      ] && ARGS+=( -e "${{ inputs.env }}" )
+            [ -n "${{ inputs.format }}"   ] && ARGS+=( -f "${{ inputs.format }}" )
+            [ -n "${{ inputs.output }}"   ] && ARGS+=( -o "${{ inputs.output }}" )
+            [ "${{ inputs.fail-fast }}"  = "true" ] && ARGS+=( --fail-fast )
+            [ "${{ inputs.coverage }}"   = "true" ] && ARGS+=( --coverage )
+            ;;
+          diff)
+            ARGS+=( "${{ inputs.base-spec }}" "${{ inputs.revision-spec }}" )
+            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
+            [ -n "${{ inputs.output }}" ] && ARGS+=( -o "${{ inputs.output }}" )
+            [ "${{ inputs.breaking-only }}" = "true" ] && ARGS+=( --breaking-only )
+            ;;
+          validate)
+            ARGS+=( "${{ inputs.scenario }}" )
+            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
+            [ -n "${{ inputs.output }}" ] && ARGS+=( -o "${{ inputs.output }}" )
+            ;;
+          request)
+            ARGS+=( "${{ inputs.scenario }}" )
+            [ -n "${{ inputs.env }}"    ] && ARGS+=( -e "${{ inputs.env }}" )
+            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
+            ;;
+          *)
+            echo "::error::Unknown command '$CMD'. Use: run | conform | diff | request | validate"
+            exit 2
+            ;;
+        esac
+
+        clrsig "$CMD" "${ARGS[@]}"
+        EXIT=$?
+        echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+        exit $EXIT

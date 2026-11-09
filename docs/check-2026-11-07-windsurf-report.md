@@ -119,8 +119,8 @@ As an API client, you're competing with Postman, Insomnia, Bruno, Yaak, Hoppscot
 - [x] **Scenario Step Duplicate:** Can I duplicate scenario Steps
 - [x] **Scenario and Request confusion:** After a Creat a scenario and saved a same name request shows up on the requests panel, and also Scenario top bar also display the method GET and the scenairo title, i can provide screen shots if needed
 - [x] **Recent Work Spaces: ** please add to fiel menu: recent workspaces: under a submenu maybe max 10 display
-- [ ] **Postman/Insomnia import + GitHub Action** — pure growth, removes the two biggest adoption barriers.
-- [ ] **`clrsig conform` + `diff`** — your real product. Everything else is a commodity HTTP client.
+- [x] **Postman/Insomnia import + GitHub Action** — pure growth, removes the two biggest adoption barriers.
+- [x] **`clrsig conform` + `diff`** — your real product. Everything else is a commodity HTTP client.
 - [x] **Response viewer memoization + debounced search** — cheap fix for the main sluggishness risk.
-- [ ] **Onboarding: promote the demo server to first-run** — converts a download into a successful first request.
+- [x] **Onboarding: promote the demo server to first-run** — converts a download into a successful first request.
 - [ ] **Unify dialogs, split [ScenarioViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ScenarioViewer.tsx:0:0-0:0), add `Ctrl+Tab`** — polish that compounds.

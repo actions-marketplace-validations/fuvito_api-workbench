@@ -346,6 +346,8 @@ type WorkspacePanelProps = {
   onImportOpenAPI: () => void
   onImportPostman?: () => void
   onImportInsomnia?: () => void
+  onTryDemo?: () => void
+  demoStarting?: boolean
   onRefresh?: () => void
   importing?: boolean
   activeFilePath?: string
@@ -379,6 +381,8 @@ export function WorkspacePanel({
   onImportOpenAPI,
   onImportPostman,
   onImportInsomnia,
+  onTryDemo,
+  demoStarting,
   onRefresh,
   importing,
   activeFilePath,
@@ -769,8 +773,31 @@ export function WorkspacePanel({
         </>
       ) : (
         <div className="flex flex-col gap-2 p-3">
+          {onTryDemo && (
+            <div className="rounded border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 p-3 mb-1">
+              <p className="text-xs font-semibold text-[var(--color-foreground)] mb-1">Try the demo</p>
+              <p className="text-[11px] text-[var(--color-muted-foreground)] mb-2.5 leading-relaxed">
+                Start a local API server with sample data, open example requests, and explore Clear Signal in one click.
+              </p>
+              <button
+                type="button"
+                onClick={onTryDemo}
+                disabled={demoStarting}
+                className={cn(
+                  'w-full flex items-center justify-center gap-1.5 text-xs rounded px-3 py-1.5 font-semibold',
+                  'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50',
+                )}
+              >
+                {demoStarting ? (
+                  <><Loader2 size={11} className="animate-spin" /> Starting…</>
+                ) : (
+                  <><Play size={11} /> Try the Demo</>
+                )}
+              </button>
+            </div>
+          )}
           <p className="text-xs text-[var(--color-muted-foreground)]">
-            Open a workspace folder to manage your request collections and environments.
+            Or open your own workspace folder.
           </p>
           <button
             type="button"
