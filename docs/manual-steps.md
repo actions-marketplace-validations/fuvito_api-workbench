@@ -31,7 +31,7 @@ Requires a tagged release to exist first (see above).
 4. Fill in the category (suggested: **Testing**) and submit.
 5. After listing, users can find it by searching "Clear Signal" or "clrsig" in the Marketplace.
 
-- [ ] Action listed on GitHub Actions Marketplace
+- [x] Action listed on GitHub Actions Marketplace — https://github.com/marketplace/actions/clear-signal-api-contract-validation
 
 ---
 
