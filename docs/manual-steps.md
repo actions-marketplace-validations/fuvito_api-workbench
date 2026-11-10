@@ -53,7 +53,7 @@ The Docker job in `release.yml` pushes to `ghcr.io` using `GITHUB_TOKEN`. This w
 1. Go to `https://github.com/settings/packages`.
 2. Find `api-workbench` → **Package settings** → set visibility to **Public**.
 
-- [ ] GHCR package visibility set to Public (verify after first tag push)
+- [x] GHCR package visibility set to Public (verified — docker job succeeded in v0.2.0)
 
 ---
 
