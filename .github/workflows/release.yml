@@ -13,20 +13,21 @@ jobs:
     name: Desktop — Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -40,7 +41,7 @@ jobs:
         working-directory: apps/desktop/wails
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clrsig-windows-amd64
           path: apps/desktop/wails/build/bin/clrsig.exe
@@ -49,20 +50,21 @@ jobs:
     name: Desktop — macOS
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -86,13 +88,13 @@ jobs:
         run: ditto -c -k --sequesterRsrc --keepParent "apps/desktop/wails/build/bin/Clear Signal.app" clrsig-darwin-amd64.zip
 
       - name: Upload macOS arm64 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clrsig-darwin-arm64
           path: clrsig-darwin-arm64.zip
 
       - name: Upload macOS amd64 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clrsig-darwin-amd64
           path: clrsig-darwin-amd64.zip
@@ -101,25 +103,26 @@ jobs:
     name: Desktop — Linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -133,7 +136,7 @@ jobs:
         working-directory: apps/desktop/wails
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clrsig-linux-amd64
           path: apps/desktop/wails/build/bin/clrsig
@@ -157,12 +160,13 @@ jobs:
             goarch: amd64
             suffix: ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
           cache: true
+          cache-dependency-path: "**/go.sum"
 
       - name: Build CLI (${{ matrix.goos }}/${{ matrix.goarch }})
         run: |
@@ -172,7 +176,7 @@ jobs:
         working-directory: apps/cli
 
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clrsig-cli-${{ matrix.goos }}-${{ matrix.goarch }}
           path: apps/cli/clrsig-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}
@@ -184,7 +188,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -207,10 +211,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [release-windows, release-macos, release-linux, cli-binaries, docker]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist/
 
@@ -249,14 +253,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
       - name: Run tap update script
         run: python3 scripts/update-tap.py ${{ github.ref_name }}
 
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: bump tap to ${{ github.ref_name }} [skip ci]"
           file_pattern: Formula/clrsig.rb bucket/clrsig.json
