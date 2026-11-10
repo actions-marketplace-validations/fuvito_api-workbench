@@ -17,22 +17,13 @@ Enter
 Sleep 300ms
 
 # --- Part 1: multi-step scenario run ---
-Type "clrsig run examples/scenarios/user-lifecycle.yaml \\"
-Sleep 400ms
-Enter
-Type "  --env examples/environments/local.yaml"
+Type "clrsig run examples/scenarios/user-lifecycle.yaml --env examples/environments/local.yaml"
 Sleep 600ms
 Enter
 Sleep 5s
 
 # --- Part 2: spec conformance check ---
-Type "clrsig conform examples/server/openapi.yaml \\"
-Sleep 400ms
-Enter
-Type "  --base-url http://localhost:8080 --coverage \\"
-Sleep 400ms
-Enter
-Type "  --env examples/environments/demo-conform.yaml"
+Type "clrsig conform examples/server/openapi.yaml --base-url http://localhost:8080 --coverage --env examples/environments/demo-conform.yaml"
 Sleep 600ms
 Enter
 Sleep 6s
