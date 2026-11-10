@@ -17,7 +17,7 @@ Code is done; these require a browser, an account, or typing something outside t
 3. GitHub Actions will build all binaries, push the Docker image, create the GitHub Release, and update the Homebrew formula and Scoop manifest automatically.
 4. Visit `github.com/fuvito/api-workbench/releases` and confirm the release looks correct.
 
-- [ ] First release tagged and published (`v0.1.0` or similar)
+- [x] First release tagged and published (`v0.1.0`)
 
 ---
 
