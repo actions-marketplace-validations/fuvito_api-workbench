@@ -24,7 +24,7 @@ function tryPrettyJSON(s: string): string {
   try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
 }
 
-function statusColor(code: number): string {
+export function statusColor(code: number): string {
   if (code < 300) return 'text-emerald-400'
   if (code < 400) return 'text-blue-400'
   if (code < 500) return 'text-amber-400'

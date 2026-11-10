@@ -3,6 +3,23 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.2.0',
+    date: '2026-11-09',
+    items: [
+      'Inno Setup Windows installer with Start Menu and optional Desktop shortcut',
+      'clrsig conform: cross-run coverage aggregation via history.db — cumulative view shows operations never covered across all runs',
+      'clrsig conform: request validation (violations reported separately from response violations)',
+      'clrsig diff --format junit: breaking changes become JUnit <failure> elements for PR annotation',
+      'Homebrew tap (brew tap fuvito/api-workbench && brew install clrsig)',
+      'Scoop manifest (scoop bucket add + scoop install clrsig)',
+      'Docker image published to ghcr.io on every release',
+      'GitHub Actions Marketplace: uses: fuvito/api-workbench@v1',
+      'clrsig --version via cobra Version field set by build ldflags',
+      'os.Exit refactored out of cobra handlers (exitError sentinel)',
+      'Demo GIF regenerated automatically by CI on every tape/CLI/core change',
+    ],
+  },
+  {
     version: '0.1.0',
     date: '2026-11-04',
     items: [
@@ -66,7 +83,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.1.0 — Public MVP</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.2.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
