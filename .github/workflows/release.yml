@@ -230,6 +230,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           path: dist/
+          pattern: clrsig-*
 
       - name: Generate CLI checksums
         run: |
