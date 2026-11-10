@@ -115,6 +115,40 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+
+	// conform_runs: one row per clrsig conform execution.
+	if _, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS conform_runs (
+			id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at         TEXT    NOT NULL,
+			spec_hash          TEXT    NOT NULL,
+			spec_path          TEXT    NOT NULL,
+			total_operations   INTEGER NOT NULL DEFAULT 0,
+			covered_operations INTEGER NOT NULL DEFAULT 0
+		)
+	`); err != nil {
+		return err
+	}
+	// conform_coverage: per-operation result for each run.
+	if _, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS conform_coverage (
+			run_id       INTEGER NOT NULL REFERENCES conform_runs(id),
+			operation_id TEXT    NOT NULL,
+			method       TEXT    NOT NULL,
+			path         TEXT    NOT NULL,
+			covered      INTEGER NOT NULL DEFAULT 0
+		)
+	`); err != nil {
+		return err
+	}
+	for _, stmt := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_conform_runs_hash     ON conform_runs(spec_hash)`,
+		`CREATE INDEX IF NOT EXISTS idx_conform_coverage_run  ON conform_coverage(run_id)`,
+	} {
+		if _, err := s.db.Exec(stmt); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -175,4 +209,125 @@ func (s *Store) Clear() error {
 // Close releases the database connection.
 func (s *Store) Close() error {
 	return s.db.Close()
+}
+
+// ConformOp captures per-operation coverage data for a single conform run.
+type ConformOp struct {
+	OperationID string
+	Method      string
+	Path        string
+	Covered     bool // true when an HTTP response was received (StatusCode > 0)
+}
+
+// CumulativeReport summarises operation coverage aggregated across all recorded
+// runs for a given spec (identified by its content hash).
+type CumulativeReport struct {
+	SpecPath        string
+	SpecHash        string
+	RunCount        int
+	TotalOperations int
+	EverCoveredOps  []string // "METHOD /path" for ops covered in at least one run
+	NeverCoveredOps []string // "METHOD /path" for ops never covered
+	Percent         float64
+}
+
+// RecordConformRun persists the per-operation results of a conformance run.
+// specPath is a human-readable label (file path or URL); specHash is a SHA256
+// hex string of the spec bytes used to group runs of the same spec together.
+func (s *Store) RecordConformRun(specPath, specHash string, ops []ConformOp) error {
+	total := len(ops)
+	covered := 0
+	for _, op := range ops {
+		if op.Covered {
+			covered++
+		}
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(
+		`INSERT INTO conform_runs (created_at, spec_hash, spec_path, total_operations, covered_operations) VALUES (?, ?, ?, ?, ?)`,
+		time.Now().UTC().Format(time.RFC3339), specHash, specPath, total, covered,
+	)
+	if err != nil {
+		return err
+	}
+	runID, _ := res.LastInsertId()
+
+	for _, op := range ops {
+		cov := 0
+		if op.Covered {
+			cov = 1
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO conform_coverage (run_id, operation_id, method, path, covered) VALUES (?, ?, ?, ?, ?)`,
+			runID, op.OperationID, op.Method, op.Path, cov,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// CumulativeCoverage returns aggregated coverage for all runs of the spec
+// identified by specHash. Returns nil, nil when no runs have been recorded yet.
+func (s *Store) CumulativeCoverage(specHash string) (*CumulativeReport, error) {
+	var runCount int
+	if err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM conform_runs WHERE spec_hash = ?`, specHash,
+	).Scan(&runCount); err != nil {
+		return nil, err
+	}
+	if runCount == 0 {
+		return nil, nil
+	}
+
+	var specPath string
+	_ = s.db.QueryRow(
+		`SELECT spec_path FROM conform_runs WHERE spec_hash = ? ORDER BY id DESC LIMIT 1`, specHash,
+	).Scan(&specPath)
+
+	rows, err := s.db.Query(`
+		SELECT cc.operation_id, cc.method, cc.path, MAX(cc.covered) AS ever_covered
+		FROM conform_coverage cc
+		JOIN conform_runs cr ON cc.run_id = cr.id
+		WHERE cr.spec_hash = ?
+		GROUP BY cc.operation_id, cc.method, cc.path
+		ORDER BY cc.method, cc.path
+	`, specHash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	rep := &CumulativeReport{
+		SpecPath: specPath,
+		SpecHash: specHash,
+		RunCount: runCount,
+	}
+	for rows.Next() {
+		var opID, method, path string
+		var everCovered int
+		if err := rows.Scan(&opID, &method, &path, &everCovered); err != nil {
+			return nil, err
+		}
+		rep.TotalOperations++
+		label := method + " " + path
+		if everCovered == 1 {
+			rep.EverCoveredOps = append(rep.EverCoveredOps, label)
+		} else {
+			rep.NeverCoveredOps = append(rep.NeverCoveredOps, label)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if rep.TotalOperations > 0 {
+		rep.Percent = float64(len(rep.EverCoveredOps)) / float64(rep.TotalOperations) * 100
+	}
+	return rep, nil
 }

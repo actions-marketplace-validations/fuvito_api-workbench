@@ -99,6 +99,79 @@ func TestStoreEmpty(t *testing.T) {
 	}
 }
 
+func TestConformCumulativeCoverage(t *testing.T) {
+	dir := t.TempDir()
+	store, err := history.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer store.Close()
+
+	ops1 := []history.ConformOp{
+		{OperationID: "listUsers", Method: "GET", Path: "/users", Covered: true},
+		{OperationID: "createUser", Method: "POST", Path: "/users", Covered: true},
+		{OperationID: "deleteUser", Method: "DELETE", Path: "/users/{id}", Covered: false},
+	}
+	ops2 := []history.ConformOp{
+		{OperationID: "listUsers", Method: "GET", Path: "/users", Covered: true},
+		{OperationID: "createUser", Method: "POST", Path: "/users", Covered: false},
+		{OperationID: "deleteUser", Method: "DELETE", Path: "/users/{id}", Covered: true},
+	}
+
+	const hash = "abc123"
+	if err := store.RecordConformRun("openapi.yaml", hash, ops1); err != nil {
+		t.Fatalf("RecordConformRun 1: %v", err)
+	}
+
+	// After one run, CumulativeCoverage should report 1 run
+	rep, err := store.CumulativeCoverage(hash)
+	if err != nil {
+		t.Fatalf("CumulativeCoverage: %v", err)
+	}
+	if rep == nil || rep.RunCount != 1 {
+		t.Fatalf("expected 1 run, got %+v", rep)
+	}
+	if rep.TotalOperations != 3 || len(rep.EverCoveredOps) != 2 || len(rep.NeverCoveredOps) != 1 {
+		t.Errorf("after run 1: total=%d covered=%d missed=%d", rep.TotalOperations, len(rep.EverCoveredOps), len(rep.NeverCoveredOps))
+	}
+
+	if err := store.RecordConformRun("openapi.yaml", hash, ops2); err != nil {
+		t.Fatalf("RecordConformRun 2: %v", err)
+	}
+
+	// After two runs, all three operations should be covered cumulatively
+	rep, err = store.CumulativeCoverage(hash)
+	if err != nil {
+		t.Fatalf("CumulativeCoverage after run 2: %v", err)
+	}
+	if rep.RunCount != 2 {
+		t.Errorf("expected 2 runs, got %d", rep.RunCount)
+	}
+	if len(rep.EverCoveredOps) != 3 || len(rep.NeverCoveredOps) != 0 {
+		t.Errorf("expected all covered: %+v / %+v", rep.EverCoveredOps, rep.NeverCoveredOps)
+	}
+	if rep.Percent != 100.0 {
+		t.Errorf("expected 100%%, got %.1f", rep.Percent)
+	}
+}
+
+func TestConformCumulativeNoRuns(t *testing.T) {
+	dir := t.TempDir()
+	store, err := history.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer store.Close()
+
+	rep, err := store.CumulativeCoverage("unknown-hash")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rep != nil {
+		t.Errorf("expected nil for unknown spec, got %+v", rep)
+	}
+}
+
 func TestDefaultPath(t *testing.T) {
 	path, err := history.DefaultPath()
 	if err != nil {

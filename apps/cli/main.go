@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
+	"github.com/fuvito/api-workbench/packages/core/history"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
@@ -566,6 +569,13 @@ Exit codes:
 			runner := conformance.New(exec)
 			result := runner.Run(context.Background(), spec, baseURL, env, opts)
 
+			// Hash the spec bytes to group runs of the same spec in history.
+			rawHash := sha256.Sum256(data)
+			specHash := hex.EncodeToString(rawHash[:])
+
+			// Record this run to history (silently — a broken db never blocks conformance).
+			recordConformRun(src, specHash, result)
+
 			var cov *conformance.CoverageReport
 			if showCoverage {
 				cov = conformance.ComputeCoverage(result)
@@ -599,6 +609,12 @@ Exit codes:
 				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
 			}
 
+			// Print cumulative coverage in text mode when --coverage is set and
+			// there is more than one run recorded for this spec.
+			if showCoverage && strings.ToLower(format) == "text" {
+				printCumulativeCoverage(cmd, specHash)
+			}
+
 			_, failed, _ := result.Counts()
 			if failed > 0 {
 				return &exitError{1}
@@ -617,6 +633,56 @@ Exit codes:
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	return cmd
+}
+
+// recordConformRun persists per-operation coverage to history.db.
+// Errors are silently discarded so a broken database never blocks conformance output.
+func recordConformRun(specPath, specHash string, result *conformance.ConformResult) {
+	dbPath, err := history.DefaultPath()
+	if err != nil {
+		return
+	}
+	store, err := history.Open(dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+
+	ops := make([]history.ConformOp, len(result.Operations))
+	for i, op := range result.Operations {
+		ops[i] = history.ConformOp{
+			OperationID: op.OperationID,
+			Method:      op.Method,
+			Path:        op.Path,
+			Covered:     op.StatusCode > 0,
+		}
+	}
+	_ = store.RecordConformRun(specPath, specHash, ops)
+}
+
+// printCumulativeCoverage writes the cross-run coverage summary to cmd's stdout
+// when more than one run has been recorded for the given spec hash.
+func printCumulativeCoverage(cmd *cobra.Command, specHash string) {
+	dbPath, err := history.DefaultPath()
+	if err != nil {
+		return
+	}
+	store, err := history.Open(dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+
+	rep, err := store.CumulativeCoverage(specHash)
+	if err != nil || rep == nil || rep.RunCount < 2 {
+		return
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "\nCumulative coverage (%d runs):  %d/%d (%.1f%%)\n",
+		rep.RunCount, len(rep.EverCoveredOps), rep.TotalOperations, rep.Percent)
+	if len(rep.NeverCoveredOps) > 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "  Never covered: %s\n", strings.Join(rep.NeverCoveredOps, ", "))
+	}
 }
 
 // fetchSpec retrieves spec bytes and detected format from a file path or URL.

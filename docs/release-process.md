@@ -112,8 +112,9 @@ Go to `github.com/fuvito/api-workbench/releases` and confirm:
 
 - [ ] Release exists and is not marked as draft
 - [ ] Pre-release flag is correct (should be set for tags containing `-`, e.g. `v0.2.0-beta.1`)
-- [ ] All 12 expected files are attached:
-  - `clrsig.exe` (desktop, Windows)
+- [ ] All 13 expected files are attached:
+  - `clrsig-windows-amd64-setup.exe` (desktop installer, Windows)
+  - `clrsig.exe` (desktop portable, Windows)
   - `clrsig-darwin-arm64.zip` (desktop, macOS Apple Silicon)
   - `clrsig-darwin-amd64.zip` (desktop, macOS Intel)
   - `clrsig` (desktop, Linux)

@@ -81,9 +81,10 @@ Download the latest release from [GitHub Releases](https://github.com/fuvito/api
 | Platform | File |
 |---|---|
 | Linux (amd64) | `clrsig-linux-amd64` |
-| macOS (Intel) | `clrsig-darwin-amd64` |
-| macOS (Apple Silicon) | `clrsig-darwin-arm64` |
-| Windows (amd64) | `clrsig-windows-amd64.exe` |
+| macOS (Intel) | `clrsig-darwin-amd64.zip` |
+| macOS (Apple Silicon) | `clrsig-darwin-arm64.zip` |
+| Windows — installer | `clrsig-windows-amd64-setup.exe` — installs to Program Files, creates Start Menu and Desktop shortcuts |
+| Windows — portable | `clrsig.exe` — run anywhere without installing |
 
 > **macOS note:** release binaries are unsigned. On first launch, macOS Gatekeeper will block the binary with *"cannot be opened because the developer cannot be verified."*
 > To allow it, run:
