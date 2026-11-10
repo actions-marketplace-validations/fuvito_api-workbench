@@ -12,7 +12,7 @@
 #define MyAppURL       "https://github.com/fuvito/api-workbench"
 
 [Setup]
-AppId={B4E9A237-6F1C-4D8E-A523-07C5B1F8D962}
+AppId={{B4E9A237-6F1C-4D8E-A523-07C5B1F8D962}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
