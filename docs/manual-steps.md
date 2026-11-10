@@ -42,7 +42,7 @@ Requires a tagged release to exist first (see above).
 
 Marketplace listing and Homebrew tap both require the repo to be public.
 
-- [ ] Repository is public
+- [x] Repository is public
 
 ---
 
@@ -85,7 +85,7 @@ scoop install clrsig
 clrsig --version
 ```
 
-- [ ] `scoop install clrsig` works
+- [x] `scoop install clrsig` works
 
 ---
 
