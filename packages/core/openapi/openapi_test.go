@@ -145,6 +145,25 @@ const swagger2Fixture = `{
     "api_key": {"type": "apiKey", "name": "api_key", "in": "header"},
     "petstore_auth": {"type": "oauth2"}
   },
+  "definitions": {
+    "Pet": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "status": {"type": "string"}
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "username": {"type": "string"},
+        "email": {"type": "string"}
+      }
+    }
+  },
   "paths": {
     "/pet/{petId}": {
       "get": {
@@ -173,14 +192,22 @@ const swagger2Fixture = `{
         "tags": ["pet"],
         "parameters": [
           {"name": "body", "in": "body", "required": true,
-            "schema": {
-              "type": "object",
-              "required": ["name"],
-              "properties": {"name": {}, "status": {}}
-            }
+            "schema": {"$ref": "#/definitions/Pet"}
           }
         ],
         "security": [{"petstore_auth": ["write:pets"]}]
+      }
+    },
+    "/user": {
+      "post": {
+        "operationId": "createUser",
+        "summary": "Create user",
+        "tags": ["user"],
+        "parameters": [
+          {"name": "body", "in": "body", "required": true,
+            "schema": {"$ref": "#/definitions/User"}
+          }
+        ]
       }
     }
   }
@@ -209,8 +236,8 @@ func TestParseSwagger2Bytes_Info(t *testing.T) {
 	if version != "1.0.6" {
 		t.Errorf("version: got %q, want %q", version, "1.0.6")
 	}
-	if len(reqs) != 3 {
-		t.Errorf("expected 3 requests, got %d", len(reqs))
+	if len(reqs) != 4 {
+		t.Errorf("expected 4 requests, got %d", len(reqs))
 	}
 }
 
@@ -242,7 +269,7 @@ func TestParseSwagger2Bytes_BaseURLOverride(t *testing.T) {
 	}
 }
 
-func TestParseSwagger2Bytes_BodyStub(t *testing.T) {
+func TestParseSwagger2Bytes_BodyStub_Inline(t *testing.T) {
 	_, _, reqs, err := openapi.ParseSwagger2Bytes([]byte(swagger2Fixture), "json", "")
 	if err != nil {
 		t.Fatalf("ParseSwagger2Bytes: %v", err)
@@ -259,6 +286,28 @@ func TestParseSwagger2Bytes_BodyStub(t *testing.T) {
 		}
 	}
 	t.Error("addPet not found")
+}
+
+func TestParseSwagger2Bytes_BodyStub_Ref(t *testing.T) {
+	_, _, reqs, err := openapi.ParseSwagger2Bytes([]byte(swagger2Fixture), "json", "")
+	if err != nil {
+		t.Fatalf("ParseSwagger2Bytes: %v", err)
+	}
+	for _, r := range reqs {
+		if r.OperationID == "createUser" {
+			if r.Request.Body == nil || r.Request.Body.Type != domain.BodyJSON {
+				t.Error("expected JSON body for createUser")
+			}
+			// User definition has id, username, email — all should appear as placeholders
+			for _, field := range []string{`"id"`, `"username"`, `"email"`} {
+				if !strings.Contains(r.Request.Body.Content, field) {
+					t.Errorf("body stub missing field %s: %s", field, r.Request.Body.Content)
+				}
+			}
+			return
+		}
+	}
+	t.Error("createUser not found")
 }
 
 func TestParseSwagger2Bytes_APIKeyAuth(t *testing.T) {

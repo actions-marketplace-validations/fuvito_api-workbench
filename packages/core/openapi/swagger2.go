@@ -19,6 +19,7 @@ type swagger2Doc struct {
 	Schemes      []string                        `yaml:"schemes"             json:"schemes"`
 	Paths        map[string]swagger2PathItem     `yaml:"paths"               json:"paths"`
 	SecurityDefs map[string]swagger2SecurityDef  `yaml:"securityDefinitions" json:"securityDefinitions"`
+	Definitions  map[string]swagger2Schema       `yaml:"definitions"         json:"definitions"`
 }
 
 type swagger2Info struct {
@@ -53,9 +54,11 @@ type swagger2Parameter struct {
 }
 
 type swagger2Schema struct {
+	Ref        string                    `yaml:"$ref"       json:"$ref"`
 	Type       string                    `yaml:"type"       json:"type"`
 	Properties map[string]swagger2Schema `yaml:"properties" json:"properties"`
 	Required   []string                  `yaml:"required"   json:"required"`
+	Items      *swagger2Schema           `yaml:"items"      json:"items"`
 }
 
 type swagger2SecurityDef struct {
@@ -131,7 +134,7 @@ func ParseSwagger2Bytes(data []byte, format, baseURL string) (title, version str
 				continue
 			}
 			params := mergeSwagger2Params(item.Parameters, op.Parameters)
-			req := buildSwagger2Request(base, method, path, op, params, doc.SecurityDefs)
+			req := buildSwagger2Request(base, method, path, op, params, doc.SecurityDefs, doc.Definitions)
 			reqs = append(reqs, GeneratedRequest{
 				Request:     req,
 				OperationID: op.OperationID,
@@ -165,6 +168,7 @@ func buildSwagger2Request(
 	op *swagger2Operation,
 	params []swagger2Parameter,
 	secDefs map[string]swagger2SecurityDef,
+	defs map[string]swagger2Schema,
 ) *domain.Request {
 	name := op.Summary
 	if name == "" {
@@ -196,7 +200,7 @@ func buildSwagger2Request(
 			if p.Schema != nil {
 				req.Body = &domain.RequestBody{
 					Type:    domain.BodyJSON,
-					Content: buildSwagger2BodyStub(p.Schema),
+					Content: buildSwagger2BodyStub(p.Schema, defs),
 				}
 			}
 		}
@@ -251,23 +255,40 @@ func mergeSwagger2Params(pathLevel, opLevel []swagger2Parameter) []swagger2Param
 	return result
 }
 
-func buildSwagger2BodyStub(s *swagger2Schema) string {
-	if s == nil || len(s.Properties) == 0 {
+// resolveSwagger2Ref follows a $ref pointer of the form "#/definitions/Name".
+func resolveSwagger2Ref(s *swagger2Schema, defs map[string]swagger2Schema) *swagger2Schema {
+	if s == nil || s.Ref == "" {
+		return s
+	}
+	// Only local definition refs are supported: "#/definitions/<Name>"
+	parts := strings.SplitN(s.Ref, "/", 3)
+	if len(parts) != 3 || parts[0] != "#" || parts[1] != "definitions" {
+		return s
+	}
+	if resolved, ok := defs[parts[2]]; ok {
+		return &resolved
+	}
+	return s
+}
+
+func buildSwagger2BodyStub(s *swagger2Schema, defs map[string]swagger2Schema) string {
+	resolved := resolveSwagger2Ref(s, defs)
+	if resolved == nil || len(resolved.Properties) == 0 {
 		return "{}"
 	}
 
-	required := make(map[string]bool, len(s.Required))
-	for _, r := range s.Required {
+	required := make(map[string]bool, len(resolved.Required))
+	for _, r := range resolved.Required {
 		required[r] = true
 	}
 
 	var reqFields, optFields []string
-	for _, r := range s.Required {
-		if _, ok := s.Properties[r]; ok {
+	for _, r := range resolved.Required {
+		if _, ok := resolved.Properties[r]; ok {
 			reqFields = append(reqFields, r)
 		}
 	}
-	for name := range s.Properties {
+	for name := range resolved.Properties {
 		if !required[name] {
 			optFields = append(optFields, name)
 		}
