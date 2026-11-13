@@ -478,13 +478,21 @@ func DiffJUnit(result *openapi.DiffResult) ([]byte, error) {
 		})
 	} else {
 		for _, c := range result.Changes {
+			name := fmt.Sprintf("[%s] %s", c.Level, c.ID)
+			if c.Method != "" && c.Path != "" {
+				name = fmt.Sprintf("[%s] %s  %s %s", c.Level, c.ID, c.Method, c.Path)
+			}
+			detail := c.Text
+			if c.Method != "" && c.Path != "" {
+				detail = fmt.Sprintf("%s  %s %s", c.Text, c.Method, c.Path)
+			}
 			tc := jUnitCase{
-				Name:      fmt.Sprintf("[%s] %s", c.Level, c.ID),
+				Name:      name,
 				ClassName: "openapi.diff",
 				Time:      "0.000",
 			}
 			if c.Breaking {
-				tc.Failure = &jUnitFailure{Message: c.Text, Text: c.Text}
+				tc.Failure = &jUnitFailure{Message: detail, Text: detail}
 			}
 			cases = append(cases, tc)
 		}

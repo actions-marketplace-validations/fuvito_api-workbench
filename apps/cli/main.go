@@ -294,9 +294,12 @@ func runCmd() *cobra.Command {
 				}
 			}
 
-			// --spec flag overrides specFile: from scenario YAML
+			// --spec flag overrides specFile: from scenario YAML.
+			// specFile: in the YAML is resolved relative to the scenario file;
+			// --spec on the command line is resolved relative to CWD.
 			effectiveSpecFile := s.SpecFile
-			if specFile != "" {
+			specFromFlag := specFile != ""
+			if specFromFlag {
 				effectiveSpecFile = specFile
 			}
 
@@ -305,7 +308,7 @@ func runCmd() *cobra.Command {
 			var runner *scenario.Runner
 			if effectiveSpecFile != "" {
 				specPath := effectiveSpecFile
-				if !filepath.IsAbs(specPath) {
+				if !filepath.IsAbs(specPath) && !specFromFlag {
 					specPath = filepath.Join(filepath.Dir(scenarioPath), specPath)
 				}
 				specData, err := os.ReadFile(specPath)
@@ -821,6 +824,8 @@ Exit codes:
 					ID       string `json:"id"`
 					Level    string `json:"level"`
 					Breaking bool   `json:"breaking"`
+					Method   string `json:"method,omitempty"`
+					Path     string `json:"path,omitempty"`
 					Text     string `json:"text"`
 				}
 				type jsonOut struct {
@@ -833,6 +838,8 @@ Exit codes:
 						ID:       c.ID,
 						Level:    c.Level,
 						Breaking: c.Breaking,
+						Method:   c.Method,
+						Path:     c.Path,
 						Text:     c.Text,
 					})
 				}
@@ -852,7 +859,11 @@ Exit codes:
 						if c.Breaking {
 							mark = "!"
 						}
-						fmt.Fprintf(&sb, "  [%s] %s  %s\n", c.Level, mark, c.Text)
+						loc := ""
+						if c.Method != "" && c.Path != "" {
+							loc = fmt.Sprintf("  %s %s", c.Method, c.Path)
+						}
+						fmt.Fprintf(&sb, "  [%s] %s  %s%s\n", c.Level, mark, c.Text, loc)
 					}
 					fmt.Fprintln(&sb)
 					breaking := 0

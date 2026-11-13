@@ -290,7 +290,24 @@ clrsig diff openapi-v1.yaml openapi-v2.yaml
 clrsig diff openapi-v1.yaml openapi-v2.yaml --breaking-only --format junit --output diff-report.xml
 ```
 
+**Sample output** (v1 → v2: `POST /users` removed, `GET /users/{id}` added):
+
+```
+Spec diff: Users API v1.0.0 → v2.0.0
+──────────────────────────────────────────────────
+✗ [ERR] api removed without deprecation
+✓ [INFO] endpoint added
+──────────────────────────────────────────────────
+Result: BREAKING CHANGES DETECTED (2 total changes)
+```
+
 **Exit codes:** `0` = no breaking changes · `1` = breaking changes found · `2` = parse error
+
+**Integration test** — the diff check is exercised in-process in the example server test suite:
+
+```bash
+go test -v -run TestSpecDiff ./examples/server
+```
 
 ---
 
