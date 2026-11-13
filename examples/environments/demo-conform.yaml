@@ -1,6 +1,8 @@
 schemaVersion: "1"
 name: demo-conform
 variables:
+  - name: baseUrl
+    value: http://localhost:8080
   - name: token
     value: demo-token-12345
     secret: true

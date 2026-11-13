@@ -52,6 +52,7 @@ export type SidebarProps = {
   demoStarting?: boolean
   onRefresh?: () => void
   importing?: boolean
+  importError?: string
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
   onSelectScenario?: (path: string, name: string) => void
@@ -77,7 +78,7 @@ export function Sidebar({
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder, onMoveFile,
   onSelectHistory, onClearHistory,
-  onImportOpenAPI, onImportPostman, onImportInsomnia, onTryDemo, demoStarting, onRefresh, importing,
+  onImportOpenAPI, onImportPostman, onImportInsomnia, onTryDemo, demoStarting, onRefresh, importing, importError,
   activeFilePath, dirtyFilePaths,
   onSelectScenario,
   onNewScenario,
@@ -140,6 +141,7 @@ export function Sidebar({
             demoStarting={demoStarting}
             onRefresh={onRefresh}
             importing={importing}
+            importError={importError}
             activeFilePath={activeFilePath}
             dirtyFilePaths={dirtyFilePaths}
             scenarios={scenarios}

@@ -462,3 +462,127 @@ func TestConformJUnit_ErrorOp(t *testing.T) {
 		t.Error("missing <error> element")
 	}
 }
+
+// ---- TextWithCoverage ----
+
+func makeCovResult() *openapi.ScenarioCoverageResult {
+	return &openapi.ScenarioCoverageResult{
+		Covered: 2,
+		Total:   3,
+		Percent: 66.7,
+		Exercised: []openapi.CoveredOperation{
+			{Method: "GET", Path: "/widgets"},
+			{Method: "POST", Path: "/widgets"},
+		},
+		Missed: []openapi.CoveredOperation{
+			{Method: "DELETE", Path: "/widgets/{id}"},
+		},
+	}
+}
+
+func makeStepWithRequest(title string, method, url string, statusCode int) scenario.StepResult {
+	return scenario.StepResult{
+		Title:    title,
+		Passed:   true,
+		Request:  &domain.Request{Method: domain.HTTPMethod(method), URL: url},
+		Response: &domain.Response{StatusCode: statusCode, Duration: 10 * time.Millisecond},
+	}
+}
+
+func TestTextWithCoverage_ShowsSection(t *testing.T) {
+	r := passedResult("cov-test")
+	out := reporting.TextWithCoverage(r, makeCovResult())
+	if !strings.Contains(out, "Spec coverage:") {
+		t.Error("missing 'Spec coverage:' header")
+	}
+	if !strings.Contains(out, "2 / 3") {
+		t.Error("missing covered/total counts")
+	}
+	if !strings.Contains(out, "Covered:") {
+		t.Error("missing 'Covered:' section")
+	}
+	if !strings.Contains(out, "Not covered:") {
+		t.Error("missing 'Not covered:' section")
+	}
+	if !strings.Contains(out, "/widgets") {
+		t.Error("missing covered operation path")
+	}
+	if !strings.Contains(out, "/widgets/{id}") {
+		t.Error("missing missed operation path")
+	}
+}
+
+func TestTextWithCoverage_NilCoverage(t *testing.T) {
+	r := passedResult("no-cov")
+	plain := reporting.Text(r)
+	out := reporting.TextWithCoverage(r, nil)
+	if out != plain {
+		t.Error("nil coverage: output should equal plain Text()")
+	}
+}
+
+func TestTextWithCoverage_SortedOutput(t *testing.T) {
+	cov := &openapi.ScenarioCoverageResult{
+		Covered: 2, Total: 2, Percent: 100,
+		Exercised: []openapi.CoveredOperation{
+			{Method: "POST", Path: "/z"},
+			{Method: "GET", Path: "/a"},
+		},
+	}
+	out := reporting.TextWithCoverage(passedResult("sort"), cov)
+	aIdx := strings.Index(out, "/a")
+	zIdx := strings.Index(out, "/z")
+	if aIdx < 0 || zIdx < 0 {
+		t.Fatal("expected both paths in output")
+	}
+	if aIdx > zIdx {
+		t.Error("covered operations should be sorted by path: /a should appear before /z")
+	}
+}
+
+// ---- JSONWithCoverage ----
+
+func TestJSONWithCoverage_IncludesCoverage(t *testing.T) {
+	r := passedResult("json-cov")
+	raw, err := reporting.JSONWithCoverage(r, makeCovResult())
+	if err != nil {
+		t.Fatalf("JSONWithCoverage: %v", err)
+	}
+	var rep reporting.JSONReport
+	if err := json.Unmarshal(raw, &rep); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if rep.Coverage == nil {
+		t.Fatal("want coverage section")
+	}
+	if rep.Coverage.Total != 3 {
+		t.Errorf("total: got %d, want 3", rep.Coverage.Total)
+	}
+	if rep.Coverage.Covered != 2 {
+		t.Errorf("covered: got %d, want 2", rep.Coverage.Covered)
+	}
+	if len(rep.Coverage.Exercised) != 2 {
+		t.Errorf("exercised: got %d, want 2", len(rep.Coverage.Exercised))
+	}
+	if len(rep.Coverage.Missed) != 1 {
+		t.Errorf("missed: got %d, want 1", len(rep.Coverage.Missed))
+	}
+}
+
+func TestJSONWithCoverage_NilCoverage(t *testing.T) {
+	r := passedResult("no-cov")
+	plain, _ := reporting.JSON(r)
+	withCov, err := reporting.JSONWithCoverage(r, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var plainRep, covRep reporting.JSONReport
+	json.Unmarshal(plain, &plainRep)
+	json.Unmarshal(withCov, &covRep)
+	if covRep.Coverage != nil {
+		t.Error("nil coverage: Coverage field should be absent")
+	}
+	if covRep.Scenario != plainRep.Scenario || covRep.Passed != plainRep.Passed {
+		t.Error("nil coverage: main report fields should be unchanged")
+	}
+}

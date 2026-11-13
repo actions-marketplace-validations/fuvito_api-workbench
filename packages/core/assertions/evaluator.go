@@ -137,12 +137,27 @@ paths:
 }
 
 func inlineSchemaYAML(s string) string {
-	// If schema looks like JSON, convert to inline YAML representation.
-	// For simple cases we just embed as a JSON block scalar.
-	if strings.TrimSpace(s)[0] == '{' {
-		return "|\n          " + strings.ReplaceAll(strings.TrimSpace(s), "\n", "\n          ")
+	s = strings.TrimSpace(s)
+	if len(s) == 0 {
+		return s
 	}
-	return s
+	if s[0] == '{' {
+		// JSON schema: collapse to a single line so it embeds as an inline
+		// YAML mapping (JSON is valid YAML; a block scalar would be a string).
+		return strings.NewReplacer("\n", "", "\r", "").Replace(s)
+	}
+	// YAML schema: indent every line to sit under the `schema:` key (14-space
+	// indent level in the wrapper spec) so the block parses as a mapping.
+	const indent = "                " // 16 spaces
+	lines := strings.Split(s, "\n")
+	var b strings.Builder
+	for _, l := range lines {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		b.WriteString("\n" + indent + strings.TrimLeft(l, " \t"))
+	}
+	return b.String()
 }
 
 // ---- comparison engine ----

@@ -256,6 +256,8 @@ func runCmd() *cobra.Command {
 	var format string
 	var outputFile string
 	var timeoutMs int
+	var specFile string
+	var showCoverage bool
 
 	cmd := &cobra.Command{
 		Use:   "run <scenario-file>",
@@ -292,11 +294,21 @@ func runCmd() *cobra.Command {
 				}
 			}
 
+			// --spec flag overrides specFile: from scenario YAML.
+			// specFile: in the YAML is resolved relative to the scenario file;
+			// --spec on the command line is resolved relative to CWD.
+			effectiveSpecFile := s.SpecFile
+			specFromFlag := specFile != ""
+			if specFromFlag {
+				effectiveSpecFile = specFile
+			}
+
 			exec := executor.New(executor.Options{})
+			var loadedSpec *openapi.Spec
 			var runner *scenario.Runner
-			if s.SpecFile != "" {
-				specPath := s.SpecFile
-				if !filepath.IsAbs(specPath) {
+			if effectiveSpecFile != "" {
+				specPath := effectiveSpecFile
+				if !filepath.IsAbs(specPath) && !specFromFlag {
 					specPath = filepath.Join(filepath.Dir(scenarioPath), specPath)
 				}
 				specData, err := os.ReadFile(specPath)
@@ -307,20 +319,43 @@ func runCmd() *cobra.Command {
 				if ext == "yml" {
 					ext = "yaml"
 				}
-				spec, err := openapi.ParseBytes(specData, ext)
+				loadedSpec, err = openapi.ParseBytes(specData, ext)
 				if err != nil {
 					return fmt.Errorf("parsing spec file %q: %w", specPath, err)
 				}
-				runner = scenario.NewWithSpec(exec, spec)
+				runner = scenario.NewWithSpec(exec, loadedSpec)
 			} else {
 				runner = scenario.New(exec)
 			}
 			result := runner.Run(context.Background(), s, env)
 
+			// Compute spec coverage when requested (requires a loaded spec)
+			var cov *openapi.ScenarioCoverageResult
+			if showCoverage {
+				if loadedSpec == nil {
+					fmt.Fprintln(cmd.ErrOrStderr(), "warning: --coverage requires a spec (use --spec or add specFile: to the scenario)")
+				} else {
+					var executed []openapi.ExecutedRequest
+					for _, sr := range result.Steps {
+						if sr.Request != nil && sr.Response != nil {
+							executed = append(executed, openapi.ExecutedRequest{
+								Method: string(sr.Request.Method),
+								URL:    sr.Request.URL,
+							})
+						}
+					}
+					cov = loadedSpec.ScenarioCoverage(executed)
+				}
+			}
+
 			var reportBytes []byte
 			switch strings.ToLower(format) {
 			case "json":
-				reportBytes, err = reporting.JSON(result)
+				if cov != nil {
+					reportBytes, err = reporting.JSONWithCoverage(result, cov)
+				} else {
+					reportBytes, err = reporting.JSON(result)
+				}
 				if err != nil {
 					return fmt.Errorf("generating JSON report: %w", err)
 				}
@@ -331,7 +366,11 @@ func runCmd() *cobra.Command {
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
 			default:
-				reportBytes = []byte(reporting.Text(result))
+				if cov != nil {
+					reportBytes = []byte(reporting.TextWithCoverage(result, cov))
+				} else {
+					reportBytes = []byte(reporting.Text(result))
+				}
 			}
 
 			if outputFile != "" {
@@ -356,6 +395,8 @@ func runCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
+	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file to validate responses and compute coverage (overrides specFile: in scenario)")
+	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Report which spec operations were exercised (requires --spec or specFile: in scenario)")
 
 	return cmd
 }
@@ -783,6 +824,8 @@ Exit codes:
 					ID       string `json:"id"`
 					Level    string `json:"level"`
 					Breaking bool   `json:"breaking"`
+					Method   string `json:"method,omitempty"`
+					Path     string `json:"path,omitempty"`
 					Text     string `json:"text"`
 				}
 				type jsonOut struct {
@@ -795,6 +838,8 @@ Exit codes:
 						ID:       c.ID,
 						Level:    c.Level,
 						Breaking: c.Breaking,
+						Method:   c.Method,
+						Path:     c.Path,
 						Text:     c.Text,
 					})
 				}
@@ -814,7 +859,11 @@ Exit codes:
 						if c.Breaking {
 							mark = "!"
 						}
-						fmt.Fprintf(&sb, "  [%s] %s  %s\n", c.Level, mark, c.Text)
+						loc := ""
+						if c.Method != "" && c.Path != "" {
+							loc = fmt.Sprintf("  %s %s", c.Method, c.Path)
+						}
+						fmt.Fprintf(&sb, "  [%s] %s  %s%s\n", c.Level, mark, c.Text, loc)
 					}
 					fmt.Fprintln(&sb)
 					breaking := 0

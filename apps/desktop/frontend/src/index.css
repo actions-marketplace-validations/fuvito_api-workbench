@@ -111,6 +111,17 @@ button svg, a svg {
   100% { transform: translateX(400%); }
 }
 
+/* Placeholder text — clearly dimmer than content so empty fields don't look filled.
+   Unlayered rule beats Tailwind utilities; opacity:1 cancels Firefox's 0.54 default. */
+::placeholder {
+  color: oklch(0.36 0.006 285);
+  opacity: 1;
+}
+:root.light ::placeholder {
+  color: oklch(0.62 0.006 285);
+  opacity: 1;
+}
+
 /* Custom scrollbars — thin and theme-aware */
 ::-webkit-scrollbar {
   width: 6px;
