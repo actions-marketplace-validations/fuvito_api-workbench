@@ -128,7 +128,7 @@ See [`clrsig-action/README.md`](clrsig-action/README.md) for all commands, input
 | UI | Tailwind CSS v4 + shadcn/ui |
 | CLI | Cobra |
 | Project files | YAML + JSON |
-| API specification | OpenAPI 3.0 / 3.1 |
+| API specification | OpenAPI 3.0 / 3.1 + Swagger 2.0 |
 | History | SQLite |
 | Package manager | pnpm 9 (frontend), Go workspace (backend) |
 
@@ -176,12 +176,170 @@ go run .
 
 ```bash
 cd apps/cli
-go run . run ../../examples/scenarios/user-lifecycle.yaml --env ../../examples/server/local.yaml
+go run . run ../../examples/scenarios/user-lifecycle.yaml --env ../../examples/environments/local.yaml
 ```
 
 ### Import an OpenAPI spec
 
 Open the desktop app → open a workspace → click **Import OpenAPI** in the workspace panel → select `examples/server/openapi.yaml`. All operations are saved as individual request files and appear in the workspace tree.
+
+---
+
+## CLI Reference
+
+The `clrsig` CLI exposes six commands. All commands support `--format json` for machine-readable output and `--output <file>` to write results to disk instead of stdout.
+
+### `run` — execute a scenario
+
+```bash
+clrsig run <scenario-file> [flags]
+
+  -e, --env <file>       Environment file (YAML or JSON)
+  -s, --spec <file>      OpenAPI spec to validate responses against
+      --coverage         Report which spec operations the scenario exercised
+  -f, --format           Output format: text (default), json, junit
+  -o, --output <file>    Write report to file
+      --timeout <ms>     Global step timeout (overrides per-step setting)
+```
+
+**Example — scenario with spec validation and coverage:**
+
+```bash
+clrsig run scenarios/user-lifecycle.yaml \
+  --env environments/local.yaml \
+  --spec openapi.yaml \
+  --coverage
+```
+
+```
+Scenario: User lifecycle
+  PASS  Login  200  18ms
+  PASS  Create user  201  4ms
+  PASS  Fetch user  200  2ms
+  PASS  Delete user  204  1ms
+
+PASSED  4 passed, 0 failed, 0 skipped  (9/9 assertions passed)  25ms
+
+Spec coverage: 4 / 8 operations (50%)
+
+Covered:
+  POST    /auth/login
+  POST    /users
+  DELETE  /users/{id}
+  GET     /users/{id}
+
+Not covered:
+  GET     /health
+  GET     /protected
+  GET     /users
+  PUT     /users/{id}
+```
+
+You can also embed the spec path in the scenario YAML with `specFile: ./openapi.yaml` so it loads automatically without the flag.
+
+**Exit codes:** `0` = all passed · `1` = assertion failures · `2` = parse or config error
+
+---
+
+### `conform` — run all spec operations against a live server
+
+Generates a request for every operation declared in the spec, executes them, and validates each response against the spec's declared schema.
+
+```bash
+clrsig conform <spec-file-or-url> [flags]
+
+  -b, --base-url <url>       Server to send requests to (overrides spec servers[0])
+  -e, --env <file>           Environment file for variable resolution
+      --tags <tag1,tag2>     Only run operations with these tags
+      --paths </prefix>      Only run operations whose path starts with this prefix
+      --coverage             Append coverage summary
+      --fail-fast            Stop after first violation
+      --request-timeout <ms> Per-request timeout (default 10 000)
+  -f, --format               text (default), json, junit
+  -o, --output <file>        Write report to file
+```
+
+```bash
+# Run against the local example server
+clrsig conform examples/server/openapi.yaml \
+  --base-url http://localhost:8080 \
+  --coverage
+
+# Fetch the spec from a URL
+clrsig conform https://petstore.swagger.io/v2/swagger.json \
+  --base-url https://petstore.swagger.io/v2 \
+  --env environments/petstore.yaml
+```
+
+**Exit codes:** `0` = all conformed · `1` = violations or execution failures · `2` = parse error
+
+---
+
+### `diff` — detect breaking changes between two specs
+
+```bash
+clrsig diff <base-spec> <revision-spec> [flags]
+
+      --breaking-only    Only report breaking changes
+  -f, --format           text (default), json, junit
+  -o, --output <file>    Write report to file
+```
+
+```bash
+clrsig diff openapi-v1.yaml openapi-v2.yaml
+clrsig diff openapi-v1.yaml openapi-v2.yaml --breaking-only --format junit --output diff-report.xml
+```
+
+**Exit codes:** `0` = no breaking changes · `1` = breaking changes found · `2` = parse error
+
+---
+
+### `generate` — write request files from a spec
+
+```bash
+clrsig generate <spec-file-or-url> [flags]
+
+  -b, --base-url <url>   Override base URL from spec
+  -o, --output <dir>     Output directory (default: ./<spec-title>/)
+  -f, --format           text (default) or json
+      --dry-run          Print what would be generated without writing files
+```
+
+```bash
+clrsig generate openapi.yaml --output requests/
+clrsig generate https://petstore.swagger.io/v2/swagger.json --dry-run
+```
+
+---
+
+### `request` — execute a single request file
+
+```bash
+clrsig request <request-file> [flags]
+
+  -e, --env <file>       Environment file
+      --timeout <ms>     Request timeout
+  -f, --format           text (default) or json
+```
+
+```bash
+clrsig request requests/users/get-users.yaml --env environments/staging.yaml
+```
+
+---
+
+### `validate` — check scenario files for errors without executing them
+
+```bash
+clrsig validate <scenario-file> [file2...] [flags]
+
+  -f, --format   text (default) or json
+  -o, --output   Write report to file
+```
+
+```bash
+clrsig validate scenarios/*.yaml
+```
 
 ---
 
@@ -245,8 +403,12 @@ You can edit these files directly in any text editor. `{{variable}}` references 
 ### Run all Go tests
 
 ```bash
-# From the repo root
+# Core packages — from the repo root
 go test ./packages/core/...
+
+# Integration tests — spins up an in-process httptest server, runs the
+# user-lifecycle scenario, and verifies spec coverage (no external process needed)
+go test -v -run TestScenarioCoverage ./examples/server
 ```
 
 ### Run frontend unit tests
@@ -308,10 +470,11 @@ api-workbench/
 │       ├── variables/      # {{variable}} interpolation and runtime resolver
 │       ├── assertions/     # Assertion evaluation (status, header, jsonpath, schema)
 │       ├── scenario/       # Multi-step scenario runner with FailPolicy and variable extraction
-│       ├── openapi/        # OpenAPI 3.0/3.1 parser, request generator, response validator
+│       ├── openapi/        # OpenAPI 3.0/3.1 + Swagger 2.0 parser, generator, validator, diff
+│       ├── conformance/    # Conformance runner — executes all spec operations, reports violations
 │       ├── serialization/  # YAML/JSON round-trip for requests, environments, scenarios
-│       ├── reporting/      # Text and JSON report output for CLI
-│       └── history/        # SQLite-backed request history (credentials never stored)
+│       ├── reporting/      # Text, JSON, and JUnit report output for CLI
+│       └── history/        # SQLite-backed request + conformance run history
 │
 ├── examples/
 │   ├── server/             # Local Go HTTP server for end-to-end testing
@@ -321,7 +484,7 @@ api-workbench/
 ├── docs/                   # Architecture and product documentation
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml          # Push/PR: core tests → CLI build → desktop build
+│       ├── ci.yml          # Push/PR: core tests → integration tests → CLI + desktop build
 │       └── release.yml     # Tag push: cross-platform builds → GitHub Release
 ├── go.work                 # Go workspace (ties core + cli + desktop + examples/server)
 ├── pnpm-workspace.yaml
