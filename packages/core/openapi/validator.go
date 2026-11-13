@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -298,9 +299,24 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 		}
 	}
 
+	// Use the spec's first server URL as the base for path matching.
+	// This normalises executed URLs so FindRoute succeeds regardless of
+	// which actual host the requests were sent to (e.g. an httptest server
+	// on a random port vs. the host declared in the spec's servers list).
+	specBase := ""
+	if len(s.doc.Servers) > 0 {
+		specBase = strings.TrimRight(s.doc.Servers[0].URL, "/")
+	}
+
 	exercised := make(map[opKey]struct{})
 	for _, ex := range executed {
-		req, err := http.NewRequest(strings.ToUpper(ex.Method), ex.URL, nil)
+		matchURL := ex.URL
+		if specBase != "" {
+			if u, err := url.Parse(ex.URL); err == nil && u.Path != "" {
+				matchURL = specBase + u.Path
+			}
+		}
+		req, err := http.NewRequest(strings.ToUpper(ex.Method), matchURL, nil)
 		if err != nil {
 			continue
 		}

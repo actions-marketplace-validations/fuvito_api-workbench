@@ -43,9 +43,10 @@ var (
 	loginWindowStart = time.Now()
 )
 
-func main() {
+// newMux builds and returns the server's request mux.
+// Extracted so tests can spin up a fresh httptest.Server without binding :8080.
+func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/auth/login", handleLogin)
 	mux.HandleFunc("/users", handleUsers)
 	mux.HandleFunc("/users/", handleUser)
@@ -53,6 +54,11 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/maintenance", handleMaintenance)
 	mux.HandleFunc("/admin/reset", handleAdminReset)
+	return mux
+}
+
+func main() {
+	mux := newMux()
 
 	fmt.Println("Clear Signal example server")
 	fmt.Println("Listening on http://localhost:8080")
