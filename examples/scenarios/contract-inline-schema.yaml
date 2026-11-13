@@ -1,0 +1,107 @@
+schemaVersion: "1"
+title: Contract — inline schema assertions
+description: >
+  Validates response shapes using explicit inline JSON Schema assertions.
+  Each step declares the exact shape it expects; any deviation is a failure.
+
+steps:
+  - title: Health check shape
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: health response shape
+        schema: |
+          {
+            "type": "object",
+            "required": ["status", "time"],
+            "properties": {
+              "status": {"type": "string", "enum": ["ok"]},
+              "time":   {"type": "string"}
+            }
+          }
+
+  - title: Login response shape
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"{{username}}","password":"{{password}}"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: login response shape
+        schema: |
+          {
+            "type": "object",
+            "required": ["token", "message"],
+            "properties": {
+              "token":   {"type": "string"},
+              "message": {"type": "string"}
+            }
+          }
+    extractions:
+      - name: token
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - title: User list shape
+    request:
+      method: GET
+      url: "{{baseUrl}}/users"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: user list shape
+        schema: |
+          {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "email", "createdAt"],
+              "properties": {
+                "id":        {"type": "integer"},
+                "name":      {"type": "string"},
+                "email":     {"type": "string"},
+                "createdAt": {"type": "string"}
+              }
+            }
+          }
+
+  - title: Single user shape
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: user object shape
+        schema: |
+          {
+            "type": "object",
+            "required": ["id", "name", "email", "createdAt"],
+            "properties": {
+              "id":        {"type": "integer"},
+              "name":      {"type": "string"},
+              "email":     {"type": "string"},
+              "createdAt": {"type": "string"}
+            }
+          }

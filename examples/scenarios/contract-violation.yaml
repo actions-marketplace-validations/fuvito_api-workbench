@@ -1,0 +1,83 @@
+schemaVersion: "1"
+title: Contract — violation detection
+description: >
+  These steps are intentionally wrong to demonstrate how Clear Signal catches
+  schema violations. Every step below is expected to fail its schema assertion.
+  Use failPolicy: continue so all violations are reported, not just the first.
+
+steps:
+  - title: "FAIL — missing required field (version)"
+    description: >
+      The spec declares no 'version' field on /health, so asserting it is
+      required will always catch a drift if the field is ever removed.
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: "version field must be present"
+        schema: |
+          {
+            "type": "object",
+            "required": ["status", "time", "version"],
+            "properties": {
+              "status":  {"type": "string"},
+              "time":    {"type": "string"},
+              "version": {"type": "string"}
+            }
+          }
+    failPolicy: continue
+
+  - title: "FAIL — wrong type for id (string instead of integer)"
+    description: >
+      The API returns id as an integer. Asserting string catches any API change
+      that serialises id differently (e.g. switching to UUID strings).
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: "id must be integer (string assertion catches type drift)"
+        schema: |
+          {
+            "type": "object",
+            "required": ["id", "name", "email"],
+            "properties": {
+              "id":    {"type": "string"},
+              "name":  {"type": "string"},
+              "email": {"type": "string"}
+            }
+          }
+    failPolicy: continue
+
+  - title: "FAIL — extra required field not in response"
+    description: >
+      Asserts a 'role' field that the API has never returned. Useful as a
+      canary: if this ever passes, the API added an undeclared field.
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+      - type: schema
+        name: "role field must be present"
+        schema: |
+          {
+            "type": "object",
+            "required": ["id", "name", "email", "role"],
+            "properties": {
+              "id":    {"type": "integer"},
+              "name":  {"type": "string"},
+              "email": {"type": "string"},
+              "role":  {"type": "string", "enum": ["admin", "user"]}
+            }
+          }
+    failPolicy: continue
