@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
@@ -101,10 +102,20 @@ func assertionLabel(a domain.Assertion) string {
 
 // JSONReport is the machine-readable output structure for CI/CD pipelines.
 type JSONReport struct {
-	Scenario   string     `json:"scenario"`
-	Passed     bool       `json:"passed"`
-	DurationMs int64      `json:"durationMs"`
-	Steps      []JSONStep `json:"steps"`
+	Scenario   string                `json:"scenario"`
+	Passed     bool                  `json:"passed"`
+	DurationMs int64                 `json:"durationMs"`
+	Steps      []JSONStep            `json:"steps"`
+	Coverage   *JSONScenarioCoverage `json:"coverage,omitempty"`
+}
+
+// JSONScenarioCoverage is the coverage section in a scenario JSON report.
+type JSONScenarioCoverage struct {
+	Total     int              `json:"total"`
+	Covered   int              `json:"covered"`
+	Percent   float64          `json:"percent"`
+	Exercised []JSONCoverageOp `json:"exercised"`
+	Missed    []JSONCoverageOp `json:"missed"`
 }
 
 type JSONStep struct {
@@ -499,6 +510,75 @@ func DiffJUnit(result *openapi.DiffResult) ([]byte, error) {
 		return nil, err
 	}
 	return append([]byte(xml.Header), out...), nil
+}
+
+// TextWithCoverage is like Text but appends a spec coverage section.
+func TextWithCoverage(result *scenario.Result, cov *openapi.ScenarioCoverageResult) string {
+	base := Text(result)
+	if cov == nil {
+		return base
+	}
+	var b strings.Builder
+	b.WriteString(base)
+	b.WriteByte('\n')
+	fmt.Fprintf(&b, "Spec coverage: %d / %d operations (%.0f%%)\n", cov.Covered, cov.Total, cov.Percent)
+	exercised := sortedCovOps(cov.Exercised)
+	missed := sortedCovOps(cov.Missed)
+	if len(exercised) > 0 {
+		b.WriteByte('\n')
+		fmt.Fprintln(&b, "Covered:")
+		for _, op := range exercised {
+			fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
+		}
+	}
+	if len(missed) > 0 {
+		b.WriteByte('\n')
+		fmt.Fprintln(&b, "Not covered:")
+		for _, op := range missed {
+			fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
+		}
+	}
+	return b.String()
+}
+
+func sortedCovOps(ops []openapi.CoveredOperation) []openapi.CoveredOperation {
+	out := make([]openapi.CoveredOperation, len(ops))
+	copy(out, ops)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].Method < out[j].Method
+	})
+	return out
+}
+
+// JSONWithCoverage is like JSON but includes spec coverage data.
+func JSONWithCoverage(result *scenario.Result, cov *openapi.ScenarioCoverageResult) ([]byte, error) {
+	b, err := JSON(result)
+	if err != nil || cov == nil {
+		return b, err
+	}
+	// Unmarshal → attach coverage → re-marshal.
+	var report JSONReport
+	if err := json.Unmarshal(b, &report); err != nil {
+		return b, nil // shouldn't happen; return plain report
+	}
+	jc := &JSONScenarioCoverage{
+		Total:     cov.Total,
+		Covered:   cov.Covered,
+		Percent:   cov.Percent,
+		Exercised: make([]JSONCoverageOp, 0, len(cov.Exercised)),
+		Missed:    make([]JSONCoverageOp, 0, len(cov.Missed)),
+	}
+	for _, op := range sortedCovOps(cov.Exercised) {
+		jc.Exercised = append(jc.Exercised, JSONCoverageOp{Method: op.Method, Path: op.Path})
+	}
+	for _, op := range sortedCovOps(cov.Missed) {
+		jc.Missed = append(jc.Missed, JSONCoverageOp{Method: op.Method, Path: op.Path})
+	}
+	report.Coverage = jc
+	return json.MarshalIndent(report, "", "  ")
 }
 
 // JSON returns a machine-readable JSON report.
