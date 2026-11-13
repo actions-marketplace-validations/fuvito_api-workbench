@@ -43,14 +43,14 @@ func buildBodyStub(mt *openapi3.MediaType) string {
 
 	fields := append(reqFields, optFields...)
 	var sb strings.Builder
-	sb.WriteString("{")
+	sb.WriteString("{\n")
 	for i, name := range fields {
 		if i > 0 {
-			sb.WriteString(", ")
+			sb.WriteString(",\n")
 		}
-		sb.WriteString(`"` + name + `": "{{` + name + `}}"`)
+		sb.WriteString(`  "` + name + `": "{{` + name + `}}"`)
 	}
-	sb.WriteString("}")
+	sb.WriteString("\n}")
 	return sb.String()
 }
 
