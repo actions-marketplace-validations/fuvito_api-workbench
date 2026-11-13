@@ -36,6 +36,10 @@ package-lock.json
 
 # ---- Testing ----
 
+# Generated CLI reports
+*.xml
+*.junit
+
 # Playwright generated reports and results
 apps/desktop/e2e/playwright-report/
 test-results/
