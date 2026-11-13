@@ -27,6 +27,7 @@ export function useWorkspace(deps: {
   const [activeEnv, setActiveEnv] = useState<EnvInfo | null>(null)
   const [envVarMap, setEnvVarMap] = useState<Record<string, string>>({})
   const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState('')
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [scenarioList, setScenarioList] = useState<ScenarioInfo[]>([])
   const [recentWorkspaces, setRecentWorkspaces] = useState<string[]>([])
@@ -345,15 +346,19 @@ export function useWorkspace(deps: {
 
   async function handleImportOpenAPI() {
     setImporting(true)
+    setImportError('')
     try {
       const result = await importOpenAPISpec()
       if (result.error) {
-        console.error('import error:', result.error)
+        setImportError(result.error)
+        setTimeout(() => setImportError(''), 8000)
       } else {
         await refreshFileTree()
       }
     } catch (err) {
-      console.error('import failed:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setImportError(msg)
+      setTimeout(() => setImportError(''), 8000)
     } finally {
       setImporting(false)
     }
@@ -406,7 +411,7 @@ export function useWorkspace(deps: {
   }
 
   return {
-    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, history, scenarioList, recentWorkspaces,
+    workspacePath, fileTree, environments, activeEnv, envVarMap, importing, importError, history, scenarioList, recentWorkspaces,
     refreshFileTree, refreshWorkspace, refreshHistory,
     handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace, handleOpenWorkspaceByPath,
     handleSelectFile, handleOpenRequest, handleEnvChange,

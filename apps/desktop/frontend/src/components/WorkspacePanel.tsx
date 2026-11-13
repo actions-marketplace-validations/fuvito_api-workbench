@@ -66,6 +66,7 @@ type WorkspacePanelProps = {
   demoStarting?: boolean
   onRefresh?: () => void
   importing?: boolean
+  importError?: string
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
   scenarioError?: string | null
@@ -105,6 +106,7 @@ export function WorkspacePanel({
   demoStarting,
   onRefresh,
   importing,
+  importError,
   activeFilePath,
   dirtyFilePaths,
   scenarioError,
@@ -204,6 +206,11 @@ export function WorkspacePanel({
           {explorerError && (
             <div className="px-2 py-1 text-[10px] text-red-400 bg-red-500/10 border-b border-red-500/20 truncate" title={explorerError}>
               {explorerError}
+            </div>
+          )}
+          {importError && (
+            <div className="px-2 py-1.5 text-[10px] text-red-400 bg-red-500/10 border-b border-red-500/20" title={importError}>
+              Import failed: {importError}
             </div>
           )}
           <div className="flex-1 overflow-auto py-1">

@@ -540,6 +540,7 @@ export default function App() {
           demoStarting={demo.demoStarting}
           onRefresh={workspace.refreshWorkspace}
           importing={workspace.importing}
+          importError={workspace.importError}
           activeFilePath={activeTab.filePath ?? undefined}
           dirtyFilePaths={tabs.dirtyFilePaths}
           scenarios={workspace.scenarioList}

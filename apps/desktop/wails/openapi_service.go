@@ -107,24 +107,36 @@ func (s *OpenAPIService) importFromPath(path, baseURL string) ImportResult {
 }
 
 func (s *OpenAPIService) importFromBytes(data []byte, format, baseURL string) ImportResult {
-	spec, err := openapi.ParseBytes(data, format)
-	if err != nil {
-		return ImportResult{Error: fmt.Sprintf("parsing spec: %v", err)}
+	var title, version string
+	var reqs []openapi.GeneratedRequest
+
+	if openapi.IsSwagger2(data) {
+		var err error
+		title, version, reqs, err = openapi.ParseSwagger2Bytes(data, format, baseURL)
+		if err != nil {
+			return ImportResult{Error: fmt.Sprintf("parsing Swagger 2.0 spec: %v", err)}
+		}
+	} else {
+		spec, err := openapi.ParseBytes(data, format)
+		if err != nil {
+			return ImportResult{Error: fmt.Sprintf("parsing spec: %v", err)}
+		}
+		title, version = spec.Info()
+		reqs, err = openapi.GenerateRequests(spec, baseURL)
+		if err != nil {
+			return ImportResult{Error: fmt.Sprintf("generating requests: %v", err)}
+		}
 	}
 
-	title, version := spec.Info()
+	return s.saveGeneratedRequests(title, version, reqs)
+}
 
-	reqs, err := openapi.GenerateRequests(spec, baseURL)
-	if err != nil {
-		return ImportResult{Error: fmt.Sprintf("generating requests: %v", err)}
-	}
-
+func (s *OpenAPIService) saveGeneratedRequests(title, version string, reqs []openapi.GeneratedRequest) ImportResult {
 	wsPath := s.workspace.workspacePath
 	if wsPath == "" {
 		return ImportResult{Error: "no workspace open — open or create a workspace first"}
 	}
 
-	// Determine the directory to save requests into; use a subdir per spec title.
 	dirName := sanitizeDirName(title)
 	if dirName == "" {
 		dirName = "imported"
