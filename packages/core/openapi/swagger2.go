@@ -50,6 +50,7 @@ type swagger2Parameter struct {
 	Name     string          `yaml:"name"     json:"name"`
 	In       string          `yaml:"in"       json:"in"`
 	Required bool            `yaml:"required" json:"required"`
+	Type     string          `yaml:"type"     json:"type"`
 	Schema   *swagger2Schema `yaml:"schema"   json:"schema"`
 }
 
@@ -140,6 +141,7 @@ func ParseSwagger2Bytes(data []byte, format, baseURL string) (title, version str
 				OperationID: op.OperationID,
 				Summary:     op.Summary,
 				Tags:        op.Tags,
+				Path:        path,
 			})
 		}
 	}
@@ -198,10 +200,48 @@ func buildSwagger2Request(
 			}
 		case "body":
 			if p.Schema != nil {
-				req.Body = &domain.RequestBody{
-					Type:    domain.BodyJSON,
-					Content: buildSwagger2BodyStub(p.Schema, defs),
+				resolved := resolveSwagger2Ref(p.Schema, defs)
+				if resolved != nil && resolved.Type == "array" {
+					itemStub := "{}"
+					if resolved.Items != nil {
+						itemStub = buildSwagger2BodyStub(resolved.Items, defs)
+					}
+					req.Body = &domain.RequestBody{
+						Type:    domain.BodyJSON,
+						Content: "[\n  " + strings.ReplaceAll(itemStub, "\n", "\n  ") + "\n]",
+					}
+				} else {
+					req.Body = &domain.RequestBody{
+						Type:    domain.BodyJSON,
+						Content: buildSwagger2BodyStub(p.Schema, defs),
+					}
 				}
+			}
+		}
+	}
+
+	// formData parameters (used when there is no body param)
+	if req.Body == nil {
+		var textFields, fileFields []string
+		for _, p := range params {
+			if p.In != "formData" {
+				continue
+			}
+			if p.Type == "file" {
+				fileFields = append(fileFields, p.Name)
+			} else {
+				textFields = append(textFields, p.Name)
+			}
+		}
+		if len(fileFields) > 0 {
+			req.Body = &domain.RequestBody{
+				Type:    domain.BodyMultipart,
+				Content: buildMultipartStub(textFields, fileFields),
+			}
+		} else if len(textFields) > 0 {
+			req.Body = &domain.RequestBody{
+				Type:    domain.BodyFormURLEncoded,
+				Content: buildFormStub(textFields),
 			}
 		}
 	}
@@ -269,6 +309,31 @@ func resolveSwagger2Ref(s *swagger2Schema, defs map[string]swagger2Schema) *swag
 		return &resolved
 	}
 	return s
+}
+
+func buildFormStub(fields []string) string {
+	pairs := make([]string, len(fields))
+	for i, name := range fields {
+		pairs[i] = name + "={{" + name + "}}"
+	}
+	return strings.Join(pairs, "&")
+}
+
+func buildMultipartStub(textFields, fileFields []string) string {
+	type entry struct {
+		N string `json:"n"`
+		T string `json:"t"`
+		V string `json:"v"`
+	}
+	entries := make([]entry, 0, len(textFields)+len(fileFields))
+	for _, name := range textFields {
+		entries = append(entries, entry{N: name, T: "text", V: "{{" + name + "}}"})
+	}
+	for _, name := range fileFields {
+		entries = append(entries, entry{N: name, T: "file", V: ""})
+	}
+	data, _ := json.Marshal(entries)
+	return string(data)
 }
 
 func buildSwagger2BodyStub(s *swagger2Schema, defs map[string]swagger2Schema) string {

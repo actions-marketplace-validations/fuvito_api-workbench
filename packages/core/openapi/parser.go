@@ -102,6 +102,7 @@ type GeneratedRequest struct {
 	OperationID string
 	Summary     string
 	Tags        []string
+	Path        string // raw path from the spec, e.g. "/user/{username}"
 }
 
 // GenerateRequests creates one domain.Request per operation in the spec.
@@ -147,6 +148,7 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 				OperationID: op.OperationID,
 				Summary:     op.Summary,
 				Tags:        op.Tags,
+				Path:        path,
 			}
 			results = append(results, gr)
 		}

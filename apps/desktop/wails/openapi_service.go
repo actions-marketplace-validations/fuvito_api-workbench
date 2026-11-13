@@ -141,8 +141,8 @@ func (s *OpenAPIService) saveGeneratedRequests(title, version string, reqs []ope
 	if dirName == "" {
 		dirName = "imported"
 	}
-	destDir := filepath.Join(wsPath, "requests", dirName)
-	if err := os.MkdirAll(destDir, 0755); err != nil {
+	baseDir := filepath.Join(wsPath, "requests", dirName)
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return ImportResult{Error: fmt.Sprintf("creating import directory: %v", err)}
 	}
 
@@ -154,14 +154,29 @@ func (s *OpenAPIService) saveGeneratedRequests(title, version string, reqs []ope
 			continue
 		}
 
-		filename := sanitizeFilename(gr.OperationID)
+		// Group by first tag (mirrors Swagger UI's grouping)
+		opDir := baseDir
+		if len(gr.Tags) > 0 {
+			if tagDir := sanitizeDirName(gr.Tags[0]); tagDir != "" {
+				opDir = filepath.Join(baseDir, tagDir)
+				if err := os.MkdirAll(opDir, 0755); err != nil {
+					continue
+				}
+			}
+		}
+
+		// Filename: method + last path segment (e.g. "post-createWithList")
+		filename := pathBasedFilename(string(gr.Request.Method), gr.Path)
+		if filename == "" {
+			filename = sanitizeFilename(gr.OperationID)
+		}
 		if filename == "" {
 			filename = sanitizeFilename(gr.Request.Title)
 		}
 		if filename == "" {
 			filename = "request"
 		}
-		savePath := filepath.Join(destDir, filename+".yaml")
+		savePath := filepath.Join(opDir, filename+".yaml")
 
 		if err := atomicWrite(savePath, yamlData); err != nil {
 			continue
@@ -178,6 +193,26 @@ func (s *OpenAPIService) saveGeneratedRequests(title, version string, reqs []ope
 	}
 
 	return result
+}
+
+// pathBasedFilename builds a readable filename from the HTTP method and raw spec
+// path, e.g. "POST /user/{username}" → "post-username".
+// Falls back to "" when the path produces no usable segment.
+func pathBasedFilename(method, rawPath string) string {
+	parts := strings.Split(strings.Trim(rawPath, "/"), "/")
+	var segment string
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] != "" {
+			segment = parts[i]
+			break
+		}
+	}
+	if segment == "" {
+		return ""
+	}
+	// Strip {braces} from path params: {username} → username
+	segment = strings.Trim(segment, "{}")
+	return strings.ToLower(method) + "-" + sanitizeFilename(segment)
 }
 
 func sanitizeDirName(s string) string {
