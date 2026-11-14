@@ -31,6 +31,10 @@ A **workspace** is an ordinary folder on your filesystem. Clear Signal reads and
 
 **To create a new workspace:** click **New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
 
+When a workspace is opened, the first request file found in the tree is loaded automatically into the editor — no need to click a file manually to get started.
+
+**Switching workspaces:** opening or switching to a workspace (via the File menu, the Open Workspace button, or a recent workspace entry) closes the current workspace and all its tabs first. If any tabs have unsaved changes, a confirmation dialog appears before the switch.
+
 The last-used workspace and active environment are remembered between sessions.
 
 ---
@@ -99,6 +103,10 @@ If you try to open a different file, create a new request, or close a tab while 
 
 Clear Signal supports multiple request tabs. Each tab maintains independent state (URL, method, body, headers, response). Click the `+` icon in the tab bar or press **Ctrl+N** to open a new tab. The close button appears on hover.
 
+When more tabs are open than fit in the tab bar, gradient fade indicators appear at the left and right edges. The active tab scrolls into view automatically whenever you switch tabs.
+
+**Quick open (Ctrl+P):** press **Ctrl+P** to open a fuzzy-search modal that lists every request file in the current workspace. Type any part of the name to filter, use the arrow keys to navigate, and press **Enter** (or click) to open. Press **Escape** to dismiss without opening.
+
 ---
 
 ## 4. Organising requests into folders
@@ -141,6 +149,8 @@ Reference a variable anywhere in the URL, headers, query parameters, request bod
 GET {{baseUrl}}/users/{{userId}}
 Authorization: Bearer {{authToken}}
 ```
+
+**Autocomplete:** typing `{{` in the URL bar or in any value field triggers a dropdown that lists all variables defined in the active environment. Use the arrow keys to navigate the list and press **Enter** or click an item to insert it. The dropdown closes automatically if no environment is active or no variables are defined.
 
 Unresolved references are left as-is and appear literally in the outbound request, making missing configuration easy to spot.
 
@@ -187,6 +197,8 @@ The right panel shows:
 - **Timing breakdown** — a stacked bar showing DNS lookup, TCP connect, TLS handshake, time-to-first-byte, and body transfer time. Hover each segment for the exact millisecond value.
 - **Body** — JSON responses are syntax-highlighted and pretty-printed. Click the toggle to switch to raw view. Click the copy icon to copy the body to the clipboard.
 - **Headers** — full response header table.
+
+**Collapsing the response panel:** click the chevron icon on the left edge of the status bar to collapse the response panel to a narrow strip, giving the request editor more room. Click the chevron again to restore it.
 
 ### Request history
 
@@ -576,6 +588,7 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 | **Enter** (URL field focused) | Send the current request |
 | **Ctrl+N** | New request tab |
 | **Ctrl+S** | Save the current request |
+| **Ctrl+P** | Quick open — fuzzy-search all request files in the workspace |
 
 ---
 
