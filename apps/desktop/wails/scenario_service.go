@@ -5,7 +5,9 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -557,19 +559,11 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	var loadedSpec *openapi.Spec
 	var specLoadErr string
 	if sc.SpecFile != "" {
-		specPath := sc.SpecFile
-		if !filepath.IsAbs(specPath) {
-			specPath = filepath.Join(filepath.Dir(path), specPath)
-		}
-		specData, err := os.ReadFile(specPath)
+		specData, specExt, err := loadSpecBytes(sc.SpecFile, filepath.Dir(path))
 		if err != nil {
 			specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
 		} else {
-			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
-			if ext == "" {
-				ext = "yaml"
-			}
-			spec, err := openapi.ParseBytes(specData, ext)
+			spec, err := openapi.ParseBytes(specData, specExt)
 			if err != nil {
 				specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
 			} else {
@@ -666,6 +660,46 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	}
 
 	return out
+}
+
+// loadSpecBytes fetches the OpenAPI spec at specRef (HTTP/HTTPS URL or file path).
+// scenarioDir is used to resolve relative paths; it is ignored for URLs.
+// Returns the raw bytes and a format hint ("yaml" or "json").
+func loadSpecBytes(specRef, scenarioDir string) (data []byte, format string, err error) {
+	if strings.HasPrefix(specRef, "http://") || strings.HasPrefix(specRef, "https://") {
+		resp, httpErr := http.Get(specRef) //nolint:noctx
+		if httpErr != nil {
+			return nil, "", httpErr
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, "", fmt.Errorf("HTTP %d fetching spec", resp.StatusCode)
+		}
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, "", readErr
+		}
+		// Detect format from URL path; default to yaml.
+		format = "yaml"
+		if strings.HasSuffix(strings.ToLower(specRef), ".json") {
+			format = "json"
+		}
+		return body, format, nil
+	}
+
+	// File path — resolve relative paths against the scenario's directory.
+	if !filepath.IsAbs(specRef) {
+		specRef = filepath.Join(scenarioDir, specRef)
+	}
+	body, readErr := os.ReadFile(specRef)
+	if readErr != nil {
+		return nil, "", readErr
+	}
+	format = strings.TrimPrefix(strings.ToLower(filepath.Ext(specRef)), ".")
+	if format == "" {
+		format = "yaml"
+	}
+	return body, format, nil
 }
 
 // ---- Scenario template gallery ----
