@@ -72,7 +72,7 @@ export function ActivityRail({
         {([
           { icon: Server,   label: 'Simulations', title: 'Simulations — coming soon' },
           { icon: BarChart2, label: 'Analytics',   title: 'Analytics — coming soon' },
-        ] as { icon: React.ComponentType<{ size?: number }>; label: string; title: string }[]).map(({ icon: Icon, label, title }) => (
+        ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string }[]).map(({ icon: Icon, label, title }) => (
           <button
             key={label}
             type="button"
@@ -103,7 +103,7 @@ export function ActivityRail({
         {([
           { icon: Settings,   label: 'Settings', title: 'Settings', onClick: onShowSettings },
           { icon: HelpCircle, label: 'Help',     title: 'Help',     onClick: onShowHelp },
-        ] as { icon: React.ComponentType<{ size?: number }>; label: string; title: string; onClick: () => void }[]).map(({ icon: Icon, label, title, onClick }) => (
+        ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string; onClick: () => void }[]).map(({ icon: Icon, label, title, onClick }) => (
           <button
             key={label}
             type="button"

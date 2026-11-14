@@ -14,7 +14,7 @@ export type TabState = {
   auth: AuthState
   timeoutMs: number
   name: string | null
-  description: string | null
+  description?: string | null
   filePath: string | null
   targetDir: string | null
   savedKey: string
