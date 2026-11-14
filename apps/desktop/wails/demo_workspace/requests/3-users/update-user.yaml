@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: Update User
+title: Update User
 description: Replace a user's fields with the provided values. Supply {{userId}} to target a specific user.
 method: PUT
 url: "{{baseUrl}}/users/{{userId}}"

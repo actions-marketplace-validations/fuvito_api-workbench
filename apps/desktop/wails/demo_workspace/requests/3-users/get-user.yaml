@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: Get User
+title: Get User
 description: Fetch a single user by ID. Set {{userId}} in the environment or replace it inline.
 method: GET
 url: "{{baseUrl}}/users/{{userId}}"

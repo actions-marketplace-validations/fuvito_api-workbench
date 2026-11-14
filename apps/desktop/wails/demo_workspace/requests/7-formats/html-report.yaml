@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: HTML User Report
+title: HTML User Report
 description: Returns an HTML report listing all users. A good example of server-side rendering responding to an Accept: text/html header.
 method: GET
 url: "{{baseUrl}}/report.html"

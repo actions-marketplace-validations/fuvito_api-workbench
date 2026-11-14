@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: HTML Page
+title: HTML Page
 description: Returns a simple HTML document. The response viewer shows raw HTML — useful for checking Content-Type negotiation.
 method: GET
 url: "{{baseUrl}}/page"

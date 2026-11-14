@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: Any Status Code
+title: Any Status Code
 description: Request any HTTP status code from the server. Change the last path segment (418) to any valid status code to see how Clear Signal renders it.
 method: GET
 url: "{{baseUrl}}/status/418"
