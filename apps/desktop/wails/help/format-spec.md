@@ -82,7 +82,7 @@ title: User Lifecycle        # required — display name
 description: "Verifies CRUD operations for /users. Run after any changes to the users endpoint or auth middleware."
                              # optional — when to run it and what it proves
 
-specFile: "../openapi.yaml"  # optional — path to OpenAPI spec; enables automatic schema validation per step
+specFile: "/absolute/path/to/openapi.yaml"  # optional — absolute path to OpenAPI spec; enables schema assertions by operationId
 
 steps:
   - label: Login             # required — short action phrase ("Login", "Create order", not "Step 1")

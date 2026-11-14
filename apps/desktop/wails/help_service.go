@@ -55,6 +55,11 @@ Create the requested files following the format spec exactly. Apply all of these
 - For creation steps (POST 201), assert the returned ID is greater than 0 or not empty.
 - For deletion steps (DELETE 204), the status assertion alone is sufficient.
 
+**specFile (OpenAPI spec binding)**
+- If the user wants ` + "`" + `type: schema` + "`" + ` assertions against an OpenAPI spec, you must ask them for the **absolute path** (e.g. ` + "`" + `C:/projects/myapi/openapi.yaml` + "`" + ` on Windows, ` + "`" + `/home/user/myapi/openapi.yaml` + "`" + ` on Mac/Linux) or the full URL to the spec file — never invent or guess a relative path.
+- If the user does not provide a path, ask: *"What is the full path or URL to your OpenAPI spec file?"*
+- Do not use relative paths like ` + "`" + `../../openapi.yaml` + "`" + ` — they break whenever the scenario file is moved or opened on a different machine.
+
 **General**
 - All ` + "`" + `{{variable}}` + "`" + ` references in a scenario must either exist in the environment file or be extracted by an earlier step in the same scenario. Never reference a variable that has no source.
 - Use ` + "`" + `failPolicy: continue` + "`" + ` for independent verification steps that should not block the rest of the scenario.
@@ -88,6 +93,9 @@ Verification checklist:
 - [ ] Body ` + "`" + `type` + "`" + ` is one of: ` + "`" + `none` + "`" + ` ` + "`" + `json` + "`" + ` ` + "`" + `raw` + "`" + ` ` + "`" + `form-urlencoded` + "`" + `
 - [ ] ` + "`" + `failPolicy` + "`" + ` is one of: ` + "`" + `stop` + "`" + ` ` + "`" + `continue` + "`" + ` ` + "`" + `skip` + "`" + ` (or omitted — default is stop)
 - [ ] HTTP ` + "`" + `method` + "`" + ` is one of: ` + "`" + `GET` + "`" + ` ` + "`" + `POST` + "`" + ` ` + "`" + `PUT` + "`" + ` ` + "`" + `PATCH` + "`" + ` ` + "`" + `DELETE` + "`" + ` ` + "`" + `HEAD` + "`" + ` ` + "`" + `OPTIONS` + "`" + ` (uppercase)
+
+**specFile**
+- [ ] ` + "`" + `specFile` + "`" + ` is an absolute path or omitted — never a relative path like ` + "`" + `../../openapi.yaml` + "`" + `
 
 **Variables**
 - [ ] Every ` + "`" + `{{variable}}` + "`" + ` referenced in a scenario is either defined in the environment file or extracted by a step that runs before the referencing step
