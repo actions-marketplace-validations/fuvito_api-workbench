@@ -1,4 +1,5 @@
 schemaVersion: "1"
 name: Health Check
+description: Ping the server to confirm it is running. Returns 200 OK with status and uptime.
 method: GET
 url: "{{baseUrl}}/health"

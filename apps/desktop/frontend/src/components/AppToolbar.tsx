@@ -19,68 +19,77 @@ export function AppToolbar({
   activeTab, activeTabId, updateTab,
   onOpenRequest, onSaveRequest, onNewRequest, onDuplicateTab,
 }: AppToolbarProps) {
+  const hasDescription = activeTab.kind !== 'scenario' && !!activeTab.description
+
   return (
     <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
-      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      <div className={cn('min-w-0 flex-1', hasDescription ? 'flex flex-col gap-0' : 'flex items-center gap-1.5')}>
         {activeTab.kind === 'scenario' ? (
           <span className="text-xs text-[var(--color-muted-foreground)] truncate">
             {activeTab.name ?? 'Scenario'}
           </span>
         ) : (
           <>
-            {isTabDirty(activeTab) && (
-              <span className="shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />
-            )}
-            {activeTab.name !== null && (
-              <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[activeTab.method])}>
-                {activeTab.method}
-              </span>
-            )}
-            {activeTab.editingName ? (
-              <input
-                autoFocus
-                type="text"
-                value={activeTab.name ?? ''}
-                onChange={e => updateTab(activeTabId, { name: e.target.value })}
-                onBlur={() => {
-                  if (!activeTab.name?.trim()) updateTab(activeTabId, { name: null, editingName: false })
-                  else updateTab(activeTabId, { editingName: false })
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === 'Escape') {
+            <div className="flex items-center gap-1.5 min-w-0">
+              {isTabDirty(activeTab) && (
+                <span className="shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />
+              )}
+              {activeTab.name !== null && (
+                <span className={cn('text-xs font-mono font-bold shrink-0', METHOD_COLOR[activeTab.method])}>
+                  {activeTab.method}
+                </span>
+              )}
+              {activeTab.editingName ? (
+                <input
+                  autoFocus
+                  type="text"
+                  value={activeTab.name ?? ''}
+                  onChange={e => updateTab(activeTabId, { name: e.target.value })}
+                  onBlur={() => {
                     if (!activeTab.name?.trim()) updateTab(activeTabId, { name: null, editingName: false })
                     else updateTab(activeTabId, { editingName: false })
-                  }
-                }}
-                className={cn(
-                  'text-xs font-medium bg-transparent outline-none',
-                  'border-b border-[var(--color-accent)]',
-                  'text-[var(--color-foreground)] w-40',
-                )}
-              />
-            ) : activeTab.name !== null ? (
-              <button
-                type="button"
-                onClick={() => updateTab(activeTabId, { editingName: true, saveError: null })}
-                title="Click to rename"
-                className="text-xs font-medium text-[var(--color-foreground)] hover:text-[var(--color-accent)] truncate transition-colors text-left"
-              >
-                {activeTab.name}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => updateTab(activeTabId, { name: '', editingName: true })}
-                title="Click to name this request"
-                className="text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-              >
-                New Request
-              </button>
-            )}
-            {activeTab.saveError && (
-              <span className="text-label text-[var(--color-destructive)] truncate ml-1">
-                {activeTab.saveError}
-              </span>
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      if (!activeTab.name?.trim()) updateTab(activeTabId, { name: null, editingName: false })
+                      else updateTab(activeTabId, { editingName: false })
+                    }
+                  }}
+                  className={cn(
+                    'text-xs font-medium bg-transparent outline-none',
+                    'border-b border-[var(--color-accent)]',
+                    'text-[var(--color-foreground)] w-40',
+                  )}
+                />
+              ) : activeTab.name !== null ? (
+                <button
+                  type="button"
+                  onClick={() => updateTab(activeTabId, { editingName: true, saveError: null })}
+                  title="Click to rename"
+                  className="text-xs font-medium text-[var(--color-foreground)] hover:text-[var(--color-accent)] truncate transition-colors text-left"
+                >
+                  {activeTab.name}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => updateTab(activeTabId, { name: '', editingName: true })}
+                  title="Click to name this request"
+                  className="text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                >
+                  New Request
+                </button>
+              )}
+              {activeTab.saveError && (
+                <span className="text-label text-[var(--color-destructive)] truncate ml-1">
+                  {activeTab.saveError}
+                </span>
+              )}
+            </div>
+            {hasDescription && (
+              <p className="text-[11px] text-[var(--color-muted-foreground)] truncate leading-tight">
+                {activeTab.description}
+              </p>
             )}
           </>
         )}

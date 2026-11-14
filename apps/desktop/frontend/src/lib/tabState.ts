@@ -14,6 +14,7 @@ export type TabState = {
   auth: AuthState
   timeoutMs: number
   name: string | null
+  description: string | null
   filePath: string | null
   targetDir: string | null
   savedKey: string
@@ -69,6 +70,7 @@ export function createBlankTab(targetDir: string | null = null): TabState {
     auth: { type: 'none' },
     timeoutMs: 0,
     name: null,
+    description: null,
     filePath: null,
     targetDir,
     savedKey,

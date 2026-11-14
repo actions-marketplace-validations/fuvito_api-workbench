@@ -1,5 +1,6 @@
 schemaVersion: "1"
 name: Login
+description: Authenticate with username/password and receive a bearer token. Use the token in subsequent requests via {{authToken}}.
 method: POST
 url: "{{baseUrl}}/auth/login"
 body:

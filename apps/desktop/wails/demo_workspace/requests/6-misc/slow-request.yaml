@@ -1,5 +1,6 @@
 schemaVersion: "1"
 name: Slow Request
+description: The server waits the given number of milliseconds before responding. Use this to explore request timeouts and the timing breakdown.
 method: GET
 url: "{{baseUrl}}/slow"
 queryParams:
