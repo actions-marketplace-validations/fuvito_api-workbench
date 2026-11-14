@@ -24,6 +24,9 @@ import {
   GetEnvironment as WailsGetEnvironment,
   SaveEnvironment as WailsSaveEnvironment,
   DeleteEnvironment as WailsDeleteEnvironment,
+  GetEnvironmentRaw as WailsGetEnvironmentRaw,
+  SaveEnvironmentRaw as WailsSaveEnvironmentRaw,
+  ValidateEnvironmentYAML as WailsValidateEnvironmentYAML,
   DeleteRequest as WailsDeleteRequest,
   CreateFolder as WailsCreateFolder,
   DeleteFolder as WailsDeleteFolder,
@@ -59,6 +62,7 @@ import {
   StopDemo as WailsStopDemo,
   IsRunning as WailsIsDemoRunning,
   GetPort as WailsGetDemoPort,
+  OpenSpecInBrowser as WailsOpenDemoSpec,
 } from '@wailsjs/go/main/DemoService'
 import {
   ListScenarios as WailsListScenarios,
@@ -67,6 +71,7 @@ import {
   RunFolder as WailsRunFolder,
   LoadScenarioRaw as WailsLoadScenarioRaw,
   SaveScenarioRaw as WailsSaveScenarioRaw,
+  ValidateScenarioYAML as WailsValidateScenarioYAML,
   CreateScenario as WailsCreateScenario,
   DuplicateScenario as WailsDuplicateScenario,
   DeleteScenario as WailsDeleteScenario,
@@ -76,7 +81,11 @@ import {
   ListTemplates as WailsListTemplates,
   CreateFromTemplate as WailsCreateFromTemplate,
 } from '@wailsjs/go/main/ScenarioService'
-import { GetUserGuide as WailsGetUserGuide } from '@wailsjs/go/main/HelpService'
+import {
+  GetUserGuide as WailsGetUserGuide,
+  GetFormatSpec as WailsGetFormatSpec,
+  GetAIPrompt as WailsGetAIPrompt,
+} from '@wailsjs/go/main/HelpService'
 
 // ---- Shared I/O types ----
 
@@ -316,6 +325,20 @@ export async function deleteEnvironment(path: string): Promise<void> {
   await WailsDeleteEnvironment(path)
 }
 
+export async function getEnvironmentRaw(path: string): Promise<string> {
+  const result = await WailsGetEnvironmentRaw(path)
+  return result as unknown as string
+}
+
+export async function saveEnvironmentRaw(path: string, content: string): Promise<EnvInfo> {
+  const result = await WailsSaveEnvironmentRaw(path, content)
+  return result as unknown as EnvInfo
+}
+
+export async function validateEnvironmentYAML(content: string): Promise<string> {
+  return (await WailsValidateEnvironmentYAML(content)) as unknown as string
+}
+
 export async function deleteRequest(path: string): Promise<void> {
   await WailsDeleteRequest(path)
 }
@@ -435,6 +458,11 @@ export async function getDemoPort(): Promise<number> {
   return result as unknown as number
 }
 
+export async function openDemoSpec(): Promise<string> {
+  const result = await WailsOpenDemoSpec()
+  return result as unknown as string
+}
+
 // ---- Response cache ----
 
 export interface ResponseCacheData extends ResponseData {
@@ -494,8 +522,8 @@ export interface ExtractionDetail {
 }
 
 export interface StepDetail {
-  title: string
-  description?: string
+  label: string
+  notes?: string
   disabled?: boolean
   method?: string
   url?: string
@@ -527,7 +555,7 @@ export interface AssertionResult {
 }
 
 export interface StepResult {
-  title: string
+  label: string
   passed: boolean
   skipped: boolean
   statusCode: number
@@ -553,6 +581,7 @@ export interface ScenarioResult {
   durationMs: number
   steps: StepResult[]
   error?: string
+  specError?: string
   coverage?: ScenarioCoverage
 }
 
@@ -577,6 +606,10 @@ export async function loadScenarioRaw(path: string): Promise<string> {
 
 export async function saveScenarioRaw(path: string, content: string): Promise<string> {
   return (await WailsSaveScenarioRaw(path, content)) as unknown as string
+}
+
+export async function validateScenarioYAML(content: string): Promise<string> {
+  return (await WailsValidateScenarioYAML(content)) as unknown as string
 }
 
 export interface CreateScenarioResult {
@@ -659,4 +692,12 @@ export async function runFolder(folderPath: string): Promise<FolderRunItem[]> {
 
 export async function getUserGuide(): Promise<string> {
   return (await WailsGetUserGuide()) as unknown as string
+}
+
+export async function getFormatSpec(): Promise<string> {
+  return (await WailsGetFormatSpec()) as unknown as string
+}
+
+export async function getAIPrompt(): Promise<string> {
+  return (await WailsGetAIPrompt()) as unknown as string
 }

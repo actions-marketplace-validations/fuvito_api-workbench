@@ -47,12 +47,12 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 
 	for i, step := range sc.Steps {
 		num := i + 1
-		name := step.Title
+		name := step.Label
 
 		if name == "" {
-			add(num, "", "step title is required")
+			add(num, "", "step label is required")
 		} else if prev, ok := seenNames[name]; ok {
-			add(num, name, fmt.Sprintf("duplicate step title (also step %d)", prev))
+			add(num, name, fmt.Sprintf("duplicate step label (also step %d)", prev))
 		} else {
 			seenNames[name] = num
 		}

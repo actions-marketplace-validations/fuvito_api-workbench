@@ -5,7 +5,7 @@ description: >
   attempts the third returns 429 with Retry-After and X-RateLimit-* headers.
 
 steps:
-  - title: Reset rate limit counters
+  - label: Reset rate limit counters
     request:
       method: POST
       url: "{{baseUrl}}/admin/reset"
@@ -15,7 +15,7 @@ steps:
         expected: "200"
     failPolicy: stop
 
-  - title: First failed login — expect 401
+  - label: First failed login — expect 401
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -32,7 +32,7 @@ steps:
         expected: "1"
     failPolicy: continue
 
-  - title: Second failed login — expect 401
+  - label: Second failed login — expect 401
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -49,7 +49,7 @@ steps:
         expected: "0"
     failPolicy: continue
 
-  - title: Third failed login — expect 429 with rate limit headers
+  - label: Third failed login — expect 429 with rate limit headers
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"

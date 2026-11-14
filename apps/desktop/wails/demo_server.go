@@ -51,6 +51,9 @@ func resetDemoState() {
 func newDemoMux() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/openapi.yaml", handleDemoOpenAPISpec)
+	mux.HandleFunc("/docs", handleDemoSwaggerUI)
+
 	mux.HandleFunc("/health", withCount(handleDemoHealth))
 	mux.HandleFunc("/echo", withCount(handleDemoEcho))
 	mux.HandleFunc("/status/", withCount(handleDemoStatus))
@@ -88,6 +91,54 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func handleDemoOpenAPISpec(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="demo-openapi.yaml"`)
+	w.WriteHeader(http.StatusOK)
+	w.Write(demoOpenAPIYAML) //nolint:errcheck
+}
+
+func handleDemoSwaggerUI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		demoErrJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Clear Signal Demo API — Swagger UI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"/>
+  <style>
+    body { margin: 0; }
+    .swagger-ui .topbar { background: #1e1b4b; }
+    .swagger-ui .topbar .download-url-wrapper { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: "/openapi.yaml",
+      dom_id: "#swagger-ui",
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: "BaseLayout",
+      deepLinking: true,
+      tryItOutEnabled: true,
+    })
+  </script>
+</body>
+</html>`)
 }
 
 func withCount(h http.HandlerFunc) http.HandlerFunc {

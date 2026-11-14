@@ -21,6 +21,8 @@ export function GetActiveEnvironment():Promise<main.EnvironmentInfoIO>;
 
 export function GetEnvironment(arg1:string):Promise<main.EnvironmentIO>;
 
+export function GetEnvironmentRaw(arg1:string):Promise<string>;
+
 export function GetRecentWorkspaces():Promise<Array<string>>;
 
 export function GetWorkspacePath():Promise<string>;
@@ -57,8 +59,12 @@ export function SaveContentToFile(arg1:string,arg2:string):Promise<string>;
 
 export function SaveEnvironment(arg1:main.EnvironmentIO):Promise<main.EnvironmentInfoIO>;
 
+export function SaveEnvironmentRaw(arg1:string,arg2:string):Promise<main.EnvironmentInfoIO>;
+
 export function SaveRequest(arg1:main.RequestFileIO):Promise<string>;
 
 export function SaveResponseCache(arg1:string,arg2:main.ResponseCacheIO):Promise<void>;
 
 export function SelectEnvironment(arg1:string):Promise<void>;
+
+export function ValidateEnvironmentYAML(arg1:string):Promise<string>;

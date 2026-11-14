@@ -26,7 +26,7 @@ func Text(result *scenario.Result) string {
 
 	for _, sr := range result.Steps {
 		if sr.Skipped {
-			fmt.Fprintf(&b, "  SKIP  %s\n", sr.Title)
+			fmt.Fprintf(&b, "  SKIP  %s\n", sr.Label)
 			continue
 		}
 
@@ -40,7 +40,7 @@ func Text(result *scenario.Result) string {
 			suffix = fmt.Sprintf("  %d  %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
 		}
 
-		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Title, suffix)
+		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Label, suffix)
 
 		if sr.Error != "" {
 			fmt.Fprintf(&b, "         error: %s\n", sr.Error)
@@ -201,7 +201,7 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 			stepMs = sr.Response.Duration.Milliseconds()
 		}
 		tc := jUnitCase{
-			Name:      sr.Title,
+			Name:      sr.Label,
 			ClassName: result.Scenario.Title,
 			Time:      secStr(stepMs),
 		}
@@ -599,7 +599,7 @@ func JSON(result *scenario.Result) ([]byte, error) {
 
 	for _, sr := range result.Steps {
 		step := JSONStep{
-			Name:      sr.Title,
+			Name:      sr.Label,
 			Passed:    sr.Passed,
 			Skipped:   sr.Skipped,
 			Error:     sr.Error,

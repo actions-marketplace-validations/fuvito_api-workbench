@@ -8,7 +8,7 @@ import (
 )
 
 func step(name string, req *domain.Request) domain.ScenarioStep {
-	return domain.ScenarioStep{Title: name, Request: req}
+	return domain.ScenarioStep{Label: name, Request: req}
 }
 
 func getReq() *domain.Request {
@@ -20,7 +20,7 @@ func TestValidate_Valid(t *testing.T) {
 		Title: "My scenario",
 		Steps: []domain.ScenarioStep{
 			{
-				Title:   "Get items",
+				Label:   "Get items",
 				Request: getReq(),
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: 200},
@@ -58,8 +58,8 @@ func TestValidate_StepMissingName(t *testing.T) {
 		Steps: []domain.ScenarioStep{{Request: getReq()}},
 	}
 	issues := scenario.Validate(sc, "")
-	if !hasMessage(issues, "step title is required") {
-		t.Error("expected step title error")
+	if !hasMessage(issues, "step label is required") {
+		t.Error("expected step label error")
 	}
 }
 
@@ -69,15 +69,15 @@ func TestValidate_DuplicateStepName(t *testing.T) {
 		Steps: []domain.ScenarioStep{step("Login", getReq()), step("Login", getReq())},
 	}
 	issues := scenario.Validate(sc, "")
-	if !hasMessageContaining(issues, "duplicate step title") {
-		t.Error("expected duplicate step title error")
+	if !hasMessageContaining(issues, "duplicate step label") {
+		t.Error("expected duplicate step label error")
 	}
 }
 
 func TestValidate_StepNeitherRequestNorRef(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
-		Steps: []domain.ScenarioStep{{Title: "Empty step"}},
+		Steps: []domain.ScenarioStep{{Label: "Empty step"}},
 	}
 	issues := scenario.Validate(sc, "")
 	if !hasMessage(issues, "step must have either request or requestRef") {
@@ -89,7 +89,7 @@ func TestValidate_StepBothRequestAndRef(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
 		Steps: []domain.ScenarioStep{{
-			Title:      "Ambiguous",
+			Label:      "Ambiguous",
 			Request:    getReq(),
 			RequestRef: "some/request.yaml",
 		}},
@@ -104,7 +104,7 @@ func TestValidate_UnknownAssertionType(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
 		Steps: []domain.ScenarioStep{{
-			Title:   "Check",
+			Label:   "Check",
 			Request: getReq(),
 			Assertions: []domain.Assertion{
 				{Type: "bogus", Operator: domain.OperatorEq, Expected: 200},
@@ -121,7 +121,7 @@ func TestValidate_UnknownAssertionOperator(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
 		Steps: []domain.ScenarioStep{{
-			Title:   "Check",
+			Label:   "Check",
 			Request: getReq(),
 			Assertions: []domain.Assertion{
 				{Type: domain.AssertionStatus, Operator: "badop", Expected: 200},
@@ -138,7 +138,7 @@ func TestValidate_HeaderAssertionMissingPath(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
 		Steps: []domain.ScenarioStep{{
-			Title:   "Check",
+			Label:   "Check",
 			Request: getReq(),
 			Assertions: []domain.Assertion{
 				{Type: domain.AssertionHeader, Operator: domain.OperatorEq, Expected: "application/json"},
@@ -155,7 +155,7 @@ func TestValidate_UnknownExtractionSource(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
 		Steps: []domain.ScenarioStep{{
-			Title:   "Extract",
+			Label:   "Extract",
 			Request: getReq(),
 			Extractions: []domain.Extraction{
 				{Name: "val", Source: "xml", Path: "//id"},
@@ -172,7 +172,7 @@ func TestValidate_UnknownFailPolicy(t *testing.T) {
 	sc := &domain.Scenario{
 		Title: "Test",
 		Steps: []domain.ScenarioStep{{
-			Title:      "Step",
+			Label:      "Step",
 			Request:    getReq(),
 			FailPolicy: "ignore",
 		}},
@@ -188,7 +188,7 @@ func TestValidate_IssueString(t *testing.T) {
 	if fileLvl.String() != "scenario title is required" {
 		t.Errorf("file-level String: %q", fileLvl.String())
 	}
-	stepLvl := scenario.Issue{Step: 2, Name: "Login", Message: "duplicate step title (also step 1)"}
+	stepLvl := scenario.Issue{Step: 2, Name: "Login", Message: "duplicate step label (also step 1)"}
 	if stepLvl.String() == "" {
 		t.Error("step-level String should be non-empty")
 	}

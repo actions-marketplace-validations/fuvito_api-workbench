@@ -6,7 +6,7 @@ description: >
   required. Demonstrates a full resource lifecycle with jsonpath assertions.
 
 steps:
-  - title: List posts
+  - label: List posts
     request:
       method: GET
       url: https://jsonplaceholder.typicode.com/posts
@@ -27,7 +27,7 @@ steps:
         expected: ""
     failPolicy: stop
 
-  - title: Get single post
+  - label: Get single post
     request:
       method: GET
       url: https://jsonplaceholder.typicode.com/posts/1
@@ -45,7 +45,7 @@ steps:
         expected: ""
     failPolicy: stop
 
-  - title: Create post
+  - label: Create post
     request:
       method: POST
       url: https://jsonplaceholder.typicode.com/posts
@@ -73,7 +73,7 @@ steps:
         path: "$.id"
     failPolicy: continue
 
-  - title: Update post
+  - label: Update post
     request:
       method: PUT
       url: https://jsonplaceholder.typicode.com/posts/1
@@ -93,7 +93,7 @@ steps:
         expected: "Updated title"
     failPolicy: continue
 
-  - title: Delete post
+  - label: Delete post
     request:
       method: DELETE
       url: https://jsonplaceholder.typicode.com/posts/1

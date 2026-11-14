@@ -48,8 +48,8 @@ type ExtractionDetailIO struct {
 }
 
 type StepDetailIO struct {
-	Title             string               `json:"title"`
-	Description       string               `json:"description,omitempty"`
+	Label             string               `json:"label"`
+	Notes             string               `json:"notes,omitempty"`
 	Disabled          bool                 `json:"disabled,omitempty"`
 	Method            string               `json:"method,omitempty"`
 	URL               string               `json:"url,omitempty"`
@@ -81,7 +81,7 @@ type AssertionResultIO struct {
 }
 
 type StepResultIO struct {
-	Title           string              `json:"title"`
+	Label           string              `json:"label"`
 	Passed          bool                `json:"passed"`
 	Skipped         bool                `json:"skipped"`
 	StatusCode      int                 `json:"statusCode"`
@@ -107,6 +107,7 @@ type ScenarioResultIO struct {
 	DurationMs int64          `json:"durationMs"`
 	Steps      []StepResultIO `json:"steps"`
 	Error      string         `json:"error,omitempty"`
+	SpecError  string         `json:"specError,omitempty"`
 	Coverage   *CoverageIO    `json:"coverage,omitempty"`
 }
 
@@ -222,8 +223,8 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{
-			Title:       step.Title,
-			Description: step.Description,
+			Label:       step.Label,
+			Notes:       step.Notes,
 			Disabled:    step.Disabled,
 			RequestRef:  step.RequestRef,
 			FailPolicy:  string(step.FailPolicy),
@@ -290,6 +291,24 @@ func (s *ScenarioService) SaveScenarioRaw(path string, content string) string {
 	return ""
 }
 
+// ValidateScenarioYAML parses and validates YAML content as a scenario file.
+// Returns "" on success, or a human-readable error/issue list on failure.
+func (s *ScenarioService) ValidateScenarioYAML(content string) string {
+	sc, err := serialization.ParseScenario([]byte(content), "yaml")
+	if err != nil {
+		return "YAML parse error: " + err.Error()
+	}
+	issues := scenario.Validate(sc, "")
+	if len(issues) == 0 {
+		return ""
+	}
+	msgs := make([]string, len(issues))
+	for i, iss := range issues {
+		msgs[i] = iss.String()
+	}
+	return strings.Join(msgs, "\n")
+}
+
 // CreateScenarioResultIO is the return type for CreateScenario.
 type CreateScenarioResultIO struct {
 	Path  string `json:"path"`
@@ -333,7 +352,7 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 title: %s
 description: ""
 steps:
-  - title: Step 1
+  - label: Step 1
     request:
       method: GET
       url: https://api.example.com
@@ -532,7 +551,39 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	}
 
 	exec := buildExecutorWithCookies(s.settings)
-	runner := scenario.New(exec)
+
+	// Load the OpenAPI spec now (before creating the runner) so that
+	// type:schema assertions with an operationId value can resolve against it.
+	var loadedSpec *openapi.Spec
+	var specLoadErr string
+	if sc.SpecFile != "" {
+		specPath := sc.SpecFile
+		if !filepath.IsAbs(specPath) {
+			specPath = filepath.Join(filepath.Dir(path), specPath)
+		}
+		specData, err := os.ReadFile(specPath)
+		if err != nil {
+			specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
+		} else {
+			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
+			if ext == "" {
+				ext = "yaml"
+			}
+			spec, err := openapi.ParseBytes(specData, ext)
+			if err != nil {
+				specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
+			} else {
+				loadedSpec = spec
+			}
+		}
+	}
+
+	var runner *scenario.Runner
+	if loadedSpec != nil {
+		runner = scenario.NewWithSpec(exec, loadedSpec)
+	} else {
+		runner = scenario.New(exec)
+	}
 
 	env := s.workspace.ActiveEnvironment()
 	if envPath != "" {
@@ -551,10 +602,11 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		Title:      result.Scenario.Title,
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
+		SpecError:  specLoadErr,
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{
-			Title:      sr.Title,
+			Label:      sr.Label,
 			Passed:     sr.Passed,
 			Skipped:    sr.Skipped,
 			Error:      sr.Error,
@@ -585,43 +637,31 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		out.Steps = append(out.Steps, step)
 	}
 
-	// Compute spec coverage if the scenario declares a specFile.
-	if sc.SpecFile != "" {
-		specPath := sc.SpecFile
-		if !filepath.IsAbs(specPath) {
-			specPath = filepath.Join(filepath.Dir(path), specPath)
+	// Compute spec coverage using the already-loaded spec (if any).
+	if loadedSpec != nil {
+		var executed []openapi.ExecutedRequest
+		for _, sr := range result.Steps {
+			if sr.Skipped || sr.Request == nil {
+				continue
+			}
+			executed = append(executed, openapi.ExecutedRequest{
+				Method: string(sr.Request.Method),
+				URL:    sr.Request.URL,
+			})
 		}
-		if specData, err := os.ReadFile(specPath); err == nil {
-			ext := strings.ToLower(filepath.Ext(specPath))
-			if ext == "" {
-				ext = "yaml"
+		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {
+			cov := &CoverageIO{
+				Covered: cr.Covered,
+				Total:   cr.Total,
+				Percent: cr.Percent,
 			}
-			if spec, err := openapi.ParseBytes(specData, strings.TrimPrefix(ext, ".")); err == nil {
-				var executed []openapi.ExecutedRequest
-				for _, sr := range result.Steps {
-					if sr.Skipped || sr.Request == nil {
-						continue
-					}
-					executed = append(executed, openapi.ExecutedRequest{
-						Method: string(sr.Request.Method),
-						URL:    sr.Request.URL,
-					})
-				}
-				if cr := spec.ScenarioCoverage(executed); cr != nil {
-					cov := &CoverageIO{
-						Covered: cr.Covered,
-						Total:   cr.Total,
-						Percent: cr.Percent,
-					}
-					for _, op := range cr.Exercised {
-						cov.Exercised = append(cov.Exercised, op.String())
-					}
-					for _, op := range cr.Missed {
-						cov.Missed = append(cov.Missed, op.String())
-					}
-					out.Coverage = cov
-				}
+			for _, op := range cr.Exercised {
+				cov.Exercised = append(cov.Exercised, op.String())
 			}
+			for _, op := range cr.Missed {
+				cov.Missed = append(cov.Missed, op.String())
+			}
+			out.Coverage = cov
 		}
 	}
 

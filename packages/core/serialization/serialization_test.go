@@ -126,7 +126,7 @@ schemaVersion: "1"
 title: User flow
 description: Create and retrieve a user
 steps:
-  - title: Create user
+  - label: Create user
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -141,7 +141,7 @@ steps:
       - name: userId
         source: jsonpath
         path: "$.id"
-  - title: Get user
+  - label: Get user
     request:
       method: GET
       url: "{{baseUrl}}/users/{{userId}}"
@@ -172,8 +172,8 @@ func TestParseScenario_YAML(t *testing.T) {
 	}
 
 	step0 := s.Steps[0]
-	if step0.Title != "Create user" {
-		t.Errorf("step0 title: %q", step0.Title)
+	if step0.Label != "Create user" {
+		t.Errorf("step0 label: %q", step0.Label)
 	}
 	if step0.Request == nil || step0.Request.Method != domain.MethodPOST {
 		t.Errorf("step0 request method: %+v", step0.Request)
@@ -200,7 +200,7 @@ func TestWriteScenario_RoundTrip(t *testing.T) {
 		Title:         "Round trip",
 		Steps: []domain.ScenarioStep{
 			{
-				Title: "Step A",
+				Label: "Step A",
 				Request: &domain.Request{
 					Method: domain.MethodGET,
 					URL:    "https://example.com",

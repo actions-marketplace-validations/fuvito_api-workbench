@@ -172,6 +172,8 @@ Every persisted project definition must:
 - Preserve unknown supported extension fields where possible.
 - Have documented migration rules for future schema versions.
 
+**Format spec rule:** Any change to a serialized field name, type, valid value set, or structure in a request, scenario, or environment file **must** update `apps/desktop/wails/help/format-spec.md` in the same commit. The spec is the canonical human reference and the source document for the AI prompt — it must stay in sync with the code.
+
 ---
 
 ## 9. What is Explicitly Out of Scope (MVP)
@@ -323,3 +325,19 @@ Do not implement or stub any of these without explicit user direction.
 - **CI** — `.github/workflows/ci.yml` updated to `go test -v`.
 - **Release workflow** — `.github/workflows/release.yml` triggers on `v*` tags. Four jobs: `release-windows` (windows-latest, `wails build -platform windows/amd64`), `release-macos` (macos-latest, arm64 + amd64), `release-linux` (ubuntu-latest, installs `libgtk-3-dev libwebkit2gtk-4.0-dev`), `cli-binaries` (matrix: win/mac/linux × amd64 + darwin/arm64). Final `publish` job downloads all artifacts and creates a GitHub Release via `softprops/action-gh-release@v2`; pre-release flag set automatically for tags containing `-`.
 - **Phase 5 / MVP acceptance criteria met**: developer can import an OpenAPI spec, execute generated requests with timing breakdown, configure app settings (theme, font size, timeout, proxy, TLS), create and run multi-step scenarios through the desktop app and CLI, and ship cross-platform binaries via GitHub Actions on tag push.
+
+### 2026-11-14 — Format spec + AI prompt (Help menu)
+
+- **`apps/desktop/wails/help/format-spec.md`** — new canonical YAML format specification covering request, scenario, and environment file formats; assertion and extraction references; variable syntax; file naming conventions.
+- **`help_service.go`** — added `GetFormatSpec()` and `GetAIPrompt()`. `GetAIPrompt()` returns a complete system prompt (4-step workflow: discovery survey → generate → self-verify → deliver; 8 best-practice rules; a 15-point verification checklist) followed by the full spec.
+- **`HelpPanel.tsx`** — refactored to tabbed layout: **User Guide** | **Format Spec**. Format Spec tab has a "Copy AI Prompt" button (clipboard, 2 s flash) and a one-line hint explaining the AI workflow.
+- **`CLAUDE.md` Section 8** — added rule: any serialization field change must update `format-spec.md` in the same commit.
+
+### 2026-11-14 — Scenario narrative layer (label + notes)
+
+- **Domain**: `ScenarioStep.Title` → `Label`, `ScenarioStep.Description` → `Notes`. Scenario-level `Title`/`Description` unchanged.
+- **Serialization**: YAML/JSON step fields renamed `title`→`label`, `description`→`notes`. Existing files using `title:` on steps must be migrated.
+- **Reporting + runner + validate**: all references updated; validation error messages updated to "step label is required" / "duplicate step label".
+- **Wails service**: `StepDetailIO` and `StepResultIO` updated (`label`/`notes` JSON tags); new scenario starter YAML uses `label:`.
+- **Frontend**: `StepDetail.label`/`notes`, `StepResult.label`; `ScenarioStepList` shows `notes` as a secondary italic line under the label; step editor uses "Step label" / "Notes (optional)" placeholders; `scenario-yaml.ts` serializes `label:`/`notes:`.
+- **Templates + examples**: all 11 scenario template files and `examples/scenarios/user-lifecycle.yaml` migrated to `label:`/`notes:` with example notes added.

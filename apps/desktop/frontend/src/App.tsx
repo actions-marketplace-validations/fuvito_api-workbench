@@ -30,7 +30,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo, openDemoSpec } from '@/lib/bridge'
 import type { FolderRunState } from '@/components/Sidebar'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
@@ -112,6 +112,7 @@ export default function App() {
   // Modal / overlay state
   const [showAbout, setShowAbout] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec'>('guide')
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
@@ -375,13 +376,28 @@ export default function App() {
     label: 'Help',
     items: [
       {
-        kind: 'action',
-        label: demo.demoStarting ? 'Starting Demo…' : demo.demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
-        onClick: demo.demoRunning ? demo.handleStopDemo : demo.handleStartDemo,
-        disabled: demo.demoStarting,
+        kind: 'submenu',
+        label: 'Demo Server',
+        items: [
+          {
+            kind: 'action',
+            label: demo.demoStarting ? 'Starting…' : demo.demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
+            onClick: demo.demoRunning ? demo.handleStopDemo : demo.handleStartDemo,
+            disabled: demo.demoStarting,
+          },
+          { kind: 'separator' },
+          {
+            kind: 'action',
+            label: 'View API Spec',
+            disabled: !demo.demoRunning,
+            title: demo.demoRunning ? 'Open the Swagger UI for the demo server in your browser' : 'Start the demo server first',
+            onClick: () => openDemoSpec(),
+          },
+        ],
       },
       { kind: 'separator' },
-      { kind: 'action', label: 'User Guide', onClick: () => setShowHelp(true) },
+      { kind: 'action', label: 'User Guide',   onClick: () => { setHelpInitialTab('guide'); setShowHelp(true) } },
+      { kind: 'action', label: 'Format Spec…', onClick: () => { setHelpInitialTab('spec');  setShowHelp(true) } },
       { kind: 'separator' },
       { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
     ],
@@ -491,7 +507,7 @@ export default function App() {
         />
       )}
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
-      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} initialTab={helpInitialTab} />}
       {workspace.importFromURLDialog && (
         <ImportFromURLDialog
           value={workspace.importFromURLInput}

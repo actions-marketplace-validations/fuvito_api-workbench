@@ -29,3 +29,5 @@ export function RunScenario(arg1:string,arg2:string,arg3:number):Promise<main.Sc
 export function SaveScenarioRaw(arg1:string,arg2:string):Promise<string>;
 
 export function SaveScenarioResult(arg1:string,arg2:main.ScenarioResultIO):Promise<string>;
+
+export function ValidateScenarioYAML(arg1:string):Promise<string>;

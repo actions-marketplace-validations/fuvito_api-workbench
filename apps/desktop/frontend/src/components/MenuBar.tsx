@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type SubMenuItem =
-  | { kind: 'action'; label: string; onClick: () => void; title?: string }
+  | { kind: 'action'; label: string; onClick: () => void; title?: string; disabled?: boolean }
   | { kind: 'separator' }
 
 type MenuItem =
@@ -91,9 +91,15 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
                             <li key={si}>
                               <button
                                 type="button"
+                                disabled={sub.disabled}
                                 title={sub.title}
-                                onMouseDown={() => { setOpen(null); sub.onClick() }}
-                                className="w-full flex items-center px-3 py-1 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer truncate"
+                                onMouseDown={() => { if (!sub.disabled) { setOpen(null); sub.onClick() } }}
+                                className={cn(
+                                  'w-full flex items-center px-3 py-1 text-xs truncate',
+                                  sub.disabled
+                                    ? 'opacity-40 cursor-default text-[var(--color-muted-foreground)]'
+                                    : 'text-[var(--color-foreground)] hover:bg-[var(--color-muted)] cursor-pointer',
+                                )}
                               >
                                 {sub.label}
                               </button>

@@ -29,7 +29,7 @@ func TestRun_AllPass(t *testing.T) {
 		Title: "Simple pass",
 		Steps: []domain.ScenarioStep{
 			{
-				Title:   "Health check",
+				Label:   "Health check",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL + "/health"},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -68,7 +68,7 @@ func TestRun_VariableExtraction(t *testing.T) {
 		Title: "Create then fetch",
 		Steps: []domain.ScenarioStep{
 			{
-				Title:   "Create user",
+				Label:   "Create user",
 				Request: &domain.Request{Method: domain.MethodPOST, URL: srv.URL + "/users"},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "201"},
@@ -78,7 +78,7 @@ func TestRun_VariableExtraction(t *testing.T) {
 				},
 			},
 			{
-				Title:   "Get user",
+				Label:   "Get user",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL + "/users/{{userId}}"},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -91,7 +91,7 @@ func TestRun_VariableExtraction(t *testing.T) {
 	result := newRunner().Run(context.Background(), s, nil)
 	if !result.Passed {
 		for i, sr := range result.Steps {
-			t.Logf("step %d %q: passed=%v error=%q", i, sr.Title, sr.Passed, sr.Error)
+			t.Logf("step %d %q: passed=%v error=%q", i, sr.Label, sr.Passed, sr.Error)
 			for _, ar := range sr.Assertions {
 				t.Logf("  assertion: passed=%v msg=%q", ar.Passed, ar.Message)
 			}
@@ -113,7 +113,7 @@ func TestRun_FailPolicyStop(t *testing.T) {
 		Title: "Fail stop",
 		Steps: []domain.ScenarioStep{
 			{
-				Title:   "Failing step",
+				Label:   "Failing step",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -121,7 +121,7 @@ func TestRun_FailPolicyStop(t *testing.T) {
 				FailPolicy: domain.FailPolicyStop,
 			},
 			{
-				Title:   "Should be skipped",
+				Label:   "Should be skipped",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 			},
 		},
@@ -159,7 +159,7 @@ func TestRun_WithEnvironment(t *testing.T) {
 		Title: "With env",
 		Steps: []domain.ScenarioStep{
 			{
-				Title: "Auth request",
+				Label: "Auth request",
 				Request: &domain.Request{
 					Method:  domain.MethodGET,
 					URL:     "{{baseUrl}}/protected",
@@ -197,14 +197,14 @@ func TestRun_HeaderExtraction(t *testing.T) {
 		Title: "Header extraction",
 		Steps: []domain.ScenarioStep{
 			{
-				Title:   "Step 1",
+				Label:   "Step 1",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Extractions: []domain.Extraction{
 					{Name: "reqID", Source: domain.ExtractHeader, Path: "X-Request-ID"},
 				},
 			},
 			{
-				Title: "Step 2",
+				Label: "Step 2",
 				Request: &domain.Request{
 					Method:  domain.MethodGET,
 					URL:     srv2.URL,
@@ -233,7 +233,7 @@ func TestResult_Counts(t *testing.T) {
 		Title: "Counts",
 		Steps: []domain.ScenarioStep{
 			{
-				Title:   "Pass step",
+				Label:   "Pass step",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "200"},
@@ -241,7 +241,7 @@ func TestResult_Counts(t *testing.T) {
 				FailPolicy: domain.FailPolicyContinue,
 			},
 			{
-				Title:   "Fail step",
+				Label:   "Fail step",
 				Request: &domain.Request{Method: domain.MethodGET, URL: srv.URL},
 				Assertions: []domain.Assertion{
 					{Type: domain.AssertionStatus, Operator: domain.OperatorEq, Expected: "201"},

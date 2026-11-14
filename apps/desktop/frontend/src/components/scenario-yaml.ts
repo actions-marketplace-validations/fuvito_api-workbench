@@ -24,8 +24,8 @@ export function serializeScenarioToYAML(d: ScenarioDetail): string {
   } else {
     lines.push('steps:')
     for (const step of d.steps) {
-      lines.push(`  - title: ${yamlScalar(step.title)}`)
-      if (step.description) lines.push(`    description: ${yamlScalar(step.description)}`)
+      lines.push(`  - label: ${yamlScalar(step.label)}`)
+      if (step.notes) lines.push(`    notes: ${yamlScalar(step.notes)}`)
       if (step.disabled) lines.push('    disabled: true')
       if (step.requestRef) {
         lines.push(`    requestRef: ${yamlScalar(step.requestRef)}`)

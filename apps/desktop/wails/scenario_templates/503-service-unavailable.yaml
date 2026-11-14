@@ -5,7 +5,7 @@ description: >
   clients when to retry. Verify the maintenance endpoint conforms.
 
 steps:
-  - title: Request maintenance endpoint — expect 503 with Retry-After
+  - label: Request maintenance endpoint — expect 503 with Retry-After
     request:
       method: GET
       url: "{{baseUrl}}/maintenance"

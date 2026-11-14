@@ -95,3 +95,20 @@ func openWithSystemApp(path string) error {
 	go cmd.Wait() //nolint:errcheck
 	return nil
 }
+
+func openURL(url string) error {
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", "", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("launching browser: %w", err)
+	}
+	go cmd.Wait() //nolint:errcheck
+	return nil
+}

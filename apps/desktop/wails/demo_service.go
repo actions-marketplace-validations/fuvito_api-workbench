@@ -17,6 +17,9 @@ import (
 //go:embed demo_workspace
 var demoWorkspaceFS embed.FS
 
+//go:embed help/demo-openapi.yaml
+var demoOpenAPIYAML []byte
+
 // DemoResult is returned to the frontend by StartDemo.
 type DemoResult struct {
 	WorkspacePath string `json:"workspacePath"`
@@ -137,6 +140,21 @@ func (d *DemoService) StopDemo() {
 	}
 	d.prevWorkspace = ""
 	d.prevEnvPath = ""
+}
+
+// OpenSpecInBrowser opens the Swagger UI docs page for the running demo server
+// in the system default browser. Returns a non-empty error string on failure.
+func (d *DemoService) OpenSpecInBrowser() string {
+	d.mu.Lock()
+	port := d.port
+	d.mu.Unlock()
+	if port == 0 {
+		return "demo server is not running"
+	}
+	if err := openURL(fmt.Sprintf("http://localhost:%d/docs", port)); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 // ---- helpers ----

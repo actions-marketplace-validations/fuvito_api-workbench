@@ -1,0 +1,616 @@
+openapi: "3.0.3"
+info:
+  title: Clear Signal Demo API
+  description: |
+    A demonstration API server built into Clear Signal.
+    Use it to explore requests, build scenarios, and test response handling
+    without needing an external service.
+
+    **Credentials**
+    - Bearer login: `admin` / `secret`
+    - Basic auth: `demo` / `demo`
+    - API key: `demo-key-12345` (header `X-Api-Key` or query `?api_key=`)
+  version: "1.0.0"
+  contact:
+    name: Clear Signal
+    url: https://github.com/fuvito/api-workbench
+
+servers:
+  - url: http://localhost:8090
+    description: Local demo server (port may differ — check the status bar)
+
+tags:
+  - name: health
+    description: Server health and diagnostics
+  - name: auth
+    description: Authentication examples (Bearer, Basic, API Key)
+  - name: users
+    description: User CRUD operations
+  - name: posts
+    description: Paginated post listing
+  - name: files
+    description: File upload
+  - name: misc
+    description: Echo, arbitrary status codes, slow responses
+  - name: formats
+    description: Alternative response formats — XML, Atom, HTML
+
+paths:
+
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Server health check
+      description: Returns uptime, request count, and a list of available endpoints.
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:         { type: string, example: ok }
+                  version:        { type: string, example: "1.0.0" }
+                  uptime:         { type: string, example: 5m30s }
+                  requests_served: { type: integer, example: 42 }
+                  timestamp:      { type: string, format: date-time }
+                  endpoints:
+                    type: array
+                    items: { type: string }
+
+  /echo:
+    get:
+      tags: [misc]
+      operationId: echoGet
+      summary: Echo — reflects GET request back as JSON
+      parameters:
+        - in: query
+          name: any
+          schema: { type: string }
+          description: Any query parameters are reflected back
+      responses:
+        "200":
+          description: Reflected request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EchoResponse" }
+    post:
+      tags: [misc]
+      operationId: echoPost
+      summary: Echo — reflects POST request back as JSON
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Reflected request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EchoResponse" }
+    put:
+      tags: [misc]
+      operationId: echoPut
+      summary: Echo — reflects PUT request back as JSON
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Reflected request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EchoResponse" }
+    patch:
+      tags: [misc]
+      operationId: echoPatch
+      summary: Echo — reflects PATCH request back as JSON
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Reflected request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EchoResponse" }
+    delete:
+      tags: [misc]
+      operationId: echoDelete
+      summary: Echo — reflects DELETE request back as JSON
+      responses:
+        "200":
+          description: Reflected request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EchoResponse" }
+
+  /status/{code}:
+    get:
+      tags: [misc]
+      operationId: getStatus
+      summary: Return any HTTP status code
+      description: Useful for testing how your client handles 4xx/5xx responses.
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema: { type: integer, example: 404 }
+          description: HTTP status code to return (100–599)
+      responses:
+        default:
+          description: Response with the requested status code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:      { type: integer, example: 404 }
+                  text:      { type: string, example: Not Found }
+                  message:   { type: string }
+                  timestamp: { type: string, format: date-time }
+
+  /slow:
+    get:
+      tags: [misc]
+      operationId: slowResponse
+      summary: Delayed response
+      description: Waits for the given number of milliseconds before responding. Useful for testing timeouts and loading states.
+      parameters:
+        - in: query
+          name: delay
+          schema: { type: integer, default: 2000, maximum: 10000 }
+          description: Delay in milliseconds
+      responses:
+        "200":
+          description: Response after delay
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  delay:     { type: integer, example: 2000 }
+                  message:   { type: string }
+                  timestamp: { type: string, format: date-time }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Login — returns a Bearer token
+      description: Use `username=admin`, `password=secret`. The returned token is `demo-jwt-abc123`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: admin }
+                password: { type: string, example: secret }
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:      { type: string, example: demo-jwt-abc123 }
+                  token_type: { type: string, example: Bearer }
+                  expires_in: { type: integer, example: 3600 }
+                  user:       { $ref: "#/components/schemas/UserProfile" }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/profile:
+    get:
+      tags: [auth]
+      operationId: getProfile
+      summary: Get authenticated user profile
+      description: "Requires `Authorization: Bearer demo-jwt-abc123`."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserProfile" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/basic:
+    get:
+      tags: [auth]
+      operationId: basicAuth
+      summary: Basic authentication example
+      description: Use username `demo`, password `demo`.
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:     { type: string }
+                  username:    { type: string }
+                  auth_method: { type: string }
+                  timestamp:   { type: string, format: date-time }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /auth/apikey:
+    get:
+      tags: [auth]
+      operationId: apiKeyAuth
+      summary: API key authentication example
+      description: "Use header `X-Api-Key: demo-key-12345` or query param `?api_key=demo-key-12345`."
+      security:
+        - apiKeyHeader: []
+        - apiKeyQuery: []
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:     { type: string }
+                  key_prefix:  { type: string }
+                  scope:       { type: array, items: { type: string } }
+                  auth_method: { type: string }
+                  timestamp:   { type: string, format: date-time }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: List all users (paginated)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10, maximum: 100 }
+      responses:
+        "200":
+          description: Paginated user list
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserListResponse" }
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:  { type: string, example: Alice Smith }
+                email: { type: string, format: email, example: alice@example.com }
+                role:  { type: string, example: developer }
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "422":
+          description: Validation error — name and email are required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /users/{id}:
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: Get a user by ID
+      parameters:
+        - $ref: "#/components/parameters/userId"
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      tags: [users]
+      operationId: updateUser
+      summary: Update a user
+      parameters:
+        - $ref: "#/components/parameters/userId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:  { type: string }
+                email: { type: string, format: email }
+                role:  { type: string }
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: Delete a user
+      parameters:
+        - $ref: "#/components/parameters/userId"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /posts:
+    get:
+      tags: [posts]
+      operationId: listPosts
+      summary: List posts (paginated, 100 synthetic entries)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10, maximum: 50 }
+      responses:
+        "200":
+          description: Paginated post list
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostListResponse" }
+
+  /files/upload:
+    post:
+      tags: [files]
+      operationId: uploadFile
+      summary: Upload a file
+      description: |
+        Accepts two upload modes:
+        - `multipart/form-data` with field `file` for a real file upload
+        - `application/json` with `{filename, mimeType, sizeBytes}` for a simulated upload
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+          application/json:
+            schema:
+              type: object
+              properties:
+                filename:  { type: string, example: photo.jpg }
+                mimeType:  { type: string, example: image/jpeg }
+                sizeBytes: { type: integer, example: 204800 }
+      responses:
+        "201":
+          description: Upload accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:           { type: string }
+                  name:         { type: string }
+                  size:         { type: integer }
+                  content_type: { type: string }
+                  uploaded_at:  { type: string, format: date-time }
+                  url:          { type: string }
+
+  /feed:
+    get:
+      tags: [formats]
+      operationId: getAtomFeed
+      summary: Atom XML feed
+      responses:
+        "200":
+          description: Atom syndication feed
+          content:
+            application/atom+xml:
+              schema: { type: string }
+
+  /sitemap.xml:
+    get:
+      tags: [formats]
+      operationId: getSitemap
+      summary: XML sitemap (sitemaps.org schema)
+      responses:
+        "200":
+          description: Sitemap XML
+          content:
+            application/xml:
+              schema: { type: string }
+
+  /data.xml:
+    get:
+      tags: [formats]
+      operationId: getDataXML
+      summary: Users as structured XML with attributes
+      responses:
+        "200":
+          description: XML data
+          content:
+            application/xml:
+              schema: { type: string }
+
+  /page:
+    get:
+      tags: [formats]
+      operationId: getHTMLPage
+      summary: HTML status page
+      responses:
+        "200":
+          description: HTML page with server stats and links
+          content:
+            text/html:
+              schema: { type: string }
+
+  /report.html:
+    get:
+      tags: [formats]
+      operationId: getHTMLReport
+      summary: HTML table report of all users
+      responses:
+        "200":
+          description: HTML table report
+          content:
+            text/html:
+              schema: { type: string }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    basicAuth:
+      type: http
+      scheme: basic
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+    apiKeyQuery:
+      type: apiKey
+      in: query
+      name: api_key
+
+  parameters:
+    userId:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer, example: 1 }
+      description: Numeric user ID
+
+  schemas:
+
+    User:
+      type: object
+      properties:
+        id:        { type: integer, example: 1 }
+        name:      { type: string, example: Alice Smith }
+        email:     { type: string, format: email, example: alice@example.com }
+        role:      { type: string, example: admin }
+        createdAt: { type: string, format: date-time }
+
+    UserProfile:
+      type: object
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        email:       { type: string }
+        role:        { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+          example: [read, write, delete, admin]
+        last_login:  { type: string, format: date-time }
+        created_at:  { type: string, format: date-time }
+
+    UserListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/User" }
+        total:       { type: integer, example: 5 }
+        page:        { type: integer, example: 1 }
+        limit:       { type: integer, example: 10 }
+        total_pages: { type: integer, example: 1 }
+
+    Post:
+      type: object
+      properties:
+        id:         { type: integer }
+        title:      { type: string }
+        body:       { type: string }
+        author:     { type: string, format: email }
+        tags:
+          type: array
+          items: { type: string }
+        views:      { type: integer }
+        created_at: { type: string, format: date-time }
+
+    PostListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Post" }
+        total:       { type: integer, example: 100 }
+        page:        { type: integer, example: 1 }
+        limit:       { type: integer, example: 10 }
+        total_pages: { type: integer, example: 10 }
+
+    EchoResponse:
+      type: object
+      properties:
+        method:      { type: string, example: GET }
+        path:        { type: string, example: /echo }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+        queryParams:
+          type: object
+          additionalProperties: { type: string }
+        body:        { type: string }
+        timestamp:   { type: string, format: date-time }
+        message:     { type: string }
+
+    Error:
+      type: object
+      properties:
+        error:  { type: string }
+        status: { type: integer }

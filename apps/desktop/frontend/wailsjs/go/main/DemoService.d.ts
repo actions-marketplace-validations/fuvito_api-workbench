@@ -6,6 +6,8 @@ export function GetPort():Promise<number>;
 
 export function IsRunning():Promise<boolean>;
 
+export function OpenSpecInBrowser():Promise<string>;
+
 export function StartDemo():Promise<main.DemoResult>;
 
 export function StopDemo():Promise<void>;

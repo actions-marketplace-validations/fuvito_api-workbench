@@ -571,6 +571,55 @@ func (w *WorkspaceService) DeleteRequest(path string) error {
 	return nil
 }
 
+// ValidateEnvironmentYAML parses YAML content as an environment file.
+// Returns "" on success, or a human-readable error on failure.
+func (w *WorkspaceService) ValidateEnvironmentYAML(content string) string {
+	_, err := serialization.ParseEnvironmentFile([]byte(content), "env.yaml")
+	if err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// GetEnvironmentRaw returns the raw YAML/JSON text of an environment file for direct editing.
+func (w *WorkspaceService) GetEnvironmentRaw(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w", path, err)
+	}
+	return string(data), nil
+}
+
+// SaveEnvironmentRaw validates that content parses as a valid environment file, writes it
+// atomically, and returns the updated environment info.
+func (w *WorkspaceService) SaveEnvironmentRaw(path, content string) (*EnvironmentInfoIO, error) {
+	if path == "" {
+		if w.workspacePath == "" {
+			return nil, fmt.Errorf("no workspace open — open or create a workspace first")
+		}
+		return nil, fmt.Errorf("cannot save raw YAML without a file path — save via the form first")
+	}
+
+	ext := strings.TrimPrefix(filepath.Ext(path), ".")
+	if ext == "" {
+		ext = "yaml"
+	}
+
+	env, err := serialization.ParseEnvironmentFile([]byte(content), filepath.Base(path))
+	if err != nil {
+		return nil, fmt.Errorf("invalid environment YAML: %w", err)
+	}
+	if err := atomicWrite(path, []byte(content)); err != nil {
+		return nil, err
+	}
+
+	info := &EnvironmentInfoIO{Path: path, Name: env.Name}
+	if path == w.activeEnvPath {
+		w.activeEnv = env
+	}
+	return info, nil
+}
+
 // DeleteEnvironment removes an environment file.
 // If it was the active environment, the active selection is cleared.
 func (w *WorkspaceService) DeleteEnvironment(path string) error {
