@@ -1,16 +1,13 @@
 import { useState } from 'react'
 import { Search, X } from 'lucide-react'
-import type { FileNode, ScenarioInfo, FolderRunItem, TemplateInfo } from '@/lib/bridge'
-import { listTemplates, createFromTemplate, openInExplorer } from '@/lib/bridge'
-import type { RunAllState } from '@/components/Sidebar'
+import type { FileNode, FolderRunItem } from '@/lib/bridge'
+import { openInExplorer } from '@/lib/bridge'
 import { ContextMenu } from '@/components/ContextMenu'
-import { ScenarioTemplateGallery } from '@/components/ScenarioTemplateGallery'
 import { TreeNode } from './WorkspaceFileTree'
-import { buildFileMenuItems, buildScenarioMenuItems } from './workspaceMenus'
+import { buildFileMenuItems } from './workspaceMenus'
 import { WorkspacePanelHeader } from './WorkspacePanelHeader'
 import { WorkspaceEmptyState } from './WorkspaceEmptyState'
-import { FolderRunResults, RunAllResults } from './WorkspaceRunResults'
-import { WorkspaceScenarioSection } from './WorkspaceScenarioSection'
+import { FolderRunResults } from './WorkspaceRunResults'
 
 function filterTree(nodes: FileNode[], query: string): FileNode[] {
   if (!query) return nodes
@@ -33,24 +30,12 @@ export interface FolderRunState {
   results: FolderRunItem[]
 }
 
-// ---- Panel ----
-
 type WorkspacePanelProps = {
   workspacePath: string
   fileTree: FileNode[]
-  scenarios?: ScenarioInfo[]
   onOpenWorkspace: () => void
   onNewWorkspace: () => void
   onSelectFile: (path: string) => void
-  onSelectScenario?: (path: string, name: string) => void
-  onNewScenario?: (name: string) => void
-  onNewScenarioFile?: (path: string, name: string) => void
-  onDuplicateScenario?: (path: string) => void
-  onDeleteScenario?: (path: string) => void
-  onRenameScenario?: (path: string, newName: string) => void
-  runAllState?: RunAllState
-  onRunAllScenarios?: () => void
-  onDismissRunAll?: () => void
   onDeleteFile?: (path: string) => void
   onDuplicateFile?: (path: string) => void
   onDeleteFolder?: (path: string) => void
@@ -69,7 +54,6 @@ type WorkspacePanelProps = {
   importError?: string
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
-  scenarioError?: string | null
   onRunFolder?: (folderPath: string) => void
   folderRunState?: FolderRunState | null
   onDismissFolderRun?: () => void
@@ -78,19 +62,9 @@ type WorkspacePanelProps = {
 export function WorkspacePanel({
   workspacePath,
   fileTree,
-  scenarios = [],
   onOpenWorkspace,
   onNewWorkspace,
   onSelectFile,
-  onSelectScenario,
-  onNewScenario,
-  onNewScenarioFile,
-  onDuplicateScenario,
-  onDeleteScenario,
-  onRenameScenario,
-  runAllState,
-  onRunAllScenarios,
-  onDismissRunAll,
   onDeleteFile,
   onDuplicateFile,
   onDeleteFolder,
@@ -109,7 +83,6 @@ export function WorkspacePanel({
   importError,
   activeFilePath,
   dirtyFilePaths,
-  scenarioError,
   onRunFolder,
   folderRunState,
   onDismissFolderRun,
@@ -120,40 +93,7 @@ export function WorkspacePanel({
   const [searchQuery, setSearchQuery] = useState('')
   const filteredTree = filterTree(fileTree, searchQuery)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
-  const [showTemplates, setShowTemplates] = useState(false)
-  const [templates, setTemplates] = useState<TemplateInfo[]>([])
-  const [templatesLoading, setTemplatesLoading] = useState(false)
-
-  async function openTemplateGallery() {
-    setShowTemplates(true)
-    if (templates.length === 0) {
-      setTemplatesLoading(true)
-      const list = await listTemplates()
-      setTemplates(list)
-      setTemplatesLoading(false)
-    }
-  }
-
-  async function handleUseTemplate(templateID: string, name: string) {
-    setShowTemplates(false)
-    const result = await createFromTemplate(templateID, name)
-    if (!result.error && result.path) {
-      onNewScenarioFile?.(result.path, name)
-    }
-  }
-  const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
-
-  function handleToggleCollapse(path: string) {
-    setCollapsedPaths(prev => {
-      const next = new Set(prev)
-      if (next.has(path)) { next.delete(path) } else { next.add(path) }
-      return next
-    })
-  }
-
-  // ---- Context menu ----
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
-  const [scenarioCtxMenu, setScenarioCtxMenu] = useState<{ x: number; y: number; path: string; name: string } | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [explorerError, setExplorerError] = useState<string | null>(null)
 
@@ -165,10 +105,12 @@ export function WorkspacePanel({
     }
   }
 
-  function handleContextMenu(e: React.MouseEvent, node: FileNode) {
-    e.preventDefault()
-    e.stopPropagation()
-    setCtxMenu({ x: e.clientX, y: e.clientY, node })
+  function handleToggleCollapse(path: string) {
+    setCollapsedPaths(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) { next.delete(path) } else { next.add(path) }
+      return next
+    })
   }
 
   return (
@@ -239,7 +181,7 @@ export function WorkspacePanel({
                   dirtyFilePaths={dirtyFilePaths}
                   renamingPath={renamingPath}
                   onRenameEnd={() => setRenamingPath(null)}
-                  onContextMenu={handleContextMenu}
+                  onContextMenu={(e, node) => setCtxMenu({ x: e.clientX, y: e.clientY, node })}
                   collapsedPaths={collapsedPaths}
                   onToggleCollapse={handleToggleCollapse}
                 />
@@ -247,26 +189,6 @@ export function WorkspacePanel({
             )}
             {folderRunState && (
               <FolderRunResults state={folderRunState} onSelectFile={onSelectFile} onDismiss={onDismissFolderRun} />
-            )}
-
-            <WorkspaceScenarioSection
-              scenarios={scenarios}
-              scenarioError={scenarioError}
-              runAllState={runAllState}
-              onRunAllScenarios={onRunAllScenarios}
-              onNewScenario={onNewScenario}
-              onSelectScenario={onSelectScenario}
-              onDuplicateScenario={onDuplicateScenario}
-              onDeleteScenario={onDeleteScenario}
-              onRenameScenario={onRenameScenario}
-              onOpenTemplateGallery={openTemplateGallery}
-              renamingScenarioPath={renamingScenarioPath}
-              onRenamingChange={setRenamingScenarioPath}
-              onScenarioContextMenu={(e, path, name) => setScenarioCtxMenu({ x: e.clientX, y: e.clientY, path, name })}
-            />
-
-            {runAllState && (
-              <RunAllResults state={runAllState} onSelectScenario={onSelectScenario} onDismiss={onDismissRunAll} />
             )}
           </div>
         </>
@@ -295,29 +217,6 @@ export function WorkspacePanel({
             onOpenInExplorer: handleOpenInExplorer,
           })}
           onClose={() => setCtxMenu(null)}
-        />
-      )}
-
-      {scenarioCtxMenu && (
-        <ContextMenu
-          x={scenarioCtxMenu.x}
-          y={scenarioCtxMenu.y}
-          items={buildScenarioMenuItems(scenarioCtxMenu, {
-            onOpen: (path, name) => onSelectScenario?.(path, name),
-            onDuplicate: onDuplicateScenario,
-            onRename: setRenamingScenarioPath,
-            onDelete: onDeleteScenario,
-          })}
-          onClose={() => setScenarioCtxMenu(null)}
-        />
-      )}
-
-      {showTemplates && (
-        <ScenarioTemplateGallery
-          templates={templates}
-          loading={templatesLoading}
-          onUse={handleUseTemplate}
-          onClose={() => setShowTemplates(false)}
         />
       )}
     </div>

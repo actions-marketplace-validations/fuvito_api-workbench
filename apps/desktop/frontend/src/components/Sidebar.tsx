@@ -2,11 +2,11 @@ import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
 import type { FolderRunState } from '@/components/WorkspacePanel'
+import { ScenariosPanel } from '@/components/ScenariosPanel'
+import type { RailTab } from '@/components/ActivityRail'
 import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
 
 export type { FolderRunState }
-
-export type SidebarTab = 'workspace' | 'history'
 
 export interface RunAllEntry {
   path: string
@@ -25,9 +25,7 @@ export interface RunAllState {
 }
 
 export type SidebarProps = {
-  width: number
-  tab: SidebarTab
-  onTabChange: (t: SidebarTab) => void
+  tab: RailTab
   workspacePath: string
   fileTree: FileNode[]
   history: HistoryEntry[]
@@ -71,8 +69,7 @@ export type SidebarProps = {
 }
 
 export function Sidebar({
-  width,
-  tab, onTabChange,
+  tab,
   workspacePath, fileTree, history, scenarios,
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
@@ -80,101 +77,75 @@ export function Sidebar({
   onSelectHistory, onClearHistory,
   onImportOpenAPI, onImportPostman, onImportInsomnia, onTryDemo, demoStarting, onRefresh, importing, importError,
   activeFilePath, dirtyFilePaths,
-  onSelectScenario,
-  onNewScenario,
-  onNewScenarioFile,
-  onDuplicateScenario,
-  onDeleteScenario,
-  onRenameScenario,
-  runAllState,
-  onRunAllScenarios,
-  onDismissRunAll,
-  scenarioError,
-  onRunFolder,
-  folderRunState,
-  onDismissFolderRun,
+  onSelectScenario, onNewScenario, onNewScenarioFile,
+  onDuplicateScenario, onDeleteScenario, onRenameScenario,
+  runAllState, onRunAllScenarios, onDismissRunAll, scenarioError,
+  onRunFolder, folderRunState, onDismissFolderRun,
 }: SidebarProps) {
   return (
-    <aside
-      className="shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)]"
-      style={{ width }}
-    >
-      {/* Tab bar */}
-      <div className="flex border-b border-[var(--color-border)]">
-        {(['workspace', 'history'] as SidebarTab[]).map(t => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => onTabChange(t)}
-            className={cn(
-              'flex-1 py-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors',
-              tab === t
-                ? 'text-[var(--color-foreground)] border-b-2 border-[var(--color-accent)]'
-                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] border-b-2 border-transparent',
-            )}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {tab === 'explorer' && (
+        <WorkspacePanel
+          workspacePath={workspacePath}
+          fileTree={fileTree}
+          onOpenWorkspace={onOpenWorkspace}
+          onNewWorkspace={onNewWorkspace}
+          onSelectFile={onSelectFile}
+          onDeleteFile={onDeleteFile}
+          onDuplicateFile={onDuplicateFile}
+          onDeleteFolder={onDeleteFolder}
+          onNewRequestInFolder={onNewRequestInFolder}
+          onCreateFolder={onCreateFolder}
+          onRenameFile={onRenameFile}
+          onRenameFolder={onRenameFolder}
+          onMoveFile={onMoveFile}
+          onImportOpenAPI={onImportOpenAPI}
+          onImportPostman={onImportPostman}
+          onImportInsomnia={onImportInsomnia}
+          onTryDemo={onTryDemo}
+          demoStarting={demoStarting}
+          onRefresh={onRefresh}
+          importing={importing}
+          importError={importError}
+          activeFilePath={activeFilePath}
+          dirtyFilePaths={dirtyFilePaths}
+          onRunFolder={onRunFolder}
+          folderRunState={folderRunState}
+          onDismissFolderRun={onDismissFolderRun}
+        />
+      )}
 
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {tab === 'workspace' && (
-          <WorkspacePanel
-            workspacePath={workspacePath}
-            fileTree={fileTree}
-            onOpenWorkspace={onOpenWorkspace}
-            onNewWorkspace={onNewWorkspace}
-            onSelectFile={onSelectFile}
-            onDeleteFile={onDeleteFile}
-            onDuplicateFile={onDuplicateFile}
-            onDeleteFolder={onDeleteFolder}
-            onNewRequestInFolder={onNewRequestInFolder}
-            onCreateFolder={onCreateFolder}
-            onRenameFile={onRenameFile}
-            onRenameFolder={onRenameFolder}
-            onMoveFile={onMoveFile}
-            onImportOpenAPI={onImportOpenAPI}
-            onImportPostman={onImportPostman}
-            onImportInsomnia={onImportInsomnia}
-            onTryDemo={onTryDemo}
-            demoStarting={demoStarting}
-            onRefresh={onRefresh}
-            importing={importing}
-            importError={importError}
-            activeFilePath={activeFilePath}
-            dirtyFilePaths={dirtyFilePaths}
-            scenarios={scenarios}
-            onSelectScenario={onSelectScenario}
-            onNewScenario={onNewScenario}
-            onNewScenarioFile={onNewScenarioFile}
-            onDuplicateScenario={onDuplicateScenario}
-            onDeleteScenario={onDeleteScenario}
-            onRenameScenario={onRenameScenario}
-            runAllState={runAllState}
-            onRunAllScenarios={onRunAllScenarios}
-            onDismissRunAll={onDismissRunAll}
-            scenarioError={scenarioError}
-            onRunFolder={onRunFolder}
-            folderRunState={folderRunState}
-            onDismissFolderRun={onDismissFolderRun}
-          />
-        )}
+      {tab === 'scenarios' && (
+        <ScenariosPanel
+          workspacePath={workspacePath}
+          scenarios={scenarios ?? []}
+          scenarioError={scenarioError}
+          runAllState={runAllState}
+          onRunAllScenarios={onRunAllScenarios}
+          onDismissRunAll={onDismissRunAll}
+          onSelectScenario={onSelectScenario}
+          onNewScenario={onNewScenario}
+          onNewScenarioFile={onNewScenarioFile}
+          onDuplicateScenario={onDuplicateScenario}
+          onDeleteScenario={onDeleteScenario}
+          onRenameScenario={onRenameScenario}
+        />
+      )}
 
-        {tab === 'history' && (
-          <div className="flex flex-col flex-1 overflow-hidden">
-            {history.length > 0 && (
-              <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0">
-                <button
-                  type="button"
-                  onClick={onClearHistory}
-                  className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
-                >
-                  Clear history
-                </button>
-              </div>
-            )}
-            <div className="flex-1 overflow-auto">
+      {tab === 'history' && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {history.length > 0 && (
+            <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0">
+              <button
+                type="button"
+                onClick={onClearHistory}
+                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+              >
+                Clear history
+              </button>
+            </div>
+          )}
+          <div className="flex-1 overflow-auto">
             {history.length === 0 ? (
               <p className="p-3 text-xs text-[var(--color-muted-foreground)]">No requests yet.</p>
             ) : (
@@ -213,10 +184,9 @@ export function Sidebar({
                 ))}
               </ul>
             )}
-            </div>
           </div>
-        )}
-      </div>
-    </aside>
+        </div>
+      )}
+    </div>
   )
 }

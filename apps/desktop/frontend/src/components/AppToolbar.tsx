@@ -1,53 +1,24 @@
-import { useState, useRef, useEffect } from 'react'
-import { FolderOpen, Save, FilePlus, Settings, Pencil, CopyPlus, HelpCircle, MoreHorizontal } from 'lucide-react'
+import { FolderOpen, Save, FilePlus, CopyPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SnippetButton } from '@/components/SnippetButton'
 import { isTabDirty } from '@/lib/tabState'
 import type { TabState } from '@/lib/tabState'
 import { METHOD_COLOR } from '@/lib/httpUtils'
-import type { EnvInfo } from '@/lib/bridge'
 
 type AppToolbarProps = {
   activeTab: TabState
   activeTabId: string
   updateTab: (id: string, patch: Partial<TabState>) => void
-  environments: EnvInfo[]
-  activeEnv: EnvInfo | null
-  workspacePath: string
-  demoRunning: boolean
-  demoPort: number
   onOpenRequest: () => void
   onSaveRequest: () => void
   onNewRequest: () => void
   onDuplicateTab: () => void
-  onShowSettings: () => void
-  onShowHelp: () => void
-  onEnvChange: (path: string) => void
-  onEditEnv: () => void
-  onStopDemo: () => void
 }
 
 export function AppToolbar({
   activeTab, activeTabId, updateTab,
-  environments, activeEnv, workspacePath,
-  demoRunning, demoPort,
   onOpenRequest, onSaveRequest, onNewRequest, onDuplicateTab,
-  onShowSettings, onShowHelp, onEnvChange, onEditEnv, onStopDemo,
 }: AppToolbarProps) {
-  const [overflowOpen, setOverflowOpen] = useState(false)
-  const overflowRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!overflowOpen) return
-    function handleClick(e: MouseEvent) {
-      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
-        setOverflowOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [overflowOpen])
-
   return (
     <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -139,92 +110,6 @@ export function AppToolbar({
           </button>
         )}
         {activeTab.kind !== 'scenario' && <SnippetButton tab={activeTab} />}
-
-        {/* Overflow menu: Settings + Help */}
-        <div ref={overflowRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setOverflowOpen(o => !o)}
-            title="More actions"
-            className={cn('p-1.5 rounded transition-colors',
-              overflowOpen
-                ? 'text-[var(--color-foreground)] bg-[var(--color-muted)]'
-                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]'
-            )}
-          >
-            <MoreHorizontal size={13} />
-          </button>
-          {overflowOpen && (
-            <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1">
-              <button
-                type="button"
-                onClick={() => { setOverflowOpen(false); onShowSettings() }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
-              >
-                <Settings size={12} />
-                Settings
-              </button>
-              <button
-                type="button"
-                onClick={() => { setOverflowOpen(false); onShowHelp() }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
-              >
-                <HelpCircle size={12} />
-                User Guide
-              </button>
-            </div>
-          )}
-        </div>
-
-        {environments.length > 0 && (
-          <div className="w-px h-4 bg-[var(--color-border)]" />
-        )}
-
-        {environments.length > 0 && (
-          <select
-            value={activeEnv?.path ?? ''}
-            onChange={e => onEnvChange(e.target.value)}
-            className={cn(
-              'bg-[var(--color-muted)] text-xs rounded px-2 py-0.5',
-              'border border-[var(--color-border)] outline-none cursor-pointer',
-              activeEnv ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]',
-            )}
-          >
-            <option value="">No environment</option>
-            {environments.map(env => (
-              <option key={env.path} value={env.path}>{env.name}</option>
-            ))}
-          </select>
-        )}
-
-        {workspacePath && (
-          <button type="button" onClick={onEditEnv}
-            title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'Create environment'}
-            className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
-            <Pencil size={13} />
-          </button>
-        )}
-
-        {demoRunning && (
-          <>
-            <div className="w-px h-4 bg-[var(--color-border)]" />
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(`http://localhost:${demoPort}`).catch(() => {})}
-                title={`Copy base URL: http://localhost:${demoPort}`}
-                className="text-emerald-400 font-mono hover:text-emerald-300 transition-colors"
-              >
-                Demo :{demoPort}
-              </button>
-              <button type="button" onClick={onStopDemo} title="Stop demo server"
-                className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors leading-none">
-                ✕
-              </button>
-            </div>
-          </>
-        )}
       </div>
     </header>
   )
