@@ -93,7 +93,6 @@ type EnvironmentIO struct {
 type RequestFileIO struct {
 	SchemaVersion string          `json:"schemaVersion"`
 	Title         string          `json:"title"`
-	Description   string          `json:"description,omitempty"`
 	Method        string          `json:"method"`
 	URL           string          `json:"url"`
 	Headers       []HeaderIO      `json:"headers,omitempty"`
@@ -734,7 +733,6 @@ func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
 	out := &RequestFileIO{
 		SchemaVersion: req.SchemaVersion,
 		Title:         req.Title,
-		Description:   req.Description,
 		Method:        string(req.Method),
 		URL:           req.URL,
 	}
@@ -772,7 +770,6 @@ func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
 func requestFileIOToDomain(r RequestFileIO) *domain.Request {
 	req := &domain.Request{
 		Title:       r.Title,
-		Description: r.Description,
 		Method:      domain.HTTPMethod(r.Method),
 		URL:         r.URL,
 	}

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import {
-  ChevronRight, ChevronDown, FileText, Folder, FolderOpen,
+  ChevronRight, ChevronDown, Folder, FolderOpen,
   FolderPlus, FilePlus, Trash2, CopyPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -129,7 +129,7 @@ export function TreeNode({
       >
         <div
           className={cn(
-            'group flex items-center hover:bg-[var(--color-muted)] transition-colors',
+            'group flex items-center gap-1.5 hover:bg-[var(--color-muted)] transition-colors',
             isDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40',
           )}
           style={{ paddingLeft: `${8 + indent}px` }}
@@ -138,12 +138,12 @@ export function TreeNode({
           <button
             type="button"
             onClick={() => onToggleCollapse(node.path)}
-            className="flex items-center gap-1 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
+            className="flex items-center gap-1.5 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
           >
             <span className="shrink-0">
               {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </span>
-            <span className="shrink-0">
+            <span className="shrink-0 text-amber-500">
               {expanded ? <FolderOpen size={12} /> : <Folder size={12} />}
             </span>
           </button>
@@ -245,7 +245,12 @@ export function TreeNode({
       style={{ paddingLeft: `${6 + indent + 15}px` }}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, node) }}
     >
-      <FileText size={11} className="shrink-0" />
+      <span className="w-9 shrink-0 flex items-center">
+        {node.method
+          ? <span className={cn('font-mono text-[9px] font-bold', METHOD_COLORS[node.method] ?? 'text-[var(--color-muted-foreground)]')}>{node.method.slice(0, 4)}</span>
+          : <span className="text-[var(--color-muted-foreground)] text-[9px] font-mono">—</span>
+        }
+      </span>
       {isRenaming ? (
         <RenameInput
           initialValue={displayName}
@@ -265,7 +270,6 @@ export function TreeNode({
           >
             {displayName}
           </span>
-          {node.method && <MethodBadge method={node.method} />}
           {dirtyFilePaths?.has(node.path) && (
             <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
           )}

@@ -55,7 +55,6 @@ type RequestBody struct {
 type Request struct {
 	SchemaVersion string
 	Title         string
-	Description   string
 	Method        HTTPMethod
 	URL           string
 	Headers       []Header

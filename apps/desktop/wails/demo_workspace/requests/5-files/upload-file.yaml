@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: Upload File
+title: Upload File
 method: POST
 url: "{{baseUrl}}/files/upload"
 body:

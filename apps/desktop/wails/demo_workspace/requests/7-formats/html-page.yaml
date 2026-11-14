@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: HTML Page
+title: HTML Page
 method: GET
 url: "{{baseUrl}}/page"
 headers:

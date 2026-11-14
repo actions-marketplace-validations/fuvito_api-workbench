@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: API Key Auth
+title: API Key Auth
 method: GET
 url: "{{baseUrl}}/auth/apikey"
 auth:

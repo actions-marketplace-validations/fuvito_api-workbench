@@ -1,4 +1,4 @@
 schemaVersion: "1"
-name: Delete User
+title: Delete User
 method: DELETE
 url: "{{baseUrl}}/users/{{userId}}"

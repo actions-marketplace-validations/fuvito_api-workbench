@@ -1,4 +1,4 @@
 schemaVersion: "1"
-name: Get User
+title: Get User
 method: GET
 url: "{{baseUrl}}/users/{{userId}}"

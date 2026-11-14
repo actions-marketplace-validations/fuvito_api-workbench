@@ -157,7 +157,6 @@ export interface EnvInfo {
 export interface RequestFileIO {
   schemaVersion: string
   title: string
-  description?: string
   method: string
   url: string
   headers?: Array<{ name: string; value: string }>

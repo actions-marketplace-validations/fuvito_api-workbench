@@ -206,7 +206,11 @@ func (s *RequestService) GetHistory() []HistoryEntryIO {
 	if s.store == nil {
 		return nil
 	}
-	entries, err := s.store.Recent(100)
+	wsPath := ""
+	if s.workspace != nil {
+		wsPath = s.workspace.GetWorkspacePath()
+	}
+	entries, err := s.store.Recent(wsPath, 100)
 	if err != nil {
 		log.Printf("reading history: %v", err)
 		return nil
@@ -249,7 +253,11 @@ func (s *RequestService) ClearHistory() {
 	if s.store == nil {
 		return
 	}
-	if err := s.store.Clear(); err != nil {
+	wsPath := ""
+	if s.workspace != nil {
+		wsPath = s.workspace.GetWorkspacePath()
+	}
+	if err := s.store.Clear(wsPath); err != nil {
 		log.Printf("clearing history: %v", err)
 	}
 }
@@ -267,7 +275,11 @@ func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {
 		bodyType = input.Body.Type
 		bodyContent = input.Body.Content
 	}
-	if _, err := s.store.Record(input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size, headers, bodyType, bodyContent); err != nil {
+	wsPath := ""
+	if s.workspace != nil {
+		wsPath = s.workspace.GetWorkspacePath()
+	}
+	if _, err := s.store.Record(wsPath, input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size, headers, bodyType, bodyContent); err != nil {
 		log.Printf("writing history: %v", err)
 	}
 }

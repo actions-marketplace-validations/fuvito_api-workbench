@@ -1,4 +1,4 @@
 schemaVersion: "1"
-name: Sitemap (XML)
+title: Sitemap (XML)
 method: GET
 url: "{{baseUrl}}/sitemap.xml"

@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: Atom Feed (XML)
+title: Atom Feed (XML)
 method: GET
 url: "{{baseUrl}}/feed"
 headers:

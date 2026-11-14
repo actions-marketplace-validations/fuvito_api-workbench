@@ -1,5 +1,5 @@
 schemaVersion: "1"
-name: Create User
+title: Create User
 method: POST
 url: "{{baseUrl}}/users"
 body:

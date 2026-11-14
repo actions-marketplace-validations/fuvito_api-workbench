@@ -3,6 +3,10 @@ import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
 import { AppToolbar } from '@/components/AppToolbar'
+import { ActivityRail } from '@/components/ActivityRail'
+import type { RailTab } from '@/components/ActivityRail'
+import { StatusBar } from '@/components/StatusBar'
+import { LandingPage } from '@/components/LandingPage'
 import { SettingsPanel } from '@/components/SettingsPanel'
 import { HelpPanel } from '@/components/HelpPanel'
 import { EnvironmentEditor } from '@/components/EnvironmentEditor'
@@ -10,7 +14,6 @@ import { RequestEditor } from '@/components/RequestEditor'
 import { ResponseViewer } from '@/components/ResponseViewer'
 import { ScenarioViewer } from '@/components/ScenarioViewer'
 import { Sidebar } from '@/components/Sidebar'
-import type { SidebarTab } from '@/components/Sidebar'
 import { AboutDialog } from '@/components/AboutDialog'
 import {
   DeleteRequestDialog,
@@ -25,7 +28,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo } from '@/lib/bridge'
 import type { FolderRunState } from '@/components/Sidebar'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
@@ -48,13 +51,14 @@ export default function App() {
   const demo = useDemo({
     refreshWorkspace: workspace.refreshWorkspace,
     setTabsState: tabs.setTabsState,
+    openFirstFileInTree: workspace.openFirstFileInTree,
   })
 
   // Wire cross-dependency after both hooks are initialized
   // eslint-disable-next-line react/refs
   refreshWorkspaceRef.current = workspace.refreshFileTree
 
-  // Local UI state
+  // Layout state
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const v = parseInt(localStorage.getItem('ui.sidebarWidth') ?? '')
     return isNaN(v) ? 224 : Math.max(160, Math.min(480, v))
@@ -63,18 +67,81 @@ export default function App() {
     const v = parseInt(localStorage.getItem('ui.responseWidth') ?? '')
     return isNaN(v) ? 0 : Math.max(0, v)
   })
+  const [railTab, setRailTab] = useState<RailTab>(() => {
+    const v = localStorage.getItem('ui.railTab') as RailTab | null
+    return v === 'explorer' || v === 'scenarios' || v === 'history' ? v : 'explorer'
+  })
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    return localStorage.getItem('ui.sidebarOpen') !== 'false'
+  })
+  const [railExpanded, setRailExpanded] = useState(() => {
+    return localStorage.getItem('ui.railExpanded') === 'true'
+  })
+
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
   const sidebarWidthRef = useRef(sidebarWidth)
   const responseWidthRef = useRef(responseWidth)
   useEffect(() => { sidebarWidthRef.current = sidebarWidth }, [sidebarWidth])
   useEffect(() => { responseWidthRef.current = responseWidth }, [responseWidth])
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('workspace')
+
+  function handleRailTabClick(tab: RailTab) {
+    if (tab === railTab && sidebarOpen) {
+      setSidebarOpen(false)
+      localStorage.setItem('ui.sidebarOpen', 'false')
+    } else {
+      setRailTab(tab)
+      localStorage.setItem('ui.railTab', tab)
+      setSidebarOpen(true)
+      localStorage.setItem('ui.sidebarOpen', 'true')
+    }
+  }
+
+  function handleToggleRailExpanded() {
+    setRailExpanded(prev => {
+      const next = !prev
+      localStorage.setItem('ui.railExpanded', String(next))
+      return next
+    })
+  }
+
+  // Modal / overlay state
   const [showAbout, setShowAbout] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
   const [scenarioRenameError, setScenarioRenameError] = useState<string | null>(null)
+  const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState(false)
+  const [pendingWorkspaceAction, setPendingWorkspaceAction] = useState<(() => void) | null>(null)
+
+  async function doCloseWorkspace() {
+    if (demo.demoRunning) {
+      try { await stopDemo() } catch { /* best-effort */ }
+      demo.clearDemoState()
+    }
+    await workspace.handleCloseWorkspace()
+  }
+
+  function requestCloseWorkspace() {
+    const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingWorkspaceAction(null)
+      setPendingCloseWorkspace(true)
+    } else {
+      doCloseWorkspace()
+    }
+  }
+
+  function requestWorkspaceSwitch(action: () => void) {
+    if (!workspace.workspacePath) { action(); return }
+    const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingWorkspaceAction(() => action)
+      setPendingCloseWorkspace(true)
+    } else {
+      doCloseWorkspace().then(() => action())
+    }
+  }
 
   // Run All Scenarios state
   const [runAllState, setRunAllState] = useState<import('@/components/Sidebar').RunAllState | null>(null)
@@ -240,7 +307,7 @@ export default function App() {
     }
   }
 
-  // Keyboard shortcuts — registered once, reads from refs
+  // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'S' && e.shiftKey) {
@@ -264,9 +331,13 @@ export default function App() {
         e.preventDefault()
         handleSendRef.current?.()
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault()
-        workspace.handleOpenRequest()
+        setSidebarOpen(o => {
+          const next = !o
+          localStorage.setItem('ui.sidebarOpen', String(next))
+          return next
+        })
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
         e.preventDefault()
@@ -289,39 +360,62 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Menus
-  const menus: MenuDef[] = [
+  // Menus — context-sensitive: landing (no workspace) vs full (workspace open)
+  const helpMenu: MenuDef = {
+    label: 'Help',
+    items: [
+      {
+        kind: 'action',
+        label: demo.demoStarting ? 'Starting Demo…' : demo.demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
+        onClick: demo.demoRunning ? demo.handleStopDemo : demo.handleStartDemo,
+        disabled: demo.demoStarting,
+      },
+      { kind: 'separator' },
+      { kind: 'action', label: 'User Guide', onClick: () => setShowHelp(true) },
+      { kind: 'separator' },
+      { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
+    ],
+  }
+  const viewMenu: MenuDef = {
+    label: 'View',
+    items: [
+      { kind: 'action', label: settings.settings.theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme', onClick: settings.handleToggleTheme },
+      { kind: 'separator' },
+      { kind: 'action', label: 'Settings…', onClick: () => settings.setShowSettings(true) },
+    ],
+  }
+  const recentWorkspacesSubmenu = {
+    kind: 'submenu' as const,
+    label: 'Recent Workspaces',
+    disabled: workspace.recentWorkspaces.length === 0,
+    items: workspace.recentWorkspaces.map(p => ({
+      kind: 'action' as const,
+      label: p.split(/[\\/]/).pop() ?? p,
+      title: p,
+      onClick: () => requestWorkspaceSwitch(() => workspace.handleOpenWorkspaceByPath(p)),
+    })),
+  }
+
+  const menus: MenuDef[] = workspace.workspacePath ? [
     {
       label: 'File',
       items: [
-        { kind: 'action', label: 'Open Workspace…',  onClick: workspace.handleOpenWorkspace },
-        { kind: 'action', label: 'New Workspace…',   onClick: workspace.handleNewWorkspace },
-        { kind: 'action', label: 'Close Workspace',  onClick: workspace.handleCloseWorkspace, disabled: !workspace.workspacePath },
-        {
-          kind: 'submenu',
-          label: 'Recent Workspaces',
-          disabled: workspace.recentWorkspaces.length === 0,
-          items: workspace.recentWorkspaces.map(p => ({
-            kind: 'action' as const,
-            label: p.split(/[\\/]/).pop() ?? p,
-            title: p,
-            onClick: () => workspace.handleOpenWorkspaceByPath(p),
-          })),
-        },
+        { kind: 'action', label: 'Open Workspace…',  onClick: () => requestWorkspaceSwitch(workspace.handleOpenWorkspace) },
+        { kind: 'action', label: 'New Workspace…',   onClick: () => requestWorkspaceSwitch(workspace.handleNewWorkspace) },
+        { kind: 'action', label: 'Close Workspace',  onClick: requestCloseWorkspace },
+        recentWorkspacesSubmenu,
         { kind: 'separator' },
-        { kind: 'action', label: 'New Tab',    shortcut: 'Ctrl+N',       onClick: tabs.handleNewTab },
-        { kind: 'action', label: 'Open Request…', shortcut: 'Ctrl+O',    onClick: workspace.handleOpenRequest },
-        { kind: 'action', label: 'Save Request',  shortcut: 'Ctrl+S',    onClick: tabs.handleSaveRequest },
-        { kind: 'action', label: 'Save All',      shortcut: 'Ctrl+Shift+S', onClick: tabs.handleSaveAll, disabled: tabs.dirtyFilePaths.size === 0 },
-        { kind: 'action', label: 'Save As…',                              onClick: tabs.handleSaveAsRequest },
+        { kind: 'action', label: 'New Tab',       shortcut: 'Ctrl+N',        onClick: tabs.handleNewTab },
+        { kind: 'action', label: 'Save Request',  shortcut: 'Ctrl+S',        onClick: tabs.handleSaveRequest },
+        { kind: 'action', label: 'Save All',      shortcut: 'Ctrl+Shift+S',  onClick: tabs.handleSaveAll, disabled: tabs.dirtyFilePaths.size === 0 },
+        { kind: 'action', label: 'Save As…',                                 onClick: tabs.handleSaveAsRequest },
         { kind: 'separator' },
         {
           kind: 'submenu',
           label: 'Import',
-          disabled: !workspace.workspacePath,
           items: [
-            { kind: 'action', label: 'OpenAPI Spec…',      onClick: workspace.handleImportOpenAPI },
-            { kind: 'action', label: 'OpenAPI from URL…',  onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) } },
+            { kind: 'action', label: 'OpenAPI Spec…',       onClick: workspace.handleImportOpenAPI },
+            { kind: 'action', label: 'OpenAPI from URL…',   onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) } },
             { kind: 'separator' },
             { kind: 'action', label: 'Postman Collection…', onClick: workspace.handleImportPostman },
             { kind: 'action', label: 'Insomnia Export…',    onClick: workspace.handleImportInsomnia },
@@ -347,29 +441,21 @@ export default function App() {
         { kind: 'action', label: 'Exit', onClick: quitApp },
       ],
     },
+    viewMenu,
+    helpMenu,
+  ] : [
     {
-      label: 'View',
+      label: 'File',
       items: [
-        { kind: 'action', label: settings.settings.theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme', onClick: settings.handleToggleTheme },
+        { kind: 'action', label: 'Open Workspace…', onClick: workspace.handleOpenWorkspace },
+        { kind: 'action', label: 'New Workspace…',  onClick: workspace.handleNewWorkspace },
+        recentWorkspacesSubmenu,
         { kind: 'separator' },
-        { kind: 'action', label: 'Settings…', onClick: () => settings.setShowSettings(true) },
+        { kind: 'action', label: 'Exit', onClick: quitApp },
       ],
     },
-    {
-      label: 'Help',
-      items: [
-        {
-          kind: 'action',
-          label: demo.demoStarting ? 'Starting Demo…' : demo.demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
-          onClick: demo.demoRunning ? demo.handleStopDemo : demo.handleStartDemo,
-          disabled: demo.demoStarting,
-        },
-        { kind: 'separator' },
-        { kind: 'action', label: 'User Guide', onClick: () => setShowHelp(true) },
-        { kind: 'separator' },
-        { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
-      ],
-    },
+    viewMenu,
+    helpMenu,
   ]
 
   const { tabs: tabList, activeTabId, activeTab, updateTab } = tabs
@@ -386,6 +472,7 @@ export default function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       <MenuBar menus={menus} />
 
+      {/* Dialogs */}
       {workspace.deletingFilePath && (
         <DeleteRequestDialog
           filePath={workspace.deletingFilePath}
@@ -393,10 +480,8 @@ export default function App() {
           onConfirm={workspace.confirmDeleteFile}
         />
       )}
-
       {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
-
       {workspace.importFromURLDialog && (
         <ImportFromURLDialog
           value={workspace.importFromURLInput}
@@ -406,7 +491,6 @@ export default function App() {
           error={workspace.importFromURLError}
         />
       )}
-
       {workspace.newFolderDialog && (
         <NewFolderDialog
           parentLabel={workspace.newFolderDialog.parentLabel}
@@ -417,7 +501,6 @@ export default function App() {
           error={workspace.newFolderError}
         />
       )}
-
       {workspace.deletingFolderPath && (
         <DeleteFolderDialog
           folderPath={workspace.deletingFolderPath}
@@ -425,7 +508,6 @@ export default function App() {
           onConfirm={workspace.confirmDeleteFolder}
         />
       )}
-
       {closingTab && (
         <CloseDirtyTabDialog
           tabName={closingTab.name}
@@ -437,7 +519,6 @@ export default function App() {
           }}
         />
       )}
-
       {tabs.closingDirtyScenarioTabId && (() => {
         const t = tabList.find(x => x.id === tabs.closingDirtyScenarioTabId)
         return t ? (
@@ -449,7 +530,6 @@ export default function App() {
           />
         ) : null
       })()}
-
       {tabs.pendingBulkClose && (() => {
         const dirtyCount = tabs.pendingBulkClose.tabIds.filter(id => {
           const t = tabList.find(x => x.id === id)
@@ -465,7 +545,23 @@ export default function App() {
           />
         )
       })()}
-
+      {pendingCloseWorkspace && (() => {
+        const dirtyCount = tabList.filter(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty)).length
+        const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
+        const action = pendingWorkspaceAction
+        return (
+          <DiscardChangesDialog
+            title={action ? 'Switch workspace' : 'Close workspace'}
+            message={`${dirtyCount} ${noun} unsaved changes. ${action ? 'Switch workspace' : 'Close workspace'} and discard them?`}
+            onCancel={() => { setPendingCloseWorkspace(false); setPendingWorkspaceAction(null) }}
+            onDiscard={() => {
+              setPendingCloseWorkspace(false)
+              setPendingWorkspaceAction(null)
+              doCloseWorkspace().then(() => action?.())
+            }}
+          />
+        )
+      })()}
       {deletingScenario && (
         <DeleteScenarioDialog
           name={deletingScenario.name}
@@ -484,232 +580,267 @@ export default function App() {
         />
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        {settings.showSettings && (
-          <SettingsPanel
-            settings={settings.settings}
-            onSave={settings.handleSaveSettings}
-            onReset={settings.handleResetSettings}
-            onPreview={settings.applySettings}
-            onClose={() => { settings.applySettings(settings.settings); settings.setShowSettings(false) }}
-          />
-        )}
-
-        {showEnvEditor && (
-          <EnvironmentEditor
-            envPath={editingEnvPath}
-            workspacePath={workspace.workspacePath}
-            onClose={() => setShowEnvEditor(false)}
-            onSaved={async saved => {
-              setShowEnvEditor(false)
-              await workspace.refreshWorkspace()
-              try { await selectEnvironment(saved.path) } catch { /* best-effort */ }
-              await workspace.refreshWorkspace()
-            }}
-            onDeleted={async () => {
-              setShowEnvEditor(false)
-              await workspace.refreshWorkspace()
-            }}
-          />
-        )}
-
-        <Sidebar
-          width={sidebarWidth}
-          tab={sidebarTab}
-          onTabChange={setSidebarTab}
+      {/* Overlays */}
+      {settings.showSettings && (
+        <SettingsPanel
+          settings={settings.settings}
+          onSave={settings.handleSaveSettings}
+          onReset={settings.handleResetSettings}
+          onPreview={settings.applySettings}
+          onClose={() => { settings.applySettings(settings.settings); settings.setShowSettings(false) }}
+        />
+      )}
+      {showEnvEditor && (
+        <EnvironmentEditor
+          envPath={editingEnvPath}
           workspacePath={workspace.workspacePath}
-          fileTree={workspace.fileTree}
-          history={workspace.history}
-          onOpenWorkspace={workspace.handleOpenWorkspace}
-          onNewWorkspace={workspace.handleNewWorkspace}
-          onSelectFile={workspace.handleSelectFile}
-          onDeleteFile={workspace.handleDeleteFile}
-          onDuplicateFile={workspace.handleDuplicateFile}
-          onDeleteFolder={workspace.handleDeleteFolder}
-          onNewRequestInFolder={tabs.handleNewRequestInFolder}
-          onCreateFolder={workspace.handleCreateFolder}
-          onRenameFile={workspace.handleRenameFile}
-          onRenameFolder={workspace.handleRenameFolder}
-          onMoveFile={workspace.handleMoveFile}
-          onSelectHistory={tabs.handleSelectHistory}
-          onClearHistory={workspace.handleClearHistory}
-          onImportOpenAPI={workspace.handleImportOpenAPI}
-          onImportPostman={workspace.handleImportPostman}
-          onImportInsomnia={workspace.handleImportInsomnia}
-          onTryDemo={demo.handleStartDemo}
-          demoStarting={demo.demoStarting}
-          onRefresh={workspace.refreshWorkspace}
-          importing={workspace.importing}
-          importError={workspace.importError}
-          activeFilePath={activeTab.filePath ?? undefined}
-          dirtyFilePaths={tabs.dirtyFilePaths}
-          scenarios={workspace.scenarioList}
-          onSelectScenario={tabs.openScenarioAsTab}
-          scenarioError={scenarioRenameError}
-          runAllState={runAllState ?? undefined}
-          onRunAllScenarios={handleRunAll}
-          onDismissRunAll={() => setRunAllState(null)}
-          onRunFolder={handleRunFolder}
-          folderRunState={folderRunState}
-          onDismissFolderRun={() => setFolderRunState(null)}
-          onNewScenario={async (name) => {
-            const result = await createScenario(name)
-            if (!result.error && result.path) {
-              await workspace.refreshWorkspace()
-              tabs.openScenarioAsTab(result.path, name)
-            }
-          }}
-          onNewScenarioFile={async (path, name) => {
+          onClose={() => setShowEnvEditor(false)}
+          onSaved={async saved => {
+            setShowEnvEditor(false)
             await workspace.refreshWorkspace()
-            tabs.openScenarioAsTab(path, name)
+            try { await selectEnvironment(saved.path) } catch { /* best-effort */ }
+            await workspace.refreshWorkspace()
           }}
-          onDuplicateScenario={async (path) => {
-            const result = await duplicateScenario(path)
-            if (!result.error && result.path) {
-              await workspace.refreshWorkspace()
-              const name = result.path.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? 'copy'
-              tabs.openScenarioAsTab(result.path, name)
-            }
-          }}
-          onDeleteScenario={(path) => {
-            const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
-            const name = workspace.scenarioList.find(s => s.path === path)?.title ?? path.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? 'scenario'
-            setDeletingScenario({ path, name, isDirty: matchTab?.scenarioDirty ?? false })
-          }}
-          onRenameScenario={async (path, newName) => {
-            const result = await renameScenario(path, newName)
-            if (!result.startsWith('error:')) {
-              const newPath = result
-              tabs.setTabsState(prev => ({
-                ...prev,
-                tabs: prev.tabs.map(t =>
-                  t.kind === 'scenario' && t.scenarioPath === path
-                    ? { ...t, scenarioPath: newPath, scenarioName: newName, name: newName }
-                    : t
-                ),
-              }))
-              await workspace.refreshWorkspace()
-            } else {
-              setScenarioRenameError(result.replace(/^error:\s*/i, ''))
-              setTimeout(() => setScenarioRenameError(null), 4000)
-            }
+          onDeleted={async () => {
+            setShowEnvEditor(false)
+            await workspace.refreshWorkspace()
           }}
         />
+      )}
 
-        <div
-          className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
-          onMouseDown={e => {
-            e.preventDefault()
-            draggingRef.current = 'sidebar'
-            document.body.style.cursor = 'col-resize'
-            document.body.style.userSelect = 'none'
-          }}
-        />
+      {/* Main area — gated on workspace */}
+      {workspace.workspacePath ? (
+        <>
+          <div className="flex flex-1 overflow-hidden">
+            <ActivityRail
+              activeTab={railTab}
+              sidebarOpen={sidebarOpen}
+              expanded={railExpanded}
+              onTabClick={handleRailTabClick}
+              onToggleExpanded={handleToggleRailExpanded}
+              onShowSettings={() => settings.setShowSettings(true)}
+              onShowHelp={() => setShowHelp(true)}
+              demoRunning={demo.demoRunning}
+            />
 
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <TabBar
-            tabs={tabInfos}
-            activeTabId={activeTabId}
-            onSelect={tabs.handleSelectTab}
-            onClose={tabs.handleCloseTab}
-            onNew={tabs.handleNewTab}
-            onSave={tabs.saveTabById}
-            onCloseOthers={tabs.handleCloseOthers}
-            onCloseToRight={tabs.handleCloseToRight}
-          />
-
-          <AppToolbar
-            activeTab={activeTab}
-            activeTabId={activeTabId}
-            updateTab={updateTab}
-            environments={workspace.environments}
-            activeEnv={workspace.activeEnv}
-            workspacePath={workspace.workspacePath}
-            demoRunning={demo.demoRunning}
-            demoPort={demo.demoPort}
-            onOpenRequest={workspace.handleOpenRequest}
-            onSaveRequest={tabs.handleSaveRequest}
-            onNewRequest={tabs.handleNewTab}
-            onDuplicateTab={tabs.handleDuplicateTab}
-            onShowSettings={() => settings.setShowSettings(true)}
-            onShowHelp={() => setShowHelp(true)}
-            onEnvChange={workspace.handleEnvChange}
-            onEditEnv={() => { setEditingEnvPath(workspace.activeEnv?.path ?? null); setShowEnvEditor(true) }}
-            onStopDemo={demo.handleStopDemo}
-          />
-
-          <div className="flex-1 flex overflow-hidden relative">
-            {/* Scenario viewers: keep mounted once opened so edit state survives tab switches */}
-            {tabList.filter(t => t.kind === 'scenario').map(t => (
-              <div
-                key={t.id}
-                className="absolute inset-0 overflow-hidden"
-                style={{ display: t.id === activeTabId ? 'flex' : 'none' }}
-              >
-                <ScenarioViewer
-                  scenarioPath={t.scenarioPath ?? ''}
-                  scenarioName={t.scenarioName ?? ''}
-                  result={t.scenarioResult ?? null}
-                  running={t.scenarioRunning ?? false}
-                  theme={settings.settings.theme}
-                  environments={workspace.environments}
-                  activeEnvPath={workspace.activeEnv?.path ?? ''}
-                  onResultChange={r => updateTab(t.id, { scenarioResult: r })}
-                  onRunningChange={running => updateTab(t.id, { scenarioRunning: running })}
-                  onDirtyChange={dirty => updateTab(t.id, { scenarioDirty: dirty })}
-                />
-              </div>
-            ))}
-
-            {/* Request panel: only mount when active tab is a request */}
-            {activeTab.kind !== 'scenario' && (
+            {sidebarOpen && (
               <>
-                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                  <RequestEditor
-                    method={activeTab.method}
-                    url={activeTab.url}
-                    loading={activeTab.loading}
-                    queryParams={activeTab.queryParams}
-                    headers={activeTab.headers}
-                    body={activeTab.body}
-                    auth={activeTab.auth}
-                    onMethodChange={m => updateTab(activeTabId, { method: m })}
-                    onUrlChange={u => updateTab(activeTabId, { url: u })}
-                    onUrlPaste={handleUrlPaste}
-                    onQueryParamsChange={p => updateTab(activeTabId, { queryParams: p })}
-                    onHeadersChange={h => updateTab(activeTabId, { headers: h })}
-                    onBodyChange={b => updateTab(activeTabId, { body: b })}
-                    onAuthChange={a => updateTab(activeTabId, { auth: a })}
-                    onPickFile={pickFile}
-                    timeoutMs={activeTab.timeoutMs}
-                    onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
-                    envVarMap={workspace.envVarMap}
-                    onSend={handleSend}
-                    onCancel={handleCancel}
+                <aside
+                  className="shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] overflow-hidden"
+                  style={{ width: sidebarWidth }}
+                >
+                  <Sidebar
+                    tab={railTab}
+                    workspacePath={workspace.workspacePath}
+                    fileTree={workspace.fileTree}
+                    history={workspace.history}
+                    onOpenWorkspace={workspace.handleOpenWorkspace}
+                    onNewWorkspace={workspace.handleNewWorkspace}
+                    onSelectFile={workspace.handleSelectFile}
+                    onDeleteFile={workspace.handleDeleteFile}
+                    onDuplicateFile={workspace.handleDuplicateFile}
+                    onDeleteFolder={workspace.handleDeleteFolder}
+                    onNewRequestInFolder={tabs.handleNewRequestInFolder}
+                    onCreateFolder={workspace.handleCreateFolder}
+                    onRenameFile={workspace.handleRenameFile}
+                    onRenameFolder={workspace.handleRenameFolder}
+                    onMoveFile={workspace.handleMoveFile}
+                    onSelectHistory={tabs.handleSelectHistory}
+                    onClearHistory={workspace.handleClearHistory}
+                    onImportOpenAPI={workspace.handleImportOpenAPI}
+                    onImportPostman={workspace.handleImportPostman}
+                    onImportInsomnia={workspace.handleImportInsomnia}
+                    onTryDemo={demo.handleStartDemo}
+                    demoStarting={demo.demoStarting}
+                    onRefresh={workspace.refreshWorkspace}
+                    importing={workspace.importing}
+                    importError={workspace.importError}
+                    activeFilePath={activeTab.filePath ?? undefined}
+                    dirtyFilePaths={tabs.dirtyFilePaths}
+                    scenarios={workspace.scenarioList}
+                    onSelectScenario={tabs.openScenarioAsTab}
+                    scenarioError={scenarioRenameError}
+                    runAllState={runAllState ?? undefined}
+                    onRunAllScenarios={handleRunAll}
+                    onDismissRunAll={() => setRunAllState(null)}
+                    onRunFolder={handleRunFolder}
+                    folderRunState={folderRunState}
+                    onDismissFolderRun={() => setFolderRunState(null)}
+                    onNewScenario={async (name) => {
+                      const result = await createScenario(name)
+                      if (!result.error && result.path) {
+                        await workspace.refreshWorkspace()
+                        tabs.openScenarioAsTab(result.path, name)
+                      }
+                    }}
+                    onNewScenarioFile={async (path, name) => {
+                      await workspace.refreshWorkspace()
+                      tabs.openScenarioAsTab(path, name)
+                    }}
+                    onDuplicateScenario={async (path) => {
+                      const result = await duplicateScenario(path)
+                      if (!result.error && result.path) {
+                        await workspace.refreshWorkspace()
+                        const name = result.path.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? 'copy'
+                        tabs.openScenarioAsTab(result.path, name)
+                      }
+                    }}
+                    onDeleteScenario={(path) => {
+                      const matchTab = tabs.tabs.find(t => t.kind === 'scenario' && t.scenarioPath === path)
+                      const name = workspace.scenarioList.find(s => s.path === path)?.title ?? path.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? 'scenario'
+                      setDeletingScenario({ path, name, isDirty: matchTab?.scenarioDirty ?? false })
+                    }}
+                    onRenameScenario={async (path, newName) => {
+                      const result = await renameScenario(path, newName)
+                      if (!result.startsWith('error:')) {
+                        const newPath = result
+                        tabs.setTabsState(prev => ({
+                          ...prev,
+                          tabs: prev.tabs.map(t =>
+                            t.kind === 'scenario' && t.scenarioPath === path
+                              ? { ...t, scenarioPath: newPath, scenarioName: newName, name: newName }
+                              : t
+                          ),
+                        }))
+                        await workspace.refreshWorkspace()
+                      } else {
+                        setScenarioRenameError(result.replace(/^error:\s*/i, ''))
+                        setTimeout(() => setScenarioRenameError(null), 4000)
+                      }
+                    }}
                   />
-                </div>
+                </aside>
 
                 <div
                   className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
                   onMouseDown={e => {
                     e.preventDefault()
-                    draggingRef.current = 'response'
+                    draggingRef.current = 'sidebar'
                     document.body.style.cursor = 'col-resize'
                     document.body.style.userSelect = 'none'
                   }}
                 />
-
-                <div
-                  className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
-                  style={responseWidth > 0 ? { width: responseWidth } : {}}
-                >
-                  <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} />
-                </div>
               </>
             )}
+
+            <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+              <TabBar
+                tabs={tabInfos}
+                activeTabId={activeTabId}
+                onSelect={tabs.handleSelectTab}
+                onClose={tabs.handleCloseTab}
+                onNew={tabs.handleNewTab}
+                onSave={tabs.saveTabById}
+                onCloseOthers={tabs.handleCloseOthers}
+                onCloseToRight={tabs.handleCloseToRight}
+              />
+
+              <AppToolbar
+                activeTab={activeTab}
+                activeTabId={activeTabId}
+                updateTab={updateTab}
+                onOpenRequest={workspace.handleOpenRequest}
+                onSaveRequest={tabs.handleSaveRequest}
+                onNewRequest={tabs.handleNewTab}
+                onDuplicateTab={tabs.handleDuplicateTab}
+              />
+
+              <div className="flex-1 flex overflow-hidden relative">
+                {/* Scenario viewers: keep mounted once opened so edit state survives tab switches */}
+                {tabList.filter(t => t.kind === 'scenario').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none' }}
+                  >
+                    <ScenarioViewer
+                      scenarioPath={t.scenarioPath ?? ''}
+                      scenarioName={t.scenarioName ?? ''}
+                      result={t.scenarioResult ?? null}
+                      running={t.scenarioRunning ?? false}
+                      theme={settings.settings.theme}
+                      environments={workspace.environments}
+                      activeEnvPath={workspace.activeEnv?.path ?? ''}
+                      onResultChange={r => updateTab(t.id, { scenarioResult: r })}
+                      onRunningChange={running => updateTab(t.id, { scenarioRunning: running })}
+                      onDirtyChange={dirty => updateTab(t.id, { scenarioDirty: dirty })}
+                    />
+                  </div>
+                ))}
+
+                {/* Request panel: only mount when active tab is a request */}
+                {activeTab.kind !== 'scenario' && (
+                  <>
+                    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                      <RequestEditor
+                        method={activeTab.method}
+                        url={activeTab.url}
+                        loading={activeTab.loading}
+                        queryParams={activeTab.queryParams}
+                        headers={activeTab.headers}
+                        body={activeTab.body}
+                        auth={activeTab.auth}
+                        onMethodChange={m => updateTab(activeTabId, { method: m })}
+                        onUrlChange={u => updateTab(activeTabId, { url: u })}
+                        onUrlPaste={handleUrlPaste}
+                        onQueryParamsChange={p => updateTab(activeTabId, { queryParams: p })}
+                        onHeadersChange={h => updateTab(activeTabId, { headers: h })}
+                        onBodyChange={b => updateTab(activeTabId, { body: b })}
+                        onAuthChange={a => updateTab(activeTabId, { auth: a })}
+                        onPickFile={pickFile}
+                        timeoutMs={activeTab.timeoutMs}
+                        onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
+                        envVarMap={workspace.envVarMap}
+                        onSend={handleSend}
+                        onCancel={handleCancel}
+                      />
+                    </div>
+
+                    <div
+                      className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
+                      onMouseDown={e => {
+                        e.preventDefault()
+                        draggingRef.current = 'response'
+                        document.body.style.cursor = 'col-resize'
+                        document.body.style.userSelect = 'none'
+                      }}
+                    />
+
+                    <div
+                      className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
+                      style={responseWidth > 0 ? { width: responseWidth } : {}}
+                    >
+                      <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} />
+                    </div>
+                  </>
+                )}
+              </div>
+            </main>
           </div>
-        </main>
-      </div>
+
+          <StatusBar
+            environments={workspace.environments}
+            activeEnv={workspace.activeEnv}
+            workspacePath={workspace.workspacePath}
+            demoRunning={demo.demoRunning}
+            demoPort={demo.demoPort}
+            onEnvChange={workspace.handleEnvChange}
+            onEditEnv={() => { setEditingEnvPath(workspace.activeEnv?.path ?? null); setShowEnvEditor(true) }}
+            onStopDemo={demo.handleStopDemo}
+          />
+        </>
+      ) : (
+        <LandingPage
+          recentWorkspaces={workspace.recentWorkspaces}
+          demoStarting={demo.demoStarting}
+          demoRunning={demo.demoRunning}
+          onNewWorkspace={workspace.handleNewWorkspace}
+          onOpenWorkspace={workspace.handleOpenWorkspace}
+          onOpenRecentWorkspace={workspace.handleOpenWorkspaceByPath}
+          onTryDemo={demo.handleStartDemo}
+          onStopDemo={demo.handleStopDemo}
+        />
+      )}
     </div>
   )
 }

@@ -17,7 +17,6 @@ import (
 type RequestFile struct {
 	SchemaVersion string     `yaml:"schemaVersion" json:"schemaVersion"`
 	Title         string     `yaml:"title,omitempty" json:"title,omitempty"`
-	Description   string     `yaml:"description,omitempty" json:"description,omitempty"`
 	Method        string     `yaml:"method" json:"method"`
 	URL           string     `yaml:"url" json:"url"`
 	Headers       []KVPair   `yaml:"headers,omitempty" json:"headers,omitempty"`
@@ -96,7 +95,6 @@ func requestFileToDomain(rf *RequestFile) (*domain.Request, error) {
 	req := &domain.Request{
 		SchemaVersion: rf.SchemaVersion,
 		Title:         rf.Title,
-		Description:   rf.Description,
 		Method:        domain.HTTPMethod(strings.ToUpper(rf.Method)),
 		URL:           rf.URL,
 	}
@@ -141,7 +139,6 @@ func requestDomainToFile(req *domain.Request) *RequestFile {
 	rf := &RequestFile{
 		SchemaVersion: "1",
 		Title:         req.Title,
-		Description:   req.Description,
 		Method:        string(req.Method),
 		URL:           req.URL,
 	}

@@ -1,4 +1,4 @@
 schemaVersion: "1"
-name: Health Check
+title: Health Check
 method: GET
 url: "{{baseUrl}}/health"
