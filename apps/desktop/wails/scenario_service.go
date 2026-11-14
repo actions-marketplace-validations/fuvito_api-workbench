@@ -293,7 +293,7 @@ func (s *ScenarioService) SaveScenarioRaw(path string, content string) string {
 // ValidateScenarioYAML parses and validates YAML content as a scenario file.
 // Returns "" on success, or a human-readable error/issue list on failure.
 func (s *ScenarioService) ValidateScenarioYAML(content string) string {
-	sc, err := serialization.ParseScenario([]byte(content), "scenario.yaml")
+	sc, err := serialization.ParseScenario([]byte(content), "yaml")
 	if err != nil {
 		return "YAML parse error: " + err.Error()
 	}
