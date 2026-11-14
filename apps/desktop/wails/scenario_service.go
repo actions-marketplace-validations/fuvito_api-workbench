@@ -550,7 +550,32 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	}
 
 	exec := buildExecutorWithCookies(s.settings)
-	runner := scenario.New(exec)
+
+	// Load the OpenAPI spec now (before creating the runner) so that
+	// type:schema assertions with an operationId value can resolve against it.
+	var loadedSpec *openapi.Spec
+	if sc.SpecFile != "" {
+		specPath := sc.SpecFile
+		if !filepath.IsAbs(specPath) {
+			specPath = filepath.Join(filepath.Dir(path), specPath)
+		}
+		if specData, err := os.ReadFile(specPath); err == nil {
+			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
+			if ext == "" {
+				ext = "yaml"
+			}
+			if spec, err := openapi.ParseBytes(specData, ext); err == nil {
+				loadedSpec = spec
+			}
+		}
+	}
+
+	var runner *scenario.Runner
+	if loadedSpec != nil {
+		runner = scenario.NewWithSpec(exec, loadedSpec)
+	} else {
+		runner = scenario.New(exec)
+	}
 
 	env := s.workspace.ActiveEnvironment()
 	if envPath != "" {
@@ -603,43 +628,31 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		out.Steps = append(out.Steps, step)
 	}
 
-	// Compute spec coverage if the scenario declares a specFile.
-	if sc.SpecFile != "" {
-		specPath := sc.SpecFile
-		if !filepath.IsAbs(specPath) {
-			specPath = filepath.Join(filepath.Dir(path), specPath)
+	// Compute spec coverage using the already-loaded spec (if any).
+	if loadedSpec != nil {
+		var executed []openapi.ExecutedRequest
+		for _, sr := range result.Steps {
+			if sr.Skipped || sr.Request == nil {
+				continue
+			}
+			executed = append(executed, openapi.ExecutedRequest{
+				Method: string(sr.Request.Method),
+				URL:    sr.Request.URL,
+			})
 		}
-		if specData, err := os.ReadFile(specPath); err == nil {
-			ext := strings.ToLower(filepath.Ext(specPath))
-			if ext == "" {
-				ext = "yaml"
+		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {
+			cov := &CoverageIO{
+				Covered: cr.Covered,
+				Total:   cr.Total,
+				Percent: cr.Percent,
 			}
-			if spec, err := openapi.ParseBytes(specData, strings.TrimPrefix(ext, ".")); err == nil {
-				var executed []openapi.ExecutedRequest
-				for _, sr := range result.Steps {
-					if sr.Skipped || sr.Request == nil {
-						continue
-					}
-					executed = append(executed, openapi.ExecutedRequest{
-						Method: string(sr.Request.Method),
-						URL:    sr.Request.URL,
-					})
-				}
-				if cr := spec.ScenarioCoverage(executed); cr != nil {
-					cov := &CoverageIO{
-						Covered: cr.Covered,
-						Total:   cr.Total,
-						Percent: cr.Percent,
-					}
-					for _, op := range cr.Exercised {
-						cov.Exercised = append(cov.Exercised, op.String())
-					}
-					for _, op := range cr.Missed {
-						cov.Missed = append(cov.Missed, op.String())
-					}
-					out.Coverage = cov
-				}
+			for _, op := range cr.Exercised {
+				cov.Exercised = append(cov.Exercised, op.String())
 			}
+			for _, op := range cr.Missed {
+				cov.Missed = append(cov.Missed, op.String())
+			}
+			out.Coverage = cov
 		}
 	}
 
