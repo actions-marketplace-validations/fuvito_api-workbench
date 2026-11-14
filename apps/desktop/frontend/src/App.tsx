@@ -72,8 +72,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })
-  const [railCollapsed, setRailCollapsed] = useState(() => {
-    return localStorage.getItem('ui.railCollapsed') === 'true'
+  const [railExpanded, setRailExpanded] = useState(() => {
+    return localStorage.getItem('ui.railExpanded') === 'true'
   })
 
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
@@ -83,14 +83,7 @@ export default function App() {
   useEffect(() => { responseWidthRef.current = responseWidth }, [responseWidth])
 
   function handleRailTabClick(tab: RailTab) {
-    if (railCollapsed) {
-      setRailCollapsed(false)
-      localStorage.setItem('ui.railCollapsed', 'false')
-      setRailTab(tab)
-      localStorage.setItem('ui.railTab', tab)
-      setSidebarOpen(true)
-      localStorage.setItem('ui.sidebarOpen', 'true')
-    } else if (tab === railTab && sidebarOpen) {
+    if (tab === railTab && sidebarOpen) {
       setSidebarOpen(false)
       localStorage.setItem('ui.sidebarOpen', 'false')
     } else {
@@ -101,14 +94,12 @@ export default function App() {
     }
   }
 
-  function handleCollapseRail() {
-    setRailCollapsed(true)
-    localStorage.setItem('ui.railCollapsed', 'true')
-  }
-
-  function handleExpandRail() {
-    setRailCollapsed(false)
-    localStorage.setItem('ui.railCollapsed', 'false')
+  function handleToggleRailExpanded() {
+    setRailExpanded(prev => {
+      const next = !prev
+      localStorage.setItem('ui.railExpanded', String(next))
+      return next
+    })
   }
 
   // Modal / overlay state
@@ -313,9 +304,9 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault()
-        setRailCollapsed(prev => {
-          const next = !prev
-          localStorage.setItem('ui.railCollapsed', String(next))
+        setSidebarOpen(o => {
+          const next = !o
+          localStorage.setItem('ui.sidebarOpen', String(next))
           return next
         })
       }
@@ -401,8 +392,6 @@ export default function App() {
     {
       label: 'View',
       items: [
-        { kind: 'action', label: 'Toggle Sidebar', shortcut: 'Ctrl+B', onClick: () => handleRailTabClick(railTab) },
-        { kind: 'separator' },
         { kind: 'action', label: settings.settings.theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme', onClick: settings.handleToggleTheme },
         { kind: 'separator' },
         { kind: 'action', label: 'Settings…', onClick: () => settings.setShowSettings(true) },
@@ -560,25 +549,18 @@ export default function App() {
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        {railCollapsed ? (
-          <div
-            className="w-1.5 shrink-0 border-r border-[var(--color-border)] cursor-pointer hover:bg-[var(--color-accent)]/25 transition-colors"
-            title="Expand sidebar (Ctrl+B)"
-            onClick={handleExpandRail}
-          />
-        ) : (
-          <ActivityRail
-            activeTab={railTab}
-            sidebarOpen={sidebarOpen}
-            onTabClick={handleRailTabClick}
-            onCollapse={handleCollapseRail}
-            onShowSettings={() => settings.setShowSettings(true)}
-            onShowHelp={() => setShowHelp(true)}
-            demoRunning={demo.demoRunning}
-          />
-        )}
+        <ActivityRail
+          activeTab={railTab}
+          sidebarOpen={sidebarOpen}
+          expanded={railExpanded}
+          onTabClick={handleRailTabClick}
+          onToggleExpanded={handleToggleRailExpanded}
+          onShowSettings={() => settings.setShowSettings(true)}
+          onShowHelp={() => setShowHelp(true)}
+          demoRunning={demo.demoRunning}
+        />
 
-        {!railCollapsed && sidebarOpen && (
+        {sidebarOpen && (
           <>
             <aside
               className="shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] overflow-hidden"
