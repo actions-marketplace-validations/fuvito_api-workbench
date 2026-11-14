@@ -62,8 +62,13 @@ export function useDemo(deps: {
     }
   }
 
+  function clearDemoState() {
+    setDemoRunning(false)
+    setDemoPort(0)
+  }
+
   return {
     demoRunning, demoPort, demoStarting,
-    handleStartDemo, handleStopDemo,
+    handleStartDemo, handleStopDemo, clearDemoState,
   }
 }

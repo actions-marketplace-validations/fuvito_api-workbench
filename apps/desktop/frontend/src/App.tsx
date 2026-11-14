@@ -28,7 +28,7 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo } from '@/lib/bridge'
 import type { FolderRunState } from '@/components/Sidebar'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
@@ -112,12 +112,20 @@ export default function App() {
   const [scenarioRenameError, setScenarioRenameError] = useState<string | null>(null)
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState(false)
 
+  async function doCloseWorkspace() {
+    if (demo.demoRunning) {
+      try { await stopDemo() } catch { /* best-effort */ }
+      demo.clearDemoState()
+    }
+    workspace.handleCloseWorkspace()
+  }
+
   function requestCloseWorkspace() {
     const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
     if (hasDirty) {
       setPendingCloseWorkspace(true)
     } else {
-      workspace.handleCloseWorkspace()
+      doCloseWorkspace()
     }
   }
 
@@ -531,7 +539,7 @@ export default function App() {
             title="Close workspace"
             message={`${dirtyCount} ${noun} unsaved changes. Close workspace and discard them?`}
             onCancel={() => setPendingCloseWorkspace(false)}
-            onDiscard={() => { setPendingCloseWorkspace(false); workspace.handleCloseWorkspace() }}
+            onDiscard={() => { setPendingCloseWorkspace(false); doCloseWorkspace() }}
           />
         )
       })()}
