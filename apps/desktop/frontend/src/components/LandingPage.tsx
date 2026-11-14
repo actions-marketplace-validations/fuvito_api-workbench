@@ -31,15 +31,7 @@ export function LandingPage({
 
         {/* Brand */}
         <div className="flex flex-col items-center gap-2 text-center select-none">
-          <div className="w-14 h-14 rounded-2xl bg-[var(--color-accent)] flex items-center justify-center mb-1 shadow-lg">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="14" cy="14" r="3" fill="white"/>
-              <path d="M14 7C10.134 7 7 10.134 7 14" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-              <path d="M14 7C17.866 7 21 10.134 21 14" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-              <path d="M14 3C7.925 3 3 7.925 3 14" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeOpacity="0.5"/>
-              <path d="M14 3C20.075 3 25 7.925 25 14" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeOpacity="0.5"/>
-            </svg>
-          </div>
+          <img src="/appicon.png" alt="Clear Signal" className="w-16 h-16 rounded-2xl shadow-lg mb-1" draggable={false} />
           <h1 className="text-2xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h1>
           <p className="text-xs text-[var(--color-muted-foreground)]">API Contract Validation &amp; Testing</p>
         </div>
