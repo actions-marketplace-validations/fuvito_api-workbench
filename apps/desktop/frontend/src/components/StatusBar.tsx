@@ -23,15 +23,15 @@ export function StatusBar({
     : null
 
   return (
-    <footer className="flex items-center gap-2 px-2 h-6 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-card)]">
-      <div className="flex items-center gap-1.5 min-w-0 flex-1 text-[10px]">
+    <footer className="flex items-center gap-2 px-2 h-7 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-card)]">
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 text-xs">
         {environments.length > 0 && (
           <>
             <select
               value={activeEnv?.path ?? ''}
               onChange={e => onEnvChange(e.target.value)}
               className={cn(
-                'bg-transparent border-none outline-none cursor-pointer text-[10px] max-w-[140px]',
+                'bg-transparent border-none outline-none cursor-pointer text-xs max-w-[140px]',
                 activeEnv ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]',
               )}
             >
@@ -79,7 +79,7 @@ export function StatusBar({
 
       {workspaceName && (
         <span
-          className="ml-auto text-[10px] text-[var(--color-muted-foreground)] truncate max-w-[200px] select-none"
+          className="ml-auto text-xs text-[var(--color-muted-foreground)] truncate max-w-[200px] select-none"
           title={workspacePath}
         >
           {workspaceName}
