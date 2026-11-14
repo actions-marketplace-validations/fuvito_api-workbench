@@ -581,6 +581,7 @@ export interface ScenarioResult {
   durationMs: number
   steps: StepResult[]
   error?: string
+  specError?: string
   coverage?: ScenarioCoverage
 }
 

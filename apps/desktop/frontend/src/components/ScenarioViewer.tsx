@@ -400,6 +400,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         </div>
       )}
 
+      {/* specFile load error — shown when specFile is set but couldn't be loaded */}
+      {result?.specError && !running && (
+        <div className="shrink-0 px-4 py-2 text-xs text-amber-400 bg-amber-500/10 border-b border-amber-500/20">
+          <span className="font-semibold">specFile warning: </span>{result.specError}
+        </div>
+      )}
+
       {/* Coverage banner — shown when scenario has a specFile and run produced coverage data */}
       {result?.coverage && !running && (
         <CoverageBanner coverage={result.coverage} />

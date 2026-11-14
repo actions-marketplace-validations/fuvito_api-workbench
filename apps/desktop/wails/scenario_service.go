@@ -107,6 +107,7 @@ type ScenarioResultIO struct {
 	DurationMs int64          `json:"durationMs"`
 	Steps      []StepResultIO `json:"steps"`
 	Error      string         `json:"error,omitempty"`
+	SpecError  string         `json:"specError,omitempty"`
 	Coverage   *CoverageIO    `json:"coverage,omitempty"`
 }
 
@@ -554,17 +555,24 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	// Load the OpenAPI spec now (before creating the runner) so that
 	// type:schema assertions with an operationId value can resolve against it.
 	var loadedSpec *openapi.Spec
+	var specLoadErr string
 	if sc.SpecFile != "" {
 		specPath := sc.SpecFile
 		if !filepath.IsAbs(specPath) {
 			specPath = filepath.Join(filepath.Dir(path), specPath)
 		}
-		if specData, err := os.ReadFile(specPath); err == nil {
+		specData, err := os.ReadFile(specPath)
+		if err != nil {
+			specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
+		} else {
 			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
 			if ext == "" {
 				ext = "yaml"
 			}
-			if spec, err := openapi.ParseBytes(specData, ext); err == nil {
+			spec, err := openapi.ParseBytes(specData, ext)
+			if err != nil {
+				specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
+			} else {
 				loadedSpec = spec
 			}
 		}
@@ -594,6 +602,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		Title:      result.Scenario.Title,
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
+		SpecError:  specLoadErr,
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{

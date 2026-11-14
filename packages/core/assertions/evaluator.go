@@ -101,10 +101,12 @@ func (ev *Evaluator) evalSchema(a domain.Assertion, resp *domain.Response) (actu
 		return "", false, "response body is empty"
 	}
 
-	// If a spec is loaded and the schema value looks like an operationId
-	// (no braces, colons, or newlines), validate against the spec's declared
-	// response schema for that operation rather than treating it as inline YAML.
-	if ev.spec != nil && looksLikeOperationID(a.Schema) {
+	// If the schema value looks like an operationId (no braces, colons, or newlines),
+	// validate against the spec's declared response schema for that operation.
+	if looksLikeOperationID(a.Schema) {
+		if ev.spec == nil {
+			return "", false, fmt.Sprintf("schema assertion: %q looks like an operationId but no specFile is loaded — add specFile to the scenario or use an inline JSON/YAML schema", a.Schema)
+		}
 		errs := openapi.ValidateResponse(ev.spec, a.Schema, resp)
 		if len(errs) == 0 {
 			return body, true, ""
