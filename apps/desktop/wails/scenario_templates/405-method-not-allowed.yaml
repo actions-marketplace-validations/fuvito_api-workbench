@@ -6,7 +6,7 @@ description: >
   endpoints that restrict HTTP methods.
 
 steps:
-  - title: GET on login endpoint — expect 405 with Allow header
+  - label: GET on login endpoint — expect 405 with Allow header
     request:
       method: GET
       url: "{{baseUrl}}/auth/login"
@@ -23,7 +23,7 @@ steps:
         operator: contains
         expected: "POST"
 
-  - title: DELETE on users collection — expect 405 with Allow header
+  - label: DELETE on users collection — expect 405 with Allow header
     request:
       method: DELETE
       url: "{{baseUrl}}/users"
@@ -40,7 +40,7 @@ steps:
         operator: contains
         expected: "POST"
 
-  - title: POST on health endpoint — expect 405 with Allow header
+  - label: POST on health endpoint — expect 405 with Allow header
     request:
       method: POST
       url: "{{baseUrl}}/health"

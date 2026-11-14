@@ -224,9 +224,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             {index + 1}
           </span>
           <input
-            value={step.title}
-            onChange={e => onChange({ title: e.target.value })}
-            placeholder="Step title"
+            value={step.label}
+            onChange={e => onChange({ label: e.target.value })}
+            placeholder="Step label"
             className="flex-1 min-w-0 bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-foreground)] font-semibold py-0.5"
           />
           <div className="flex items-center shrink-0">
@@ -267,9 +267,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
           </div>
         </div>
         <input
-          value={step.description ?? ''}
-          onChange={e => onChange({ description: e.target.value })}
-          placeholder="Step description (optional)"
+          value={step.notes ?? ''}
+          onChange={e => onChange({ notes: e.target.value })}
+          placeholder="Notes (optional)"
           className="w-full mt-1 bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-muted-foreground)] py-0.5 italic placeholder:not-italic"
         />
       </div>

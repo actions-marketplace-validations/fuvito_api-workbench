@@ -3,7 +3,8 @@ title: User lifecycle
 description: Login, create a user, fetch it back, verify it, then delete it.
 
 steps:
-  - title: Login
+  - label: Login
+    notes: "Obtain a bearer token. Subsequent steps depend on this — failPolicy stop is intentional."
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -24,7 +25,8 @@ steps:
         path: "$.token"
     failPolicy: stop
 
-  - title: Create user
+  - label: Create user
+    notes: "POST to /users with a fixed payload. Extracts the new user's ID for use in later steps."
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -52,7 +54,8 @@ steps:
         path: "$.id"
     failPolicy: stop
 
-  - title: Fetch user
+  - label: Fetch user
+    notes: "Verify the user is readable immediately after creation."
     request:
       method: GET
       url: "{{baseUrl}}/users/{{userId}}"
@@ -73,7 +76,8 @@ steps:
         expected: "diana@example.com"
     failPolicy: continue
 
-  - title: Delete user
+  - label: Delete user
+    notes: "Clean up — 204 No Content confirms the resource was removed."
     request:
       method: DELETE
       url: "{{baseUrl}}/users/{{userId}}"

@@ -18,8 +18,9 @@
 10. [CI/CD integration](#10-cicd-integration)
 11. [Settings](#11-settings)
 12. [File format reference](#12-file-format-reference)
-13. [Keyboard shortcuts](#13-keyboard-shortcuts)
-14. [Troubleshooting](#14-troubleshooting)
+13. [Creating files with AI assistance](#13-creating-files-with-ai-assistance)
+14. [Keyboard shortcuts](#14-keyboard-shortcuts)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -229,10 +230,12 @@ Scenarios are the primary tool for **Spec Conformance Testing**: proving that yo
 
 ```yaml
 schemaVersion: "1"
-name: User lifecycle
+title: User lifecycle
+description: "Verifies CRUD operations for /users. Run after any changes to the users endpoint or auth middleware."
 
 steps:
-  - name: Login
+  - label: Login
+    notes: "Obtain a bearer token. failPolicy stop — all subsequent steps depend on this."
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -245,10 +248,12 @@ steps:
         path: "$.token"
     assertions:
       - type: status
+        operator: eq
         expected: 200
     failPolicy: stop   # stop | continue | skip
 
-  - name: Create user
+  - label: Create user
+    notes: "POST to /users. Extracts the new user's ID for use in later steps."
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -264,13 +269,15 @@ steps:
         path: "$.id"
     assertions:
       - type: status
+        operator: eq
         expected: 201
       - type: jsonpath
         path: "$.name"
         operator: eq
         expected: Alice
 
-  - name: Fetch user
+  - label: Fetch user
+    notes: "Verify the user is readable immediately after creation."
     request:
       method: GET
       url: "{{baseUrl}}/users/{{userId}}"
@@ -279,16 +286,20 @@ steps:
           value: "Bearer {{token}}"
     assertions:
       - type: status
+        operator: eq
         expected: 200
       - type: schema
-        schema: "#/components/schemas/User"
+        schema: getUserById
+    failPolicy: continue
 ```
 
 ### Step fields
 
 | Field | Description |
 |---|---|
-| `request` | Inline request definition. Alternatively, use `requestRef: path/to/file.yaml` to reference a saved request file. |
+| `label` | Short action phrase for the step — e.g. "Login", "Create order". Shown in the runner UI and reports. |
+| `notes` | Optional prose explaining the step's purpose and dependencies — e.g. "Requires the token from the Login step". |
+| `request` | Inline request definition. Alternatively, use `requestRef: path/to/file.yaml` to reference a saved request file. Use one or the other, never both. |
 | `extractions` | Pull values from the response into runtime variables for subsequent steps. |
 | `assertions` | Checks that must pass for the step to succeed. |
 | `failPolicy` | What to do if an assertion fails: `stop` (default — skips remaining steps), `continue` (keeps going), `skip` (skips this step if a previous one failed). |
@@ -501,31 +512,24 @@ All project files are human-readable YAML (or JSON equivalents). Every file carr
 
 ```yaml
 schemaVersion: "1"
-name: Get user by ID
+title: Get user by ID
 
-request:
-  method: GET
-  url: "{{baseUrl}}/users/{{userId}}"
-  headers:
-    - name: Accept
-      value: application/json
-  queryParams:
-    - name: include
-      value: orders
-  auth:
-    type: bearer
-    token: "{{apiToken}}"
-  timeout: 10000   # milliseconds; 0 = use global default
+method: GET
+url: "{{baseUrl}}/users/{{userId}}"
 
-assertions:
-  - type: status
-    expected: 200
-  - type: jsonpath
-    path: "$.id"
-    operator: eq
-    expected: "{{userId}}"
-  - type: schema
-    schema: "#/components/schemas/User"
+headers:
+  - name: Accept
+    value: application/json
+
+queryParams:
+  - name: include
+    value: orders
+
+auth:
+  type: bearer
+  token: "{{apiToken}}"
+
+timeoutMs: 10000   # 0 = use global default
 ```
 
 ### Environment file
@@ -581,7 +585,40 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ---
 
-## 13. Keyboard shortcuts
+## 13. Creating files with AI assistance
+
+The **Format Spec** tab in the Help panel (the `?` icon in the toolbar) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
+
+### What the AI prompt does
+
+When you paste the prompt into an AI assistant, it follows a four-step workflow:
+
+1. **Discovery survey** — the assistant asks a short set of questions: what you want to build, whether you have an existing OpenAPI spec or curl commands to share, what the base URL and authentication method are, and whether you need multiple environments (dev/staging/prod).
+
+2. **Generate** — based on your answers, the assistant creates one or more YAML files following the Clear Signal format exactly. It automatically extracts the base URL into an environment file, marks secrets as `secret: true`, and structures scenario steps with proper `label` and `notes` fields.
+
+3. **Self-verify** — before delivering, the assistant checks every generated file against the spec: required fields, valid enum values, no invented field names, and that every `{{variable}}` reference is either defined in the environment file or extracted by an earlier scenario step. It fixes any violations it finds.
+
+4. **Deliver** — the assistant presents each file with its suggested filename, a list of variables you need to fill in before running, and any assumptions it made (e.g. base URL inferred from the OpenAPI spec).
+
+### Workflow
+
+1. Click the `?` icon in the toolbar to open the Help panel.
+2. Switch to the **Format Spec** tab.
+3. Click **Copy AI Prompt** — the spec plus the system prompt is now on your clipboard.
+4. Open ChatGPT, Gemini, or any AI assistant and paste into a new conversation.
+5. The assistant will begin the discovery survey. Answer its questions and it will generate valid Clear Signal YAML files.
+6. Copy each generated file and save it to your workspace under `requests/`, `scenarios/`, or `environments/`.
+
+### Tips
+
+- If you have an OpenAPI spec, paste its contents when the assistant asks for source material — it will generate one scenario per workflow rather than per endpoint.
+- If the assistant invents a field name that does not appear in the Format Spec, ask it to re-verify against the spec. The self-verification step catches most of these, but re-running the check is always safe.
+- For multi-environment setups, tell the assistant which environments you need (e.g. dev, staging, production). It will generate one environment file per target with identical variable names so the same scenario runs against all of them.
+
+---
+
+## 14. Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
@@ -592,7 +629,7 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### The app does not open after `wails dev`
 

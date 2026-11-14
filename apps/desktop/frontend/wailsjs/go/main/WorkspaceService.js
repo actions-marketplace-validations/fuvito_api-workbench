@@ -38,6 +38,10 @@ export function GetEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['GetEnvironment'](arg1);
 }
 
+export function GetEnvironmentRaw(arg1) {
+  return window['go']['main']['WorkspaceService']['GetEnvironmentRaw'](arg1);
+}
+
 export function GetRecentWorkspaces() {
   return window['go']['main']['WorkspaceService']['GetRecentWorkspaces']();
 }
@@ -110,6 +114,10 @@ export function SaveEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['SaveEnvironment'](arg1);
 }
 
+export function SaveEnvironmentRaw(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['SaveEnvironmentRaw'](arg1, arg2);
+}
+
 export function SaveRequest(arg1) {
   return window['go']['main']['WorkspaceService']['SaveRequest'](arg1);
 }
@@ -120,4 +128,8 @@ export function SaveResponseCache(arg1, arg2) {
 
 export function SelectEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['SelectEnvironment'](arg1);
+}
+
+export function ValidateEnvironmentYAML(arg1) {
+  return window['go']['main']['WorkspaceService']['ValidateEnvironmentYAML'](arg1);
 }

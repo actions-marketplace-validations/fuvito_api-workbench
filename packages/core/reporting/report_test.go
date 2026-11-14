@@ -26,7 +26,7 @@ func makeStep(title string, passed bool, statusCode int, assertions []domain.Ass
 		resp = &domain.Response{StatusCode: statusCode, Duration: 50 * time.Millisecond}
 	}
 	return scenario.StepResult{
-		Title:      title,
+		Label:      title,
 		Response:   resp,
 		Assertions: assertions,
 		Passed:     passed,
@@ -68,7 +68,7 @@ func failedResult(title string) *scenario.Result {
 }
 
 func skippedResult(title string) *scenario.Result {
-	sr := scenario.StepResult{Title: "skipped step", Skipped: true}
+	sr := scenario.StepResult{Label: "skipped step", Skipped: true}
 	return &scenario.Result{
 		Scenario: makeScenario(title),
 		Steps:    []scenario.StepResult{sr},
@@ -78,7 +78,7 @@ func skippedResult(title string) *scenario.Result {
 }
 
 func errorResult(title string) *scenario.Result {
-	sr := scenario.StepResult{Title: "error step", Error: "connection refused", Passed: false}
+	sr := scenario.StepResult{Label: "error step", Error: "connection refused", Passed: false}
 	return &scenario.Result{
 		Scenario: makeScenario(title),
 		Steps:    []scenario.StepResult{sr},
@@ -146,7 +146,7 @@ func TestText_AssertionLabels(t *testing.T) {
 		Scenario: makeScenario("labels"),
 		Steps: []scenario.StepResult{
 			{
-				Title:  "s",
+				Label:  "s",
 				Passed: true,
 				Assertions: []domain.AssertionResult{
 					assertion(domain.AssertionStatus, "", domain.OperatorEq, 200, true, ""),
@@ -178,7 +178,7 @@ func TestText_Extracted(t *testing.T) {
 	r := &scenario.Result{
 		Scenario: makeScenario("extract"),
 		Steps: []scenario.StepResult{
-			{Title: "s", Passed: true, Extracted: map[string]string{"token": "abc123"}},
+			{Label: "s", Passed: true, Extracted: map[string]string{"token": "abc123"}},
 		},
 		Passed:   true,
 		Duration: 1 * time.Millisecond,
@@ -482,7 +482,7 @@ func makeCovResult() *openapi.ScenarioCoverageResult {
 
 func makeStepWithRequest(title string, method, url string, statusCode int) scenario.StepResult {
 	return scenario.StepResult{
-		Title:    title,
+		Label:    title,
 		Passed:   true,
 		Request:  &domain.Request{Method: domain.HTTPMethod(method), URL: url},
 		Response: &domain.Response{StatusCode: statusCode, Duration: 10 * time.Millisecond},

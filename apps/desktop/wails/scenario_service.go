@@ -48,8 +48,8 @@ type ExtractionDetailIO struct {
 }
 
 type StepDetailIO struct {
-	Title             string               `json:"title"`
-	Description       string               `json:"description,omitempty"`
+	Label             string               `json:"label"`
+	Notes             string               `json:"notes,omitempty"`
 	Disabled          bool                 `json:"disabled,omitempty"`
 	Method            string               `json:"method,omitempty"`
 	URL               string               `json:"url,omitempty"`
@@ -81,7 +81,7 @@ type AssertionResultIO struct {
 }
 
 type StepResultIO struct {
-	Title           string              `json:"title"`
+	Label           string              `json:"label"`
 	Passed          bool                `json:"passed"`
 	Skipped         bool                `json:"skipped"`
 	StatusCode      int                 `json:"statusCode"`
@@ -222,8 +222,8 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{
-			Title:       step.Title,
-			Description: step.Description,
+			Label:       step.Label,
+			Notes:       step.Notes,
 			Disabled:    step.Disabled,
 			RequestRef:  step.RequestRef,
 			FailPolicy:  string(step.FailPolicy),
@@ -290,6 +290,24 @@ func (s *ScenarioService) SaveScenarioRaw(path string, content string) string {
 	return ""
 }
 
+// ValidateScenarioYAML parses and validates YAML content as a scenario file.
+// Returns "" on success, or a human-readable error/issue list on failure.
+func (s *ScenarioService) ValidateScenarioYAML(content string) string {
+	sc, err := serialization.ParseScenario([]byte(content), "scenario.yaml")
+	if err != nil {
+		return "YAML parse error: " + err.Error()
+	}
+	issues := scenario.Validate(sc, "")
+	if len(issues) == 0 {
+		return ""
+	}
+	msgs := make([]string, len(issues))
+	for i, iss := range issues {
+		msgs[i] = iss.String()
+	}
+	return strings.Join(msgs, "\n")
+}
+
 // CreateScenarioResultIO is the return type for CreateScenario.
 type CreateScenarioResultIO struct {
 	Path  string `json:"path"`
@@ -333,7 +351,7 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 title: %s
 description: ""
 steps:
-  - title: Step 1
+  - label: Step 1
     request:
       method: GET
       url: https://api.example.com
@@ -554,7 +572,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{
-			Title:      sr.Title,
+			Label:      sr.Label,
 			Passed:     sr.Passed,
 			Skipped:    sr.Skipped,
 			Error:      sr.Error,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult } from '@/lib/bridge'
+import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult, validateScenarioYAML } from '@/lib/bridge'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
@@ -40,6 +40,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const [editorContent, setEditorContent] = useState('')
   const [loadingRaw, setLoadingRaw] = useState(false)
   const [rawError, setRawError] = useState<string | null>(null)
+  const [yamlCheckState, setYamlCheckState] = useState<'idle' | 'checking' | 'valid'>('idle')
 
   // Visual editor state
   const [visualDetail, setVisualDetail] = useState<ScenarioDetail | null>(null)
@@ -180,7 +181,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       ...detail,
       steps: detail.steps.map(s => ({
         ...s,
-        description: s.description ?? '',
+        notes: s.notes ?? '',
         headers: s.headers ? [...s.headers] : [],
         queryParams: s.queryParams ? [...s.queryParams] : [],
         bodyType: s.bodyType ?? 'none',
@@ -208,8 +209,8 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   function addVisualStep() {
     if (!visualDetail) return
     const newStep: StepDetail = {
-      title: `Step ${visualDetail.steps.length + 1}`,
-      description: '',
+      label: `Step ${visualDetail.steps.length + 1}`,
+      notes: '',
       method: 'GET',
       url: '',
       headers: [],
@@ -261,7 +262,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   function duplicateVisualStep(i: number) {
     if (!visualDetail) return
     const src = visualDetail.steps[i]
-    const copy: StepDetail = { ...src, title: `${src.title} copy`, assertions: [...src.assertions], extractions: [...src.extractions], headers: [...(src.headers ?? [])], queryParams: [...(src.queryParams ?? [])] }
+    const copy: StepDetail = { ...src, label: `${src.label} copy`, assertions: [...src.assertions], extractions: [...src.extractions], headers: [...(src.headers ?? [])], queryParams: [...(src.queryParams ?? [])] }
     const newSteps = [...visualDetail.steps.slice(0, i + 1), copy, ...visualDetail.steps.slice(i + 1)]
     setVisualDetail({ ...visualDetail, steps: newSteps })
     setVisualDirty(true)
@@ -276,6 +277,19 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setVisualDirty(true)
   }
 
+  async function handleCheckYaml() {
+    setYamlCheckState('checking')
+    setRawError(null)
+    const err = await validateScenarioYAML(editorContent)
+    if (err) {
+      setRawError(err)
+      setYamlCheckState('idle')
+    } else {
+      setYamlCheckState('valid')
+      setTimeout(() => setYamlCheckState('idle'), 2000)
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     setSaveError(null)
@@ -284,14 +298,14 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       for (const step of visualDetail.steps) {
         for (const a of step.assertions) {
           if ((a.type === 'jsonpath' || a.type === 'header') && !a.path?.trim()) {
-            setSaveError(`Step "${step.title}": ${a.type} assertion requires a path.`)
+            setSaveError(`Step "${step.label}": ${a.type} assertion requires a path.`)
             setSaving(false)
             return
           }
         }
         for (const e of step.extractions) {
           if (!e.name?.trim()) {
-            setSaveError(`Step "${step.title}": extraction is missing a variable name.`)
+            setSaveError(`Step "${step.label}": extraction is missing a variable name.`)
             setSaving(false)
             return
           }
@@ -367,6 +381,8 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         onEnterYaml={handleEnterYaml}
         onDiscard={handleDiscard}
         onSave={handleSave}
+        onCheckYaml={handleCheckYaml}
+        yamlCheckState={yamlCheckState}
       />
 
       {/* Progress bar */}
@@ -391,7 +407,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
 
       {/* Body */}
       {mode === 'yaml' ? (
-        <YamlEditorPane theme={theme} value={editorContent} error={rawError} onChange={setEditorContent} />
+        <YamlEditorPane theme={theme} value={editorContent} error={rawError} onChange={v => { setEditorContent(v); if (yamlCheckState !== 'idle') setYamlCheckState('idle'); if (rawError) setRawError(null) }} />
       ) : (
         <div ref={containerRef} className="flex-1 flex overflow-hidden">
 

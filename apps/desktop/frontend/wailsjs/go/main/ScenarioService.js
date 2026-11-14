@@ -57,3 +57,7 @@ export function SaveScenarioRaw(arg1, arg2) {
 export function SaveScenarioResult(arg1, arg2) {
   return window['go']['main']['ScenarioService']['SaveScenarioResult'](arg1, arg2);
 }
+
+export function ValidateScenarioYAML(arg1) {
+  return window['go']['main']['ScenarioService']['ValidateScenarioYAML'](arg1);
+}

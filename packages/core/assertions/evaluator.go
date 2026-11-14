@@ -13,9 +13,14 @@ import (
 )
 
 // Evaluator checks domain.Assertions against domain.Responses.
-type Evaluator struct{}
+type Evaluator struct {
+	spec *openapi.Spec // nil if no spec loaded; used for operationId-based schema assertions
+}
 
 func New() *Evaluator { return &Evaluator{} }
+
+// NewWithSpec creates an Evaluator that can resolve schema assertions by operationId.
+func NewWithSpec(spec *openapi.Spec) *Evaluator { return &Evaluator{spec: spec} }
 
 // Evaluate checks a single assertion against the response and returns the result.
 func (e *Evaluator) Evaluate(a domain.Assertion, resp *domain.Response) domain.AssertionResult {
@@ -29,7 +34,7 @@ func (e *Evaluator) Evaluate(a domain.Assertion, resp *domain.Response) domain.A
 	case domain.AssertionJSONPath:
 		res.Actual, res.Passed, res.Message = evalJSONPath(a, resp)
 	case domain.AssertionSchema:
-		res.Actual, res.Passed, res.Message = evalSchema(a, resp)
+		res.Actual, res.Passed, res.Message = e.evalSchema(a, resp)
 	default:
 		res.Passed = false
 		res.Message = fmt.Sprintf("unknown assertion type %q", a.Type)
@@ -87,7 +92,7 @@ func evalJSONPath(a domain.Assertion, resp *domain.Response) (actual string, pas
 	return
 }
 
-func evalSchema(a domain.Assertion, resp *domain.Response) (actual string, passed bool, msg string) {
+func (ev *Evaluator) evalSchema(a domain.Assertion, resp *domain.Response) (actual string, passed bool, msg string) {
 	if a.Schema == "" {
 		return "", false, "schema assertion requires a schema value"
 	}
@@ -96,8 +101,23 @@ func evalSchema(a domain.Assertion, resp *domain.Response) (actual string, passe
 		return "", false, "response body is empty"
 	}
 
-	// Parse the inline schema string as an OpenAPI spec fragment.
-	// We wrap it in a minimal spec so kin-openapi can validate it.
+	// If a spec is loaded and the schema value looks like an operationId
+	// (no braces, colons, or newlines), validate against the spec's declared
+	// response schema for that operation rather than treating it as inline YAML.
+	if ev.spec != nil && looksLikeOperationID(a.Schema) {
+		errs := openapi.ValidateResponse(ev.spec, a.Schema, resp)
+		if len(errs) == 0 {
+			return body, true, ""
+		}
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		return body, false, strings.Join(msgs, "; ")
+	}
+
+	// Inline schema (JSON object or YAML fragment) — wrap it in a minimal spec
+	// so kin-openapi can validate it.
 	specYAML := []byte(`
 openapi: "3.0.3"
 info:
@@ -114,7 +134,7 @@ paths:
               schema: ` + inlineSchemaYAML(a.Schema) + `
           description: ok
 `)
-	spec, err := openapi.ParseBytes(specYAML, "yaml")
+	inlineSpec, err := openapi.ParseBytes(specYAML, "yaml")
 	if err != nil {
 		return "", false, fmt.Sprintf("invalid schema: %v", err)
 	}
@@ -125,7 +145,7 @@ paths:
 		Body:       resp.Body,
 	}
 
-	errs := openapi.ValidateResponse(spec, "validate", fakeResp)
+	errs := openapi.ValidateResponse(inlineSpec, "validate", fakeResp)
 	if len(errs) == 0 {
 		return body, true, ""
 	}
@@ -134,6 +154,13 @@ paths:
 		msgs[i] = e.Error()
 	}
 	return body, false, strings.Join(msgs, "; ")
+}
+
+// looksLikeOperationID returns true when s could be an OpenAPI operationId rather
+// than an inline YAML/JSON schema fragment. Inline schemas contain braces, colons,
+// or newlines; operationIds are simple identifiers that contain none of those.
+func looksLikeOperationID(s string) bool {
+	return !strings.ContainsAny(s, "{\n\r:")
 }
 
 func inlineSchemaYAML(s string) string {

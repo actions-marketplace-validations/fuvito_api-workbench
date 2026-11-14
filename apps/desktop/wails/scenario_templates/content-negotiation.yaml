@@ -6,7 +6,7 @@ description: >
   Verify the health endpoint honours JSON and plain-text requests correctly.
 
 steps:
-  - title: Request JSON explicitly — Content-Type must be application/json
+  - label: Request JSON explicitly — Content-Type must be application/json
     request:
       method: GET
       url: "{{baseUrl}}/health"
@@ -26,7 +26,7 @@ steps:
         operator: eq
         expected: "ok"
 
-  - title: Request plain text — Content-Type must be text/plain
+  - label: Request plain text — Content-Type must be text/plain
     request:
       method: GET
       url: "{{baseUrl}}/health"
@@ -42,7 +42,7 @@ steps:
         operator: contains
         expected: "text/plain"
 
-  - title: No Accept header — server defaults to JSON
+  - label: No Accept header — server defaults to JSON
     request:
       method: GET
       url: "{{baseUrl}}/health"

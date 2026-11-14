@@ -7,7 +7,7 @@ description: >
   this limit.
 
 steps:
-  - title: Get octocat user profile
+  - label: Get octocat user profile
     request:
       method: GET
       url: https://api.github.com/users/octocat
@@ -34,7 +34,7 @@ steps:
         path: "$.avatar_url"
     failPolicy: stop
 
-  - title: List user repositories
+  - label: List user repositories
     request:
       method: GET
       url: https://api.github.com/users/octocat/repos
@@ -57,7 +57,7 @@ steps:
         expected: ""
     failPolicy: continue
 
-  - title: Check rate limit status
+  - label: Check rate limit status
     request:
       method: GET
       url: https://api.github.com/rate_limit

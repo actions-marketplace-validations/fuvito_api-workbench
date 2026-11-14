@@ -18,7 +18,7 @@ import (
 
 // StepResult holds the outcome of a single scenario step.
 type StepResult struct {
-	Title       string
+	Label       string
 	Request     *domain.Request
 	Response    *domain.Response
 	Assertions  []domain.AssertionResult
@@ -49,9 +49,9 @@ func New(exec *executor.Executor) *Runner {
 }
 
 // NewWithSpec creates a Runner that automatically validates each step's response
-// against the provided OpenAPI spec.
+// against the provided OpenAPI spec, and enables operationId-based schema assertions.
 func NewWithSpec(exec *executor.Executor, spec *openapi.Spec) *Runner {
-	return &Runner{exec: exec, asserter: assertions.New(), spec: spec}
+	return &Runner{exec: exec, asserter: assertions.NewWithSpec(spec), spec: spec}
 }
 
 // Run executes all steps of the scenario sequentially.
@@ -74,7 +74,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 	for i := range s.Steps {
 		step := &s.Steps[i]
 		if i < fromStep || step.Disabled {
-			result.Steps = append(result.Steps, StepResult{Title: step.Title, Skipped: true})
+			result.Steps = append(result.Steps, StepResult{Label: step.Label, Skipped: true})
 			continue
 		}
 		sr := r.runStep(ctx, step, resolver, prevFailed)
@@ -86,7 +86,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 			if step.FailPolicy == domain.FailPolicyStop || step.FailPolicy == "" {
 				for j := i + 1; j < len(s.Steps); j++ {
 					result.Steps = append(result.Steps, StepResult{
-						Title:   s.Steps[j].Title,
+						Label:   s.Steps[j].Label,
 						Skipped: true,
 					})
 				}
@@ -102,7 +102,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 }
 
 func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolver *variables.Resolver, prevFailed bool) StepResult {
-	sr := StepResult{Title: step.Title}
+	sr := StepResult{Label: step.Label}
 
 	if prevFailed && step.FailPolicy == domain.FailPolicySkip {
 		sr.Skipped = true

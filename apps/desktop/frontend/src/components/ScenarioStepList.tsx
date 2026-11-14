@@ -57,7 +57,7 @@ export function StepListRow({ step, index, result, selected, onSelect, editMode 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className={cn('text-xs font-medium truncate', isDisabled ? 'line-through text-[var(--color-muted-foreground)]' : selected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
-            {step.title || 'Untitled step'}
+            {step.label || 'Unlabeled step'}
           </span>
           {isDisabled && <EyeOff size={9} className="shrink-0 text-amber-400" />}
           {result && (
@@ -68,6 +68,9 @@ export function StepListRow({ step, index, result, selected, onSelect, editMode 
                 : <XCircle size={15} className="shrink-0 text-red-400" />
           )}
         </div>
+        {step.notes && (
+          <p className="text-[11px] text-[var(--color-muted-foreground)] truncate mt-0.5 italic">{step.notes}</p>
+        )}
         {step.requestRef ? (
           <p className="text-xs text-[var(--color-muted-foreground)] truncate font-mono mt-0.5">↗ {step.requestRef}</p>
         ) : step.method ? (

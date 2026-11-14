@@ -66,7 +66,7 @@ export function ScenarioStatsDialog({ result, onClose }: Props) {
                   </td>
                   <td className="px-2 py-2.5">
                     <div className="font-medium text-[var(--color-foreground)] truncate max-w-[220px]">
-                      {sr.title || `Step ${i + 1}`}
+                      {sr.label || `Step ${i + 1}`}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1">
                       {sr.skipped

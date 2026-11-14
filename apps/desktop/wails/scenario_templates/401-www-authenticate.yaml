@@ -6,7 +6,7 @@ description: >
   Verify the protected endpoint conforms.
 
 steps:
-  - title: Request without token — expect 401 with WWW-Authenticate
+  - label: Request without token — expect 401 with WWW-Authenticate
     request:
       method: GET
       url: "{{baseUrl}}/protected"
@@ -27,7 +27,7 @@ steps:
         operator: ne
         expected: ""
 
-  - title: Request with wrong token — same 401 rules apply
+  - label: Request with wrong token — same 401 rules apply
     request:
       method: GET
       url: "{{baseUrl}}/protected"

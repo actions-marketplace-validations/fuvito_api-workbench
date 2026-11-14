@@ -10,6 +10,10 @@ export function IsRunning() {
   return window['go']['main']['DemoService']['IsRunning']();
 }
 
+export function OpenSpecInBrowser() {
+  return window['go']['main']['DemoService']['OpenSpecInBrowser']();
+}
+
 export function StartDemo() {
   return window['go']['main']['DemoService']['StartDemo']();
 }

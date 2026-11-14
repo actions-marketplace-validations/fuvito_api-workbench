@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Trash2, Lock, CopyPlus } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Eye, EyeOff, Trash2, Lock, CopyPlus, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { inputCls as baseInputCls } from '@/lib/styles'
-import { getEnvironment, saveEnvironment, deleteEnvironment } from '@/lib/bridge'
+import { getEnvironment, saveEnvironment, deleteEnvironment, getEnvironmentRaw, saveEnvironmentRaw, validateEnvironmentYAML } from '@/lib/bridge'
 import type { EnvInfo } from '@/lib/bridge'
 
 interface EnvVar {
@@ -20,22 +20,47 @@ type Props = {
   onDeleted: () => void
 }
 
+function envToYAML(name: string, variables: EnvVar[]): string {
+  const lines: string[] = ['schemaVersion: "1"', `name: ${yamlScalar(name)}`, '', 'variables:']
+  if (variables.length === 0) lines.push('  []')
+  for (const v of variables) {
+    lines.push(`  - name: ${yamlScalar(v.name)}`)
+    lines.push(`    value: ${yamlScalar(v.value)}`)
+    if (v.secret) lines.push(`    secret: true`)
+  }
+  return lines.join('\n') + '\n'
+}
+
+function yamlScalar(s: string): string {
+  if (s === '') return "''"
+  if (/[:#\[\]{},|>&*!%@`'"]/.test(s) || /^\s|\s$/.test(s) || s.includes('\n')) {
+    return "'" + s.replace(/'/g, "''") + "'"
+  }
+  return s
+}
+
 export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, onDeleted }: Props) {
+  const [mode, setMode] = useState<'form' | 'yaml'>('form')
   const [name, setName] = useState('')
   const [variables, setVariables] = useState<EnvVar[]>([])
+  const [yamlText, setYamlText] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [yamlCheckState, setYamlCheckState] = useState<'idle' | 'checking' | 'valid'>('idle')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const isNew = !envPath
 
   /* eslint-disable react/set-state-in-effect */
   useEffect(() => {
+    setMode('form')
     if (!envPath) {
       setName('')
       setVariables([])
+      setYamlText('')
       setError('')
       return
     }
@@ -50,6 +75,81 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
       .finally(() => setLoading(false))
   }, [envPath])
   /* eslint-enable react/set-state-in-effect */
+
+  async function handleCheckYaml() {
+    setYamlCheckState('checking')
+    setError('')
+    const err = await validateEnvironmentYAML(yamlText)
+    if (err) {
+      setError(err)
+      setYamlCheckState('idle')
+    } else {
+      setYamlCheckState('valid')
+      setTimeout(() => setYamlCheckState('idle'), 2000)
+    }
+  }
+
+  async function handleSwitchToYAML() {
+    setError('')
+    if (envPath) {
+      try {
+        const raw = await getEnvironmentRaw(envPath)
+        setYamlText(raw)
+      } catch {
+        setYamlText(envToYAML(name, variables))
+      }
+    } else {
+      setYamlText(envToYAML(name, variables))
+    }
+    setMode('yaml')
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
+
+  async function handleSwitchToForm() {
+    setError('')
+    try {
+      const env = await parseYAMLToForm(yamlText)
+      setName(env.name)
+      setVariables(env.variables.map(v => ({ id: crypto.randomUUID(), ...v })))
+      setMode('form')
+    } catch (err) {
+      setError('Cannot switch to form — fix YAML errors first: ' + String(err))
+    }
+  }
+
+  async function parseYAMLToForm(text: string) {
+    // We use the Go serialization parser by writing to a temp parse call.
+    // Since we don't have a standalone parse endpoint, do a lightweight client-side parse
+    // of the YAML structure to extract name + variables.
+    const lines = text.split('\n')
+    let envName = ''
+    const vars: Array<{ name: string; value: string; secret: boolean }> = []
+    let inVariables = false
+    let currentVar: { name?: string; value?: string; secret?: boolean } | null = null
+
+    for (const raw of lines) {
+      const line = raw.trimEnd()
+      if (line.startsWith('name:') && !inVariables) {
+        envName = line.replace(/^name:\s*/, '').replace(/^['"]|['"]$/g, '')
+      } else if (line.startsWith('variables:')) {
+        inVariables = true
+      } else if (inVariables) {
+        const trimmed = line.trimStart()
+        if (trimmed.startsWith('- name:')) {
+          if (currentVar?.name !== undefined) vars.push({ name: currentVar.name ?? '', value: currentVar.value ?? '', secret: !!currentVar.secret })
+          currentVar = { name: trimmed.replace(/^- name:\s*/, '').replace(/^['"]|['"]$/g, '') }
+        } else if (trimmed.startsWith('value:') && currentVar) {
+          currentVar.value = trimmed.replace(/^value:\s*/, '').replace(/^['"]|['"]$/g, '')
+        } else if (trimmed.startsWith('secret:') && currentVar) {
+          currentVar.secret = trimmed.includes('true')
+        }
+      }
+    }
+    if (currentVar?.name !== undefined) vars.push({ name: currentVar.name ?? '', value: currentVar.value ?? '', secret: !!currentVar.secret })
+
+    if (!envName) throw new Error('missing required field: name')
+    return { name: envName, variables: vars }
+  }
 
   function addVariable() {
     setVariables(prev => [...prev, { id: crypto.randomUUID(), name: '', value: '', secret: false }])
@@ -73,17 +173,23 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
   }
 
   async function handleSave() {
-    if (!name.trim()) { setError('Environment name is required.'); return }
-    if (!workspacePath && isNew) { setError('Open a workspace first.'); return }
     setSaving(true)
     setError('')
     try {
-      const saved = await saveEnvironment({
-        path: envPath ?? '',
-        name: name.trim(),
-        variables: variables.map(({ name: n, value, secret }) => ({ name: n, value, secret })),
-      })
-      onSaved(saved)
+      if (mode === 'yaml') {
+        if (!envPath) { setError('Save via the form first to create the file, then edit YAML.'); setSaving(false); return }
+        const saved = await saveEnvironmentRaw(envPath, yamlText)
+        onSaved(saved)
+      } else {
+        if (!name.trim()) { setError('Environment name is required.'); setSaving(false); return }
+        if (!workspacePath && isNew) { setError('Open a workspace first.'); setSaving(false); return }
+        const saved = await saveEnvironment({
+          path: envPath ?? '',
+          name: name.trim(),
+          variables: variables.map(({ name: n, value, secret }) => ({ name: n, value, secret })),
+        })
+        onSaved(saved)
+      }
     } catch (err) {
       setError(String(err))
     } finally {
@@ -127,13 +233,40 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
         'shadow-2xl flex flex-col',
       )}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] shrink-0">
-          <span className="text-xs font-semibold text-[var(--color-foreground)]">
-            {isNew ? 'New Environment' : 'Edit Environment'}
-          </span>
-          <button type="button" onClick={onClose} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
-            <X size={15} />
-          </button>
+        <div className="flex items-center justify-between px-4 pt-2 border-b border-[var(--color-border)] shrink-0">
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => mode === 'yaml' ? handleSwitchToForm() : undefined}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium border-b-2 transition-colors',
+                mode === 'form'
+                  ? 'border-[var(--color-accent)] text-[var(--color-foreground)]'
+                  : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] cursor-pointer',
+              )}
+            >
+              {isNew ? 'New Environment' : 'Form'}
+            </button>
+            {!isNew && (
+              <button
+                type="button"
+                onClick={() => mode === 'form' ? handleSwitchToYAML() : undefined}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium border-b-2 transition-colors',
+                  mode === 'yaml'
+                    ? 'border-[var(--color-accent)] text-[var(--color-foreground)]'
+                    : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] cursor-pointer',
+                )}
+              >
+                YAML
+              </button>
+            )}
+          </div>
+          <div className="pb-2">
+            <button type="button" onClick={onClose} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -142,7 +275,45 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
             <p className="text-xs text-[var(--color-muted-foreground)] animate-pulse">Loading…</p>
           )}
 
-          {!loading && (
+          {!loading && mode === 'yaml' && (
+            <div className="flex flex-col gap-2 flex-1">
+              <textarea
+                ref={textareaRef}
+                value={yamlText}
+                onChange={e => { setYamlText(e.target.value); if (yamlCheckState !== 'idle') setYamlCheckState('idle'); if (error) setError('') }}
+                spellCheck={false}
+                className={cn(
+                  'flex-1 w-full font-mono text-xs leading-relaxed resize-none rounded border border-[var(--color-border)]',
+                  'bg-[var(--color-muted)] text-[var(--color-foreground)] p-3 outline-none',
+                  'focus:border-[var(--color-accent)] transition-colors min-h-[300px]',
+                )}
+              />
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={handleCheckYaml}
+                  disabled={yamlCheckState === 'checking'}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors',
+                    yamlCheckState === 'valid'
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] border border-[var(--color-border)] hover:border-[var(--color-foreground)]',
+                    yamlCheckState === 'checking' && 'opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  {yamlCheckState === 'checking' ? (
+                    <><Loader2 size={11} className="animate-spin" /> Checking…</>
+                  ) : yamlCheckState === 'valid' ? (
+                    <><CheckCircle2 size={11} /> Valid</>
+                  ) : (
+                    <><ShieldCheck size={11} /> Check YAML</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!loading && mode === 'form' && (
             <>
               {/* Name */}
               <div className="flex items-center gap-3">
@@ -241,11 +412,11 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
                   + Add variable
                 </button>
               </div>
-
-              {error && (
-                <p className="text-xs text-[var(--color-destructive)]">{error}</p>
-              )}
             </>
+          )}
+
+          {error && (
+            <p className="text-xs text-[var(--color-destructive)]">{error}</p>
           )}
         </div>
 

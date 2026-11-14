@@ -94,8 +94,8 @@ export function StepDetailPanel({ step, result, onRunFrom }: { step: StepDetail;
         {step.requestRef && (
           <p className="text-xs text-[var(--color-muted-foreground)] font-mono mb-2 break-all">↗ {step.requestRef}</p>
         )}
-        {step.description && (
-          <p className="text-xs text-[var(--color-muted-foreground)] italic mb-2">{step.description}</p>
+        {step.notes && (
+          <p className="text-xs text-[var(--color-muted-foreground)] italic mb-2">{step.notes}</p>
         )}
 
         {(step.headers?.length ?? 0) > 0 && (

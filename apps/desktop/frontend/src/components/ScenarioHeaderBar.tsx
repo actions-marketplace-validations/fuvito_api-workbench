@@ -1,4 +1,4 @@
-import { Play, Loader2, CheckCircle2, Save, X, Clock } from 'lucide-react'
+import { Play, Loader2, CheckCircle2, Save, X, Clock, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioResult, EnvInfo } from '@/lib/bridge'
 
@@ -27,6 +27,8 @@ type Props = {
   onEnterYaml: () => void
   onDiscard: () => void
   onSave: () => void
+  onCheckYaml?: () => void
+  yamlCheckState?: 'idle' | 'checking' | 'valid'
 }
 
 const toggleActiveCls = 'border-b-2 border-[var(--color-accent)] text-[var(--color-foreground)]'
@@ -38,6 +40,7 @@ export function ScenarioHeaderBar({
   result, running, onShowStats, onRun,
   saveError, savedFlash, isDirty,
   onModeView, onEnterVisual, onEnterYaml, onDiscard, onSave,
+  onCheckYaml, yamlCheckState = 'idle',
 }: Props) {
   const steps = result?.steps ?? []
   const passed = steps.filter(s => s.passed && !s.skipped).length
@@ -122,6 +125,28 @@ export function ScenarioHeaderBar({
                 className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
                 <X size={11} /> Discard
               </button>
+              {mode === 'yaml' && onCheckYaml && (
+                <button
+                  type="button"
+                  onClick={onCheckYaml}
+                  disabled={yamlCheckState === 'checking'}
+                  className={cn(
+                    'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors',
+                    yamlCheckState === 'valid'
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
+                    yamlCheckState === 'checking' && 'opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  {yamlCheckState === 'checking' ? (
+                    <><Loader2 size={11} className="animate-spin" /> Checking…</>
+                  ) : yamlCheckState === 'valid' ? (
+                    <><CheckCircle2 size={11} /> Valid</>
+                  ) : (
+                    <><ShieldCheck size={11} /> Check</>
+                  )}
+                </button>
+              )}
               <button type="button" onClick={onSave} disabled={saving || (mode === 'yaml' && !isDirty)}
                 className={cn('shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity',
                   'bg-[var(--color-accent)] text-white',

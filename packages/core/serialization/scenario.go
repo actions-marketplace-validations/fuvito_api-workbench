@@ -26,8 +26,8 @@ type RetryPolicyFile struct {
 }
 
 type StepFile struct {
-	Title        string           `yaml:"title,omitempty" json:"title,omitempty"`
-	Description  string           `yaml:"description,omitempty" json:"description,omitempty"`
+	Label        string           `yaml:"label,omitempty" json:"label,omitempty"`
+	Notes        string           `yaml:"notes,omitempty" json:"notes,omitempty"`
 	Disabled     bool             `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 	RequestRef   string           `yaml:"requestRef,omitempty" json:"requestRef,omitempty"`
 	Request      *RequestFile     `yaml:"request,omitempty" json:"request,omitempty"`
@@ -101,7 +101,7 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 	for _, step := range sf.Steps {
 		ds, err := stepFileToDomain(&step)
 		if err != nil {
-			return nil, fmt.Errorf("step %q: %w", step.Title, err)
+			return nil, fmt.Errorf("step %q: %w", step.Label, err)
 		}
 		s.Steps = append(s.Steps, *ds)
 	}
@@ -110,8 +110,8 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 
 func stepFileToDomain(sf *StepFile) (*domain.ScenarioStep, error) {
 	step := &domain.ScenarioStep{
-		Title:        sf.Title,
-		Description:  sf.Description,
+		Label:        sf.Label,
+		Notes:        sf.Notes,
 		Disabled:     sf.Disabled,
 		RequestRef:   sf.RequestRef,
 		FailPolicy:   domain.FailPolicy(sf.FailPolicy),
@@ -166,8 +166,8 @@ func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 
 func stepDomainToFile(step *domain.ScenarioStep) StepFile {
 	sf := StepFile{
-		Title:        step.Title,
-		Description:  step.Description,
+		Label:        step.Label,
+		Notes:        step.Notes,
 		Disabled:     step.Disabled,
 		RequestRef:   step.RequestRef,
 		FailPolicy:   string(step.FailPolicy),

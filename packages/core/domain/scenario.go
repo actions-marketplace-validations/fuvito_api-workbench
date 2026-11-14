@@ -19,8 +19,8 @@ type RetryPolicy struct {
 // Either RequestRef or Request must be set, not both.
 // RequestRef is a path to a saved request file relative to the workspace root.
 type ScenarioStep struct {
-	Title        string
-	Description  string
+	Label        string
+	Notes        string
 	Disabled     bool // when true, step is skipped without being counted as a failure
 	RequestRef   string
 	Request      *Request
