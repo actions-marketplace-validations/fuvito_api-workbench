@@ -9,24 +9,22 @@ test.describe('App shell', () => {
     expect(errors).toHaveLength(0)
   })
 
-  test('sidebar is visible with workspace and history tabs', async ({ page }) => {
+  test('activity rail shows Explorer, Scenarios and History buttons', async ({ page }) => {
     await gotoApp(page)
-    const sidebar = page.locator('aside')
-    await expect(sidebar.getByRole('button', { name: /workspace/i }).first()).toBeVisible()
-    await expect(sidebar.getByRole('button', { name: /history/i }).first()).toBeVisible()
+    await expect(page.getByTitle('Explorer')).toBeVisible()
+    await expect(page.getByTitle('History')).toBeVisible()
   })
 
-  test('workspace tab is active by default', async ({ page }) => {
+  test('Explorer panel is active by default', async ({ page }) => {
     await gotoApp(page)
-    // "New Workspace" button only appears on the workspace tab
-    await expect(page.getByRole('button', { name: 'New Workspace' })).toBeVisible()
+    // With an empty workspace the Explorer panel shows the empty state
+    await expect(page.getByText('No request files yet')).toBeVisible()
   })
 
-  test('switching to history tab shows history panel', async ({ page }) => {
+  test('switching to history tab shows history empty state', async ({ page }) => {
     await gotoApp(page)
-    const sidebar = page.locator('aside')
-    await sidebar.getByRole('button', { name: /history/i }).first().click()
-    await expect(page.getByText('No requests yet.')).toBeVisible()
+    await page.getByTitle('History').click()
+    await expect(page.getByText('Send a request to see it here')).toBeVisible()
   })
 
   test('request editor URL input is present', async ({ page }) => {

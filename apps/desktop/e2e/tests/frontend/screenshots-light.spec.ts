@@ -180,6 +180,7 @@ test('@screenshot-light scenario — run result PASSED', async ({ page }) => {
     })();
   `)
   await gotoApp(page)
+  await page.getByTitle('Scenarios').click()
   await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
   await page.getByText('Login').first().waitFor()
   await page.getByRole('button', { name: 'Run', exact: true }).click()

@@ -36,7 +36,7 @@ export function setupMockBridge() {
     settings: { ...DEFAULT_SETTINGS },
     executeResult: { ...DEFAULT_RESPONSE },
     history: [] as unknown[],
-    workspacePath: '',
+    workspacePath: '/workspace',
     fileTree: [] as unknown[],
     environments: [] as unknown[],
     activeEnv: null,
@@ -45,6 +45,7 @@ export function setupMockBridge() {
     scenarioResult: null as unknown,
     scenarioRaw: '' as unknown,
     scenarioResultCache: {} as Record<string, unknown>,
+    recentWorkspaces: [] as unknown[],
   }
 
   const bridge = (window as unknown as Record<string, Record<string, unknown>>)['__bridge']
@@ -68,9 +69,11 @@ export function setupMockBridge() {
         GetActiveEnvironment: () => Promise.resolve(bridge['activeEnv']),
         GetEnvironment: () => Promise.resolve({ name: '', variables: [] }),
         ActiveEnvironment: noopNull,
-        OpenWorkspace: () => Promise.resolve(''),
-        NewWorkspace: () => Promise.resolve(''),
-        CloseWorkspace: noop,
+        OpenWorkspace: () => { bridge['workspacePath'] = '/workspace'; return Promise.resolve('/workspace') },
+        NewWorkspace: () => { bridge['workspacePath'] = '/workspace'; return Promise.resolve('/workspace') },
+        CloseWorkspace: () => { bridge['workspacePath'] = ''; return Promise.resolve() },
+        OpenWorkspaceByPath: (path: string) => { bridge['workspacePath'] = path; return Promise.resolve(path) },
+        GetRecentWorkspaces: () => Promise.resolve(bridge['recentWorkspaces'] ?? []),
         SaveRequest: (r: Record<string, string>) =>
           Promise.resolve('/workspace/' + (r?.name || 'req') + '.yaml'),
         LoadRequest: noopNull,
@@ -83,6 +86,9 @@ export function setupMockBridge() {
         MoveRequest: (src: string) => Promise.resolve(src),
         SaveResponseCache: noop,
         LoadResponseCache: noopNull,
+        ClearResponseCache: noop,
+        PickFile: noopNull,
+        SaveContentToFile: () => Promise.resolve(''),
         OpenInExplorer: () => Promise.resolve(''),
         OpenInSystemViewer: noop,
         SaveEnvironment: (e: Record<string, string>) =>
@@ -109,8 +115,18 @@ export function setupMockBridge() {
         ImportOpenAPISpecFromPath: () => Promise.resolve({ count: 0, error: '' }),
         ImportOpenAPISpecFromURL: () => Promise.resolve({ count: 0, error: '' }),
       },
+      ImportService: {
+        ImportPostmanCollection: () => Promise.resolve({ count: 0, error: '' }),
+        ImportInsomniaExport: () => Promise.resolve({ count: 0, error: '' }),
+      },
       ScenarioService: {
         ListScenarios: () => Promise.resolve(bridge['scenarios']),
+        ListTemplates: () => Promise.resolve([]),
+        RunFolder: () => Promise.resolve([]),
+        CreateFromTemplate: (templateId: string) => {
+          const path = `/workspace/scenarios/${templateId}.yaml`
+          return Promise.resolve({ path, error: '' })
+        },
         LoadScenario: () => Promise.resolve(bridge['scenarioDetail'] ?? { path: '', title: '', description: '', error: '', steps: [] }),
         RunScenario: (_path: string, _envPath: string) => Promise.resolve(bridge['scenarioResult'] ?? { title: '', error: '', passed: true, durationMs: 0, steps: [] }),
         LoadScenarioRaw: () => Promise.resolve(bridge['scenarioRaw'] ?? ''),
