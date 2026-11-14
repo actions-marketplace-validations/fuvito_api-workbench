@@ -3,6 +3,19 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.3.0',
+    date: '2026-11-13',
+    items: [
+      'Ctrl+P quick open — fuzzy-search all request files in the workspace',
+      'Env-var autocomplete — typing {{ in URL bar or value fields shows available variables',
+      'Collapsible response panel — collapse to a narrow strip to give the editor more room',
+      'Tab overflow — gradient fade indicators and active-tab auto-scroll when tabs exceed bar width',
+      'Empty states for Explorer, Scenarios, and History panels',
+      'Auto-open first request when a workspace is opened',
+      'Switching workspaces closes the previous workspace and all its tabs',
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2026-11-09',
     items: [
@@ -83,7 +96,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.2.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.3.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

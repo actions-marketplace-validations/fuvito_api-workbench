@@ -1,4 +1,4 @@
-import { FolderOpen, Play, Clock, Settings, HelpCircle, Server, ChevronsRight, ChevronsLeft } from 'lucide-react'
+import { FolderOpen, Play, Clock, Settings, HelpCircle, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type RailTab = 'explorer' | 'scenarios' | 'history'
@@ -66,29 +66,6 @@ export function ActivityRail({
           )
         })}
       </nav>
-
-      {/* Backlog — coming soon */}
-      <div className="flex flex-col py-1 border-t border-[var(--color-border)]">
-        {([
-          { icon: Server, label: 'Simulations', title: 'Simulations — coming soon' },
-        ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string }[]).map(({ icon: Icon, label, title }) => (
-          <button
-            key={label}
-            type="button"
-            title={expanded ? undefined : title}
-            disabled
-            className={cn(
-              'flex items-center h-9 text-[var(--color-border)] cursor-default',
-              expanded ? 'gap-2.5 px-3' : 'justify-center w-11',
-            )}
-          >
-            <Icon size={16} className="shrink-0" />
-            {expanded && (
-              <span className="text-xs font-medium truncate">{label}</span>
-            )}
-          </button>
-        ))}
-      </div>
 
       {/* Bottom: settings + help + expand toggle */}
       <div className="mt-auto flex flex-col py-1 border-t border-[var(--color-border)]">

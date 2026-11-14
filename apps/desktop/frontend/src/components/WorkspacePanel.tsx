@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, FileCode } from 'lucide-react'
 import type { FileNode, FolderRunItem } from '@/lib/bridge'
 import { openInExplorer } from '@/lib/bridge'
 import { ContextMenu } from '@/components/ContextMenu'
@@ -157,9 +157,26 @@ export function WorkspacePanel({
           )}
           <div className="flex-1 overflow-auto py-1">
             {fileTree.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-[var(--color-muted-foreground)]">
-                No request files found.
-              </p>
+              <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+                <FileCode size={24} className="text-[var(--color-muted-foreground)] opacity-30" />
+                <p className="text-xs text-[var(--color-muted-foreground)]">No request files yet</p>
+                <div className="flex flex-col gap-1.5 w-full">
+                  <button
+                    type="button"
+                    onClick={onImportOpenAPI}
+                    className="w-full text-xs py-1.5 px-3 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+                  >
+                    Import OpenAPI spec
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNewRequestInFolder?.('')}
+                    className="w-full text-xs py-1.5 px-3 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+                  >
+                    New request
+                  </button>
+                </div>
+              </div>
             ) : filteredTree.length === 0 ? (
               <p className="px-3 py-2 text-xs text-[var(--color-muted-foreground)]">No matches.</p>
             ) : (

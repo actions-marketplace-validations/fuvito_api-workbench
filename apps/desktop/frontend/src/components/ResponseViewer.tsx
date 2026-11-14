@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2, GitCompare } from 'lucide-react'
+import { Search, X, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2, GitCompare, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
 import { openInSystemViewer } from '@/lib/bridge'
@@ -29,9 +29,10 @@ type ResponseViewerProps = {
   loading: boolean
   cachedAt?: string | null
   onClear?: () => void
+  onCollapse?: () => void
 }
 
-export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear }: ResponseViewerProps) {
+export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear, onCollapse }: ResponseViewerProps) {
   const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -135,6 +136,16 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
     <div className="flex flex-col h-full border-l border-[var(--color-border)]">
       {/* Status bar */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-[var(--color-border)] shrink-0 flex-wrap">
+        {onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            title="Collapse response panel"
+            className="p-1 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+          >
+            <ChevronRight size={12} />
+          </button>
+        )}
         {response && !response.error && response.statusCode > 0 ? (
           <>
             <span data-testid="response-status" className={cn('text-sm font-mono font-bold', statusColor(response.statusCode))}>
