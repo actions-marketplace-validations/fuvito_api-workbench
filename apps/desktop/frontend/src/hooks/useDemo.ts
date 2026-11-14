@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { startDemo, stopDemo } from '@/lib/bridge'
+import type { FileNode } from '@/lib/bridge'
 import { createBlankTab } from '@/lib/tabState'
 import type { TabState } from '@/lib/tabState'
 
 type TabsStateTuple = { tabs: TabState[]; activeTabId: string }
 
 export function useDemo(deps: {
-  refreshWorkspace: () => Promise<void>
+  refreshWorkspace: () => Promise<FileNode[]>
   setTabsState: React.Dispatch<React.SetStateAction<TabsStateTuple>>
+  openFirstFileInTree: (tree: FileNode[]) => Promise<void>
 }) {
-  const { refreshWorkspace, setTabsState } = deps
+  const { refreshWorkspace, setTabsState, openFirstFileInTree } = deps
 
   const [demoRunning, setDemoRunning] = useState(false)
   const [demoPort, setDemoPort] = useState(0)
@@ -26,7 +28,8 @@ export function useDemo(deps: {
       }
       setDemoRunning(true)
       setDemoPort(result.port)
-      await refreshWorkspace()
+      const tree = await refreshWorkspace()
+      await openFirstFileInTree(tree)
     } catch (err) {
       console.error('demo start error:', err)
     } finally {

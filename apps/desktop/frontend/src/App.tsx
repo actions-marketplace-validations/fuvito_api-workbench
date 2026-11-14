@@ -51,6 +51,7 @@ export default function App() {
   const demo = useDemo({
     refreshWorkspace: workspace.refreshWorkspace,
     setTabsState: tabs.setTabsState,
+    openFirstFileInTree: workspace.openFirstFileInTree,
   })
 
   // Wire cross-dependency after both hooks are initialized
@@ -111,21 +112,34 @@ export default function App() {
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
   const [scenarioRenameError, setScenarioRenameError] = useState<string | null>(null)
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState(false)
+  const [pendingWorkspaceAction, setPendingWorkspaceAction] = useState<(() => void) | null>(null)
 
   async function doCloseWorkspace() {
     if (demo.demoRunning) {
       try { await stopDemo() } catch { /* best-effort */ }
       demo.clearDemoState()
     }
-    workspace.handleCloseWorkspace()
+    await workspace.handleCloseWorkspace()
   }
 
   function requestCloseWorkspace() {
     const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
     if (hasDirty) {
+      setPendingWorkspaceAction(null)
       setPendingCloseWorkspace(true)
     } else {
       doCloseWorkspace()
+    }
+  }
+
+  function requestWorkspaceSwitch(action: () => void) {
+    if (!workspace.workspacePath) { action(); return }
+    const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingWorkspaceAction(() => action)
+      setPendingCloseWorkspace(true)
+    } else {
+      doCloseWorkspace().then(() => action())
     }
   }
 
@@ -378,7 +392,7 @@ export default function App() {
       kind: 'action' as const,
       label: p.split(/[\\/]/).pop() ?? p,
       title: p,
-      onClick: () => workspace.handleOpenWorkspaceByPath(p),
+      onClick: () => requestWorkspaceSwitch(() => workspace.handleOpenWorkspaceByPath(p)),
     })),
   }
 
@@ -386,8 +400,8 @@ export default function App() {
     {
       label: 'File',
       items: [
-        { kind: 'action', label: 'Open Workspace…',  onClick: workspace.handleOpenWorkspace },
-        { kind: 'action', label: 'New Workspace…',   onClick: workspace.handleNewWorkspace },
+        { kind: 'action', label: 'Open Workspace…',  onClick: () => requestWorkspaceSwitch(workspace.handleOpenWorkspace) },
+        { kind: 'action', label: 'New Workspace…',   onClick: () => requestWorkspaceSwitch(workspace.handleNewWorkspace) },
         { kind: 'action', label: 'Close Workspace',  onClick: requestCloseWorkspace },
         recentWorkspacesSubmenu,
         { kind: 'separator' },
@@ -534,12 +548,17 @@ export default function App() {
       {pendingCloseWorkspace && (() => {
         const dirtyCount = tabList.filter(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty)).length
         const noun = dirtyCount === 1 ? 'tab has' : 'tabs have'
+        const action = pendingWorkspaceAction
         return (
           <DiscardChangesDialog
-            title="Close workspace"
-            message={`${dirtyCount} ${noun} unsaved changes. Close workspace and discard them?`}
-            onCancel={() => setPendingCloseWorkspace(false)}
-            onDiscard={() => { setPendingCloseWorkspace(false); doCloseWorkspace() }}
+            title={action ? 'Switch workspace' : 'Close workspace'}
+            message={`${dirtyCount} ${noun} unsaved changes. ${action ? 'Switch workspace' : 'Close workspace'} and discard them?`}
+            onCancel={() => { setPendingCloseWorkspace(false); setPendingWorkspaceAction(null) }}
+            onDiscard={() => {
+              setPendingCloseWorkspace(false)
+              setPendingWorkspaceAction(null)
+              doCloseWorkspace().then(() => action?.())
+            }}
           />
         )
       })()}

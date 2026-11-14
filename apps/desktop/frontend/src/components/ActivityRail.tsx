@@ -1,4 +1,4 @@
-import { FolderOpen, Play, Clock, Settings, HelpCircle, BarChart2, Server, ChevronsRight, ChevronsLeft } from 'lucide-react'
+import { FolderOpen, Play, Clock, Settings, HelpCircle, Server, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type RailTab = 'explorer' | 'scenarios' | 'history'
@@ -70,8 +70,7 @@ export function ActivityRail({
       {/* Backlog — coming soon */}
       <div className="flex flex-col py-1 border-t border-[var(--color-border)]">
         {([
-          { icon: Server,   label: 'Simulations', title: 'Simulations — coming soon' },
-          { icon: BarChart2, label: 'Analytics',   title: 'Analytics — coming soon' },
+          { icon: Server, label: 'Simulations', title: 'Simulations — coming soon' },
         ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string }[]).map(({ icon: Icon, label, title }) => (
           <button
             key={label}

@@ -10,8 +10,19 @@ import {
   getRecentWorkspaces, openWorkspaceByPath,
 } from '@/lib/bridge'
 import type { HistoryEntry, FileNode, EnvInfo, RequestFileIO, ScenarioInfo } from '@/lib/bridge'
-import { createBlankTab, computeStateKey } from '@/lib/tabState'
+import { createBlankTab, computeStateKey, isBlankTab } from '@/lib/tabState'
 import type { TabsStateTuple } from '@/hooks/useTabsState'
+
+function findFirstRequestFile(nodes: FileNode[]): string | null {
+  for (const node of nodes) {
+    if (!node.isDir) return node.path
+    if (node.children) {
+      const found = findFirstRequestFile(node.children)
+      if (found) return found
+    }
+  }
+  return null
+}
 
 export function useWorkspace(deps: {
   setTabsState: React.Dispatch<React.SetStateAction<TabsStateTuple>>
@@ -59,7 +70,7 @@ export function useWorkspace(deps: {
     } catch { /* best-effort */ }
   }, [])
 
-  const refreshWorkspace = useCallback(async () => {
+  const refreshWorkspace = useCallback(async (): Promise<FileNode[]> => {
     try {
       const [path, tree, envs, activeE, scenarios, recent] = await Promise.all([
         getWorkspacePath() as Promise<string>,
@@ -76,19 +87,33 @@ export function useWorkspace(deps: {
       setScenarioList(scenarios ?? [])
       setRecentWorkspaces(recent ?? [])
       await loadEnvVars(activeE?.path)
-    } catch { /* best-effort */ }
+      return tree ?? []
+    } catch { return [] }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshHistory = useCallback(async () => {
     try { setHistory(await getHistory()) } catch { /* best-effort */ }
   }, [])
 
+  async function openFirstFileInTree(tree: FileNode[]) {
+    const firstPath = findFirstRequestFile(tree)
+    if (!firstPath) return
+    if (!tabsStateRef.current.tabs.every(t => isBlankTab(t))) return
+    try {
+      const r = await loadRequest(firstPath)
+      if (!r) return
+      const tabId = openFileAsTab(r, firstPath)
+      loadCacheIntoTab(tabId, firstPath)
+    } catch { /* best-effort */ }
+  }
+
   async function handleOpenWorkspace() {
     try {
       const path = await openWorkspace()
       if (path) {
         setWorkspacePath(path)
-        await refreshWorkspace()
+        const tree = await refreshWorkspace()
+        await openFirstFileInTree(tree)
       }
     } catch (err) {
       console.error('open workspace:', err)
@@ -100,7 +125,8 @@ export function useWorkspace(deps: {
       const path = await newWorkspace()
       if (path) {
         setWorkspacePath(path)
-        await refreshWorkspace()
+        const tree = await refreshWorkspace()
+        await openFirstFileInTree(tree)
       }
     } catch (err) {
       console.error('new workspace:', err)
@@ -112,7 +138,8 @@ export function useWorkspace(deps: {
       const opened = await openWorkspaceByPath(path)
       if (opened) {
         setWorkspacePath(opened)
-        await refreshWorkspace()
+        const tree = await refreshWorkspace()
+        await openFirstFileInTree(tree)
       }
     } catch (err) {
       console.error('open workspace by path:', err)
@@ -412,7 +439,7 @@ export function useWorkspace(deps: {
 
   return {
     workspacePath, fileTree, environments, activeEnv, envVarMap, importing, importError, history, scenarioList, recentWorkspaces,
-    refreshFileTree, refreshWorkspace, refreshHistory,
+    refreshFileTree, refreshWorkspace, refreshHistory, openFirstFileInTree,
     handleOpenWorkspace, handleNewWorkspace, handleCloseWorkspace, handleOpenWorkspaceByPath,
     handleSelectFile, handleOpenRequest, handleEnvChange,
     handleClearHistory, handleDuplicateFile, handleMoveFile,
