@@ -129,7 +129,7 @@ export function TreeNode({
       >
         <div
           className={cn(
-            'group flex items-center hover:bg-[var(--color-muted)] transition-colors',
+            'group flex items-center gap-1.5 hover:bg-[var(--color-muted)] transition-colors',
             isDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40',
           )}
           style={{ paddingLeft: `${8 + indent}px` }}
@@ -138,7 +138,7 @@ export function TreeNode({
           <button
             type="button"
             onClick={() => onToggleCollapse(node.path)}
-            className="flex items-center gap-1 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
+            className="flex items-center gap-1.5 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
           >
             <span className="shrink-0">
               {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
