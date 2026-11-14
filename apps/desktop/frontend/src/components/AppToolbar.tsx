@@ -19,18 +19,15 @@ export function AppToolbar({
   activeTab, activeTabId, updateTab,
   onOpenRequest, onSaveRequest, onNewRequest, onDuplicateTab,
 }: AppToolbarProps) {
-  const hasDescription = activeTab.kind !== 'scenario' && !!activeTab.description
-
   return (
     <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
-      <div className={cn('min-w-0 flex-1', hasDescription ? 'flex flex-col gap-0' : 'flex items-center gap-1.5')}>
+      <div className="min-w-0 flex-1 flex items-center gap-1.5">
         {activeTab.kind === 'scenario' ? (
           <span className="text-xs text-[var(--color-muted-foreground)] truncate">
             {activeTab.name ?? 'Scenario'}
           </span>
         ) : (
           <>
-            <div className="flex items-center gap-1.5 min-w-0">
               {isTabDirty(activeTab) && (
                 <span className="shrink-0 w-2 h-2 rounded-full bg-amber-400" title="Unsaved changes" />
               )}
@@ -85,12 +82,6 @@ export function AppToolbar({
                   {activeTab.saveError}
                 </span>
               )}
-            </div>
-            {hasDescription && (
-              <p className="text-[11px] text-[var(--color-muted-foreground)] truncate leading-tight">
-                {activeTab.description}
-              </p>
-            )}
           </>
         )}
       </div>

@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: Create User
-description: Create a new user. Returns the created user object with a generated ID.
 method: POST
 url: "{{baseUrl}}/users"
 body:

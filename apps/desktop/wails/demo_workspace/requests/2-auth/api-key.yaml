@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: API Key Auth
-description: Access a protected endpoint using an API key passed in the X-Api-Key header.
 method: GET
 url: "{{baseUrl}}/auth/apikey"
 auth:

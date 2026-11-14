@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: Upload File
-description: Simulate a file upload by sending metadata (filename, MIME type, size). The server echoes the metadata back.
 method: POST
 url: "{{baseUrl}}/files/upload"
 body:

@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: List Posts
-description: Retrieve a paginated list of blog posts. Each post includes title, author, and a short excerpt.
 method: GET
 url: "{{baseUrl}}/posts"
 queryParams:

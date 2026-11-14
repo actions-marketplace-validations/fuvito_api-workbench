@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: Atom Feed (XML)
-description: Returns an Atom-format XML feed. Demonstrates how Clear Signal renders XML responses with syntax highlighting.
 method: GET
 url: "{{baseUrl}}/feed"
 headers:

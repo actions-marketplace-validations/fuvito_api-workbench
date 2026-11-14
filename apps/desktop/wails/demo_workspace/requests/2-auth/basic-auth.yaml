@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: Basic Auth
-description: Access a protected endpoint using HTTP Basic authentication. Credentials are sent as a Base64-encoded header.
 method: GET
 url: "{{baseUrl}}/auth/basic"
 auth:

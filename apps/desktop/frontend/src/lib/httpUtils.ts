@@ -120,7 +120,6 @@ export function requestFileIOToState(r: RequestFileIO): {
   queryParams: KVPair[]
   body: BodyState
   auth: AuthState
-  description: string | null
 } {
   const toKV = (pairs: Array<{ name: string; value: string }> = []): KVPair[] =>
     pairs.map(p => ({ id: crypto.randomUUID(), name: p.name, value: p.value, enabled: true }))
@@ -145,6 +144,5 @@ export function requestFileIOToState(r: RequestFileIO): {
     queryParams: toKV(r.queryParams),
     body: r.body ? { type: r.body.type as BodyState['type'], content: r.body.content } : { type: 'none', content: '' },
     auth,
-    description: r.description ?? null,
   }
 }

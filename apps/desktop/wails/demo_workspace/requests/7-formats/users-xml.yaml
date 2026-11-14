@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: Users as XML
-description: Returns the user list serialized as XML instead of JSON. Shows how the same data can be served in multiple formats via Accept headers.
 method: GET
 url: "{{baseUrl}}/data.xml"
 headers:

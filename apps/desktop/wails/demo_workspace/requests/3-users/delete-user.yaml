@@ -1,5 +1,4 @@
 schemaVersion: "1"
 title: Delete User
-description: Permanently remove a user by ID. Returns 204 No Content on success.
 method: DELETE
 url: "{{baseUrl}}/users/{{userId}}"

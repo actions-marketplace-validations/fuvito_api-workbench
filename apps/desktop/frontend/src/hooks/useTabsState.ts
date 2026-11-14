@@ -148,7 +148,6 @@ export function useTabsState(deps: {
       ...state,
       timeoutMs,
       name: r.title || null,
-      description: r.description ?? null,
       filePath: path,
       targetDir: null,
       savedKey,

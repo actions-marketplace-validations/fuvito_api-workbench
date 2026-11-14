@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: Get Profile
-description: Fetch the authenticated user's profile. Requires a valid bearer token — run Login first to get one.
 method: GET
 url: "{{baseUrl}}/auth/profile"
 auth:

@@ -1,6 +1,5 @@
 schemaVersion: "1"
 title: List Users
-description: Retrieve a paginated list of users. Adjust the page and limit query params to navigate through results.
 method: GET
 url: "{{baseUrl}}/users"
 queryParams:

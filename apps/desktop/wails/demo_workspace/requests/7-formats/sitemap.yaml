@@ -1,5 +1,4 @@
 schemaVersion: "1"
 title: Sitemap (XML)
-description: Returns a standard XML sitemap. Use this to test XML response handling and content-type detection.
 method: GET
 url: "{{baseUrl}}/sitemap.xml"
