@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState, useMemo, useRef } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { inputCls as baseInputCls } from '@/lib/styles'
@@ -10,9 +10,99 @@ type Props = {
   keyPlaceholder?: string
   valuePlaceholder?: string
   keySuggestions?: string[]
+  envVarNames?: string[]
 }
 
 const inputCls = cn(baseInputCls, 'flex-1 min-w-0 font-mono px-2 py-1')
+
+type VarValueInputProps = {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  envVarNames?: string[]
+}
+
+function VarValueInput({ value, onChange, placeholder, envVarNames }: VarValueInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [acPartial, setAcPartial] = useState<string | null>(null)
+  const [acIndex, setAcIndex] = useState(0)
+
+  const acMatches = useMemo(() => {
+    if (acPartial === null || !envVarNames?.length) return []
+    const q = acPartial.toLowerCase()
+    return envVarNames.filter(n => n.toLowerCase().includes(q))
+  }, [acPartial, envVarNames])
+
+  function checkAc(el: HTMLInputElement, v: string) {
+    const pos = el.selectionStart ?? v.length
+    const before = v.slice(0, pos)
+    const oi = before.lastIndexOf('{{')
+    if (oi !== -1 && !before.slice(oi + 2).includes('}}')) {
+      setAcPartial(before.slice(oi + 2))
+      setAcIndex(0)
+    } else {
+      setAcPartial(null)
+    }
+  }
+
+  function insertVar(name: string) {
+    const el = inputRef.current; if (!el) return
+    const pos = el.selectionStart ?? value.length
+    const before = value.slice(0, pos)
+    const oi = before.lastIndexOf('{{')
+    const newVal = value.slice(0, oi) + '{{' + name + '}}' + value.slice(pos)
+    onChange(newVal); setAcPartial(null)
+    requestAnimationFrame(() => {
+      el.setSelectionRange(oi + 4 + name.length, oi + 4 + name.length)
+      el.focus()
+    })
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (acMatches.length > 0 && acPartial !== null) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setAcIndex(i => Math.min(i + 1, acMatches.length - 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setAcIndex(i => Math.max(i - 1, 0)); return }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        if (acMatches[acIndex]) { e.preventDefault(); insertVar(acMatches[acIndex]); return }
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setAcPartial(null); return }
+    }
+  }
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => { onChange(e.target.value); checkAc(e.target, e.target.value) }}
+        onKeyDown={handleKeyDown}
+        onClick={e => checkAc(e.currentTarget, value)}
+        onBlur={() => setTimeout(() => setAcPartial(null), 150)}
+        placeholder={placeholder}
+        className={inputCls}
+      />
+      {acPartial !== null && acMatches.length > 0 && (
+        <ul className="absolute top-full left-0 right-0 z-50 bg-[var(--color-card)] border border-[var(--color-border)] rounded shadow-lg mt-0.5 max-h-40 overflow-auto py-0.5">
+          {acMatches.map((name, i) => (
+            <li key={name}>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); insertVar(name) }}
+                className={cn(
+                  'w-full text-left px-3 py-1 text-xs font-mono transition-colors',
+                  i === acIndex ? 'bg-[var(--color-accent)]/15 text-[var(--color-foreground)]' : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]'
+                )}
+              >
+                {name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 export function KeyValueEditor({
   pairs,
@@ -20,6 +110,7 @@ export function KeyValueEditor({
   keyPlaceholder = 'Key',
   valuePlaceholder = 'Value',
   keySuggestions,
+  envVarNames,
 }: Props) {
   const listId = useId()
 
@@ -79,12 +170,11 @@ export function KeyValueEditor({
             list={keySuggestions ? listId : undefined}
             className={inputCls}
           />
-          <input
-            type="text"
+          <VarValueInput
             value={pair.value}
-            onChange={e => update(pair.id, 'value', e.target.value)}
+            onChange={v => update(pair.id, 'value', v)}
             placeholder={valuePlaceholder}
-            className={inputCls}
+            envVarNames={envVarNames}
           />
           <button
             type="button"

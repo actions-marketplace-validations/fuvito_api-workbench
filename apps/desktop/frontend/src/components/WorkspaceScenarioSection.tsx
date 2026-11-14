@@ -114,6 +114,28 @@ export function WorkspaceScenarioSection({
           {filteredScenarios.length === 0 && scenarioQuery && (
             <p className="px-3 py-1 text-xs text-[var(--color-muted-foreground)]">No matches.</p>
           )}
+          {filteredScenarios.length === 0 && !scenarioQuery && !creatingScenario && (
+            <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
+              <Play size={20} className="text-[var(--color-muted-foreground)] opacity-30" />
+              <p className="text-xs text-[var(--color-muted-foreground)]">No scenarios yet</p>
+              <div className="flex flex-col gap-1.5 w-full">
+                <button
+                  type="button"
+                  onClick={() => setCreatingScenario(true)}
+                  className="w-full text-xs py-1.5 px-3 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+                >
+                  New scenario
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenTemplateGallery}
+                  className="w-full text-xs py-1.5 px-3 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+                >
+                  Browse templates
+                </button>
+              </div>
+            </div>
+          )}
           {filteredScenarios.map(s => (
             <div
               key={s.path}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { QuickOpen } from '@/components/QuickOpen'
 import { MenuBar } from '@/components/MenuBar'
 import type { MenuDef } from '@/components/MenuBar'
 import { TabBar } from '@/components/TabBar'
@@ -12,6 +13,7 @@ import { HelpPanel } from '@/components/HelpPanel'
 import { EnvironmentEditor } from '@/components/EnvironmentEditor'
 import { RequestEditor } from '@/components/RequestEditor'
 import { ResponseViewer } from '@/components/ResponseViewer'
+import { ChevronLeft } from 'lucide-react'
 import { ScenarioViewer } from '@/components/ScenarioViewer'
 import { Sidebar } from '@/components/Sidebar'
 import { AboutDialog } from '@/components/AboutDialog'
@@ -77,6 +79,9 @@ export default function App() {
   const [railExpanded, setRailExpanded] = useState(() => {
     return localStorage.getItem('ui.railExpanded') === 'true'
   })
+
+  const [showQuickOpen, setShowQuickOpen] = useState(false)
+  const [responseCollapsed, setResponseCollapsed] = useState(false)
 
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
   const sidebarWidthRef = useRef(sidebarWidth)
@@ -339,6 +344,11 @@ export default function App() {
           return next
         })
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        if (!workspace.workspacePath) return
+        e.preventDefault()
+        setShowQuickOpen(o => !o)
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
         e.preventDefault()
         const { tabs: tList, activeTabId } = tabs.tabsStateRef.current
@@ -580,6 +590,14 @@ export default function App() {
         />
       )}
 
+      {showQuickOpen && (
+        <QuickOpen
+          fileTree={workspace.fileTree}
+          onSelect={workspace.handleSelectFile}
+          onClose={() => setShowQuickOpen(false)}
+        />
+      )}
+
       {/* Overlays */}
       {settings.showSettings && (
         <SettingsPanel
@@ -796,22 +814,34 @@ export default function App() {
                       />
                     </div>
 
-                    <div
-                      className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
-                      onMouseDown={e => {
-                        e.preventDefault()
-                        draggingRef.current = 'response'
-                        document.body.style.cursor = 'col-resize'
-                        document.body.style.userSelect = 'none'
-                      }}
-                    />
+                    {responseCollapsed ? (
+                      <div
+                        className="shrink-0 w-7 border-l border-[var(--color-border)] bg-[var(--color-card)] flex flex-col items-center justify-start pt-2 cursor-pointer hover:bg-[var(--color-muted)] transition-colors"
+                        onClick={() => setResponseCollapsed(false)}
+                        title="Expand response panel"
+                      >
+                        <ChevronLeft size={12} className="text-[var(--color-muted-foreground)]" />
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="w-1 shrink-0 cursor-col-resize hover:bg-[var(--color-accent)] transition-colors"
+                          onMouseDown={e => {
+                            e.preventDefault()
+                            draggingRef.current = 'response'
+                            document.body.style.cursor = 'col-resize'
+                            document.body.style.userSelect = 'none'
+                          }}
+                        />
 
-                    <div
-                      className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
-                      style={responseWidth > 0 ? { width: responseWidth } : {}}
-                    >
-                      <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} />
-                    </div>
+                        <div
+                          className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
+                          style={responseWidth > 0 ? { width: responseWidth } : {}}
+                        >
+                          <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} onCollapse={() => setResponseCollapsed(true)} />
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>

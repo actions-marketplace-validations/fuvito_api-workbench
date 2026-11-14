@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { inputCls, selectCls } from '@/lib/styles'
 import { METHOD_COLOR, HTTP_METHODS, HTTP_REQUEST_HEADERS } from '@/lib/httpUtils'
@@ -22,7 +22,7 @@ function renderVarTokens(text: string): React.ReactNode[] {
 }
 
 function HighlightedInput({
-  value, onChange, onKeyDown, onPaste, placeholder, className,
+  value, onChange, onKeyDown, onPaste, placeholder, className, envVarNames,
 }: {
   value: string
   onChange: (v: string) => void
@@ -30,15 +30,61 @@ function HighlightedInput({
   onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void
   placeholder?: string
   className?: string
+  envVarNames?: string[]
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const mirrorRef = useRef<HTMLDivElement>(null)
   const hasVars = /\{\{/.test(value)
+  const [acPartial, setAcPartial] = useState<string | null>(null)
+  const [acIndex, setAcIndex] = useState(0)
+
+  const acMatches = useMemo(() => {
+    if (acPartial === null || !envVarNames?.length) return []
+    const q = acPartial.toLowerCase()
+    return envVarNames.filter(n => n.toLowerCase().includes(q))
+  }, [acPartial, envVarNames])
+
+  function checkAc(el: HTMLInputElement, v: string) {
+    const pos = el.selectionStart ?? v.length
+    const before = v.slice(0, pos)
+    const oi = before.lastIndexOf('{{')
+    if (oi !== -1 && !before.slice(oi + 2).includes('}}')) {
+      setAcPartial(before.slice(oi + 2))
+      setAcIndex(0)
+    } else {
+      setAcPartial(null)
+    }
+  }
+
+  function insertVar(name: string) {
+    const el = inputRef.current; if (!el) return
+    const pos = el.selectionStart ?? value.length
+    const before = value.slice(0, pos)
+    const oi = before.lastIndexOf('{{')
+    const newVal = value.slice(0, oi) + '{{' + name + '}}' + value.slice(pos)
+    onChange(newVal); setAcPartial(null)
+    requestAnimationFrame(() => {
+      el.setSelectionRange(oi + 4 + name.length, oi + 4 + name.length)
+      el.focus()
+    })
+  }
 
   function syncScroll() {
     if (mirrorRef.current && inputRef.current) {
       mirrorRef.current.scrollLeft = inputRef.current.scrollLeft
     }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (acMatches.length > 0 && acPartial !== null) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setAcIndex(i => Math.min(i + 1, acMatches.length - 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setAcIndex(i => Math.max(i - 1, 0)); return }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        if (acMatches[acIndex]) { e.preventDefault(); insertVar(acMatches[acIndex]); return }
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setAcPartial(null); return }
+    }
+    onKeyDown?.(e)
   }
 
   return (
@@ -47,10 +93,12 @@ function HighlightedInput({
         ref={inputRef}
         type="text"
         value={value}
-        onChange={e => { onChange(e.target.value); syncScroll() }}
-        onKeyDown={onKeyDown}
+        onChange={e => { onChange(e.target.value); syncScroll(); checkAc(e.target, e.target.value) }}
+        onKeyDown={handleKeyDown}
         onPaste={onPaste}
         onScroll={syncScroll}
+        onClick={e => checkAc(e.currentTarget, value)}
+        onBlur={() => setTimeout(() => setAcPartial(null), 150)}
         placeholder={placeholder}
         className={cn(className, 'w-full', hasVars && 'text-transparent placeholder:text-transparent')}
         style={hasVars ? { caretColor: 'var(--color-foreground)' } : undefined}
@@ -63,6 +111,24 @@ function HighlightedInput({
         >
           {renderVarTokens(value)}
         </div>
+      )}
+      {acPartial !== null && acMatches.length > 0 && (
+        <ul className="absolute top-full left-0 right-0 z-50 bg-[var(--color-card)] border border-[var(--color-border)] rounded shadow-lg mt-0.5 max-h-40 overflow-auto py-0.5">
+          {acMatches.map((name, i) => (
+            <li key={name}>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); insertVar(name) }}
+                className={cn(
+                  'w-full text-left px-3 py-1 text-xs font-mono transition-colors',
+                  i === acIndex ? 'bg-[var(--color-accent)]/15 text-[var(--color-foreground)]' : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]'
+                )}
+              >
+                {name}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -106,6 +172,8 @@ export function RequestEditor({
     [...url.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1])
   )]
 
+  const envVarNames = useMemo(() => Object.keys(envVarMap ?? {}), [envVarMap])
+
   const activeParamCount = queryParams.filter(p => p.enabled && p.name).length
   const activeHeaderCount = headers.filter(h => h.enabled && h.name).length
 
@@ -147,6 +215,7 @@ export function RequestEditor({
           }}
           placeholder="https://api.example.com/endpoint"
           className={cn(inputCls, 'font-mono px-3 py-1')}
+          envVarNames={envVarNames}
         />
 
         <div className="flex items-center gap-1 shrink-0" title="Per-request timeout — 0 uses the global default from Settings">
@@ -244,6 +313,7 @@ export function RequestEditor({
               onChange={onQueryParamsChange}
               keyPlaceholder="Parameter"
               valuePlaceholder="Value"
+              envVarNames={envVarNames}
             />
           </div>
         )}
@@ -255,6 +325,7 @@ export function RequestEditor({
               keyPlaceholder="Header"
               valuePlaceholder="Value"
               keySuggestions={HTTP_REQUEST_HEADERS}
+              envVarNames={envVarNames}
             />
           </div>
         )}

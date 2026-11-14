@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
@@ -147,7 +148,11 @@ export function Sidebar({
           )}
           <div className="flex-1 overflow-auto">
             {history.length === 0 ? (
-              <p className="p-3 text-xs text-[var(--color-muted-foreground)]">No requests yet.</p>
+              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+                <Clock size={20} className="text-[var(--color-muted-foreground)] opacity-30" />
+                <p className="text-xs text-[var(--color-muted-foreground)]">No requests yet</p>
+                <p className="text-[11px] text-[var(--color-muted-foreground)] opacity-60">Send a request to see it here</p>
+              </div>
             ) : (
               <p className="px-3 py-1.5 text-[10px] text-[var(--color-muted-foreground)] italic border-b border-[var(--color-border)]">
                 Restores method, URL, headers, and body · auth not stored
