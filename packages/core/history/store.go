@@ -107,9 +107,10 @@ func (s *Store) migrate() error {
 	}
 	// Additive migration: add request-detail columns if not present.
 	for _, stmt := range []string{
-		`ALTER TABLE history ADD COLUMN headers      TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE history ADD COLUMN body_type    TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE history ADD COLUMN body_content TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE history ADD COLUMN headers        TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE history ADD COLUMN body_type      TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE history ADD COLUMN body_content   TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE history ADD COLUMN workspace_path TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
@@ -154,16 +155,16 @@ func (s *Store) migrate() error {
 
 // Record appends a request/response pair to history and returns the new entry ID.
 // Sensitive header values (Authorization, Cookie, etc.) are redacted before storage.
-func (s *Store) Record(method, url string, statusCode int, statusText string, durationMs, sizeBytes int64, headers []Header, bodyType, bodyContent string) (int64, error) {
+func (s *Store) Record(workspacePath, method, url string, statusCode int, statusText string, durationMs, sizeBytes int64, headers []Header, bodyType, bodyContent string) (int64, error) {
 	hJSON, err := json.Marshal(redactHeaders(headers))
 	if err != nil {
 		hJSON = []byte("[]")
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO history (executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO history (executed_at, workspace_path, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		time.Now().UTC().Format(time.RFC3339),
-		method, url, statusCode, statusText, durationMs, sizeBytes,
+		workspacePath, method, url, statusCode, statusText, durationMs, sizeBytes,
 		string(hJSON), bodyType, bodyContent,
 	)
 	if err != nil {
@@ -173,12 +174,23 @@ func (s *Store) Record(method, url string, statusCode int, statusText string, du
 }
 
 // Recent returns up to limit entries, most recent first.
-func (s *Store) Recent(limit int) ([]Entry, error) {
-	rows, err := s.db.Query(
-		`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
-		 FROM history ORDER BY id DESC LIMIT ?`,
-		limit,
-	)
+// If workspacePath is non-empty, only entries for that workspace are returned.
+func (s *Store) Recent(workspacePath string, limit int) ([]Entry, error) {
+	var rows *sql.Rows
+	var err error
+	if workspacePath != "" {
+		rows, err = s.db.Query(
+			`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
+			 FROM history WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
+			workspacePath, limit,
+		)
+	} else {
+		rows, err = s.db.Query(
+			`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
+			 FROM history ORDER BY id DESC LIMIT ?`,
+			limit,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +212,13 @@ func (s *Store) Recent(limit int) ([]Entry, error) {
 	return entries, rows.Err()
 }
 
-// Clear deletes all history entries.
-func (s *Store) Clear() error {
+// Clear deletes history entries.
+// If workspacePath is non-empty, only entries for that workspace are deleted.
+func (s *Store) Clear(workspacePath string) error {
+	if workspacePath != "" {
+		_, err := s.db.Exec(`DELETE FROM history WHERE workspace_path = ?`, workspacePath)
+		return err
+	}
 	_, err := s.db.Exec(`DELETE FROM history`)
 	return err
 }

@@ -18,11 +18,11 @@ func TestStoreRecordAndRecent(t *testing.T) {
 	defer store.Close()
 
 	headers := []history.Header{{Name: "Accept", Value: "application/json"}, {Name: "Authorization", Value: "Bearer secret"}}
-	id1, err := store.Record("GET", "https://example.com/api/users", 200, "200 OK", 123, 456, headers, "none", "")
+	id1, err := store.Record("/ws/alpha", "GET", "https://example.com/api/users", 200, "200 OK", 123, 456, headers, "none", "")
 	if err != nil {
 		t.Fatalf("Record 1: %v", err)
 	}
-	id2, err := store.Record("POST", "https://example.com/api/items", 201, "201 Created", 50, 128, nil, "json", `{"name":"test"}`)
+	id2, err := store.Record("/ws/alpha", "POST", "https://example.com/api/items", 201, "201 Created", 50, 128, nil, "json", `{"name":"test"}`)
 	if err != nil {
 		t.Fatalf("Record 2: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestStoreRecordAndRecent(t *testing.T) {
 		t.Errorf("expected id2 > id1, got %d and %d", id1, id2)
 	}
 
-	entries, err := store.Recent(10)
+	entries, err := store.Recent("/ws/alpha", 10)
 	if err != nil {
 		t.Fatalf("Recent: %v", err)
 	}
@@ -68,17 +68,57 @@ func TestStoreRecentLimit(t *testing.T) {
 	defer store.Close()
 
 	for i := range 5 {
-		if _, err := store.Record("GET", "https://example.com", 200, "200 OK", int64(i), 0, nil, "none", ""); err != nil {
+		if _, err := store.Record("/ws/limit", "GET", "https://example.com", 200, "200 OK", int64(i), 0, nil, "none", ""); err != nil {
 			t.Fatalf("Record %d: %v", i, err)
 		}
 	}
 
-	entries, err := store.Recent(3)
+	entries, err := store.Recent("/ws/limit", 3)
 	if err != nil {
 		t.Fatalf("Recent: %v", err)
 	}
 	if len(entries) != 3 {
 		t.Errorf("expected 3, got %d", len(entries))
+	}
+}
+
+func TestStoreWorkspaceIsolation(t *testing.T) {
+	dir := t.TempDir()
+	store, err := history.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer store.Close()
+
+	if _, err := store.Record("/ws/alpha", "GET", "https://alpha.com", 200, "200 OK", 10, 0, nil, "none", ""); err != nil {
+		t.Fatalf("Record alpha: %v", err)
+	}
+	if _, err := store.Record("/ws/beta", "POST", "https://beta.com", 201, "201 Created", 20, 0, nil, "none", ""); err != nil {
+		t.Fatalf("Record beta: %v", err)
+	}
+
+	alpha, err := store.Recent("/ws/alpha", 10)
+	if err != nil {
+		t.Fatalf("Recent alpha: %v", err)
+	}
+	if len(alpha) != 1 || alpha[0].URL != "https://alpha.com" {
+		t.Errorf("alpha workspace: expected 1 entry for alpha.com, got %+v", alpha)
+	}
+
+	beta, err := store.Recent("/ws/beta", 10)
+	if err != nil {
+		t.Fatalf("Recent beta: %v", err)
+	}
+	if len(beta) != 1 || beta[0].URL != "https://beta.com" {
+		t.Errorf("beta workspace: expected 1 entry for beta.com, got %+v", beta)
+	}
+
+	all, err := store.Recent("", 10)
+	if err != nil {
+		t.Fatalf("Recent all: %v", err)
+	}
+	if len(all) != 2 {
+		t.Errorf("empty workspace path should return all: expected 2, got %d", len(all))
 	}
 }
 
@@ -90,7 +130,7 @@ func TestStoreEmpty(t *testing.T) {
 	}
 	defer store.Close()
 
-	entries, err := store.Recent(10)
+	entries, err := store.Recent("", 10)
 	if err != nil {
 		t.Fatalf("Recent: %v", err)
 	}
