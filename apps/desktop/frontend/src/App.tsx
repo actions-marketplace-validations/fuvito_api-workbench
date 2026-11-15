@@ -16,6 +16,7 @@ import { ResponseViewer } from '@/components/ResponseViewer'
 import { ChevronLeft } from 'lucide-react'
 import { ScenarioViewer } from '@/components/ScenarioViewer'
 import { CoverageTab } from '@/components/CoverageTab'
+import { WorkspaceImportDialog } from '@/components/WorkspaceImportDialog'
 import { Sidebar } from '@/components/Sidebar'
 import { AboutDialog } from '@/components/AboutDialog'
 import {
@@ -31,7 +32,8 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo, openDemoSpec, createScenarioFolder, renameScenarioFolder, deleteScenarioFolder, moveRequest, copyRequest, moveScenario, copyScenario } from '@/lib/bridge'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, saveScenarioResult, runFolder, quitApp, saveContentToFile, pickFile, stopDemo, openDemoSpec, createScenarioFolder, renameScenarioFolder, deleteScenarioFolder, moveRequest, copyRequest, moveScenario, copyScenario, exportWorkspace, scanWorkspaceImport } from '@/lib/bridge'
+import type { ScanImportResult } from '@/lib/bridge'
 import type { FileClipboard, RunAllState, FolderRunState } from '@/types'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
@@ -101,6 +103,7 @@ export default function App() {
   function handleRailTabClick(tab: RailTab) {
     if (tab === 'coverage') {
       tabs.openCoverageTab()
+      setCoverageRefreshTrigger(t => t + 1)
     }
     if (tab === railTab && sidebarOpen) {
       setSidebarOpen(false)
@@ -166,11 +169,26 @@ export default function App() {
 
   // Bump after each scenario run to refresh the run log
   const [runLogTrigger, setRunLogTrigger] = useState(0)
-  // Set true after run-all finishes to auto-switch ScenariosPanel to the Run Log sub-tab
-  const [runLogAutoShow, setRunLogAutoShow] = useState(false)
 
   // Which spec is selected in the coverage sidebar (drives the single coverage tab)
   const [selectedCoverageSpecFile, setSelectedCoverageSpecFile] = useState<string | null>(null)
+  // Bump to trigger a Contracts tab refresh (on tab switch + after any scenario run)
+  const [coverageRefreshTrigger, setCoverageRefreshTrigger] = useState(0)
+
+  // Workspace export / import
+  const [pendingImport, setPendingImport] = useState<ScanImportResult | null>(null)
+
+  async function handleExportWorkspace() {
+    const err = await exportWorkspace()
+    if (err) alert(err)
+  }
+
+  async function handleImportWorkspace() {
+    const scan = await scanWorkspaceImport()
+    if (!scan.zipPath) return  // cancelled or error
+    if (scan.error) { alert(scan.error); return }
+    setPendingImport(scan)
+  }
 
   // File clipboard for copy/cut/paste operations
   const [fileClipboard, setFileClipboard] = useState<FileClipboard | null>(null)
@@ -255,6 +273,7 @@ export default function App() {
       try {
         const r = await runScenario(s.path, envPath)
         if (r.passed) passedCount++
+        saveScenarioResult(s.path, r).catch(() => {})
         setRunAllState(prev => prev ? {
           ...prev,
           done: prev.done + 1,
@@ -272,7 +291,8 @@ export default function App() {
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
     setRunLogTrigger(t => t + 1)
-    setRunLogAutoShow(true)
+
+    setCoverageRefreshTrigger(t => t + 1)
     setRailTab('scenarios')
     setSidebarOpen(true)
     localStorage.setItem('ui.railTab', 'scenarios')
@@ -289,6 +309,7 @@ export default function App() {
       try {
         const r = await runScenario(s.path, envPath)
         if (r.passed) passedCount++
+        saveScenarioResult(s.path, r).catch(() => {})
         setRunAllState(prev => prev ? {
           ...prev,
           done: prev.done + 1,
@@ -306,7 +327,8 @@ export default function App() {
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
     setRunLogTrigger(t => t + 1)
-    setRunLogAutoShow(true)
+
+    setCoverageRefreshTrigger(t => t + 1)
     setRailTab('scenarios')
     setSidebarOpen(true)
     localStorage.setItem('ui.railTab', 'scenarios')
@@ -549,6 +571,9 @@ export default function App() {
         { kind: 'action', label: 'Open Workspace…',  onClick: () => requestWorkspaceSwitch(workspace.handleOpenWorkspace) },
         { kind: 'action', label: 'New Workspace…',   onClick: () => requestWorkspaceSwitch(workspace.handleNewWorkspace) },
         { kind: 'action', label: 'Close Workspace',  onClick: requestCloseWorkspace },
+        { kind: 'separator' },
+        { kind: 'action', label: 'Export Workspace…', onClick: handleExportWorkspace },
+        { kind: 'action', label: 'Import Workspace…', onClick: handleImportWorkspace },
         recentWorkspacesSubmenu,
         { kind: 'separator' },
         { kind: 'action', label: 'New Tab',       shortcut: 'Ctrl+N',        onClick: tabs.handleNewTab },
@@ -726,6 +751,14 @@ export default function App() {
         />
       )}
 
+      {pendingImport && (
+        <WorkspaceImportDialog
+          scan={pendingImport}
+          onClose={() => setPendingImport(null)}
+          onComplete={() => { workspace.refreshWorkspace(); setPendingImport(null) }}
+        />
+      )}
+
       {showQuickOpen && (
         <QuickOpen
           fileTree={workspace.fileTree}
@@ -818,8 +851,6 @@ export default function App() {
                     onRunAllScenarios={handleRunAll}
                     onDismissRunAll={() => setRunAllState(null)}
                     runLogTrigger={runLogTrigger}
-                    runLogAutoShow={runLogAutoShow}
-                    onRunLogAutoShowDone={() => setRunLogAutoShow(false)}
                     onRunFolder={handleRunFolder}
                     onRunScenarioFolder={handleRunScenarioFolder}
                     folderRunState={folderRunState}
@@ -947,7 +978,7 @@ export default function App() {
                     <CoverageTab
                       workspacePath={workspace.workspacePath}
                       specFile={selectedCoverageSpecFile}
-                      isActive={t.id === activeTabId}
+                      refreshTrigger={coverageRefreshTrigger}
                     />
                   </div>
                 ))}
@@ -970,7 +1001,7 @@ export default function App() {
                       onResultChange={r => updateTab(t.id, { scenarioResult: r })}
                       onRunningChange={running => updateTab(t.id, { scenarioRunning: running })}
                       onDirtyChange={dirty => updateTab(t.id, { scenarioDirty: dirty })}
-                      onRunComplete={() => setRunLogTrigger(t => t + 1)}
+                      onRunComplete={() => { setRunLogTrigger(t => t + 1); setCoverageRefreshTrigger(t => t + 1) }}
                     />
                   </div>
                 ))}

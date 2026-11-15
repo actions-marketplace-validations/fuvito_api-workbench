@@ -6,6 +6,10 @@ export function ActiveEnvironment() {
   return window['go']['main']['WorkspaceService']['ActiveEnvironment']();
 }
 
+export function ApplyWorkspaceImport(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['ApplyWorkspaceImport'](arg1, arg2);
+}
+
 export function ClearResponseCache(arg1) {
   return window['go']['main']['WorkspaceService']['ClearResponseCache'](arg1);
 }
@@ -32,6 +36,10 @@ export function DeleteFolder(arg1) {
 
 export function DeleteRequest(arg1) {
   return window['go']['main']['WorkspaceService']['DeleteRequest'](arg1);
+}
+
+export function ExportWorkspace() {
+  return window['go']['main']['WorkspaceService']['ExportWorkspace']();
 }
 
 export function GetActiveEnvironment() {
@@ -128,6 +136,10 @@ export function SaveRequest(arg1) {
 
 export function SaveResponseCache(arg1, arg2) {
   return window['go']['main']['WorkspaceService']['SaveResponseCache'](arg1, arg2);
+}
+
+export function ScanWorkspaceImport() {
+  return window['go']['main']['WorkspaceService']['ScanWorkspaceImport']();
 }
 
 export function SelectEnvironment(arg1) {

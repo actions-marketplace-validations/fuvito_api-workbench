@@ -43,6 +43,9 @@ import {
   OpenWorkspaceByPath as WailsOpenWorkspaceByPath,
   SaveContentToFile as WailsSaveContentToFile,
   PickFile as WailsPickFile,
+  ExportWorkspace as WailsExportWorkspace,
+  ScanWorkspaceImport as WailsScanWorkspaceImport,
+  ApplyWorkspaceImport as WailsApplyWorkspaceImport,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -786,6 +789,37 @@ export interface FolderRunItem {
 export async function runFolder(folderPath: string): Promise<FolderRunItem[]> {
   const result = await WailsRunFolder(folderPath)
   return (result ?? []) as unknown as FolderRunItem[]
+}
+
+// ---- Workspace export / import ----
+
+export interface ScanImportResult {
+  zipPath: string       // empty = user cancelled
+  totalFiles: number
+  conflicts: string[]   // relative paths that already exist
+  error?: string
+}
+
+export interface ApplyImportResult {
+  imported: number
+  skipped: number
+  renamed: number
+  error?: string
+}
+
+// Returns "" on success or an error message. Empty string also returned on cancel.
+export async function exportWorkspace(): Promise<string> {
+  return (await WailsExportWorkspace()) as unknown as string
+}
+
+export async function scanWorkspaceImport(): Promise<ScanImportResult> {
+  const result = await WailsScanWorkspaceImport()
+  return result as unknown as ScanImportResult
+}
+
+export async function applyWorkspaceImport(zipPath: string, strategy: string): Promise<ApplyImportResult> {
+  const result = await WailsApplyWorkspaceImport(zipPath, strategy)
+  return result as unknown as ApplyImportResult
 }
 
 // ---- Help ----

@@ -7,7 +7,7 @@ import { getAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
 type Props = {
   workspacePath: string
   specFile?: string | null
-  isActive?: boolean
+  refreshTrigger?: number
 }
 
 const METHOD_COLOR: Record<string, string> = {
@@ -263,7 +263,7 @@ function exportCSV(specFile: string, entry: AccumulatedCoverage) {
 
 // ── Root component ────────────────────────────────────────────────────────────
 
-export function CoverageTab({ workspacePath, specFile, isActive }: Props) {
+export function CoverageTab({ workspacePath, specFile, refreshTrigger }: Props) {
   const [specEntry, setSpecEntry] = useState<AccumulatedCoverage | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -280,7 +280,7 @@ export function CoverageTab({ workspacePath, specFile, isActive }: Props) {
 
   useEffect(() => { refresh() }, [refresh])
 
-  useEffect(() => { if (isActive) refresh() }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (refreshTrigger) refresh() }, [refreshTrigger, refresh])
 
   async function handleReset() {
     if (!specFile) return

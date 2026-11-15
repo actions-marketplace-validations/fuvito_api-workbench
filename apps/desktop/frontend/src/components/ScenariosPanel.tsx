@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { PlayCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioInfo, TemplateInfo } from '@/lib/bridge'
@@ -36,8 +36,6 @@ type ScenariosPanelProps = {
   onCutScenario?: (path: string) => void
   onPasteToScenarioFolder?: (relFolderPath: string) => void
   runLogTrigger?: number
-  runLogAutoShow?: boolean
-  onRunLogAutoShowDone?: () => void
 }
 
 export function ScenariosPanel({
@@ -47,16 +45,9 @@ export function ScenariosPanel({
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewFolder, onDeleteScenarioFolder, onRenameScenarioFolder, onRunFolder,
   onRefresh, onMoveScenario, clipboard, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
-  runLogTrigger, runLogAutoShow, onRunLogAutoShowDone,
+  runLogTrigger,
 }: ScenariosPanelProps) {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'log'>('scenarios')
-
-  useEffect(() => {
-    if (runLogAutoShow) {
-      setActiveTab('log')
-      onRunLogAutoShowDone?.()
-    }
-  }, [runLogAutoShow, onRunLogAutoShowDone])
   const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
   const [renamingFolderPath, setRenamingFolderPath] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
