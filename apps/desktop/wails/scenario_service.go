@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -72,6 +73,7 @@ type ScenarioDetailIO struct {
 	Path        string         `json:"path"`
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
+	SpecFile    string         `json:"specFile,omitempty"`
 	Steps       []StepDetailIO `json:"steps"`
 	Error       string         `json:"error,omitempty"`
 }
@@ -104,13 +106,14 @@ type CoverageIO struct {
 }
 
 type ScenarioResultIO struct {
-	Title      string         `json:"title"`
-	Passed     bool           `json:"passed"`
-	DurationMs int64          `json:"durationMs"`
-	Steps      []StepResultIO `json:"steps"`
-	Error      string         `json:"error,omitempty"`
-	SpecError  string         `json:"specError,omitempty"`
-	Coverage   *CoverageIO    `json:"coverage,omitempty"`
+	Title               string                 `json:"title"`
+	Passed              bool                   `json:"passed"`
+	DurationMs          int64                  `json:"durationMs"`
+	Steps               []StepResultIO         `json:"steps"`
+	Error               string                 `json:"error,omitempty"`
+	SpecError           string                 `json:"specError,omitempty"`
+	Coverage            *CoverageIO            `json:"coverage,omitempty"`
+	AccumulatedCoverage *AccumulatedCoverageIO `json:"accumulatedCoverage,omitempty"`
 }
 
 // ---- Service ----
@@ -222,6 +225,7 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		Path:        path,
 		Title:       sc.Title,
 		Description: sc.Description,
+		SpecFile:    sc.SpecFile,
 	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{
@@ -656,10 +660,61 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 				cov.Missed = append(cov.Missed, op.String())
 			}
 			out.Coverage = cov
+
+			// Accumulate into the workspace coverage store.
+			if s.workspace.workspacePath != "" {
+				stored := loadStoredCoverage(s.workspace.workspacePath, sc.SpecFile)
+				stored.TotalRuns++
+				stored.LastRunAt = time.Now()
+				if result.Passed {
+					stored.PassedRuns++
+				} else {
+					stored.FailedRuns++
+				}
+				stored.Exercised = mergeExercised(stored.Exercised, cov.Exercised)
+				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
+					acc := buildAccumulatedCoverageIO(stored, loadedSpec)
+					out.AccumulatedCoverage = &acc
+				}
+			}
 		}
 	}
 
 	return out
+}
+
+// GetAccumulatedCoverage returns the accumulated spec coverage for the given specFile.
+// Returns nil (no error) when no data has been recorded yet.
+func (s *ScenarioService) GetAccumulatedCoverage(specFile string) (*AccumulatedCoverageIO, error) {
+	if s.workspace.workspacePath == "" || specFile == "" {
+		return nil, nil
+	}
+	stored := loadStoredCoverage(s.workspace.workspacePath, specFile)
+	if stored.TotalRuns == 0 {
+		return nil, nil
+	}
+	specData, specExt, err := loadSpecBytes(specFile, "")
+	if err != nil {
+		return nil, fmt.Errorf("loading spec: %w", err)
+	}
+	spec, err := openapi.ParseBytes(specData, specExt)
+	if err != nil {
+		return nil, fmt.Errorf("parsing spec: %w", err)
+	}
+	acc := buildAccumulatedCoverageIO(stored, spec)
+	return &acc, nil
+}
+
+// ResetAccumulatedCoverage deletes the stored coverage data for the given specFile.
+func (s *ScenarioService) ResetAccumulatedCoverage(specFile string) error {
+	if s.workspace.workspacePath == "" || specFile == "" {
+		return nil
+	}
+	path := filepath.Join(coverageDirPath(s.workspace.workspacePath), coverageKey(specFile))
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // loadSpecBytes fetches the OpenAPI spec at specRef (HTTP/HTTPS URL or file path).

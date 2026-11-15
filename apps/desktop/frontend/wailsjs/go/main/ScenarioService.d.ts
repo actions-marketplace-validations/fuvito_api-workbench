@@ -10,6 +10,8 @@ export function DeleteScenario(arg1:string):Promise<string>;
 
 export function DuplicateScenario(arg1:string):Promise<main.CreateScenarioResultIO>;
 
+export function GetAccumulatedCoverage(arg1:string):Promise<main.AccumulatedCoverageIO>;
+
 export function ListScenarios():Promise<Array<main.ScenarioInfoIO>>;
 
 export function ListTemplates():Promise<Array<main.TemplateInfoIO>>;
@@ -21,6 +23,8 @@ export function LoadScenarioRaw(arg1:string):Promise<string>;
 export function LoadScenarioResult(arg1:string):Promise<main.ScenarioResultIO>;
 
 export function RenameScenario(arg1:string,arg2:string):Promise<string>;
+
+export function ResetAccumulatedCoverage(arg1:string):Promise<void>;
 
 export function RunFolder(arg1:string):Promise<Array<main.FolderRunItemIO>>;
 

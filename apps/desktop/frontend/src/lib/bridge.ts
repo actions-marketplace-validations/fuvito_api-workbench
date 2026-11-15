@@ -80,6 +80,8 @@ import {
   LoadScenarioResult as WailsLoadScenarioResult,
   ListTemplates as WailsListTemplates,
   CreateFromTemplate as WailsCreateFromTemplate,
+  GetAccumulatedCoverage as WailsGetAccumulatedCoverage,
+  ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
 } from '@wailsjs/go/main/ScenarioService'
 import {
   GetUserGuide as WailsGetUserGuide,
@@ -544,6 +546,7 @@ export interface ScenarioDetail {
   path: string
   title: string
   description: string
+  specFile?: string
   steps: StepDetail[]
   error?: string
 }
@@ -575,6 +578,19 @@ export interface ScenarioCoverage {
   missed: string[]
 }
 
+export interface AccumulatedCoverage {
+  specFile: string
+  covered: number
+  total: number
+  percent: number
+  totalRuns: number
+  passedRuns: number
+  failedRuns: number
+  lastRunAt?: string
+  exercised: string[]
+  missed: string[]
+}
+
 export interface ScenarioResult {
   title: string
   passed: boolean
@@ -583,6 +599,7 @@ export interface ScenarioResult {
   error?: string
   specError?: string
   coverage?: ScenarioCoverage
+  accumulatedCoverage?: AccumulatedCoverage
 }
 
 export async function listScenarios(): Promise<ScenarioInfo[]> {
@@ -669,6 +686,15 @@ export async function listTemplates(): Promise<TemplateInfo[]> {
 export async function createFromTemplate(templateID: string, name: string): Promise<CreateScenarioResult> {
   const result = await WailsCreateFromTemplate(templateID, name)
   return result as unknown as CreateScenarioResult
+}
+
+export async function getAccumulatedCoverage(specFile: string): Promise<AccumulatedCoverage | null> {
+  const result = await WailsGetAccumulatedCoverage(specFile)
+  return result as unknown as AccumulatedCoverage | null
+}
+
+export async function resetAccumulatedCoverage(specFile: string): Promise<void> {
+  await WailsResetAccumulatedCoverage(specFile)
 }
 
 // ---- Folder run ----

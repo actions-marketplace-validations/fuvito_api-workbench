@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -271,6 +272,24 @@ type CoveredOperation struct {
 }
 
 func (o CoveredOperation) String() string { return o.Method + " " + o.Path }
+
+// AllOperations returns every operation declared in the spec as (METHOD, path) pairs,
+// sorted by path then method.
+func (s *Spec) AllOperations() []CoveredOperation {
+	var ops []CoveredOperation
+	for path, item := range s.doc.Paths.Map() {
+		for method := range item.Operations() {
+			ops = append(ops, CoveredOperation{Method: strings.ToUpper(method), Path: path})
+		}
+	}
+	sort.Slice(ops, func(i, j int) bool {
+		if ops[i].Path != ops[j].Path {
+			return ops[i].Path < ops[j].Path
+		}
+		return ops[i].Method < ops[j].Method
+	})
+	return ops
+}
 
 // ScenarioCoverageResult is the coverage computed from matching executed requests
 // against an OpenAPI spec's declared operations.

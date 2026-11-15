@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult, validateScenarioYAML } from '@/lib/bridge'
+import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult, validateScenarioYAML, getAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
-import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo } from '@/lib/bridge'
+import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
 import { ScenarioHeaderBar } from './ScenarioHeaderBar'
 import { StepListPanel } from './ScenarioStepListPanel'
@@ -51,6 +51,8 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const [savedFlash, setSavedFlash] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
+  const [accumulatedCoverage, setAccumulatedCoverage] = useState<AccumulatedCoverage | null>(null)
+
   const [leftPanelWidth, setLeftPanelWidth] = useState(320)
   const [showStats, setShowStats] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,6 +75,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setVisualDirty(false)
     setSelectedEnvPath(activeEnvPath)
     setSelectedStepIndex(null)
+    setAccumulatedCoverage(null)
   }
 
   function handleDividerMouseDown(e: React.MouseEvent) {
@@ -98,6 +101,12 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         else {
           setDetail(d)
           if (d.steps.length > 0) setSelectedStepIndex(0)
+          // Load accumulated coverage from the workspace store if the scenario has a specFile
+          if (d.specFile) {
+            getAccumulatedCoverage(d.specFile)
+              .then(acc => { if (acc) setAccumulatedCoverage(acc) })
+              .catch(() => {})
+          }
         }
       })
       .catch(e => setLoadError(String(e)))
@@ -127,13 +136,18 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     return () => document.removeEventListener('keydown', handleKey)
   }, [mode])
 
+  function applyRunResult(r: ScenarioResult) {
+    onResultChange(r)
+    if (r.accumulatedCoverage) setAccumulatedCoverage(r.accumulatedCoverage)
+    saveScenarioResult(scenarioPath, r).catch(() => {})
+  }
+
   async function handleRun() {
     onRunningChange(true)
     onResultChange(null)
     try {
       const r = await runScenario(scenarioPath, selectedEnvPath, 0)
-      onResultChange(r)
-      saveScenarioResult(scenarioPath, r).catch(() => {})
+      applyRunResult(r)
       const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
     } catch (e) {
@@ -148,8 +162,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     onResultChange(null)
     try {
       const r = await runScenario(scenarioPath, selectedEnvPath, fromStep)
-      onResultChange(r)
-      saveScenarioResult(scenarioPath, r).catch(() => {})
+      applyRunResult(r)
       const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
       else setSelectedStepIndex(fromStep)
@@ -158,6 +171,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     } finally {
       onRunningChange(false)
     }
+  }
+
+  async function handleResetCoverage() {
+    const specFile = detail?.specFile
+    if (!specFile) return
+    await resetAccumulatedCoverage(specFile).catch(() => {})
+    setAccumulatedCoverage(null)
   }
 
   async function handleEnterYaml() {
@@ -407,9 +427,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         </div>
       )}
 
-      {/* Coverage banner — shown when scenario has a specFile and run produced coverage data */}
-      {result?.coverage && !running && (
-        <CoverageBanner coverage={result.coverage} />
+      {/* Coverage banner — shows accumulated coverage (across runs) or per-run when no history yet */}
+      {(accumulatedCoverage || result?.coverage) && !running && (
+        <CoverageBanner
+          coverage={result?.coverage}
+          accumulated={accumulatedCoverage ?? undefined}
+          onReset={handleResetCoverage}
+        />
       )}
 
       {/* Body */}

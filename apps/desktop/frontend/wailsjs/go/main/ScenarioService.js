@@ -18,6 +18,10 @@ export function DuplicateScenario(arg1) {
   return window['go']['main']['ScenarioService']['DuplicateScenario'](arg1);
 }
 
+export function GetAccumulatedCoverage(arg1) {
+  return window['go']['main']['ScenarioService']['GetAccumulatedCoverage'](arg1);
+}
+
 export function ListScenarios() {
   return window['go']['main']['ScenarioService']['ListScenarios']();
 }
@@ -40,6 +44,10 @@ export function LoadScenarioResult(arg1) {
 
 export function RenameScenario(arg1, arg2) {
   return window['go']['main']['ScenarioService']['RenameScenario'](arg1, arg2);
+}
+
+export function ResetAccumulatedCoverage(arg1) {
+  return window['go']['main']['ScenarioService']['ResetAccumulatedCoverage'](arg1);
 }
 
 export function RunFolder(arg1) {
