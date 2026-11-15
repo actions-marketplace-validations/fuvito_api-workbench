@@ -113,6 +113,7 @@ type RequestFileIO struct {
 
 type WorkspaceService struct {
 	ctx              context.Context
+	wailsReady       bool // true once the real Wails ctx is available
 	workspacePath    string
 	activeEnvPath    string
 	activeEnv        *domain.Environment
@@ -137,6 +138,19 @@ func NewWorkspaceService() *WorkspaceService {
 
 func (w *WorkspaceService) setContext(ctx context.Context) {
 	w.ctx = ctx
+	w.wailsReady = true
+}
+
+// syncTitle updates the native window title to reflect the current workspace.
+func (w *WorkspaceService) syncTitle() {
+	if !w.wailsReady {
+		return
+	}
+	if w.workspacePath == "" {
+		runtime.WindowSetTitle(w.ctx, "Clear Signal")
+	} else {
+		runtime.WindowSetTitle(w.ctx, "Clear Signal — "+filepath.Base(w.workspacePath))
+	}
 }
 
 func (w *WorkspaceService) ActiveEnvironment() *domain.Environment {
@@ -148,6 +162,7 @@ func (w *WorkspaceService) ActiveEnvironment() *domain.Environment {
 // Does not persist to config (temp demo workspace should not pollute saved state).
 func (w *WorkspaceService) openWorkspaceDirect(path string) {
 	w.workspacePath = path
+	w.syncTitle()
 	envPath := filepath.Join(path, "environments", "local.yaml")
 	if _, err := os.Stat(envPath); err == nil {
 		w.activeEnvPath = envPath
@@ -173,6 +188,7 @@ func (w *WorkspaceService) OpenWorkspace() (string, error) {
 	w.workspacePath = dir
 	w.addRecentWorkspace(dir)
 	w.persistConfig()
+	w.syncTitle()
 	return dir, nil
 }
 
@@ -187,6 +203,7 @@ func (w *WorkspaceService) CloseWorkspace() {
 	w.activeEnvPath = ""
 	w.activeEnv = nil
 	w.persistConfig()
+	w.syncTitle()
 }
 
 // ListRequests returns the workspace file tree limited to request files (.yaml/.yml/.json).
@@ -747,6 +764,7 @@ func (w *WorkspaceService) OpenWorkspaceByPath(path string) (string, error) {
 	w.workspacePath = path
 	w.addRecentWorkspace(path)
 	w.persistConfig()
+	w.syncTitle()
 	return path, nil
 }
 
@@ -950,6 +968,7 @@ func (w *WorkspaceService) NewWorkspace() (string, error) {
 	w.workspacePath = dir
 	w.addRecentWorkspace(dir)
 	w.persistConfig()
+	w.syncTitle()
 	return dir, nil
 }
 

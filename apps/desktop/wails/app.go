@@ -45,6 +45,8 @@ func (a *App) startup(ctx context.Context) {
 	a.settingsService.setContext(ctx)
 	a.demoService.setContext(ctx)
 	a.scenarioService.setContext(ctx)
+	// Set title now that Wails context is live (workspace may already be set from config).
+	a.workspaceService.syncTitle()
 }
 
 func (a *App) shutdown(_ context.Context) {
