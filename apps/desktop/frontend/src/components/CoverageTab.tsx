@@ -50,6 +50,16 @@ function ProgressBar({ pct }: { pct: number }) {
   )
 }
 
+function relTime(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
 function OpRow({ op, covered, lastResult }: {
   op: string
   covered: boolean
@@ -58,28 +68,44 @@ function OpRow({ op, covered, lastResult }: {
   const { method, path } = parseOp(op)
   return (
     <div className={cn(
-      'flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-border)] last:border-0',
-      !covered && 'opacity-70',
+      'flex items-center gap-3 px-4 py-2 border-b border-[var(--color-border)] last:border-0 text-xs',
+      !covered && 'opacity-60',
     )}>
       <span className={cn(
-        'text-[11px] font-mono font-bold w-14 shrink-0 px-1.5 py-0.5 rounded text-center',
+        'font-mono font-bold w-16 shrink-0 px-1.5 py-0.5 rounded text-center text-[11px]',
         METHOD_COLOR[method] ?? 'text-[var(--color-foreground)]',
         METHOD_BG[method] ?? '',
       )}>
         {method}
       </span>
-      <span className="text-sm font-mono text-[var(--color-foreground)] flex-1 truncate">{path}</span>
-      {covered ? (
-        lastResult ? (
-          lastResult.lastPassed
-            ? <span className="text-[11px] font-semibold text-emerald-400 shrink-0 tabular-nums">✓ Pass</span>
-            : <span className="text-[11px] font-semibold text-red-400 shrink-0 tabular-nums">✗ Fail</span>
-        ) : (
-          <span className="text-emerald-400 text-sm shrink-0">✓</span>
-        )
-      ) : (
-        <span className="text-[10px] text-[var(--color-muted-foreground)] shrink-0 italic">not tested</span>
-      )}
+      <span className="font-mono text-[var(--color-foreground)] flex-1 min-w-0 truncate" title={path}>{path}</span>
+      <span className="w-24 shrink-0 text-right">
+        {covered
+          ? <span className="text-emerald-400 font-medium">✓ Covered</span>
+          : <span className="text-[var(--color-muted-foreground)]">—</span>}
+      </span>
+      <span className="w-24 shrink-0 text-right">
+        {lastResult
+          ? lastResult.lastPassed
+            ? <span className="text-emerald-400 font-semibold">✓ Pass</span>
+            : <span className="text-red-400 font-semibold">✗ Fail</span>
+          : <span className="text-[var(--color-muted-foreground)]">—</span>}
+      </span>
+      <span className="w-24 shrink-0 text-right text-[var(--color-muted-foreground)] tabular-nums">
+        {lastResult?.lastRunAt ? relTime(lastResult.lastRunAt) : '—'}
+      </span>
+    </div>
+  )
+}
+
+function TableHeader() {
+  return (
+    <div className="flex items-center gap-3 px-4 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-background)] sticky top-0 z-10 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">
+      <span className="w-16 shrink-0">Method</span>
+      <span className="flex-1">Path</span>
+      <span className="w-24 shrink-0 text-right">Coverage</span>
+      <span className="w-24 shrink-0 text-right">Last Result</span>
+      <span className="w-24 shrink-0 text-right">Last Run</span>
     </div>
   )
 }
@@ -152,6 +178,8 @@ function SpecDetailPanel({
         </div>
       </div>
 
+      {(covered.length > 0 || missed.length > 0) && <TableHeader />}
+
       <div className="divide-y divide-[var(--color-border)]">
         {/* Covered */}
         {covered.length > 0 && (
@@ -159,11 +187,11 @@ function SpecDetailPanel({
             <button
               type="button"
               onClick={() => setCoveredOpen(o => !o)}
-              className="w-full px-6 py-3 bg-emerald-500/5 border-b border-[var(--color-border)] flex items-center gap-2 hover:bg-emerald-500/10 transition-colors"
+              className="w-full px-4 py-2 bg-emerald-500/5 border-b border-[var(--color-border)] flex items-center gap-2 hover:bg-emerald-500/10 transition-colors"
             >
-              {coveredOpen ? <ChevronDown size={12} className="text-emerald-400 shrink-0" /> : <ChevronRight size={12} className="text-emerald-400 shrink-0" />}
-              <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Covered</span>
-              <span className="text-xs text-emerald-400/60 tabular-nums">{covered.length}</span>
+              {coveredOpen ? <ChevronDown size={11} className="text-emerald-400 shrink-0" /> : <ChevronRight size={11} className="text-emerald-400 shrink-0" />}
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400">Covered</span>
+              <span className="text-[10px] text-emerald-400/60 tabular-nums">{covered.length}</span>
             </button>
             {coveredOpen && covered.map(op => (
               <OpRow key={op} op={op} covered={true} lastResult={entry.operationResults?.[op]} />
@@ -177,15 +205,15 @@ function SpecDetailPanel({
             <button
               type="button"
               onClick={() => setMissedOpen(o => !o)}
-              className="w-full px-6 py-3 bg-amber-500/5 border-b border-[var(--color-border)] flex items-center gap-2 hover:bg-amber-500/10 transition-colors"
+              className="w-full px-4 py-2 bg-amber-500/5 border-b border-[var(--color-border)] flex items-center gap-2 hover:bg-amber-500/10 transition-colors"
             >
-              {missedOpen ? <ChevronDown size={12} className="text-amber-400 shrink-0" /> : <ChevronRight size={12} className="text-amber-400 shrink-0" />}
-              <AlertCircle size={12} className="text-amber-400 shrink-0" />
-              <span className="text-xs font-semibold uppercase tracking-widest text-amber-400">Not covered</span>
-              <span className="text-xs text-amber-400/60 tabular-nums">{missed.length}</span>
+              {missedOpen ? <ChevronDown size={11} className="text-amber-400 shrink-0" /> : <ChevronRight size={11} className="text-amber-400 shrink-0" />}
+              <AlertCircle size={11} className="text-amber-400 shrink-0" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-400">Not covered</span>
+              <span className="text-[10px] text-amber-400/60 tabular-nums">{missed.length}</span>
               {missedOpen && (
-                <span className="ml-auto text-[11px] text-[var(--color-muted-foreground)] italic">
-                  Add these operations to your scenarios
+                <span className="ml-auto text-[10px] text-[var(--color-muted-foreground)] italic">
+                  Add these to your scenarios
                 </span>
               )}
             </button>
@@ -206,20 +234,23 @@ function SpecDetailPanel({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function exportCSV(specFile: string, entry: AccumulatedCoverage) {
-  const rows = ['Method,Path,Status']
+  const rows = ['Method,Path,Coverage,Last Result,Last Run']
   for (const op of [...(entry.exercised ?? [])].sort()) {
     const { method, path } = parseOp(op)
-    rows.push(`${method},${path},Covered`)
+    const r = entry.operationResults?.[op]
+    const result = r ? (r.lastPassed ? 'Pass' : 'Fail') : ''
+    const runAt = r?.lastRunAt ? new Date(r.lastRunAt).toISOString() : ''
+    rows.push(`${method},${path},Covered,${result},${runAt}`)
   }
   for (const op of [...(entry.missed ?? [])].sort()) {
     const { method, path } = parseOp(op)
-    rows.push(`${method},${path},Not Covered`)
+    rows.push(`${method},${path},Not Covered,,`)
   }
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${specLabel(specFile).replace(/\.(yaml|yml|json)$/i, '')}-coverage.csv`
+  a.download = `${specLabel(specFile).replace(/\.(yaml|yml|json)$/i, '')}-contracts.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
