@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { RotateCcw, RefreshCw, BarChart2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AccumulatedCoverage } from '@/lib/bridge'
-import { listAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
+import { listAccumulatedCoverage, getAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
 
 type Props = {
   workspacePath: string
@@ -277,25 +277,37 @@ function SpecDetailPanel({
 // ── Root component ────────────────────────────────────────────────────────────
 
 export function CoverageTab({ workspacePath, specFile, onOpenSpecCoverage }: Props) {
+  // Overview mode: list of all specs (no missed needed)
   const [entries, setEntries] = useState<AccumulatedCoverage[]>([])
+  // Per-spec mode: full detail loaded via getAccumulatedCoverage (includes missed)
+  const [specEntry, setSpecEntry] = useState<AccumulatedCoverage | null>(null)
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
-    if (!workspacePath) { setEntries([]); return }
+    if (!workspacePath) { setEntries([]); setSpecEntry(null); return }
     setLoading(true)
     try {
-      const data = await listAccumulatedCoverage()
-      setEntries(data)
+      if (specFile) {
+        const data = await getAccumulatedCoverage(specFile)
+        setSpecEntry(data)
+      } else {
+        const data = await listAccumulatedCoverage()
+        setEntries(data)
+      }
     } finally {
       setLoading(false)
     }
-  }, [workspacePath])
+  }, [workspacePath, specFile])
 
   useEffect(() => { refresh() }, [refresh])
 
   async function handleReset(sf: string) {
     await resetAccumulatedCoverage(sf).catch(() => {})
-    setEntries(prev => prev.filter(e => e.specFile !== sf))
+    if (specFile) {
+      setSpecEntry(null)
+    } else {
+      setEntries(prev => prev.filter(e => e.specFile !== sf))
+    }
   }
 
   if (!workspacePath) {
@@ -306,8 +318,6 @@ export function CoverageTab({ workspacePath, specFile, onOpenSpecCoverage }: Pro
       </div>
     )
   }
-
-  const currentEntry = specFile ? entries.find(e => e.specFile === specFile) : null
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -346,8 +356,8 @@ export function CoverageTab({ workspacePath, specFile, onOpenSpecCoverage }: Pro
 
       {/* Body */}
       {specFile ? (
-        currentEntry ? (
-          <SpecDetailPanel entry={currentEntry} onReset={() => handleReset(specFile)} />
+        specEntry ? (
+          <SpecDetailPanel entry={specEntry} onReset={() => handleReset(specFile)} />
         ) : loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3">
             <RefreshCw size={20} className="animate-spin text-[var(--color-muted-foreground)]" />
