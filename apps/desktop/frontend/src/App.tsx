@@ -93,6 +93,8 @@ export default function App() {
   function handleRailTabClick(tab: RailTab) {
     if (tab === 'coverage') {
       tabs.openCoverageTab()
+      setSidebarOpen(false)
+      localStorage.setItem('ui.sidebarOpen', 'false')
       return
     }
     if (tab === railTab && sidebarOpen) {
@@ -159,6 +161,8 @@ export default function App() {
 
   // Bump after each scenario run to refresh the run log
   const [runLogTrigger, setRunLogTrigger] = useState(0)
+  // Set true after run-all finishes to auto-switch ScenariosPanel to the Run Log sub-tab
+  const [runLogAutoShow, setRunLogAutoShow] = useState(false)
 
   // Run all requests in a folder
   const [folderRunState, setFolderRunState] = useState<FolderRunState | null>(null)
@@ -200,6 +204,12 @@ export default function App() {
       }
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
+    setRunLogTrigger(t => t + 1)
+    setRunLogAutoShow(true)
+    setRailTab('scenarios')
+    setSidebarOpen(true)
+    localStorage.setItem('ui.railTab', 'scenarios')
+    localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
   // Init
@@ -707,6 +717,8 @@ export default function App() {
                     onRunAllScenarios={handleRunAll}
                     onDismissRunAll={() => setRunAllState(null)}
                     runLogTrigger={runLogTrigger}
+                    runLogAutoShow={runLogAutoShow}
+                    onRunLogAutoShowDone={() => setRunLogAutoShow(false)}
                     onRunFolder={handleRunFolder}
                     folderRunState={folderRunState}
                     onDismissFolderRun={() => setFolderRunState(null)}

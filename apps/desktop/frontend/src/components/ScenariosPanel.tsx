@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PlayCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioInfo, TemplateInfo } from '@/lib/bridge'
@@ -25,6 +25,8 @@ type ScenariosPanelProps = {
   onDeleteScenario?: (path: string) => void
   onRenameScenario?: (path: string, newName: string) => void
   runLogTrigger?: number
+  runLogAutoShow?: boolean
+  onRunLogAutoShowDone?: () => void
 }
 
 export function ScenariosPanel({
@@ -32,9 +34,16 @@ export function ScenariosPanel({
   runAllState, onRunAllScenarios, onDismissRunAll,
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
-  runLogTrigger,
+  runLogTrigger, runLogAutoShow, onRunLogAutoShowDone,
 }: ScenariosPanelProps) {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'log'>('scenarios')
+
+  useEffect(() => {
+    if (runLogAutoShow) {
+      setActiveTab('log')
+      onRunLogAutoShowDone?.()
+    }
+  }, [runLogAutoShow, onRunLogAutoShowDone])
   const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
