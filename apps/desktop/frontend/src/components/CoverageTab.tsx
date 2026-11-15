@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RotateCcw, RefreshCw, BarChart2, ArrowLeft, AlertCircle } from 'lucide-react'
+import { RotateCcw, RefreshCw, BarChart2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AccumulatedCoverage } from '@/lib/bridge'
 import { listAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
@@ -78,13 +78,11 @@ function OpRow({ op, covered }: { op: string; covered: boolean }) {
 function OverviewPanel({
   entries,
   loading,
-  onRefresh,
   onOpenSpec,
   onReset,
 }: {
   entries: AccumulatedCoverage[]
   loading: boolean
-  onRefresh: () => void
   onOpenSpec: (specFile: string) => void
   onReset: (specFile: string) => void
 }) {
@@ -368,7 +366,6 @@ export function CoverageTab({ workspacePath, specFile, onOpenSpecCoverage }: Pro
         <OverviewPanel
           entries={entries}
           loading={loading}
-          onRefresh={refresh}
           onOpenSpec={onOpenSpecCoverage}
           onReset={handleReset}
         />
