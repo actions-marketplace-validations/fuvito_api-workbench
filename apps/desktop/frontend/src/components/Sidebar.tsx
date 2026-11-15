@@ -4,6 +4,7 @@ import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
 import type { FolderRunState } from '@/components/WorkspacePanel'
 import { ScenariosPanel } from '@/components/ScenariosPanel'
+import { CoverageDashboard } from '@/components/CoverageDashboard'
 import type { RailTab } from '@/components/ActivityRail'
 import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
 
@@ -131,6 +132,10 @@ export function Sidebar({
           onDeleteScenario={onDeleteScenario}
           onRenameScenario={onRenameScenario}
         />
+      )}
+
+      {tab === 'coverage' && (
+        <CoverageDashboard workspacePath={workspacePath} />
       )}
 
       {tab === 'history' && (

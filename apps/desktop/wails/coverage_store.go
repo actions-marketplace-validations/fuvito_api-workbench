@@ -29,6 +29,7 @@ type AccumulatedCoverageIO struct {
 type storedSpecCoverage struct {
 	SpecFile   string    `json:"specFile"`
 	Exercised  []string  `json:"exercised"`
+	TotalOps   int       `json:"totalOps"` // cached from last run so dashboard doesn't reload the spec
 	TotalRuns  int       `json:"totalRuns"`
 	PassedRuns int       `json:"passedRuns"`
 	FailedRuns int       `json:"failedRuns"`

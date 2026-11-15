@@ -71,7 +71,7 @@ export default function App() {
   })
   const [railTab, setRailTab] = useState<RailTab>(() => {
     const v = localStorage.getItem('ui.railTab') as RailTab | null
-    return v === 'explorer' || v === 'scenarios' || v === 'history' ? v : 'explorer'
+    return v === 'explorer' || v === 'scenarios' || v === 'history' || v === 'coverage' ? v : 'explorer'
   })
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'

@@ -12,6 +12,8 @@ export function DuplicateScenario(arg1:string):Promise<main.CreateScenarioResult
 
 export function GetAccumulatedCoverage(arg1:string):Promise<main.AccumulatedCoverageIO>;
 
+export function ListAccumulatedCoverage():Promise<Array<main.AccumulatedCoverageIO>>;
+
 export function ListScenarios():Promise<Array<main.ScenarioInfoIO>>;
 
 export function ListTemplates():Promise<Array<main.TemplateInfoIO>>;

@@ -22,6 +22,10 @@ export function GetAccumulatedCoverage(arg1) {
   return window['go']['main']['ScenarioService']['GetAccumulatedCoverage'](arg1);
 }
 
+export function ListAccumulatedCoverage() {
+  return window['go']['main']['ScenarioService']['ListAccumulatedCoverage']();
+}
+
 export function ListScenarios() {
   return window['go']['main']['ScenarioService']['ListScenarios']();
 }

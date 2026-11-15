@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -672,6 +673,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 					stored.FailedRuns++
 				}
 				stored.Exercised = mergeExercised(stored.Exercised, cov.Exercised)
+				stored.TotalOps = cr.Total
 				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
 					acc := buildAccumulatedCoverageIO(stored, loadedSpec)
 					out.AccumulatedCoverage = &acc
@@ -715,6 +717,65 @@ func (s *ScenarioService) ResetAccumulatedCoverage(specFile string) error {
 		return err
 	}
 	return nil
+}
+
+// ListAccumulatedCoverage returns all stored accumulated coverage entries for the workspace,
+// sorted by most recently run first. Uses cached TotalOps so no spec files are reloaded.
+func (s *ScenarioService) ListAccumulatedCoverage() []AccumulatedCoverageIO {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return nil
+	}
+	dir := coverageDirPath(wsPath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var result []AccumulatedCoverageIO
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var stored storedSpecCoverage
+		if err := json.Unmarshal(data, &stored); err != nil {
+			continue
+		}
+		if stored.TotalRuns == 0 {
+			continue
+		}
+		total := stored.TotalOps
+		covered := len(stored.Exercised)
+		if covered > total {
+			covered = total
+		}
+		var pct float64
+		if total > 0 {
+			pct = float64(covered) / float64(total) * 100
+		}
+		lastRun := ""
+		if !stored.LastRunAt.IsZero() {
+			lastRun = stored.LastRunAt.Format(time.RFC3339)
+		}
+		result = append(result, AccumulatedCoverageIO{
+			SpecFile:   stored.SpecFile,
+			Covered:    covered,
+			Total:      total,
+			Percent:    pct,
+			TotalRuns:  stored.TotalRuns,
+			PassedRuns: stored.PassedRuns,
+			FailedRuns: stored.FailedRuns,
+			LastRunAt:  lastRun,
+			Exercised:  stored.Exercised,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].LastRunAt > result[j].LastRunAt
+	})
+	return result
 }
 
 // loadSpecBytes fetches the OpenAPI spec at specRef (HTTP/HTTPS URL or file path).

@@ -82,6 +82,7 @@ import {
   CreateFromTemplate as WailsCreateFromTemplate,
   GetAccumulatedCoverage as WailsGetAccumulatedCoverage,
   ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
+  ListAccumulatedCoverage as WailsListAccumulatedCoverage,
 } from '@wailsjs/go/main/ScenarioService'
 import {
   GetUserGuide as WailsGetUserGuide,
@@ -695,6 +696,11 @@ export async function getAccumulatedCoverage(specFile: string): Promise<Accumula
 
 export async function resetAccumulatedCoverage(specFile: string): Promise<void> {
   await WailsResetAccumulatedCoverage(specFile)
+}
+
+export async function listAccumulatedCoverage(): Promise<AccumulatedCoverage[]> {
+  const result = await WailsListAccumulatedCoverage()
+  return (result ?? []) as unknown as AccumulatedCoverage[]
 }
 
 // ---- Folder run ----
