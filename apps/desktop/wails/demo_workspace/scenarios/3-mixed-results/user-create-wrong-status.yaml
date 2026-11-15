@@ -1,6 +1,9 @@
 schemaVersion: "1"
-title: Full Auth and User Flow
-description: Login, create a user, fetch it back, verify the data, then delete it.
+title: Create User — Wrong Status Expected
+description: |
+  Simulates a contract drift: the spec says POST /users returns 201 Created, but
+  this scenario still expects 200 OK from an older version of the API. The name and
+  ID assertions pass; the status assertion fails.
 specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
@@ -14,18 +17,15 @@ steps:
     assertions:
       - type: status
         operator: eq
-        expected: "200"
-      - type: jsonpath
-        path: "$.token"
-        operator: ne
-        expected: ""
+        expected: 200
     extractions:
       - name: authToken
         source: jsonpath
         path: "$.token"
     failPolicy: stop
 
-  - label: Create user
+  - label: Create user (expects 200, gets 201)
+    notes: status eq 200 will FAIL — the API returns 201 Created. The body assertions still pass.
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -34,15 +34,15 @@ steps:
           value: "Bearer {{authToken}}"
       body:
         type: json
-        content: '{"name":"Grace Hopper","email":"grace@example.com","role":"developer"}'
+        content: '{"name":"Marie Curie","email":"marie@example.com","role":"researcher"}'
     assertions:
       - type: status
         operator: eq
-        expected: "201"
+        expected: 200
       - type: jsonpath
         path: "$.name"
         operator: eq
-        expected: "Grace Hopper"
+        expected: "Marie Curie"
       - type: jsonpath
         path: "$.id"
         operator: gt
@@ -51,48 +51,32 @@ steps:
       - name: newUserId
         source: jsonpath
         path: "$.id"
-    failPolicy: stop
+    failPolicy: continue
 
-  - label: Fetch user
+  - label: Fetch created user
+    notes: Runs despite the previous step failing (failPolicy continue). Should pass.
     request:
       method: GET
       url: "{{baseUrl}}/users/{{newUserId}}"
     assertions:
       - type: status
         operator: eq
-        expected: "200"
-      - type: jsonpath
-        path: "$.name"
-        operator: eq
-        expected: "Grace Hopper"
+        expected: 200
       - type: jsonpath
         path: "$.email"
         operator: eq
-        expected: "grace@example.com"
+        expected: "marie@example.com"
     failPolicy: continue
 
-  - label: Update user
-    request:
-      method: PUT
-      url: "{{baseUrl}}/users/{{newUserId}}"
-      body:
-        type: json
-        content: '{"role":"senior-developer"}'
-    assertions:
-      - type: status
-        operator: eq
-        expected: "200"
-      - type: jsonpath
-        path: "$.role"
-        operator: eq
-        expected: "senior-developer"
-    failPolicy: continue
-
-  - label: Delete user
+  - label: Delete created user
+    notes: Clean up — 204 No Content.
     request:
       method: DELETE
       url: "{{baseUrl}}/users/{{newUserId}}"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
     assertions:
       - type: status
         operator: eq
-        expected: "204"
+        expected: 204

@@ -309,24 +309,18 @@ export function useTabsState(deps: {
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
   }
 
-  function openCoverageTab(specFile?: string | null): string {
-    const key = specFile ?? null
-    const existing = tabsStateRef.current.tabs.find(
-      t => t.kind === 'coverage' && t.coverageSpecFile === key
-    )
+  function openCoverageTab(): string {
+    const existing = tabsStateRef.current.tabs.find(t => t.kind === 'coverage')
     if (existing) {
       switchTo(existing.id)
       return existing.id
     }
     const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
-    const displayName = specFile
-      ? (specFile.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? specFile)
-      : 'Coverage'
     const newTab: TabState = {
       id: crypto.randomUUID(),
       kind: 'coverage',
-      coverageSpecFile: key,
-      name: displayName,
+      coverageSpecFile: null,
+      name: 'Contracts',
       method: 'GET',
       url: '',
       queryParams: [],

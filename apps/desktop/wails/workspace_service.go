@@ -553,6 +553,46 @@ func (w *WorkspaceService) MoveRequest(srcPath, destDir string) (string, error) 
 	return newPath, nil
 }
 
+// CopyRequest copies a request file into a different folder within the workspace.
+// Returns the new file path, or an error.
+func (w *WorkspaceService) CopyRequest(srcPath, destDir string) (string, error) {
+	if w.workspacePath != "" {
+		for _, p := range []string{srcPath, destDir} {
+			rel, err := filepath.Rel(w.workspacePath, p)
+			if err != nil || strings.HasPrefix(rel, "..") {
+				return "", fmt.Errorf("path is outside the current workspace")
+			}
+		}
+	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("creating destination: %w", err)
+	}
+	base := filepath.Base(srcPath)
+	newPath := filepath.Join(destDir, base)
+	if _, err := os.Stat(newPath); err == nil {
+		ext := filepath.Ext(base)
+		stem := strings.TrimSuffix(base, ext)
+		for i := 2; ; i++ {
+			if i == 2 {
+				newPath = filepath.Join(destDir, stem+"-copy"+ext)
+			} else {
+				newPath = filepath.Join(destDir, fmt.Sprintf("%s-copy-%d%s", stem, i, ext))
+			}
+			if _, err := os.Stat(newPath); err != nil {
+				break
+			}
+		}
+	}
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return "", fmt.Errorf("reading source: %w", err)
+	}
+	if err := atomicWrite(newPath, data); err != nil {
+		return "", fmt.Errorf("writing copy: %w", err)
+	}
+	return newPath, nil
+}
+
 // DeleteRequest removes a request file from disk.
 func (w *WorkspaceService) DeleteRequest(path string) error {
 	if path == "" {

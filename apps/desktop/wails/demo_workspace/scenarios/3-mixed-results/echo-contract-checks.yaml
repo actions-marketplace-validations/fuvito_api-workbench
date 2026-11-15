@@ -1,0 +1,57 @@
+schemaVersion: "1"
+title: Echo — Contract Checks
+description: |
+  Echo GET passes cleanly. Echo POST has a copy-paste error in the expected method value.
+  The status/404 step passes its status check but fails on the wrong expected code value.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Echo GET
+    request:
+      method: GET
+      url: "{{baseUrl}}/echo"
+      queryParams:
+        - name: check
+          value: "true"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "GET"
+    failPolicy: continue
+
+  - label: Echo POST (wrong method expected)
+    notes: status eq 200 PASS. $.method eq "PUT" will FAIL — copied from the PUT step, never updated.
+    request:
+      method: POST
+      url: "{{baseUrl}}/echo"
+      body:
+        type: json
+        content: '{"test":"echo"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "PUT"
+    failPolicy: continue
+
+  - label: Status 404 (wrong code assertion)
+    notes: status eq 404 PASS. $.code eq "200" will FAIL — the response code is 404, not 200.
+    request:
+      method: GET
+      url: "{{baseUrl}}/status/404"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 404
+      - type: jsonpath
+        path: "$.code"
+        operator: eq
+        expected: "200"
+    failPolicy: continue

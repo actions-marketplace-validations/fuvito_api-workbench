@@ -1,6 +1,6 @@
 schemaVersion: "1"
-title: Auth and Protected Resource
-description: Login to obtain a Bearer token, then use it to access a protected endpoint.
+title: Auth and Profile
+description: Login and profile fetch — both pass. A clean baseline in an otherwise mixed folder.
 specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
@@ -16,13 +16,9 @@ steps:
         operator: eq
         expected: 200
       - type: jsonpath
-        path: "$.token"
-        operator: ne
-        expected: ""
-      - type: jsonpath
         path: "$.token_type"
         operator: eq
-        expected: Bearer
+        expected: "Bearer"
     extractions:
       - name: authToken
         source: jsonpath
@@ -43,8 +39,4 @@ steps:
       - type: jsonpath
         path: "$.role"
         operator: eq
-        expected: admin
-      - type: jsonpath
-        path: "$.email"
-        operator: contains
-        expected: example.com
+        expected: "admin"

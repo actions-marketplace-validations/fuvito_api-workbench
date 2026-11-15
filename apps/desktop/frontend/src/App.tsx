@@ -31,8 +31,8 @@ import { useTabsState } from '@/hooks/useTabsState'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { useSettings } from '@/hooks/useSettings'
 import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo, openDemoSpec } from '@/lib/bridge'
-import type { FolderRunState } from '@/components/Sidebar'
+import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, runFolder, quitApp, saveContentToFile, pickFile, stopDemo, openDemoSpec, createScenarioFolder, renameScenarioFolder, deleteScenarioFolder, moveRequest, copyRequest, moveScenario, copyScenario } from '@/lib/bridge'
+import type { FileClipboard, RunAllState, FolderRunState } from '@/types'
 import { authStateToPayload } from '@/lib/httpUtils'
 import { parseCurl } from '@/lib/curlImport'
 import { isTabDirty } from '@/lib/tabState'
@@ -53,6 +53,7 @@ export default function App() {
   const settings = useSettings()
   const demo = useDemo({
     refreshWorkspace: workspace.refreshWorkspace,
+    refreshHistory: workspace.refreshHistory,
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
   })
@@ -60,6 +61,13 @@ export default function App() {
   // Wire cross-dependency after both hooks are initialized
   // eslint-disable-next-line react/refs
   refreshWorkspaceRef.current = workspace.refreshFileTree
+
+  useEffect(() => {
+    const name = workspace.workspacePath
+      ? workspace.workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
+      : null
+    document.title = name ? `Clear Signal — ${name}` : 'Clear Signal'
+  }, [workspace.workspacePath])
 
   // Layout state
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -72,7 +80,7 @@ export default function App() {
   })
   const [railTab, setRailTab] = useState<RailTab>(() => {
     const v = localStorage.getItem('ui.railTab') as RailTab | null
-    return v === 'explorer' || v === 'scenarios' || v === 'history' ? v : 'explorer'
+    return v === 'explorer' || v === 'scenarios' || v === 'history' || v === 'coverage' ? v : 'explorer'
   })
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
@@ -93,9 +101,6 @@ export default function App() {
   function handleRailTabClick(tab: RailTab) {
     if (tab === 'coverage') {
       tabs.openCoverageTab()
-      setSidebarOpen(false)
-      localStorage.setItem('ui.sidebarOpen', 'false')
-      return
     }
     if (tab === railTab && sidebarOpen) {
       setSidebarOpen(false)
@@ -157,12 +162,18 @@ export default function App() {
   }
 
   // Run All Scenarios state
-  const [runAllState, setRunAllState] = useState<import('@/components/Sidebar').RunAllState | null>(null)
+  const [runAllState, setRunAllState] = useState<RunAllState | null>(null)
 
   // Bump after each scenario run to refresh the run log
   const [runLogTrigger, setRunLogTrigger] = useState(0)
   // Set true after run-all finishes to auto-switch ScenariosPanel to the Run Log sub-tab
   const [runLogAutoShow, setRunLogAutoShow] = useState(false)
+
+  // Which spec is selected in the coverage sidebar (drives the single coverage tab)
+  const [selectedCoverageSpecFile, setSelectedCoverageSpecFile] = useState<string | null>(null)
+
+  // File clipboard for copy/cut/paste operations
+  const [fileClipboard, setFileClipboard] = useState<FileClipboard | null>(null)
 
   // Run all requests in a folder
   const [folderRunState, setFolderRunState] = useState<FolderRunState | null>(null)
@@ -176,6 +187,96 @@ export default function App() {
     } catch (e) {
       setFolderRunState({ folderPath, folderName, running: false, results: [{ name: 'Error', path: '', method: '', statusCode: 0, durationMs: 0, error: String(e), passed: false }] })
     }
+  }
+
+  // ── File clipboard ──────────────────────────────────────────────────────────
+
+  async function handlePasteToRequestFolder(destDir: string) {
+    if (!fileClipboard || fileClipboard.kind !== 'request') return
+    try {
+      if (fileClipboard.op === 'copy') {
+        await copyRequest(fileClipboard.srcPath, destDir)
+      } else {
+        await moveRequest(fileClipboard.srcPath, destDir)
+        setFileClipboard(null)
+      }
+      await workspace.refreshWorkspace()
+    } catch { /* silent */ }
+  }
+
+  async function handlePasteToScenarioFolder(relFolderPath: string) {
+    if (!fileClipboard || fileClipboard.kind !== 'scenario') return
+    try {
+      if (fileClipboard.op === 'copy') {
+        await copyScenario(fileClipboard.srcPath, relFolderPath)
+      } else {
+        const newPath = await moveScenario(fileClipboard.srcPath, relFolderPath)
+        tabs.setTabsState(prev => ({
+          ...prev,
+          tabs: prev.tabs.map(t =>
+            t.kind === 'scenario' && t.scenarioPath === fileClipboard.srcPath
+              ? { ...t, scenarioPath: newPath }
+              : t
+          ),
+        }))
+        setFileClipboard(null)
+      }
+      await workspace.refreshWorkspace()
+    } catch { /* silent */ }
+  }
+
+  async function handleMoveScenario(srcPath: string, destFolderRelPath: string) {
+    try {
+      const newPath = await moveScenario(srcPath, destFolderRelPath)
+      if (newPath) {
+        tabs.setTabsState(prev => ({
+          ...prev,
+          tabs: prev.tabs.map(t =>
+            t.kind === 'scenario' && t.scenarioPath === srcPath
+              ? { ...t, scenarioPath: newPath }
+              : t
+          ),
+        }))
+        await workspace.refreshWorkspace()
+      }
+    } catch { /* silent */ }
+  }
+
+  async function handleRunScenarioFolder(folderPath: string) {
+    const all = workspace.scenarioList.filter(s => !s.isFolder)
+    const list = folderPath === ''
+      ? all
+      : all.filter(s => s.folder === folderPath || s.folder?.startsWith(folderPath + '/'))
+    if (!list.length) return
+    const envPath = workspace.activeEnv?.path ?? ''
+    setRunAllState({ running: true, done: 0, total: list.length, passed: 0, results: [] })
+    let passedCount = 0
+    for (const s of list) {
+      try {
+        const r = await runScenario(s.path, envPath)
+        if (r.passed) passedCount++
+        setRunAllState(prev => prev ? {
+          ...prev,
+          done: prev.done + 1,
+          passed: passedCount,
+          results: [...prev.results, { path: s.path, name: s.title, passed: r.passed, durationMs: r.durationMs }],
+        } : prev)
+        setRunLogTrigger(t => t + 1)
+      } catch (e) {
+        setRunAllState(prev => prev ? {
+          ...prev,
+          done: prev.done + 1,
+          results: [...prev.results, { path: s.path, name: s.title, passed: false, durationMs: 0, error: String(e) }],
+        } : prev)
+      }
+    }
+    setRunAllState(prev => prev ? { ...prev, running: false } : prev)
+    setRunLogTrigger(t => t + 1)
+    setRunLogAutoShow(true)
+    setRailTab('scenarios')
+    setSidebarOpen(true)
+    localStorage.setItem('ui.railTab', 'scenarios')
+    localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
   async function handleRunAll() {
@@ -720,13 +821,47 @@ export default function App() {
                     runLogAutoShow={runLogAutoShow}
                     onRunLogAutoShowDone={() => setRunLogAutoShow(false)}
                     onRunFolder={handleRunFolder}
+                    onRunScenarioFolder={handleRunScenarioFolder}
                     folderRunState={folderRunState}
                     onDismissFolderRun={() => setFolderRunState(null)}
-                    onNewScenario={async (name) => {
-                      const result = await createScenario(name)
+                    selectedCoverageSpecFile={selectedCoverageSpecFile}
+                    onSelectCoverageSpec={setSelectedCoverageSpecFile}
+                    clipboard={fileClipboard}
+                    onCopyFile={path => setFileClipboard({ op: 'copy', kind: 'request', srcPath: path })}
+                    onCutFile={path => setFileClipboard({ op: 'cut', kind: 'request', srcPath: path })}
+                    onPasteToRequestFolder={handlePasteToRequestFolder}
+                    onPasteToRequestRoot={() => handlePasteToRequestFolder(`${workspace.workspacePath}\\requests`)}
+                    onMoveScenario={handleMoveScenario}
+                    onCopyScenario={path => setFileClipboard({ op: 'copy', kind: 'scenario', srcPath: path })}
+                    onCutScenario={path => setFileClipboard({ op: 'cut', kind: 'scenario', srcPath: path })}
+                    onPasteToScenarioFolder={handlePasteToScenarioFolder}
+                    onNewScenario={async (name, folderPath) => {
+                      const result = await createScenario(name, folderPath ?? '')
                       if (!result.error && result.path) {
                         await workspace.refreshWorkspace()
                         tabs.openScenarioAsTab(result.path, name)
+                      }
+                    }}
+                    onNewScenarioFolder={async (parentFolderPath, name) => {
+                      const relPath = parentFolderPath ? `${parentFolderPath}/${name}` : name
+                      await createScenarioFolder(relPath)
+                      await workspace.refreshWorkspace()
+                    }}
+                    onRenameScenarioFolder={async (folderPath, newName) => {
+                      const result = await renameScenarioFolder(folderPath, newName)
+                      if (!result.startsWith('error:')) {
+                        await workspace.refreshWorkspace()
+                      }
+                    }}
+                    onDeleteScenarioFolder={async (folderPath) => {
+                      const scenDir = `${workspace.workspacePath}\\scenarios\\`
+                      const matchingTabs = tabs.tabs.filter(t =>
+                        t.kind === 'scenario' && (t.scenarioPath ?? '').startsWith(scenDir + folderPath.replace(/\//g, '\\'))
+                      )
+                      const err = await deleteScenarioFolder(folderPath)
+                      if (!err) {
+                        for (const t of matchingTabs) tabs.removeTab(t.id)
+                        await workspace.refreshWorkspace()
                       }
                     }}
                     onNewScenarioFile={async (path, name) => {
@@ -802,7 +937,7 @@ export default function App() {
               />
 
               <div className="flex-1 flex overflow-hidden relative">
-                {/* Coverage tabs */}
+                {/* Coverage tab (single instance) */}
                 {tabList.filter(t => t.kind === 'coverage').map(t => (
                   <div
                     key={t.id}
@@ -811,8 +946,8 @@ export default function App() {
                   >
                     <CoverageTab
                       workspacePath={workspace.workspacePath}
-                      specFile={t.coverageSpecFile ?? null}
-                      onOpenSpecCoverage={sf => tabs.openCoverageTab(sf)}
+                      specFile={selectedCoverageSpecFile}
+                      isActive={t.id === activeTabId}
                     />
                   </div>
                 ))}

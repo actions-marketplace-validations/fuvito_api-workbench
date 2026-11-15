@@ -12,29 +12,37 @@ import (
 	"time"
 )
 
+// OperationResult records the last-run outcome for a single spec operation.
+type OperationResult struct {
+	LastPassed bool      `json:"lastPassed"`
+	LastRunAt  time.Time `json:"lastRunAt"`
+}
+
 // StoredCoverage is the on-disk format for a single spec's accumulated data.
 type StoredCoverage struct {
-	SpecFile   string    `json:"specFile"`
-	Exercised  []string  `json:"exercised"`
-	TotalOps   int       `json:"totalOps"` // cached so list views don't reload the spec
-	TotalRuns  int       `json:"totalRuns"`
-	PassedRuns int       `json:"passedRuns"`
-	FailedRuns int       `json:"failedRuns"`
-	LastRunAt  time.Time `json:"lastRunAt"`
+	SpecFile         string                     `json:"specFile"`
+	Exercised        []string                   `json:"exercised"`
+	TotalOps         int                        `json:"totalOps"` // cached so list views don't reload the spec
+	TotalRuns        int                        `json:"totalRuns"`
+	PassedRuns       int                        `json:"passedRuns"`
+	FailedRuns       int                        `json:"failedRuns"`
+	LastRunAt        time.Time                  `json:"lastRunAt"`
+	OperationResults map[string]OperationResult `json:"operationResults,omitempty"`
 }
 
 // Report is the computed accumulated coverage view for a single spec.
 type Report struct {
-	SpecFile   string
-	Covered    int
-	Total      int
-	Percent    float64
-	TotalRuns  int
-	PassedRuns int
-	FailedRuns int
-	LastRunAt  time.Time
-	Exercised  []string
-	Missed     []string // nil when built from Summary(); populated by BuildReport
+	SpecFile         string
+	Covered          int
+	Total            int
+	Percent          float64
+	TotalRuns        int
+	PassedRuns       int
+	FailedRuns       int
+	LastRunAt        time.Time
+	Exercised        []string
+	Missed           []string // nil when built from Summary(); populated by BuildReport
+	OperationResults map[string]OperationResult
 }
 
 // Key converts a specFile value (URL or path) into a safe, unique filename.
@@ -142,15 +150,16 @@ func (sc StoredCoverage) Summary() Report {
 		ex = []string{}
 	}
 	return Report{
-		SpecFile:   sc.SpecFile,
-		Covered:    covered,
-		Total:      total,
-		Percent:    pct,
-		TotalRuns:  sc.TotalRuns,
-		PassedRuns: sc.PassedRuns,
-		FailedRuns: sc.FailedRuns,
-		LastRunAt:  sc.LastRunAt,
-		Exercised:  ex,
+		SpecFile:         sc.SpecFile,
+		Covered:          covered,
+		Total:            total,
+		Percent:          pct,
+		TotalRuns:        sc.TotalRuns,
+		PassedRuns:       sc.PassedRuns,
+		FailedRuns:       sc.FailedRuns,
+		LastRunAt:        sc.LastRunAt,
+		Exercised:        ex,
+		OperationResults: sc.OperationResults,
 	}
 }
 
@@ -179,16 +188,17 @@ func BuildReport(stored StoredCoverage, allOps []string) Report {
 		ex = []string{}
 	}
 	return Report{
-		SpecFile:   stored.SpecFile,
-		Covered:    covered,
-		Total:      total,
-		Percent:    pct,
-		TotalRuns:  stored.TotalRuns,
-		PassedRuns: stored.PassedRuns,
-		FailedRuns: stored.FailedRuns,
-		LastRunAt:  stored.LastRunAt,
-		Exercised:  ex,
-		Missed:     missed,
+		SpecFile:         stored.SpecFile,
+		Covered:          covered,
+		Total:            total,
+		Percent:          pct,
+		TotalRuns:        stored.TotalRuns,
+		PassedRuns:       stored.PassedRuns,
+		FailedRuns:       stored.FailedRuns,
+		LastRunAt:        stored.LastRunAt,
+		Exercised:        ex,
+		Missed:           missed,
+		OperationResults: stored.OperationResults,
 	}
 }
 

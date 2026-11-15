@@ -1,0 +1,41 @@
+schemaVersion: "1"
+title: Format Type Mismatch
+description: |
+  Simulates a developer who assumed all endpoints return JSON. The status checks pass,
+  but the Content-Type assertions fail because these endpoints return XML and HTML.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Atom feed (expected JSON, got XML)
+    notes: status eq 200 PASS. Content-Type contains "json" will FAIL — actual type is application/atom+xml.
+    request:
+      method: GET
+      url: "{{baseUrl}}/feed"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: "json"
+    failPolicy: continue
+
+  - label: List posts (wrong total assumption)
+    notes: status eq 200 PASS. $.total gt 200 will FAIL — there are exactly 100 synthetic posts.
+    request:
+      method: GET
+      url: "{{baseUrl}}/posts"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.total"
+        operator: gt
+        expected: "200"
+      - type: jsonpath
+        path: "$.data[0].title"
+        operator: ne
+        expected: ""
+    failPolicy: continue

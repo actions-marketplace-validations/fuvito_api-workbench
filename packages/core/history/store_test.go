@@ -113,12 +113,13 @@ func TestStoreWorkspaceIsolation(t *testing.T) {
 		t.Errorf("beta workspace: expected 1 entry for beta.com, got %+v", beta)
 	}
 
+	// Empty workspace path is scoped to entries recorded without a workspace.
 	all, err := store.Recent("", 10)
 	if err != nil {
 		t.Fatalf("Recent all: %v", err)
 	}
-	if len(all) != 2 {
-		t.Errorf("empty workspace path should return all: expected 2, got %d", len(all))
+	if len(all) != 0 {
+		t.Errorf("empty workspace path should return 0 (no unscoped entries): got %d", len(all))
 	}
 }
 

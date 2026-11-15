@@ -30,7 +30,9 @@ var scenarioTemplateFS embed.FS
 type ScenarioInfoIO struct {
 	Title     string `json:"title"`
 	Path      string `json:"path"`
+	Folder    string `json:"folder"` // relative path from {workspace}/scenarios/, "/" separated, "" for root
 	StepCount int    `json:"stepCount"`
+	IsFolder  bool   `json:"isFolder,omitempty"` // sentinel: represents an empty directory, not a file
 }
 
 type KVPairIO struct {
@@ -216,7 +218,16 @@ func (s *ScenarioService) ListScenarios() []ScenarioInfoIO {
 	scenDir := filepath.Join(wsPath, "scenarios")
 	var out []ScenarioInfoIO
 	_ = filepath.WalkDir(scenDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if p == scenDir {
+				return nil // skip root itself
+			}
+			// Emit a folder sentinel so the UI can render empty directories.
+			rel, _ := filepath.Rel(scenDir, p)
+			out = append(out, ScenarioInfoIO{IsFolder: true, Folder: filepath.ToSlash(rel), Path: p})
 			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(p))
@@ -224,7 +235,12 @@ func (s *ScenarioService) ListScenarios() []ScenarioInfoIO {
 			return nil
 		}
 		name := strings.TrimSuffix(d.Name(), filepath.Ext(d.Name()))
-		info := ScenarioInfoIO{Title: name, Path: p}
+		rel, _ := filepath.Rel(scenDir, filepath.Dir(p))
+		folder := ""
+		if rel != "." {
+			folder = filepath.ToSlash(rel)
+		}
+		info := ScenarioInfoIO{Title: name, Path: p, Folder: folder}
 		if data, err := os.ReadFile(p); err == nil {
 			if sc, err := serialization.ParseScenarioFile(data, d.Name()); err == nil {
 				info.StepCount = len(sc.Steps)
@@ -346,9 +362,9 @@ type CreateScenarioResultIO struct {
 	Error string `json:"error,omitempty"`
 }
 
-// CreateScenario creates a starter scenario YAML file in {workspace}/scenarios/
-// using the provided name. Returns the new file path, or an error message.
-func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
+// CreateScenario creates a starter scenario YAML file. folderPath is relative to
+// {workspace}/scenarios/ (e.g. "auth" or ""). Returns the new file path, or an error.
+func (s *ScenarioService) CreateScenario(name, folderPath string) CreateScenarioResultIO {
 	if name == "" {
 		return CreateScenarioResultIO{Error: "name is required"}
 	}
@@ -358,7 +374,15 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 	}
 
 	scenDir := filepath.Join(wsPath, "scenarios")
-	if err := os.MkdirAll(scenDir, 0755); err != nil {
+	targetDir := scenDir
+	if folderPath != "" {
+		clean := filepath.Clean(filepath.FromSlash(folderPath))
+		if strings.HasPrefix(clean, "..") {
+			return CreateScenarioResultIO{Error: "invalid folder path"}
+		}
+		targetDir = filepath.Join(scenDir, clean)
+	}
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return CreateScenarioResultIO{Error: err.Error()}
 	}
 
@@ -366,7 +390,7 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 	if slug == "" {
 		slug = "scenario"
 	}
-	filePath := filepath.Join(scenDir, slug+".yaml")
+	filePath := filepath.Join(targetDir, slug+".yaml")
 
 	// Avoid overwriting an existing file by appending a suffix.
 	if _, err := os.Stat(filePath); err == nil {
@@ -468,6 +492,173 @@ func (s *ScenarioService) RenameScenario(path, newName string) string {
 		}
 	}
 	return newPath
+}
+
+// MoveScenario moves a scenario file into a different folder under {workspace}/scenarios/.
+// destFolderRelPath is relative to scenarios/ (use "" for the root).
+// Returns the new absolute path on success, or an error.
+func (s *ScenarioService) MoveScenario(srcPath, destFolderRelPath string) (string, error) {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "", fmt.Errorf("no workspace open")
+	}
+	scenDir := filepath.Join(wsPath, "scenarios")
+	rel, err := filepath.Rel(scenDir, srcPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("source is outside the scenarios directory")
+	}
+	var destDir string
+	if destFolderRelPath == "" {
+		destDir = scenDir
+	} else {
+		clean := filepath.Clean(filepath.FromSlash(destFolderRelPath))
+		if strings.HasPrefix(clean, "..") {
+			return "", fmt.Errorf("invalid destination folder path")
+		}
+		destDir = filepath.Join(scenDir, clean)
+	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("creating destination: %w", err)
+	}
+	newPath := filepath.Join(destDir, filepath.Base(srcPath))
+	if newPath == srcPath {
+		return srcPath, nil
+	}
+	if _, err := os.Stat(newPath); err == nil {
+		return "", fmt.Errorf("a file named %q already exists in the destination folder", filepath.Base(srcPath))
+	}
+	if err := os.Rename(srcPath, newPath); err != nil {
+		return "", fmt.Errorf("moving file: %w", err)
+	}
+	return newPath, nil
+}
+
+// CopyScenario copies a scenario file into a different folder under {workspace}/scenarios/.
+// destFolderRelPath is relative to scenarios/ (use "" for the root).
+// Returns the new absolute path on success, or an error.
+func (s *ScenarioService) CopyScenario(srcPath, destFolderRelPath string) (string, error) {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "", fmt.Errorf("no workspace open")
+	}
+	scenDir := filepath.Join(wsPath, "scenarios")
+	rel, err := filepath.Rel(scenDir, srcPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("source is outside the scenarios directory")
+	}
+	var destDir string
+	if destFolderRelPath == "" {
+		destDir = scenDir
+	} else {
+		clean := filepath.Clean(filepath.FromSlash(destFolderRelPath))
+		if strings.HasPrefix(clean, "..") {
+			return "", fmt.Errorf("invalid destination folder path")
+		}
+		destDir = filepath.Join(scenDir, clean)
+	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("creating destination: %w", err)
+	}
+	base := filepath.Base(srcPath)
+	newPath := filepath.Join(destDir, base)
+	if _, err := os.Stat(newPath); err == nil {
+		ext := filepath.Ext(base)
+		stem := strings.TrimSuffix(base, ext)
+		for i := 2; ; i++ {
+			if i == 2 {
+				newPath = filepath.Join(destDir, stem+"-copy"+ext)
+			} else {
+				newPath = filepath.Join(destDir, fmt.Sprintf("%s-copy-%d%s", stem, i, ext))
+			}
+			if _, err := os.Stat(newPath); err != nil {
+				break
+			}
+		}
+	}
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return "", fmt.Errorf("reading source: %w", err)
+	}
+	if err := atomicWrite(newPath, data); err != nil {
+		return "", fmt.Errorf("writing copy: %w", err)
+	}
+	return newPath, nil
+}
+
+// CreateScenarioFolder creates a subfolder under {workspace}/scenarios/.
+// folderPath is relative to scenarios/ (e.g. "auth" or "auth/subsection").
+// Returns "" on success or an error message.
+func (s *ScenarioService) CreateScenarioFolder(folderPath string) string {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "no workspace open"
+	}
+	if folderPath == "" {
+		return "folder name is required"
+	}
+	clean := filepath.Clean(filepath.FromSlash(folderPath))
+	if strings.HasPrefix(clean, "..") {
+		return "invalid folder path"
+	}
+	dir := filepath.Join(wsPath, "scenarios", clean)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// RenameScenarioFolder renames the last segment of a folder.
+// folderPath is the current relative path from scenarios/; newName is just the new last segment.
+// Returns the new relative path on success, or "error: ..." on failure.
+func (s *ScenarioService) RenameScenarioFolder(folderPath, newName string) string {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "error: no workspace open"
+	}
+	if newName == "" {
+		return "error: name is required"
+	}
+	clean := filepath.Clean(filepath.FromSlash(folderPath))
+	if strings.HasPrefix(clean, "..") || clean == "." {
+		return "error: invalid folder path"
+	}
+	slug := toSlug(newName)
+	if slug == "" {
+		return "error: invalid folder name"
+	}
+	scenDir := filepath.Join(wsPath, "scenarios")
+	oldAbs := filepath.Join(scenDir, clean)
+	newAbs := filepath.Join(filepath.Dir(oldAbs), slug)
+	if oldAbs == newAbs {
+		return folderPath
+	}
+	if _, err := os.Stat(newAbs); err == nil {
+		return "error: a folder with that name already exists"
+	}
+	if err := os.Rename(oldAbs, newAbs); err != nil {
+		return "error: " + err.Error()
+	}
+	rel, _ := filepath.Rel(scenDir, newAbs)
+	return filepath.ToSlash(rel)
+}
+
+// DeleteScenarioFolder removes a folder and all its contents.
+// folderPath is relative to {workspace}/scenarios/.
+// Returns "" on success or an error message.
+func (s *ScenarioService) DeleteScenarioFolder(folderPath string) string {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "no workspace open"
+	}
+	clean := filepath.Clean(filepath.FromSlash(folderPath))
+	if strings.HasPrefix(clean, "..") || clean == "." {
+		return "invalid folder path"
+	}
+	dir := filepath.Join(wsPath, "scenarios", clean)
+	if err := os.RemoveAll(dir); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 // FolderRunItemIO is a single request result from a folder run.
@@ -670,6 +861,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			executed = append(executed, openapi.ExecutedRequest{
 				Method: string(sr.Request.Method),
 				URL:    sr.Request.URL,
+				Passed: sr.Passed,
 			})
 		}
 		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {
@@ -698,6 +890,16 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 				}
 				stored.Exercised = mergeExercised(stored.Exercised, cov.Exercised)
 				stored.TotalOps = cr.Total
+				now := time.Now()
+				if stored.OperationResults == nil {
+					stored.OperationResults = make(map[string]coverage.OperationResult)
+				}
+				for _, er := range cr.ExercisedResults {
+					stored.OperationResults[er.String()] = coverage.OperationResult{
+						LastPassed: er.Passed,
+						LastRunAt:  now,
+					}
+				}
 				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
 					acc := buildAccumulatedCoverageIO(stored, loadedSpec)
 					out.AccumulatedCoverage = &acc

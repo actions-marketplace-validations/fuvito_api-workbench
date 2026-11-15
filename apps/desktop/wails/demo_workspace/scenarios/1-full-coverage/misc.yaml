@@ -1,0 +1,157 @@
+schemaVersion: "1"
+title: Misc Endpoints
+description: Echo (all 5 methods), arbitrary status codes, slow response, posts list, and simulated file upload.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Echo GET
+    request:
+      method: GET
+      url: "{{baseUrl}}/echo"
+      queryParams:
+        - name: hello
+          value: world
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "GET"
+    failPolicy: continue
+
+  - label: Echo POST
+    request:
+      method: POST
+      url: "{{baseUrl}}/echo"
+      body:
+        type: json
+        content: '{"ping":"pong"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "POST"
+    failPolicy: continue
+
+  - label: Echo PUT
+    request:
+      method: PUT
+      url: "{{baseUrl}}/echo"
+      body:
+        type: json
+        content: '{"update":"me"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "PUT"
+    failPolicy: continue
+
+  - label: Echo PATCH
+    request:
+      method: PATCH
+      url: "{{baseUrl}}/echo"
+      body:
+        type: json
+        content: '{"patch":"me"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "PATCH"
+    failPolicy: continue
+
+  - label: Echo DELETE
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/echo"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "DELETE"
+    failPolicy: continue
+
+  - label: Status endpoint (200)
+    notes: Hits GET /status/{code} — verifies the server returns the requested code on demand.
+    request:
+      method: GET
+      url: "{{baseUrl}}/status/200"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.code"
+        operator: eq
+        expected: "200"
+    failPolicy: continue
+
+  - label: Slow response (100ms)
+    notes: Short delay to avoid slowing the run.
+    request:
+      method: GET
+      url: "{{baseUrl}}/slow"
+      queryParams:
+        - name: delay
+          value: "100"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.delay"
+        operator: eq
+        expected: "100"
+    failPolicy: continue
+
+  - label: List posts
+    request:
+      method: GET
+      url: "{{baseUrl}}/posts"
+      queryParams:
+        - name: page
+          value: "1"
+        - name: limit
+          value: "5"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.total"
+        operator: gt
+        expected: "0"
+    failPolicy: continue
+
+  - label: Upload file (simulated)
+    notes: JSON upload mode — no real file needed. Server returns 201 with the file metadata.
+    request:
+      method: POST
+      url: "{{baseUrl}}/files/upload"
+      body:
+        type: json
+        content: '{"filename":"report.pdf","mimeType":"application/pdf","sizeBytes":10240}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 201
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "report.pdf"
+    failPolicy: continue

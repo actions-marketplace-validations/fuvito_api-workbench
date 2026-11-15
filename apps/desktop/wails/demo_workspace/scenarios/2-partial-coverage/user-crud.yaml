@@ -1,0 +1,107 @@
+schemaVersion: "1"
+title: User CRUD
+description: Full create-read-update-delete cycle for the users resource.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Login
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"admin","password":"secret"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+    extractions:
+      - name: authToken
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - label: List users
+    request:
+      method: GET
+      url: "{{baseUrl}}/users"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.total"
+        operator: gt
+        expected: "0"
+    failPolicy: continue
+
+  - label: Create user
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
+      body:
+        type: json
+        content: '{"name":"Ada Lovelace","email":"ada@example.com","role":"engineer"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 201
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Ada Lovelace"
+    extractions:
+      - name: newUserId
+        source: jsonpath
+        path: "$.id"
+    failPolicy: stop
+
+  - label: Fetch user
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/{{newUserId}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.email"
+        operator: eq
+        expected: "ada@example.com"
+    failPolicy: continue
+
+  - label: Update user
+    request:
+      method: PUT
+      url: "{{baseUrl}}/users/{{newUserId}}"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
+      body:
+        type: json
+        content: '{"role":"principal-engineer"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.role"
+        operator: eq
+        expected: "principal-engineer"
+    failPolicy: continue
+
+  - label: Delete user
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/users/{{newUserId}}"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 204
+    failPolicy: continue

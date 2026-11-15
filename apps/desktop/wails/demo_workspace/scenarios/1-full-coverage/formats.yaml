@@ -1,0 +1,75 @@
+schemaVersion: "1"
+title: Alternative Response Formats
+description: Atom feed, sitemap XML, structured data XML, and two HTML endpoints — covers all five format operations.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Atom feed
+    request:
+      method: GET
+      url: "{{baseUrl}}/feed"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: xml
+    failPolicy: continue
+
+  - label: Sitemap XML
+    request:
+      method: GET
+      url: "{{baseUrl}}/sitemap.xml"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: xml
+    failPolicy: continue
+
+  - label: Users as XML
+    request:
+      method: GET
+      url: "{{baseUrl}}/data.xml"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: xml
+    failPolicy: continue
+
+  - label: HTML status page
+    request:
+      method: GET
+      url: "{{baseUrl}}/page"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: html
+    failPolicy: continue
+
+  - label: HTML user report
+    request:
+      method: GET
+      url: "{{baseUrl}}/report.html"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: html
+    failPolicy: continue

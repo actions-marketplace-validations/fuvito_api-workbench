@@ -1,0 +1,92 @@
+schemaVersion: "1"
+title: Authentication Flows
+description: Exercises all three auth methods — Bearer token (login + profile), Basic auth, and API key.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Login
+    notes: POST credentials and extract the Bearer token for the profile step.
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"admin","password":"secret"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.token_type"
+        operator: eq
+        expected: "Bearer"
+      - type: jsonpath
+        path: "$.expires_in"
+        operator: gt
+        expected: "0"
+    extractions:
+      - name: authToken
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - label: Get profile (Bearer)
+    notes: Protected endpoint — depends on the token extracted above.
+    request:
+      method: GET
+      url: "{{baseUrl}}/auth/profile"
+      headers:
+        - name: Authorization
+          value: "Bearer {{authToken}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.role"
+        operator: eq
+        expected: "admin"
+      - type: jsonpath
+        path: "$.email"
+        operator: contains
+        expected: "example.com"
+    failPolicy: continue
+
+  - label: Basic auth
+    notes: Uses username=demo / password=demo via the Basic auth header.
+    request:
+      method: GET
+      url: "{{baseUrl}}/auth/basic"
+      auth:
+        type: basic
+        username: "{{basicUser}}"
+        password: "{{basicPass}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.message"
+        operator: contains
+        expected: "Authenticated"
+    failPolicy: continue
+
+  - label: API key auth
+    notes: Passes the key in the X-Api-Key header.
+    request:
+      method: GET
+      url: "{{baseUrl}}/auth/apikey"
+      auth:
+        type: apikey
+        key: X-Api-Key
+        value: "{{apiKey}}"
+        location: header
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.message"
+        operator: contains
+        expected: "accepted"
+    failPolicy: continue

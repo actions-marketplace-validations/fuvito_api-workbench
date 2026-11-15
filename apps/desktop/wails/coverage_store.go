@@ -7,18 +7,25 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 )
 
+// OperationResultIO is the Wails IPC representation of a per-operation last-run result.
+type OperationResultIO struct {
+	LastPassed bool   `json:"lastPassed"`
+	LastRunAt  string `json:"lastRunAt,omitempty"`
+}
+
 // AccumulatedCoverageIO is the Wails IPC representation of accumulated spec coverage.
 type AccumulatedCoverageIO struct {
-	SpecFile   string   `json:"specFile"`
-	Covered    int      `json:"covered"`
-	Total      int      `json:"total"`
-	Percent    float64  `json:"percent"`
-	TotalRuns  int      `json:"totalRuns"`
-	PassedRuns int      `json:"passedRuns"`
-	FailedRuns int      `json:"failedRuns"`
-	LastRunAt  string   `json:"lastRunAt,omitempty"`
-	Exercised  []string `json:"exercised"`
-	Missed     []string `json:"missed"`
+	SpecFile         string                       `json:"specFile"`
+	Covered          int                          `json:"covered"`
+	Total            int                          `json:"total"`
+	Percent          float64                      `json:"percent"`
+	TotalRuns        int                          `json:"totalRuns"`
+	PassedRuns       int                          `json:"passedRuns"`
+	FailedRuns       int                          `json:"failedRuns"`
+	LastRunAt        string                       `json:"lastRunAt,omitempty"`
+	Exercised        []string                     `json:"exercised"`
+	Missed           []string                     `json:"missed"`
+	OperationResults map[string]OperationResultIO `json:"operationResults,omitempty"`
 }
 
 // coverageKey / coverageDirPath / loadStoredCoverage / saveStoredCoverage /
@@ -55,17 +62,29 @@ func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Sp
 	if missed == nil {
 		missed = []string{}
 	}
+	var opResults map[string]OperationResultIO
+	if len(r.OperationResults) > 0 {
+		opResults = make(map[string]OperationResultIO, len(r.OperationResults))
+		for k, v := range r.OperationResults {
+			or_ := OperationResultIO{LastPassed: v.LastPassed}
+			if !v.LastRunAt.IsZero() {
+				or_.LastRunAt = v.LastRunAt.Format(time.RFC3339)
+			}
+			opResults[k] = or_
+		}
+	}
 	return AccumulatedCoverageIO{
-		SpecFile:   r.SpecFile,
-		Covered:    r.Covered,
-		Total:      r.Total,
-		Percent:    r.Percent,
-		TotalRuns:  r.TotalRuns,
-		PassedRuns: r.PassedRuns,
-		FailedRuns: r.FailedRuns,
-		LastRunAt:  lastRun,
-		Exercised:  r.Exercised,
-		Missed:     missed,
+		SpecFile:         r.SpecFile,
+		Covered:          r.Covered,
+		Total:            r.Total,
+		Percent:          r.Percent,
+		TotalRuns:        r.TotalRuns,
+		PassedRuns:       r.PassedRuns,
+		FailedRuns:       r.FailedRuns,
+		LastRunAt:        lastRun,
+		Exercised:        r.Exercised,
+		Missed:           missed,
+		OperationResults: opResults,
 	}
 }
 
@@ -83,16 +102,28 @@ func reportToIO(r coverage.Report) AccumulatedCoverageIO {
 	if missed == nil {
 		missed = []string{}
 	}
+	var opResults map[string]OperationResultIO
+	if len(r.OperationResults) > 0 {
+		opResults = make(map[string]OperationResultIO, len(r.OperationResults))
+		for k, v := range r.OperationResults {
+			or_ := OperationResultIO{LastPassed: v.LastPassed}
+			if !v.LastRunAt.IsZero() {
+				or_.LastRunAt = v.LastRunAt.Format(time.RFC3339)
+			}
+			opResults[k] = or_
+		}
+	}
 	return AccumulatedCoverageIO{
-		SpecFile:   r.SpecFile,
-		Covered:    r.Covered,
-		Total:      r.Total,
-		Percent:    r.Percent,
-		TotalRuns:  r.TotalRuns,
-		PassedRuns: r.PassedRuns,
-		FailedRuns: r.FailedRuns,
-		LastRunAt:  lastRun,
-		Exercised:  exercised,
-		Missed:     missed,
+		SpecFile:         r.SpecFile,
+		Covered:          r.Covered,
+		Total:            r.Total,
+		Percent:          r.Percent,
+		TotalRuns:        r.TotalRuns,
+		PassedRuns:       r.PassedRuns,
+		FailedRuns:       r.FailedRuns,
+		LastRunAt:        lastRun,
+		Exercised:        exercised,
+		Missed:           missed,
+		OperationResults: opResults,
 	}
 }

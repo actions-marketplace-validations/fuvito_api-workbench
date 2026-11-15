@@ -15,7 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { tab: 'explorer',  icon: FolderOpen, label: 'Explorer',  title: 'Explorer',  activeColor: 'text-sky-400' },
   { tab: 'scenarios', icon: Play,       label: 'Scenarios', title: 'Scenarios', activeColor: 'text-violet-400' },
   { tab: 'history',   icon: Clock,      label: 'History',   title: 'History',   activeColor: 'text-amber-400' },
-  { tab: 'coverage',  icon: BarChart2,  label: 'Coverage',  title: 'Coverage',  activeColor: 'text-emerald-400' },
+  { tab: 'coverage',  icon: BarChart2,  label: 'Contracts', title: 'Contracts', activeColor: 'text-emerald-400' },
 ]
 
 type ActivityRailProps = {

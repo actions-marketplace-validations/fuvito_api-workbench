@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, FolderPlus, FolderSymlink, Upload, RefreshCw } from 'lucide-react'
+import { ChevronDown, FolderPlus, FolderSymlink, Upload, RefreshCw, Clipboard } from 'lucide-react'
 
 type Props = {
-  folderName: string
-  workspacePath: string
   importing?: boolean
   onCreateFolder?: (parentPath: string) => void
   onImportOpenAPI: () => void
@@ -11,12 +9,13 @@ type Props = {
   onImportInsomnia?: () => void
   onRefresh?: () => void
   onOpenWorkspace: () => void
+  onPasteToRoot?: () => void
 }
 
 export function WorkspacePanelHeader({
-  folderName, workspacePath, importing,
+  importing,
   onCreateFolder, onImportOpenAPI, onImportPostman, onImportInsomnia,
-  onRefresh, onOpenWorkspace,
+  onRefresh, onOpenWorkspace, onPasteToRoot,
 }: Props) {
   const [importMenuOpen, setImportMenuOpen] = useState(false)
   const importMenuRef = useRef<HTMLDivElement>(null)
@@ -31,10 +30,7 @@ export function WorkspacePanelHeader({
   }, [importMenuOpen])
 
   return (
-    <div className="px-2 py-1.5 border-b border-[var(--color-border)] flex items-center gap-1 justify-between">
-      <span className="text-label font-mono text-[var(--color-muted-foreground)] truncate" title={workspacePath}>
-        {folderName}
-      </span>
+    <div className="px-2 py-1.5 border-b border-[var(--color-border)] flex items-center gap-1 justify-end">
       <div className="flex items-center gap-1 shrink-0">
         {onCreateFolder && (
           <button
@@ -80,6 +76,16 @@ export function WorkspacePanelHeader({
             </ul>
           )}
         </div>
+        {onPasteToRoot && (
+          <button
+            type="button"
+            onClick={onPasteToRoot}
+            className="text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors"
+            title="Paste here (workspace root)"
+          >
+            <Clipboard size={12} />
+          </button>
+        )}
         {onRefresh && (
           <button
             type="button"

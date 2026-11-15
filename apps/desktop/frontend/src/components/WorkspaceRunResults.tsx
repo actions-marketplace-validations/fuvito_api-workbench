@@ -1,6 +1,5 @@
 import { X, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import type { FolderRunState } from './WorkspacePanel'
-import type { RunAllState } from '@/components/Sidebar'
+import type { FolderRunState, RunAllState } from '@/types'
 import { MethodBadge } from './WorkspaceFileTree'
 
 export function FolderRunResults({ state, onSelectFile, onDismiss }: {

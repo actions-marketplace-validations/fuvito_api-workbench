@@ -14,6 +14,10 @@ export function CloseWorkspace() {
   return window['go']['main']['WorkspaceService']['CloseWorkspace']();
 }
 
+export function CopyRequest(arg1, arg2) {
+  return window['go']['main']['WorkspaceService']['CopyRequest'](arg1, arg2);
+}
+
 export function CreateFolder(arg1, arg2) {
   return window['go']['main']['WorkspaceService']['CreateFolder'](arg1, arg2);
 }

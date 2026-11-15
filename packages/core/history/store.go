@@ -228,26 +228,14 @@ func (s *Store) RecordScenarioRun(rec ScenarioRunRecord) error {
 	return err
 }
 
-// RecentScenarioRuns returns up to limit scenario run records, most recent first.
-// If workspacePath is non-empty, only runs for that workspace are returned.
+// RecentScenarioRuns returns up to limit scenario run records for workspacePath, most recent first.
 func (s *Store) RecentScenarioRuns(workspacePath string, limit int) ([]ScenarioRunRecord, error) {
-	var rows *sql.Rows
-	var err error
-	if workspacePath != "" {
-		rows, err = s.db.Query(
-			`SELECT id, executed_at, workspace_path, scenario_path, title, passed,
-			        duration_ms, step_total, step_passed, step_failed, step_skipped, steps_json
-			 FROM scenario_runs WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
-			workspacePath, limit,
-		)
-	} else {
-		rows, err = s.db.Query(
-			`SELECT id, executed_at, workspace_path, scenario_path, title, passed,
-			        duration_ms, step_total, step_passed, step_failed, step_skipped, steps_json
-			 FROM scenario_runs ORDER BY id DESC LIMIT ?`,
-			limit,
-		)
-	}
+	rows, err := s.db.Query(
+		`SELECT id, executed_at, workspace_path, scenario_path, title, passed,
+		        duration_ms, step_total, step_passed, step_failed, step_skipped, steps_json
+		 FROM scenario_runs WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
+		workspacePath, limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -296,24 +284,13 @@ func (s *Store) Record(workspacePath, method, url string, statusCode int, status
 	return res.LastInsertId()
 }
 
-// Recent returns up to limit entries, most recent first.
-// If workspacePath is non-empty, only entries for that workspace are returned.
+// Recent returns up to limit entries for workspacePath, most recent first.
 func (s *Store) Recent(workspacePath string, limit int) ([]Entry, error) {
-	var rows *sql.Rows
-	var err error
-	if workspacePath != "" {
-		rows, err = s.db.Query(
-			`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
-			 FROM history WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
-			workspacePath, limit,
-		)
-	} else {
-		rows, err = s.db.Query(
-			`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
-			 FROM history ORDER BY id DESC LIMIT ?`,
-			limit,
-		)
-	}
+	rows, err := s.db.Query(
+		`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
+		 FROM history WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
+		workspacePath, limit,
+	)
 	if err != nil {
 		return nil, err
 	}

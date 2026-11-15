@@ -38,6 +38,7 @@ import {
   OpenInSystemViewer as WailsOpenInSystemViewer,
   OpenInExplorer as WailsOpenInExplorer,
   MoveRequest as WailsMoveRequest,
+  CopyRequest as WailsCopyRequest,
   GetRecentWorkspaces as WailsGetRecentWorkspaces,
   OpenWorkspaceByPath as WailsOpenWorkspaceByPath,
   SaveContentToFile as WailsSaveContentToFile,
@@ -76,6 +77,11 @@ import {
   DuplicateScenario as WailsDuplicateScenario,
   DeleteScenario as WailsDeleteScenario,
   RenameScenario as WailsRenameScenario,
+  CreateScenarioFolder as WailsCreateScenarioFolder,
+  RenameScenarioFolder as WailsRenameScenarioFolder,
+  DeleteScenarioFolder as WailsDeleteScenarioFolder,
+  MoveScenario as WailsMoveScenario,
+  CopyScenario as WailsCopyScenario,
   SaveScenarioResult as WailsSaveScenarioResult,
   LoadScenarioResult as WailsLoadScenarioResult,
   ListTemplates as WailsListTemplates,
@@ -493,6 +499,21 @@ export async function moveRequest(srcPath: string, destDir: string): Promise<str
   return result as unknown as string
 }
 
+export async function copyRequest(srcPath: string, destDir: string): Promise<string> {
+  const result = await WailsCopyRequest(srcPath, destDir)
+  return result as unknown as string
+}
+
+export async function moveScenario(srcPath: string, destFolderRelPath: string): Promise<string> {
+  const result = await WailsMoveScenario(srcPath, destFolderRelPath)
+  return result as unknown as string
+}
+
+export async function copyScenario(srcPath: string, destFolderRelPath: string): Promise<string> {
+  const result = await WailsCopyScenario(srcPath, destFolderRelPath)
+  return result as unknown as string
+}
+
 export async function loadResponseCache(reqPath: string): Promise<ResponseCacheData | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsLoadResponseCache(reqPath)
@@ -508,7 +529,9 @@ export async function clearResponseCache(reqPath: string): Promise<void> {
 export interface ScenarioInfo {
   title: string
   path: string
+  folder?: string  // relative path from {workspace}/scenarios/, "/" separated, "" or absent for root
   stepCount?: number
+  isFolder?: boolean  // sentinel: represents a directory entry, not a scenario file
 }
 
 export interface AssertionDetail {
@@ -591,6 +614,7 @@ export interface AccumulatedCoverage {
   lastRunAt?: string
   exercised: string[]
   missed: string[]
+  operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string }>
 }
 
 export interface ScenarioResult {
@@ -636,9 +660,24 @@ export interface CreateScenarioResult {
   error?: string
 }
 
-export async function createScenario(name: string): Promise<CreateScenarioResult> {
-  const result = await WailsCreateScenario(name)
+export async function createScenario(name: string, folderPath = ''): Promise<CreateScenarioResult> {
+  const result = await WailsCreateScenario(name, folderPath)
   return result as unknown as CreateScenarioResult
+}
+
+// Returns "" on success or an error message.
+export async function createScenarioFolder(folderPath: string): Promise<string> {
+  return (await WailsCreateScenarioFolder(folderPath)) as unknown as string
+}
+
+// Returns the new relative folder path on success, or "error: ..." on failure.
+export async function renameScenarioFolder(folderPath: string, newName: string): Promise<string> {
+  return (await WailsRenameScenarioFolder(folderPath, newName)) as unknown as string
+}
+
+// Returns "" on success or an error message.
+export async function deleteScenarioFolder(folderPath: string): Promise<string> {
+  return (await WailsDeleteScenarioFolder(folderPath)) as unknown as string
 }
 
 // Returns "" on success or an error message.

@@ -9,6 +9,8 @@ export function ClearResponseCache(arg1:string):Promise<void>;
 
 export function CloseWorkspace():Promise<void>;
 
+export function CopyRequest(arg1:string,arg2:string):Promise<string>;
+
 export function CreateFolder(arg1:string,arg2:string):Promise<string>;
 
 export function DeleteEnvironment(arg1:string):Promise<void>;
