@@ -45,6 +45,8 @@ func (a *App) startup(ctx context.Context) {
 	a.settingsService.setContext(ctx)
 	a.demoService.setContext(ctx)
 	a.scenarioService.setContext(ctx)
+	// Set title now that Wails context is live (workspace may already be set from config).
+	a.workspaceService.syncTitle()
 }
 
 func (a *App) shutdown(_ context.Context) {
@@ -64,6 +66,15 @@ func (a *App) Exit() {
 
 // beforeClose is registered as OnBeforeClose; returns true to cancel the close.
 func (a *App) beforeClose(ctx context.Context) bool {
+	// Window is still alive here — safe to read size.
+	w, h := runtime.WindowGetSize(ctx)
+	if w >= 900 && h >= 600 {
+		cfg := loadConfig()
+		cfg.WindowWidth = w
+		cfg.WindowHeight = h
+		saveConfig(cfg)
+	}
+
 	if !a.hasDirtyTabs {
 		return false
 	}

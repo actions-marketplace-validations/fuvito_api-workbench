@@ -80,10 +80,7 @@ export default function App() {
     const v = parseInt(localStorage.getItem('ui.responseWidth') ?? '')
     return isNaN(v) ? 0 : Math.max(0, v)
   })
-  const [railTab, setRailTab] = useState<RailTab>(() => {
-    const v = localStorage.getItem('ui.railTab') as RailTab | null
-    return v === 'explorer' || v === 'scenarios' || v === 'history' || v === 'coverage' ? v : 'explorer'
-  })
+  const [railTab, setRailTab] = useState<RailTab>('explorer')
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })

@@ -145,7 +145,7 @@ export function setupMockBridge() {
           const newScenario = { title: name, path, stepCount: 1 }
           ;(bridge['scenarios'] as unknown[]).push(newScenario)
           bridge['scenarioDetail'] = { path, title: name, description: '', steps: [], error: '' }
-          bridge['scenarioRaw'] = `schemaVersion: "1"\ntitle: ${name}\nsteps:\n  - title: Step 1\n`
+          bridge['scenarioRaw'] = `schemaVersion: "1"\ntitle: ${name}\nsteps:\n  - label: Step 1\n`
           return Promise.resolve({ path, error: '' })
         },
         DuplicateScenario: (path: string) => {

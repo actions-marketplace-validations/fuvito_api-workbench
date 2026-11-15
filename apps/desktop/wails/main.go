@@ -15,10 +15,16 @@ var assets embed.FS
 func main() {
 	app := NewApp()
 
+	width, height := 1280, 800
+	if cfg := loadConfig(); cfg.WindowWidth >= 900 && cfg.WindowHeight >= 600 {
+		width = cfg.WindowWidth
+		height = cfg.WindowHeight
+	}
+
 	err := wails.Run(&options.App{
 		Title:     "Clear Signal",
-		Width:     1280,
-		Height:    800,
+		Width:     width,
+		Height:    height,
 		MinWidth:  900,
 		MinHeight: 600,
 		AssetServer: &assetserver.Options{
