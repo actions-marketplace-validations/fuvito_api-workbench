@@ -32,8 +32,8 @@ type DiffResult struct {
 // Diff compares two already-parsed specs and classifies every change as
 // breaking or non-breaking using oasdiff's default rule set.
 func Diff(base, revision *Spec) (*DiffResult, error) {
-	baseSI := &load.SpecInfo{Spec: base.doc, Url: specURL(base.doc)}
-	revSI := &load.SpecInfo{Spec: revision.doc, Url: specURL(revision.doc)}
+	baseSI := &load.SpecInfo{Spec: base.doc, Source: load.NewSource(specURL(base.doc))}
+	revSI := &load.SpecInfo{Spec: revision.doc, Source: load.NewSource(specURL(revision.doc))}
 
 	diffReport, operationsSources, err := diff.GetWithOperationsSourcesMap(diff.NewConfig(), baseSI, revSI)
 	if err != nil {
