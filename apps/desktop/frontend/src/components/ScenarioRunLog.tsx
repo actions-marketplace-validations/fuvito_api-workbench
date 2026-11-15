@@ -35,8 +35,6 @@ function tryPrettyJSON(s: string): string {
 function FullStepRow({ step, index }: { step: StepResult; index: number }) {
   const [bodyOpen, setBodyOpen] = useState(false)
   const [headersOpen, setHeadersOpen] = useState(false)
-  const failedAssertions = step.assertions.filter(a => !a.passed)
-
   return (
     <div className={cn(
       'border-t border-[var(--color-border)] pl-4 pr-3',
