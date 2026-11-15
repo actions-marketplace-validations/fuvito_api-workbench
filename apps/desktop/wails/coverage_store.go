@@ -1,17 +1,13 @@
 package main
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 
+	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 )
 
-// AccumulatedCoverageIO is the accumulated spec coverage across all runs in a workspace.
+// AccumulatedCoverageIO is the Wails IPC representation of accumulated spec coverage.
 type AccumulatedCoverageIO struct {
 	SpecFile   string   `json:"specFile"`
 	Covered    int      `json:"covered"`
@@ -25,125 +21,78 @@ type AccumulatedCoverageIO struct {
 	Missed     []string `json:"missed"`
 }
 
-// storedSpecCoverage is the on-disk format for a single spec's accumulated data.
-type storedSpecCoverage struct {
-	SpecFile   string    `json:"specFile"`
-	Exercised  []string  `json:"exercised"`
-	TotalOps   int       `json:"totalOps"` // cached from last run so dashboard doesn't reload the spec
-	TotalRuns  int       `json:"totalRuns"`
-	PassedRuns int       `json:"passedRuns"`
-	FailedRuns int       `json:"failedRuns"`
-	LastRunAt  time.Time `json:"lastRunAt"`
-}
+// coverageKey / coverageDirPath / loadStoredCoverage / saveStoredCoverage /
+// mergeExercised are thin aliases kept here so scenario_service.go call sites
+// remain unchanged while the real logic lives in packages/core/coverage.
 
-// coverageKey turns a specFile value (URL or path) into a safe filename.
-func coverageKey(specFile string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(specFile) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte('_')
-		}
-	}
-	s := b.String()
-	for strings.Contains(s, "__") {
-		s = strings.ReplaceAll(s, "__", "_")
-	}
-	s = strings.Trim(s, "_")
-	if len(s) > 80 {
-		s = s[len(s)-80:]
-	}
-	return s + ".json"
+func coverageKey(specFile string) string              { return coverage.Key(specFile) }
+func coverageDirPath(workspacePath string) string     { return coverage.DirPath(workspacePath) }
+func loadStoredCoverage(wsPath, specFile string) coverage.StoredCoverage {
+	return coverage.Load(wsPath, specFile)
 }
-
-func coverageDirPath(workspacePath string) string {
-	return filepath.Join(workspacePath, ".clrsig-coverage")
+func saveStoredCoverage(wsPath string, cov coverage.StoredCoverage) error {
+	return coverage.Save(wsPath, cov)
 }
-
-func loadStoredCoverage(workspacePath, specFile string) storedSpecCoverage {
-	path := filepath.Join(coverageDirPath(workspacePath), coverageKey(specFile))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return storedSpecCoverage{SpecFile: specFile}
-	}
-	var cov storedSpecCoverage
-	if err := json.Unmarshal(data, &cov); err != nil {
-		return storedSpecCoverage{SpecFile: specFile}
-	}
-	return cov
-}
-
-func saveStoredCoverage(workspacePath string, cov storedSpecCoverage) error {
-	if workspacePath == "" {
-		return nil
-	}
-	dir := coverageDirPath(workspacePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(cov, "", "  ")
-	if err != nil {
-		return err
-	}
-	return atomicWrite(filepath.Join(dir, coverageKey(cov.SpecFile)), data)
-}
-
-// mergeExercised merges two slices of "METHOD /path" strings into a sorted, deduplicated result.
 func mergeExercised(existing, newOps []string) []string {
-	seen := make(map[string]bool, len(existing)+len(newOps))
-	for _, op := range existing {
-		seen[op] = true
-	}
-	for _, op := range newOps {
-		seen[op] = true
-	}
-	merged := make([]string, 0, len(seen))
-	for op := range seen {
-		merged = append(merged, op)
-	}
-	sort.Strings(merged)
-	return merged
+	return coverage.MergeExercised(existing, newOps)
 }
 
-// buildAccumulatedCoverageIO computes the full accumulated picture by comparing stored
-// exercised operations against the spec's declared operations.
-func buildAccumulatedCoverageIO(stored storedSpecCoverage, spec *openapi.Spec) AccumulatedCoverageIO {
-	exercisedSet := make(map[string]bool, len(stored.Exercised))
-	for _, op := range stored.Exercised {
-		exercisedSet[op] = true
-	}
-
+// buildAccumulatedCoverageIO converts a coverage.StoredCoverage + loaded spec into
+// the Wails IPC type, computing missed operations from the spec.
+func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Spec) AccumulatedCoverageIO {
 	all := spec.AllOperations()
-	var missed []string
-	for _, op := range all {
-		if !exercisedSet[op.String()] {
-			missed = append(missed, op.String())
-		}
+	allOps := make([]string, len(all))
+	for i, op := range all {
+		allOps[i] = op.String()
 	}
-
-	total := len(all)
-	covered := total - len(missed)
-	var pct float64
-	if total > 0 {
-		pct = float64(covered) / float64(total) * 100
-	}
+	r := coverage.BuildReport(stored, allOps)
 
 	lastRun := ""
-	if !stored.LastRunAt.IsZero() {
-		lastRun = stored.LastRunAt.Format(time.RFC3339)
+	if !r.LastRunAt.IsZero() {
+		lastRun = r.LastRunAt.Format(time.RFC3339)
 	}
-
+	missed := r.Missed
+	if missed == nil {
+		missed = []string{}
+	}
 	return AccumulatedCoverageIO{
-		SpecFile:   stored.SpecFile,
-		Covered:    covered,
-		Total:      total,
-		Percent:    pct,
-		TotalRuns:  stored.TotalRuns,
-		PassedRuns: stored.PassedRuns,
-		FailedRuns: stored.FailedRuns,
+		SpecFile:   r.SpecFile,
+		Covered:    r.Covered,
+		Total:      r.Total,
+		Percent:    r.Percent,
+		TotalRuns:  r.TotalRuns,
+		PassedRuns: r.PassedRuns,
+		FailedRuns: r.FailedRuns,
 		LastRunAt:  lastRun,
-		Exercised:  stored.Exercised,
+		Exercised:  r.Exercised,
+		Missed:     missed,
+	}
+}
+
+// reportToIO converts a coverage.Report (from ListAll, which has no Missed) to the IPC type.
+func reportToIO(r coverage.Report) AccumulatedCoverageIO {
+	lastRun := ""
+	if !r.LastRunAt.IsZero() {
+		lastRun = r.LastRunAt.Format(time.RFC3339)
+	}
+	exercised := r.Exercised
+	if exercised == nil {
+		exercised = []string{}
+	}
+	missed := r.Missed
+	if missed == nil {
+		missed = []string{}
+	}
+	return AccumulatedCoverageIO{
+		SpecFile:   r.SpecFile,
+		Covered:    r.Covered,
+		Total:      r.Total,
+		Percent:    r.Percent,
+		TotalRuns:  r.TotalRuns,
+		PassedRuns: r.PassedRuns,
+		FailedRuns: r.FailedRuns,
+		LastRunAt:  lastRun,
+		Exercised:  exercised,
 		Missed:     missed,
 	}
 }

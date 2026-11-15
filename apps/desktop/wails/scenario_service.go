@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -712,11 +712,7 @@ func (s *ScenarioService) ResetAccumulatedCoverage(specFile string) error {
 	if s.workspace.workspacePath == "" || specFile == "" {
 		return nil
 	}
-	path := filepath.Join(coverageDirPath(s.workspace.workspacePath), coverageKey(specFile))
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return nil
+	return coverage.Reset(s.workspace.workspacePath, specFile)
 }
 
 // ListAccumulatedCoverage returns all stored accumulated coverage entries for the workspace,
@@ -726,55 +722,11 @@ func (s *ScenarioService) ListAccumulatedCoverage() []AccumulatedCoverageIO {
 	if wsPath == "" {
 		return nil
 	}
-	dir := coverageDirPath(wsPath)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
+	reports := coverage.ListAll(wsPath)
+	result := make([]AccumulatedCoverageIO, len(reports))
+	for i, r := range reports {
+		result[i] = reportToIO(r)
 	}
-	var result []AccumulatedCoverageIO
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			continue
-		}
-		var stored storedSpecCoverage
-		if err := json.Unmarshal(data, &stored); err != nil {
-			continue
-		}
-		if stored.TotalRuns == 0 {
-			continue
-		}
-		total := stored.TotalOps
-		covered := len(stored.Exercised)
-		if covered > total {
-			covered = total
-		}
-		var pct float64
-		if total > 0 {
-			pct = float64(covered) / float64(total) * 100
-		}
-		lastRun := ""
-		if !stored.LastRunAt.IsZero() {
-			lastRun = stored.LastRunAt.Format(time.RFC3339)
-		}
-		result = append(result, AccumulatedCoverageIO{
-			SpecFile:   stored.SpecFile,
-			Covered:    covered,
-			Total:      total,
-			Percent:    pct,
-			TotalRuns:  stored.TotalRuns,
-			PassedRuns: stored.PassedRuns,
-			FailedRuns: stored.FailedRuns,
-			LastRunAt:  lastRun,
-			Exercised:  stored.Exercised,
-		})
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].LastRunAt > result[j].LastRunAt
-	})
 	return result
 }
 
