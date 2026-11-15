@@ -27,7 +27,7 @@ const SCENARIO_DETAIL = {
   error: '',
   steps: [
     {
-      title: 'Login',
+      label: 'Login',
       method: 'POST',
       url: 'https://api.example.com/auth/login',
       requestRef: '',
@@ -39,7 +39,7 @@ const SCENARIO_DETAIL = {
       extractions: [{ name: 'token', source: 'jsonpath', path: '$.token' }],
     },
     {
-      title: 'Create user',
+      label: 'Create user',
       method: 'POST',
       url: 'https://api.example.com/users',
       requestRef: '',
@@ -63,7 +63,7 @@ const SCENARIO_RESULT = {
   durationMs: 148,
   steps: [
     {
-      title: 'Login',
+      label: 'Login',
       error: '',
       passed: true,
       skipped: false,
@@ -76,7 +76,7 @@ const SCENARIO_RESULT = {
       ],
     },
     {
-      title: 'Create user',
+      label: 'Create user',
       error: '',
       passed: true,
       skipped: false,
@@ -252,7 +252,7 @@ test('@screenshot scenario — visual editor', async ({ page }) => {
   await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
   await page.getByText('Login').first().waitFor()
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
-  await page.getByPlaceholder('Step title').first().waitFor()
+  await page.getByPlaceholder('Step label').first().waitFor()
 
   await page.screenshot({ path: shot('08-scenario-editor.png'), animations: 'disabled' })
 })

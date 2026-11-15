@@ -10,7 +10,7 @@ const SCENARIO_DETAIL = {
   error: '',
   steps: [
     {
-      title: 'Create user',
+      label: 'Create user',
       method: 'POST',
       url: 'https://api.example.com/users',
       requestRef: '',
@@ -19,7 +19,7 @@ const SCENARIO_DETAIL = {
       extractions: [{ name: 'userId', source: 'jsonpath', path: '$.id' }],
     },
     {
-      title: 'Fetch user',
+      label: 'Fetch user',
       method: 'GET',
       url: 'https://api.example.com/users/{{userId}}',
       requestRef: '',
@@ -40,7 +40,7 @@ const SCENARIO_RESULT = {
   durationMs: 150,
   steps: [
     {
-      title: 'Create user',
+      label: 'Create user',
       error: '',
       passed: true,
       skipped: false,
@@ -50,7 +50,7 @@ const SCENARIO_RESULT = {
       assertions: [{ type: 'status', message: 'status = 201', passed: true }],
     },
     {
-      title: 'Fetch user',
+      label: 'Fetch user',
       error: '',
       passed: true,
       skipped: false,
@@ -191,7 +191,7 @@ test.describe('Scenarios', () => {
       passed: false,
       durationMs: 80,
       steps: [{
-        title: 'Create user',
+        label: 'Create user',
         error: '',
         passed: false,
         skipped: false,
@@ -495,9 +495,9 @@ test.describe('Scenario visual editor', () => {
     await gotoApp(page)
     await openInEditMode(page)
     // Step name inputs appear (one per step) with correct values
-    await expect(page.getByPlaceholder('Step title')).toHaveCount(2)
-    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Create user')
-    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step label')).toHaveCount(2)
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Fetch user')
   })
 
   test('visual editor shows method and URL fields', async ({ page }) => {
@@ -521,7 +521,7 @@ test.describe('Scenario visual editor', () => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await page.getByPlaceholder('Step title').first().fill('Changed name')
+    await page.getByPlaceholder('Step label').first().fill('Changed name')
     await page.getByRole('button', { name: 'Discard' }).click()
     // Back in view mode — Run button visible
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
@@ -548,20 +548,20 @@ test.describe('Scenario visual editor', () => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await expect(page.getByPlaceholder('Step title')).toHaveCount(2)
+    await expect(page.getByPlaceholder('Step label')).toHaveCount(2)
     await page.getByRole('button', { name: 'Add step' }).click()
-    await expect(page.getByPlaceholder('Step title')).toHaveCount(3)
+    await expect(page.getByPlaceholder('Step label')).toHaveCount(3)
   })
 
   test('Remove step button deletes the step', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await expect(page.getByPlaceholder('Step title')).toHaveCount(2)
+    await expect(page.getByPlaceholder('Step label')).toHaveCount(2)
     await page.getByTitle('Remove step').first().click()
-    await expect(page.getByPlaceholder('Step title')).toHaveCount(1)
+    await expect(page.getByPlaceholder('Step label')).toHaveCount(1)
     // The remaining step is "Fetch user"
-    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
   })
 
   test('Add assertion button inserts a new assertion row', async ({ page }) => {
@@ -726,13 +726,13 @@ test.describe('Scenario visual editor — step reordering', () => {
     await gotoApp(page)
     await openInEditMode(page)
     // Before: step 1 = "Create user", step 2 = "Fetch user"
-    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Create user')
-    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Fetch user')
     // Click move-down on the first step
     await page.getByTitle('Move step down').first().click()
     // After: step 1 = "Fetch user", step 2 = "Create user"
-    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Fetch user')
-    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Create user')
   })
 
   test('move-up on second step swaps it with the first', async ({ page }) => {
@@ -740,8 +740,8 @@ test.describe('Scenario visual editor — step reordering', () => {
     await gotoApp(page)
     await openInEditMode(page)
     await page.getByTitle('Move step up').nth(1).click()
-    await expect(page.getByPlaceholder('Step title').first()).toHaveValue('Fetch user')
-    await expect(page.getByPlaceholder('Step title').nth(1)).toHaveValue('Create user')
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
+    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Create user')
   })
 
   test('step numbers update after reorder', async ({ page }) => {
@@ -776,7 +776,7 @@ const SCENARIO_DETAIL_WITH_NOTES = {
   description: 'End-to-end user lifecycle',
   steps: SCENARIO_DETAIL.steps.map((s, i) => ({
     ...s,
-    description: i === 0 ? 'Creates a new user and captures the returned ID' : '',
+    notes: i === 0 ? 'Creates a new user and captures the returned ID' : undefined,
   })),
 }
 
@@ -811,9 +811,9 @@ test.describe('Scenario view mode — description and step notes', () => {
     await expect(page.getByText('Create user').first()).toBeVisible()
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
     // Description inputs visible (one per step)
-    await expect(page.getByPlaceholder('Step description (optional)')).toHaveCount(2)
-    await page.getByPlaceholder('Step description (optional)').first().fill('Sends a POST to create user')
-    await expect(page.getByPlaceholder('Step description (optional)').first()).toHaveValue('Sends a POST to create user')
+    await expect(page.getByPlaceholder('Notes (optional)')).toHaveCount(2)
+    await page.getByPlaceholder('Notes (optional)').first().fill('Sends a POST to create user')
+    await expect(page.getByPlaceholder('Notes (optional)').first()).toHaveValue('Sends a POST to create user')
   })
 
   test('saving with a step description emits description in the YAML', async ({ page }) => {
@@ -822,12 +822,12 @@ test.describe('Scenario view mode — description and step notes', () => {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
-    await page.getByPlaceholder('Step description (optional)').first().fill('My step note')
+    await page.getByPlaceholder('Notes (optional)').first().fill('My step note')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const savedYaml = await page.evaluate(() => (window as any).__bridge.scenarioRaw)
-    expect(savedYaml).toContain('description: My step note')
+    expect(savedYaml).toContain('notes: My step note')
   })
 })
 

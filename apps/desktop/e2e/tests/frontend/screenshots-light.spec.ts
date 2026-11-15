@@ -35,7 +35,7 @@ const SCENARIO_DETAIL = {
   error: '',
   steps: [
     {
-      title: 'Login',
+      label: 'Login',
       method: 'POST',
       url: 'https://api.example.com/auth/login',
       requestRef: '',
@@ -47,7 +47,7 @@ const SCENARIO_DETAIL = {
       extractions: [{ name: 'token', source: 'jsonpath', path: '$.token' }],
     },
     {
-      title: 'Create user',
+      label: 'Create user',
       method: 'POST',
       url: 'https://api.example.com/users',
       requestRef: '',
