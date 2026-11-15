@@ -125,8 +125,14 @@ function SpecDetailPanel({
   const pct = Math.round(entry.percent)
   const pctColor = pct >= 80 ? 'text-emerald-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
 
-  const covered = [...(entry.exercised ?? [])].sort((a, b) => a.localeCompare(b))
-  const missed  = [...(entry.missed   ?? [])].sort((a, b) => a.localeCompare(b))
+  function sortOps(ops: string[]) {
+    return [...ops].sort((a, b) => {
+      const pa = parseOp(a), pb = parseOp(b)
+      return pa.path !== pb.path ? pa.path.localeCompare(pb.path) : pa.method.localeCompare(pb.method)
+    })
+  }
+  const covered = sortOps(entry.exercised ?? [])
+  const missed  = sortOps(entry.missed   ?? [])
 
   return (
     <div className="flex-1 overflow-y-auto">
