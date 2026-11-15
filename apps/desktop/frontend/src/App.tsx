@@ -15,6 +15,7 @@ import { RequestEditor } from '@/components/RequestEditor'
 import { ResponseViewer } from '@/components/ResponseViewer'
 import { ChevronLeft } from 'lucide-react'
 import { ScenarioViewer } from '@/components/ScenarioViewer'
+import { CoverageTab } from '@/components/CoverageTab'
 import { Sidebar } from '@/components/Sidebar'
 import { AboutDialog } from '@/components/AboutDialog'
 import {
@@ -71,7 +72,7 @@ export default function App() {
   })
   const [railTab, setRailTab] = useState<RailTab>(() => {
     const v = localStorage.getItem('ui.railTab') as RailTab | null
-    return v === 'explorer' || v === 'scenarios' || v === 'history' || v === 'coverage' ? v : 'explorer'
+    return v === 'explorer' || v === 'scenarios' || v === 'history' ? v : 'explorer'
   })
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
@@ -90,6 +91,10 @@ export default function App() {
   useEffect(() => { responseWidthRef.current = responseWidth }, [responseWidth])
 
   function handleRailTabClick(tab: RailTab) {
+    if (tab === 'coverage') {
+      tabs.openCoverageTab()
+      return
+    }
     if (tab === railTab && sidebarOpen) {
       setSidebarOpen(false)
       localStorage.setItem('ui.sidebarOpen', 'false')
@@ -495,7 +500,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: t.kind ?? 'request' as const,
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage',
   }))
 
   return (
@@ -785,6 +790,21 @@ export default function App() {
               />
 
               <div className="flex-1 flex overflow-hidden relative">
+                {/* Coverage tabs */}
+                {tabList.filter(t => t.kind === 'coverage').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <CoverageTab
+                      workspacePath={workspace.workspacePath}
+                      specFile={t.coverageSpecFile ?? null}
+                      onOpenSpecCoverage={sf => tabs.openCoverageTab(sf)}
+                    />
+                  </div>
+                ))}
+
                 {/* Scenario viewers: keep mounted once opened so edit state survives tab switches */}
                 {tabList.filter(t => t.kind === 'scenario').map(t => (
                   <div
@@ -809,7 +829,7 @@ export default function App() {
                 ))}
 
                 {/* Request panel: only mount when active tab is a request */}
-                {activeTab.kind !== 'scenario' && (
+                {activeTab.kind !== 'scenario' && activeTab.kind !== 'coverage' && (
                   <>
                     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                       <RequestEditor

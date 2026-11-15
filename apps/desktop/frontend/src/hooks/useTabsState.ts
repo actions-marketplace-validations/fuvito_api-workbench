@@ -70,7 +70,7 @@ export function useTabsState(deps: {
     const { tabs: currentTabs, activeTabId: currentActiveId } = tabsStateRef.current
     const tab = currentTabs.find(t => t.id === currentActiveId)
     if (!tab) return
-    if (tab.kind === 'scenario') return
+    if (tab.kind === 'scenario' || tab.kind === 'coverage') return
     const newTab: TabState = {
       ...tab,
       id: crypto.randomUUID(),
@@ -309,6 +309,45 @@ export function useTabsState(deps: {
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
   }
 
+  function openCoverageTab(specFile?: string | null): string {
+    const key = specFile ?? null
+    const existing = tabsStateRef.current.tabs.find(
+      t => t.kind === 'coverage' && t.coverageSpecFile === key
+    )
+    if (existing) {
+      switchTo(existing.id)
+      return existing.id
+    }
+    const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
+    const displayName = specFile
+      ? (specFile.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') ?? specFile)
+      : 'Coverage'
+    const newTab: TabState = {
+      id: crypto.randomUUID(),
+      kind: 'coverage',
+      coverageSpecFile: key,
+      name: displayName,
+      method: 'GET',
+      url: '',
+      queryParams: [],
+      headers: [],
+      body: { type: 'none', content: '' },
+      auth: { type: 'none' },
+      timeoutMs: 0,
+      filePath: null,
+      targetDir: null,
+      savedKey: blankKey,
+      response: null,
+      previousResponse: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
+    return newTab.id
+  }
+
   function openScenarioAsTab(scenarioPath: string, scenarioName: string): string {
     // If an identical scenario tab already exists, switch to it
     const existing = tabsStateRef.current.tabs.find(
@@ -380,7 +419,7 @@ export function useTabsState(deps: {
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest, handleSaveAll,
     handleSelectHistory, handleNewRequestInFolder,
-    openScenarioAsTab,
+    openCoverageTab, openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,
     closingDirtyScenarioTabId, setClosingDirtyScenarioTabId,
     pendingBulkClose, setPendingBulkClose,
