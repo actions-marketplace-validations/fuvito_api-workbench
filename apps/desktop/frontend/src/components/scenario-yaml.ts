@@ -19,6 +19,7 @@ function yamlValue(v: unknown): string {
 export function serializeScenarioToYAML(d: ScenarioDetail): string {
   const lines: string[] = ['schemaVersion: "1"', `title: ${yamlScalar(d.title)}`]
   if (d.description) lines.push(`description: ${yamlScalar(d.description)}`)
+  if (d.specFile) lines.push(`specFile: ${yamlScalar(d.specFile)}`)
   if (!d.steps.length) {
     lines.push('steps: []')
   } else {

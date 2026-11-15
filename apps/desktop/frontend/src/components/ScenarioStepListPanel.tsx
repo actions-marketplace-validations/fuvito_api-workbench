@@ -12,7 +12,7 @@ type Props = {
   viewSteps: StepDetail[]
   editSteps: StepDetail[]
   visualDetail: ScenarioDetail | null
-  onMetaChange: (patch: { title?: string; description?: string }) => void
+  onMetaChange: (patch: { title?: string; description?: string; specFile?: string }) => void
   selectedStepIndex: number | null
   onSelectStep: (index: number) => void
   result: ScenarioResult | null
@@ -50,6 +50,12 @@ export function StepListPanel({
             onChange={e => onMetaChange({ description: e.target.value })}
             placeholder="Description (optional)"
             className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-muted-foreground)] py-0.5"
+          />
+          <input
+            value={visualDetail.specFile ?? ''}
+            onChange={e => onMetaChange({ specFile: e.target.value })}
+            placeholder="OpenAPI spec — absolute path or URL (optional)"
+            className="w-full bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-muted-foreground)] py-0.5 mt-0.5"
           />
         </div>
       )}
