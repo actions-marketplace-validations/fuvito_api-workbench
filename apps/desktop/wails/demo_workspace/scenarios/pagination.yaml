@@ -1,9 +1,10 @@
 schemaVersion: "1"
-name: Paginated Users
+title: Paginated Users
 description: Fetch two pages of users, verify pagination metadata, then look up a specific user by extracted ID.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
-  - name: List page 1 (limit 2)
+  - label: List page 1 (limit 2)
     request:
       method: GET
       url: "{{baseUrl}}/users"
@@ -33,7 +34,7 @@ steps:
         source: jsonpath
         path: "$.data[0].id"
 
-  - name: List page 2 (limit 2)
+  - label: List page 2 (limit 2)
     request:
       method: GET
       url: "{{baseUrl}}/users"
@@ -52,7 +53,7 @@ steps:
         expected: 2
     failPolicy: continue
 
-  - name: Fetch first user by extracted ID
+  - label: Fetch first user by extracted ID
     request:
       method: GET
       url: "{{baseUrl}}/users/{{firstUserId}}"

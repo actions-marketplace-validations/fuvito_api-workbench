@@ -1,9 +1,10 @@
 schemaVersion: "1"
-name: Full Auth and User Flow
+title: Full Auth and User Flow
 description: Login, create a user, fetch it back, verify the data, then delete it.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
-  - name: Login
+  - label: Login
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -24,7 +25,7 @@ steps:
         path: "$.token"
     failPolicy: stop
 
-  - name: Create user
+  - label: Create user
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -52,7 +53,7 @@ steps:
         path: "$.id"
     failPolicy: stop
 
-  - name: Fetch user
+  - label: Fetch user
     request:
       method: GET
       url: "{{baseUrl}}/users/{{newUserId}}"
@@ -70,7 +71,7 @@ steps:
         expected: "grace@example.com"
     failPolicy: continue
 
-  - name: Update user
+  - label: Update user
     request:
       method: PUT
       url: "{{baseUrl}}/users/{{newUserId}}"
@@ -87,7 +88,7 @@ steps:
         expected: "senior-developer"
     failPolicy: continue
 
-  - name: Delete user
+  - label: Delete user
     request:
       method: DELETE
       url: "{{baseUrl}}/users/{{newUserId}}"

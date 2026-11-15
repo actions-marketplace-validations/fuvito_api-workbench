@@ -1,9 +1,10 @@
 schemaVersion: "1"
-name: Auth and Protected Resource
+title: Auth and Protected Resource
 description: Login to obtain a Bearer token, then use it to access a protected endpoint.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
-  - name: Login
+  - label: Login
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -28,7 +29,7 @@ steps:
         path: "$.token"
     failPolicy: stop
 
-  - name: Get profile
+  - label: Get profile
     request:
       method: GET
       url: "{{baseUrl}}/auth/profile"

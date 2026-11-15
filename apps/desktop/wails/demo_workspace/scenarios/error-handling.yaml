@@ -1,9 +1,10 @@
 schemaVersion: "1"
-name: Error Handling
+title: Error Handling
 description: Verify the server returns correct error status codes and messages for bad requests.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
-  - name: Login with wrong password
+  - label: Login with wrong password
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -20,7 +21,7 @@ steps:
         expected: ""
     failPolicy: continue
 
-  - name: Create user with missing fields
+  - label: Create user with missing fields
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -37,7 +38,7 @@ steps:
         expected: required
     failPolicy: continue
 
-  - name: Fetch non-existent user
+  - label: Fetch non-existent user
     request:
       method: GET
       url: "{{baseUrl}}/users/99999"

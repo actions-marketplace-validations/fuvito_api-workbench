@@ -1,9 +1,10 @@
 schemaVersion: "1"
-name: Health Check
+title: Health Check
 description: Verify the server is running and returns expected health metadata.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
-  - name: Check health endpoint
+  - label: Check health endpoint
     request:
       method: GET
       url: "{{baseUrl}}/health"
