@@ -152,6 +152,9 @@ export default function App() {
   // Run All Scenarios state
   const [runAllState, setRunAllState] = useState<import('@/components/Sidebar').RunAllState | null>(null)
 
+  // Bump after each scenario run to refresh the run log
+  const [runLogTrigger, setRunLogTrigger] = useState(0)
+
   // Run all requests in a folder
   const [folderRunState, setFolderRunState] = useState<FolderRunState | null>(null)
 
@@ -182,6 +185,7 @@ export default function App() {
           passed: passedCount,
           results: [...prev.results, { path: s.path, name: s.title, passed: r.passed, durationMs: r.durationMs }],
         } : prev)
+        setRunLogTrigger(t => t + 1)
       } catch (e) {
         setRunAllState(prev => prev ? {
           ...prev,
@@ -697,6 +701,7 @@ export default function App() {
                     runAllState={runAllState ?? undefined}
                     onRunAllScenarios={handleRunAll}
                     onDismissRunAll={() => setRunAllState(null)}
+                    runLogTrigger={runLogTrigger}
                     onRunFolder={handleRunFolder}
                     folderRunState={folderRunState}
                     onDismissFolderRun={() => setFolderRunState(null)}
@@ -798,6 +803,7 @@ export default function App() {
                       onResultChange={r => updateTab(t.id, { scenarioResult: r })}
                       onRunningChange={running => updateTab(t.id, { scenarioRunning: running })}
                       onDirtyChange={dirty => updateTab(t.id, { scenarioDirty: dirty })}
+                      onRunComplete={() => setRunLogTrigger(t => t + 1)}
                     />
                   </div>
                 ))}

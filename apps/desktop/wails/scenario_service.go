@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/fuvito/api-workbench/packages/core/coverage"
+	"github.com/fuvito/api-workbench/packages/core/history"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -115,6 +116,29 @@ type ScenarioResultIO struct {
 	SpecError           string                 `json:"specError,omitempty"`
 	Coverage            *CoverageIO            `json:"coverage,omitempty"`
 	AccumulatedCoverage *AccumulatedCoverageIO `json:"accumulatedCoverage,omitempty"`
+}
+
+type StepRunEntryIO struct {
+	Label      string `json:"label"`
+	Passed     bool   `json:"passed"`
+	Skipped    bool   `json:"skipped"`
+	StatusCode int    `json:"statusCode,omitempty"`
+	DurationMs int64  `json:"durationMs,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+type ScenarioRunEntryIO struct {
+	ID           int64            `json:"id"`
+	ExecutedAt   string           `json:"executedAt"`
+	ScenarioPath string           `json:"scenarioPath"`
+	Title        string           `json:"title"`
+	Passed       bool             `json:"passed"`
+	DurationMs   int64            `json:"durationMs"`
+	StepTotal    int              `json:"stepTotal"`
+	StepPassed   int              `json:"stepPassed"`
+	StepFailed   int              `json:"stepFailed"`
+	StepSkipped  int              `json:"stepSkipped"`
+	Steps        []StepRunEntryIO `json:"steps"`
 }
 
 // ---- Service ----
@@ -682,6 +706,107 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 	}
 
+	// Record this run in the scenario run log (silently — a broken db never blocks results).
+	s.recordScenarioRun(path, out)
+
+	return out
+}
+
+// recordScenarioRun opens the history database and appends a run record.
+// Errors are silently discarded so a broken database never blocks scenario output.
+func (s *ScenarioService) recordScenarioRun(scenarioPath string, out ScenarioResultIO) {
+	dbPath, err := history.DefaultPath()
+	if err != nil {
+		return
+	}
+	store, err := history.Open(dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+
+	counts := result{passed: 0, failed: 0, skipped: 0}
+	steps := make([]history.ScenarioStepSummary, len(out.Steps))
+	for i, sr := range out.Steps {
+		steps[i] = history.ScenarioStepSummary{
+			Label:      sr.Label,
+			Passed:     sr.Passed,
+			Skipped:    sr.Skipped,
+			StatusCode: sr.StatusCode,
+			DurationMs: sr.DurationMs,
+			Error:      sr.Error,
+		}
+		if sr.Skipped {
+			counts.skipped++
+		} else if sr.Passed {
+			counts.passed++
+		} else {
+			counts.failed++
+		}
+	}
+
+	_ = store.RecordScenarioRun(history.ScenarioRunRecord{
+		WorkspacePath: s.workspace.workspacePath,
+		ScenarioPath:  scenarioPath,
+		Title:         out.Title,
+		Passed:        out.Passed,
+		DurationMs:    out.DurationMs,
+		StepTotal:     len(out.Steps),
+		StepPassed:    counts.passed,
+		StepFailed:    counts.failed,
+		StepSkipped:   counts.skipped,
+		Steps:         steps,
+	})
+}
+
+type result struct{ passed, failed, skipped int }
+
+// GetScenarioRunHistory returns recent scenario runs for the current workspace.
+func (s *ScenarioService) GetScenarioRunHistory(limit int) []ScenarioRunEntryIO {
+	if limit <= 0 {
+		limit = 100
+	}
+	dbPath, err := history.DefaultPath()
+	if err != nil {
+		return nil
+	}
+	store, err := history.Open(dbPath)
+	if err != nil {
+		return nil
+	}
+	defer store.Close()
+
+	records, err := store.RecentScenarioRuns(s.workspace.workspacePath, limit)
+	if err != nil {
+		return nil
+	}
+	out := make([]ScenarioRunEntryIO, len(records))
+	for i, r := range records {
+		steps := make([]StepRunEntryIO, len(r.Steps))
+		for j, sr := range r.Steps {
+			steps[j] = StepRunEntryIO{
+				Label:      sr.Label,
+				Passed:     sr.Passed,
+				Skipped:    sr.Skipped,
+				StatusCode: sr.StatusCode,
+				DurationMs: sr.DurationMs,
+				Error:      sr.Error,
+			}
+		}
+		out[i] = ScenarioRunEntryIO{
+			ID:           r.ID,
+			ExecutedAt:   r.ExecutedAt.Format(time.RFC3339),
+			ScenarioPath: r.ScenarioPath,
+			Title:        r.Title,
+			Passed:       r.Passed,
+			DurationMs:   r.DurationMs,
+			StepTotal:    r.StepTotal,
+			StepPassed:   r.StepPassed,
+			StepFailed:   r.StepFailed,
+			StepSkipped:  r.StepSkipped,
+			Steps:        steps,
+		}
+	}
 	return out
 }
 

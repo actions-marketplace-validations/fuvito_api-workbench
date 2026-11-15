@@ -62,6 +62,7 @@ export type SidebarProps = {
   onDeleteScenario?: (path: string) => void
   onRenameScenario?: (path: string, newName: string) => void
   runAllState?: RunAllState
+  runLogTrigger?: number
   onRunAllScenarios?: () => void
   onDismissRunAll?: () => void
   scenarioError?: string | null
@@ -81,7 +82,7 @@ export function Sidebar({
   activeFilePath, dirtyFilePaths,
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
-  runAllState, onRunAllScenarios, onDismissRunAll, scenarioError,
+  runAllState, onRunAllScenarios, onDismissRunAll, scenarioError, runLogTrigger,
   onRunFolder, folderRunState, onDismissFolderRun,
 }: SidebarProps) {
   return (
@@ -131,6 +132,7 @@ export function Sidebar({
           onDuplicateScenario={onDuplicateScenario}
           onDeleteScenario={onDeleteScenario}
           onRenameScenario={onRenameScenario}
+          runLogTrigger={runLogTrigger}
         />
       )}
 

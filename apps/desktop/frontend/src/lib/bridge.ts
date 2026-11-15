@@ -83,6 +83,7 @@ import {
   GetAccumulatedCoverage as WailsGetAccumulatedCoverage,
   ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
+  GetScenarioRunHistory as WailsGetScenarioRunHistory,
 } from '@wailsjs/go/main/ScenarioService'
 import {
   GetUserGuide as WailsGetUserGuide,
@@ -696,6 +697,34 @@ export async function getAccumulatedCoverage(specFile: string): Promise<Accumula
 
 export async function resetAccumulatedCoverage(specFile: string): Promise<void> {
   await WailsResetAccumulatedCoverage(specFile)
+}
+
+export interface StepRunEntry {
+  label: string
+  passed: boolean
+  skipped: boolean
+  statusCode?: number
+  durationMs?: number
+  error?: string
+}
+
+export interface ScenarioRunEntry {
+  id: number
+  executedAt: string
+  scenarioPath: string
+  title: string
+  passed: boolean
+  durationMs: number
+  stepTotal: number
+  stepPassed: number
+  stepFailed: number
+  stepSkipped: number
+  steps: StepRunEntry[]
+}
+
+export async function getScenarioRunHistory(limit = 100): Promise<ScenarioRunEntry[]> {
+  const result = await WailsGetScenarioRunHistory(limit)
+  return (result ?? []) as unknown as ScenarioRunEntry[]
 }
 
 export async function listAccumulatedCoverage(): Promise<AccumulatedCoverage[]> {

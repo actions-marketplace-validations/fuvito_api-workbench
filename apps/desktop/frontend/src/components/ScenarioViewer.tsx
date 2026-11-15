@@ -23,11 +23,12 @@ type Props = {
   onResultChange: (result: ScenarioResult | null) => void
   onRunningChange: (running: boolean) => void
   onDirtyChange?: (dirty: boolean) => void
+  onRunComplete?: () => void
 }
 
 // ---- Main component ----
 
-export function ScenarioViewer({ scenarioPath, scenarioName, result, running, theme = 'dark', environments = [], activeEnvPath = '', onResultChange, onRunningChange, onDirtyChange }: Props) {
+export function ScenarioViewer({ scenarioPath, scenarioName, result, running, theme = 'dark', environments = [], activeEnvPath = '', onResultChange, onRunningChange, onDirtyChange, onRunComplete }: Props) {
   const [detail, setDetail] = useState<ScenarioDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedEnvPath, setSelectedEnvPath] = useState(activeEnvPath)
@@ -154,6 +155,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       onResultChange({ title: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
       onRunningChange(false)
+      onRunComplete?.()
     }
   }
 
@@ -170,6 +172,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       onResultChange({ title: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
       onRunningChange(false)
+      onRunComplete?.()
     }
   }
 
