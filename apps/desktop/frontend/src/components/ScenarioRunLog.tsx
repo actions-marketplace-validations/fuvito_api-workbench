@@ -7,6 +7,7 @@ import { getScenarioRunHistory, loadScenarioResult } from '@/lib/bridge'
 type Props = {
   workspacePath: string
   refreshTrigger?: number
+  onSelectScenario?: (path: string, name: string) => void
 }
 
 function formatTime(iso: string): string {
@@ -200,7 +201,7 @@ function SummaryStepRow({ step, index }: { step: { label: string; passed: boolea
 
 // ── Run row ───────────────────────────────────────────────────────────────────
 
-function RunRow({ run }: { run: ScenarioRunEntry }) {
+function RunRow({ run, onSelectScenario }: { run: ScenarioRunEntry; onSelectScenario?: (path: string, name: string) => void }) {
   const [open, setOpen] = useState(false)
   const [fullResult, setFullResult] = useState<ScenarioResult | null | 'loading'>(null)
   const name = run.title || run.scenarioPath.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') || 'scenario'
@@ -222,37 +223,47 @@ function RunRow({ run }: { run: ScenarioRunEntry }) {
 
   return (
     <div className="border-b border-[var(--color-border)] last:border-0">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="w-full text-left px-3 py-2 hover:bg-[var(--color-muted)] transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {run.passed
-            ? <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
-            : <XCircle size={13} className="text-red-400 shrink-0" />
-          }
-          <span className="text-xs font-medium text-[var(--color-foreground)] flex-1 truncate">{name}</span>
-          <span className="text-[10px] text-[var(--color-muted-foreground)] tabular-nums shrink-0">
-            {formatDuration(run.durationMs)}
-          </span>
-          <span className="text-[var(--color-muted-foreground)] shrink-0">
-            {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 mt-0.5 pl-5">
-          <span className="text-[10px] text-[var(--color-muted-foreground)]">
-            {formatTime(run.executedAt)}
-          </span>
-          <span className="text-[10px] text-emerald-400">{run.stepPassed} passed</span>
-          {run.stepFailed > 0 && (
-            <span className="text-[10px] text-red-400">{run.stepFailed} failed</span>
-          )}
-          {run.stepSkipped > 0 && (
-            <span className="text-[10px] text-[var(--color-muted-foreground)]">{run.stepSkipped} skipped</span>
-          )}
-        </div>
-      </button>
+      <div className="flex items-stretch hover:bg-[var(--color-muted)] transition-colors group">
+        {/* Expand/collapse toggle */}
+        <button
+          type="button"
+          onClick={handleToggle}
+          className="shrink-0 flex items-center justify-center w-7 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+          title={open ? 'Collapse' : 'Expand detail'}
+        >
+          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+        </button>
+
+        {/* Row body — click opens scenario */}
+        <button
+          type="button"
+          onClick={() => onSelectScenario?.(run.scenarioPath, name)}
+          className="flex-1 min-w-0 text-left py-2 pr-3"
+        >
+          <div className="flex items-center gap-2">
+            {run.passed
+              ? <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+              : <XCircle size={13} className="text-red-400 shrink-0" />
+            }
+            <span className="text-xs font-medium text-[var(--color-foreground)] flex-1 truncate">{name}</span>
+            <span className="text-[10px] text-[var(--color-muted-foreground)] tabular-nums shrink-0">
+              {formatDuration(run.durationMs)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 pl-5">
+            <span className="text-[10px] text-[var(--color-muted-foreground)]">
+              {formatTime(run.executedAt)}
+            </span>
+            <span className="text-[10px] text-emerald-400">{run.stepPassed} passed</span>
+            {run.stepFailed > 0 && (
+              <span className="text-[10px] text-red-400">{run.stepFailed} failed</span>
+            )}
+            {run.stepSkipped > 0 && (
+              <span className="text-[10px] text-[var(--color-muted-foreground)]">{run.stepSkipped} skipped</span>
+            )}
+          </div>
+        </button>
+      </div>
 
       {open && (
         <div className="bg-[var(--color-card)] pb-1">
@@ -274,7 +285,7 @@ function RunRow({ run }: { run: ScenarioRunEntry }) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export function ScenarioRunLog({ workspacePath, refreshTrigger }: Props) {
+export function ScenarioRunLog({ workspacePath, refreshTrigger, onSelectScenario }: Props) {
   const [runs, setRuns] = useState<ScenarioRunEntry[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -326,7 +337,7 @@ export function ScenarioRunLog({ workspacePath, refreshTrigger }: Props) {
             </p>
           </div>
         ) : (
-          runs.map(run => <RunRow key={run.id} run={run} />)
+          runs.map(run => <RunRow key={run.id} run={run} onSelectScenario={onSelectScenario} />)
         )}
       </div>
     </div>

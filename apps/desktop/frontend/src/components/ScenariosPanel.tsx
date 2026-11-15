@@ -111,7 +111,7 @@ export function ScenariosPanel({
       </div>
 
       {activeTab === 'log' && (
-        <ScenarioRunLog workspacePath={workspacePath} refreshTrigger={runLogTrigger} />
+        <ScenarioRunLog workspacePath={workspacePath} refreshTrigger={runLogTrigger} onSelectScenario={onSelectScenario} />
       )}
 
       {activeTab === 'scenarios' && (
