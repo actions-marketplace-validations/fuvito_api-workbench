@@ -64,6 +64,15 @@ func (a *App) Exit() {
 
 // beforeClose is registered as OnBeforeClose; returns true to cancel the close.
 func (a *App) beforeClose(ctx context.Context) bool {
+	// Window is still alive here — safe to read size.
+	w, h := runtime.WindowGetSize(ctx)
+	if w >= 900 && h >= 600 {
+		cfg := loadConfig()
+		cfg.WindowWidth = w
+		cfg.WindowHeight = h
+		saveConfig(cfg)
+	}
+
 	if !a.hasDirtyTabs {
 		return false
 	}

@@ -24,6 +24,8 @@ type workspaceConfig struct {
 	WorkspacePath    string   `json:"workspacePath"`
 	ActiveEnvPath    string   `json:"activeEnvPath"`
 	RecentWorkspaces []string `json:"recentWorkspaces,omitempty"`
+	WindowWidth      int      `json:"windowWidth,omitempty"`
+	WindowHeight     int      `json:"windowHeight,omitempty"`
 }
 
 func configPath() (string, error) {
