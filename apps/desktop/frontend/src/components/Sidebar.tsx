@@ -2,28 +2,13 @@ import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
-import type { FolderRunState } from '@/components/WorkspacePanel'
 import { ScenariosPanel } from '@/components/ScenariosPanel'
+import { CoverageSidebarPanel } from '@/components/CoverageSidebarPanel'
 import type { RailTab } from '@/components/ActivityRail'
 import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
+import type { FileClipboard, RunAllEntry, RunAllState, FolderRunState } from '@/types'
 
-export type { FolderRunState }
-
-export interface RunAllEntry {
-  path: string
-  name: string
-  passed: boolean
-  durationMs: number
-  error?: string
-}
-
-export interface RunAllState {
-  running: boolean
-  done: number
-  total: number
-  passed: number
-  results: RunAllEntry[]
-}
+export type { RunAllEntry, RunAllState, FolderRunState }
 
 export type SidebarProps = {
   tab: RailTab
@@ -55,18 +40,34 @@ export type SidebarProps = {
   activeFilePath?: string
   dirtyFilePaths?: Set<string>
   onSelectScenario?: (path: string, name: string) => void
-  onNewScenario?: (name: string) => void
+  onNewScenario?: (name: string, folderPath?: string) => void
   onNewScenarioFile?: (path: string, name: string) => void
   onDuplicateScenario?: (path: string) => void
   onDeleteScenario?: (path: string) => void
   onRenameScenario?: (path: string, newName: string) => void
+  onNewScenarioFolder?: (parentFolderPath: string, name: string) => void
+  onDeleteScenarioFolder?: (folderPath: string) => void
+  onRenameScenarioFolder?: (folderPath: string, newName: string) => void
   runAllState?: RunAllState
+  runLogTrigger?: number
   onRunAllScenarios?: () => void
   onDismissRunAll?: () => void
   scenarioError?: string | null
   onRunFolder?: (folderPath: string) => void
+  onRunScenarioFolder?: (folderPath: string) => void
   folderRunState?: FolderRunState | null
   onDismissFolderRun?: () => void
+  selectedCoverageSpecFile?: string | null
+  onSelectCoverageSpec?: (specFile: string) => void
+  clipboard?: FileClipboard | null
+  onCopyFile?: (path: string) => void
+  onCutFile?: (path: string) => void
+  onPasteToRequestFolder?: (folderPath: string) => void
+  onPasteToRequestRoot?: () => void
+  onMoveScenario?: (srcPath: string, destFolderRelPath: string) => void
+  onCopyScenario?: (path: string) => void
+  onCutScenario?: (path: string) => void
+  onPasteToScenarioFolder?: (relFolderPath: string) => void
 }
 
 export function Sidebar({
@@ -80,8 +81,12 @@ export function Sidebar({
   activeFilePath, dirtyFilePaths,
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
-  runAllState, onRunAllScenarios, onDismissRunAll, scenarioError,
-  onRunFolder, folderRunState, onDismissFolderRun,
+  onNewScenarioFolder, onDeleteScenarioFolder, onRenameScenarioFolder,
+  runAllState, onRunAllScenarios, onDismissRunAll, scenarioError, runLogTrigger,
+  onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun,
+  selectedCoverageSpecFile, onSelectCoverageSpec,
+  clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
+  onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
 }: SidebarProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -113,6 +118,11 @@ export function Sidebar({
           onRunFolder={onRunFolder}
           folderRunState={folderRunState}
           onDismissFolderRun={onDismissFolderRun}
+          clipboard={clipboard}
+          onCopyFile={onCopyFile}
+          onCutFile={onCutFile}
+          onPasteToFolder={onPasteToRequestFolder}
+          onPasteToRoot={onPasteToRequestRoot}
         />
       )}
 
@@ -130,6 +140,25 @@ export function Sidebar({
           onDuplicateScenario={onDuplicateScenario}
           onDeleteScenario={onDeleteScenario}
           onRenameScenario={onRenameScenario}
+          onNewFolder={onNewScenarioFolder}
+          onDeleteScenarioFolder={onDeleteScenarioFolder}
+          onRenameScenarioFolder={onRenameScenarioFolder}
+          onRefresh={onRefresh}
+          onMoveScenario={onMoveScenario}
+          clipboard={clipboard}
+          onCopyScenario={onCopyScenario}
+          onCutScenario={onCutScenario}
+          onPasteToScenarioFolder={onPasteToScenarioFolder}
+          runLogTrigger={runLogTrigger}
+          onRunFolder={onRunScenarioFolder}
+        />
+      )}
+
+      {tab === 'coverage' && (
+        <CoverageSidebarPanel
+          workspacePath={workspacePath}
+          selectedSpecFile={selectedCoverageSpecFile ?? null}
+          onSelectSpec={sf => onSelectCoverageSpec?.(sf)}
         />
       )}
 

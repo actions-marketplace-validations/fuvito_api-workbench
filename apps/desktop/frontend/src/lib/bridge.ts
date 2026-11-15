@@ -38,10 +38,14 @@ import {
   OpenInSystemViewer as WailsOpenInSystemViewer,
   OpenInExplorer as WailsOpenInExplorer,
   MoveRequest as WailsMoveRequest,
+  CopyRequest as WailsCopyRequest,
   GetRecentWorkspaces as WailsGetRecentWorkspaces,
   OpenWorkspaceByPath as WailsOpenWorkspaceByPath,
   SaveContentToFile as WailsSaveContentToFile,
   PickFile as WailsPickFile,
+  ExportWorkspace as WailsExportWorkspace,
+  ScanWorkspaceImport as WailsScanWorkspaceImport,
+  ApplyWorkspaceImport as WailsApplyWorkspaceImport,
 } from '@wailsjs/go/main/WorkspaceService'
 import {
   ImportOpenAPISpec as WailsImportOpenAPISpec,
@@ -76,10 +80,19 @@ import {
   DuplicateScenario as WailsDuplicateScenario,
   DeleteScenario as WailsDeleteScenario,
   RenameScenario as WailsRenameScenario,
+  CreateScenarioFolder as WailsCreateScenarioFolder,
+  RenameScenarioFolder as WailsRenameScenarioFolder,
+  DeleteScenarioFolder as WailsDeleteScenarioFolder,
+  MoveScenario as WailsMoveScenario,
+  CopyScenario as WailsCopyScenario,
   SaveScenarioResult as WailsSaveScenarioResult,
   LoadScenarioResult as WailsLoadScenarioResult,
   ListTemplates as WailsListTemplates,
   CreateFromTemplate as WailsCreateFromTemplate,
+  GetAccumulatedCoverage as WailsGetAccumulatedCoverage,
+  ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
+  ListAccumulatedCoverage as WailsListAccumulatedCoverage,
+  GetScenarioRunHistory as WailsGetScenarioRunHistory,
 } from '@wailsjs/go/main/ScenarioService'
 import {
   GetUserGuide as WailsGetUserGuide,
@@ -489,6 +502,21 @@ export async function moveRequest(srcPath: string, destDir: string): Promise<str
   return result as unknown as string
 }
 
+export async function copyRequest(srcPath: string, destDir: string): Promise<string> {
+  const result = await WailsCopyRequest(srcPath, destDir)
+  return result as unknown as string
+}
+
+export async function moveScenario(srcPath: string, destFolderRelPath: string): Promise<string> {
+  const result = await WailsMoveScenario(srcPath, destFolderRelPath)
+  return result as unknown as string
+}
+
+export async function copyScenario(srcPath: string, destFolderRelPath: string): Promise<string> {
+  const result = await WailsCopyScenario(srcPath, destFolderRelPath)
+  return result as unknown as string
+}
+
 export async function loadResponseCache(reqPath: string): Promise<ResponseCacheData | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await WailsLoadResponseCache(reqPath)
@@ -504,7 +532,9 @@ export async function clearResponseCache(reqPath: string): Promise<void> {
 export interface ScenarioInfo {
   title: string
   path: string
+  folder?: string  // relative path from {workspace}/scenarios/, "/" separated, "" or absent for root
   stepCount?: number
+  isFolder?: boolean  // sentinel: represents a directory entry, not a scenario file
 }
 
 export interface AssertionDetail {
@@ -544,6 +574,7 @@ export interface ScenarioDetail {
   path: string
   title: string
   description: string
+  specFile?: string
   steps: StepDetail[]
   error?: string
 }
@@ -575,6 +606,20 @@ export interface ScenarioCoverage {
   missed: string[]
 }
 
+export interface AccumulatedCoverage {
+  specFile: string
+  covered: number
+  total: number
+  percent: number
+  totalRuns: number
+  passedRuns: number
+  failedRuns: number
+  lastRunAt?: string
+  exercised: string[]
+  missed: string[]
+  operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string }>
+}
+
 export interface ScenarioResult {
   title: string
   passed: boolean
@@ -583,6 +628,7 @@ export interface ScenarioResult {
   error?: string
   specError?: string
   coverage?: ScenarioCoverage
+  accumulatedCoverage?: AccumulatedCoverage
 }
 
 export async function listScenarios(): Promise<ScenarioInfo[]> {
@@ -617,9 +663,24 @@ export interface CreateScenarioResult {
   error?: string
 }
 
-export async function createScenario(name: string): Promise<CreateScenarioResult> {
-  const result = await WailsCreateScenario(name)
+export async function createScenario(name: string, folderPath = ''): Promise<CreateScenarioResult> {
+  const result = await WailsCreateScenario(name, folderPath)
   return result as unknown as CreateScenarioResult
+}
+
+// Returns "" on success or an error message.
+export async function createScenarioFolder(folderPath: string): Promise<string> {
+  return (await WailsCreateScenarioFolder(folderPath)) as unknown as string
+}
+
+// Returns the new relative folder path on success, or "error: ..." on failure.
+export async function renameScenarioFolder(folderPath: string, newName: string): Promise<string> {
+  return (await WailsRenameScenarioFolder(folderPath, newName)) as unknown as string
+}
+
+// Returns "" on success or an error message.
+export async function deleteScenarioFolder(folderPath: string): Promise<string> {
+  return (await WailsDeleteScenarioFolder(folderPath)) as unknown as string
 }
 
 // Returns "" on success or an error message.
@@ -671,6 +732,48 @@ export async function createFromTemplate(templateID: string, name: string): Prom
   return result as unknown as CreateScenarioResult
 }
 
+export async function getAccumulatedCoverage(specFile: string): Promise<AccumulatedCoverage | null> {
+  const result = await WailsGetAccumulatedCoverage(specFile)
+  return result as unknown as AccumulatedCoverage | null
+}
+
+export async function resetAccumulatedCoverage(specFile: string): Promise<void> {
+  await WailsResetAccumulatedCoverage(specFile)
+}
+
+export interface StepRunEntry {
+  label: string
+  passed: boolean
+  skipped: boolean
+  statusCode?: number
+  durationMs?: number
+  error?: string
+}
+
+export interface ScenarioRunEntry {
+  id: number
+  executedAt: string
+  scenarioPath: string
+  title: string
+  passed: boolean
+  durationMs: number
+  stepTotal: number
+  stepPassed: number
+  stepFailed: number
+  stepSkipped: number
+  steps: StepRunEntry[]
+}
+
+export async function getScenarioRunHistory(limit = 100): Promise<ScenarioRunEntry[]> {
+  const result = await WailsGetScenarioRunHistory(limit)
+  return (result ?? []) as unknown as ScenarioRunEntry[]
+}
+
+export async function listAccumulatedCoverage(): Promise<AccumulatedCoverage[]> {
+  const result = await WailsListAccumulatedCoverage()
+  return (result ?? []) as unknown as AccumulatedCoverage[]
+}
+
 // ---- Folder run ----
 
 export interface FolderRunItem {
@@ -686,6 +789,37 @@ export interface FolderRunItem {
 export async function runFolder(folderPath: string): Promise<FolderRunItem[]> {
   const result = await WailsRunFolder(folderPath)
   return (result ?? []) as unknown as FolderRunItem[]
+}
+
+// ---- Workspace export / import ----
+
+export interface ScanImportResult {
+  zipPath: string       // empty = user cancelled
+  totalFiles: number
+  conflicts: string[]   // relative paths that already exist
+  error?: string
+}
+
+export interface ApplyImportResult {
+  imported: number
+  skipped: number
+  renamed: number
+  error?: string
+}
+
+// Returns "" on success or an error message. Empty string also returned on cancel.
+export async function exportWorkspace(): Promise<string> {
+  return (await WailsExportWorkspace()) as unknown as string
+}
+
+export async function scanWorkspaceImport(): Promise<ScanImportResult> {
+  const result = await WailsScanWorkspaceImport()
+  return result as unknown as ScanImportResult
+}
+
+export async function applyWorkspaceImport(zipPath: string, strategy: string): Promise<ApplyImportResult> {
+  const result = await WailsApplyWorkspaceImport(zipPath, strategy)
+  return result as unknown as ApplyImportResult
 }
 
 // ---- Help ----

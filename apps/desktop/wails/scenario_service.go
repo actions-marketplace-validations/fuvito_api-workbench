@@ -5,12 +5,17 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
+	"github.com/fuvito/api-workbench/packages/core/coverage"
+	"github.com/fuvito/api-workbench/packages/core/history"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -25,7 +30,9 @@ var scenarioTemplateFS embed.FS
 type ScenarioInfoIO struct {
 	Title     string `json:"title"`
 	Path      string `json:"path"`
+	Folder    string `json:"folder"` // relative path from {workspace}/scenarios/, "/" separated, "" for root
 	StepCount int    `json:"stepCount"`
+	IsFolder  bool   `json:"isFolder,omitempty"` // sentinel: represents an empty directory, not a file
 }
 
 type KVPairIO struct {
@@ -70,6 +77,7 @@ type ScenarioDetailIO struct {
 	Path        string         `json:"path"`
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
+	SpecFile    string         `json:"specFile,omitempty"`
 	Steps       []StepDetailIO `json:"steps"`
 	Error       string         `json:"error,omitempty"`
 }
@@ -102,13 +110,37 @@ type CoverageIO struct {
 }
 
 type ScenarioResultIO struct {
-	Title      string         `json:"title"`
-	Passed     bool           `json:"passed"`
-	DurationMs int64          `json:"durationMs"`
-	Steps      []StepResultIO `json:"steps"`
-	Error      string         `json:"error,omitempty"`
-	SpecError  string         `json:"specError,omitempty"`
-	Coverage   *CoverageIO    `json:"coverage,omitempty"`
+	Title               string                 `json:"title"`
+	Passed              bool                   `json:"passed"`
+	DurationMs          int64                  `json:"durationMs"`
+	Steps               []StepResultIO         `json:"steps"`
+	Error               string                 `json:"error,omitempty"`
+	SpecError           string                 `json:"specError,omitempty"`
+	Coverage            *CoverageIO            `json:"coverage,omitempty"`
+	AccumulatedCoverage *AccumulatedCoverageIO `json:"accumulatedCoverage,omitempty"`
+}
+
+type StepRunEntryIO struct {
+	Label      string `json:"label"`
+	Passed     bool   `json:"passed"`
+	Skipped    bool   `json:"skipped"`
+	StatusCode int    `json:"statusCode,omitempty"`
+	DurationMs int64  `json:"durationMs,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+type ScenarioRunEntryIO struct {
+	ID           int64            `json:"id"`
+	ExecutedAt   string           `json:"executedAt"`
+	ScenarioPath string           `json:"scenarioPath"`
+	Title        string           `json:"title"`
+	Passed       bool             `json:"passed"`
+	DurationMs   int64            `json:"durationMs"`
+	StepTotal    int              `json:"stepTotal"`
+	StepPassed   int              `json:"stepPassed"`
+	StepFailed   int              `json:"stepFailed"`
+	StepSkipped  int              `json:"stepSkipped"`
+	Steps        []StepRunEntryIO `json:"steps"`
 }
 
 // ---- Service ----
@@ -186,7 +218,16 @@ func (s *ScenarioService) ListScenarios() []ScenarioInfoIO {
 	scenDir := filepath.Join(wsPath, "scenarios")
 	var out []ScenarioInfoIO
 	_ = filepath.WalkDir(scenDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if p == scenDir {
+				return nil // skip root itself
+			}
+			// Emit a folder sentinel so the UI can render empty directories.
+			rel, _ := filepath.Rel(scenDir, p)
+			out = append(out, ScenarioInfoIO{IsFolder: true, Folder: filepath.ToSlash(rel), Path: p})
 			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(p))
@@ -194,7 +235,12 @@ func (s *ScenarioService) ListScenarios() []ScenarioInfoIO {
 			return nil
 		}
 		name := strings.TrimSuffix(d.Name(), filepath.Ext(d.Name()))
-		info := ScenarioInfoIO{Title: name, Path: p}
+		rel, _ := filepath.Rel(scenDir, filepath.Dir(p))
+		folder := ""
+		if rel != "." {
+			folder = filepath.ToSlash(rel)
+		}
+		info := ScenarioInfoIO{Title: name, Path: p, Folder: folder}
 		if data, err := os.ReadFile(p); err == nil {
 			if sc, err := serialization.ParseScenarioFile(data, d.Name()); err == nil {
 				info.StepCount = len(sc.Steps)
@@ -220,6 +266,7 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		Path:        path,
 		Title:       sc.Title,
 		Description: sc.Description,
+		SpecFile:    sc.SpecFile,
 	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{
@@ -315,9 +362,9 @@ type CreateScenarioResultIO struct {
 	Error string `json:"error,omitempty"`
 }
 
-// CreateScenario creates a starter scenario YAML file in {workspace}/scenarios/
-// using the provided name. Returns the new file path, or an error message.
-func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
+// CreateScenario creates a starter scenario YAML file. folderPath is relative to
+// {workspace}/scenarios/ (e.g. "auth" or ""). Returns the new file path, or an error.
+func (s *ScenarioService) CreateScenario(name, folderPath string) CreateScenarioResultIO {
 	if name == "" {
 		return CreateScenarioResultIO{Error: "name is required"}
 	}
@@ -327,7 +374,15 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 	}
 
 	scenDir := filepath.Join(wsPath, "scenarios")
-	if err := os.MkdirAll(scenDir, 0755); err != nil {
+	targetDir := scenDir
+	if folderPath != "" {
+		clean := filepath.Clean(filepath.FromSlash(folderPath))
+		if strings.HasPrefix(clean, "..") {
+			return CreateScenarioResultIO{Error: "invalid folder path"}
+		}
+		targetDir = filepath.Join(scenDir, clean)
+	}
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return CreateScenarioResultIO{Error: err.Error()}
 	}
 
@@ -335,7 +390,7 @@ func (s *ScenarioService) CreateScenario(name string) CreateScenarioResultIO {
 	if slug == "" {
 		slug = "scenario"
 	}
-	filePath := filepath.Join(scenDir, slug+".yaml")
+	filePath := filepath.Join(targetDir, slug+".yaml")
 
 	// Avoid overwriting an existing file by appending a suffix.
 	if _, err := os.Stat(filePath); err == nil {
@@ -437,6 +492,173 @@ func (s *ScenarioService) RenameScenario(path, newName string) string {
 		}
 	}
 	return newPath
+}
+
+// MoveScenario moves a scenario file into a different folder under {workspace}/scenarios/.
+// destFolderRelPath is relative to scenarios/ (use "" for the root).
+// Returns the new absolute path on success, or an error.
+func (s *ScenarioService) MoveScenario(srcPath, destFolderRelPath string) (string, error) {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "", fmt.Errorf("no workspace open")
+	}
+	scenDir := filepath.Join(wsPath, "scenarios")
+	rel, err := filepath.Rel(scenDir, srcPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("source is outside the scenarios directory")
+	}
+	var destDir string
+	if destFolderRelPath == "" {
+		destDir = scenDir
+	} else {
+		clean := filepath.Clean(filepath.FromSlash(destFolderRelPath))
+		if strings.HasPrefix(clean, "..") {
+			return "", fmt.Errorf("invalid destination folder path")
+		}
+		destDir = filepath.Join(scenDir, clean)
+	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("creating destination: %w", err)
+	}
+	newPath := filepath.Join(destDir, filepath.Base(srcPath))
+	if newPath == srcPath {
+		return srcPath, nil
+	}
+	if _, err := os.Stat(newPath); err == nil {
+		return "", fmt.Errorf("a file named %q already exists in the destination folder", filepath.Base(srcPath))
+	}
+	if err := os.Rename(srcPath, newPath); err != nil {
+		return "", fmt.Errorf("moving file: %w", err)
+	}
+	return newPath, nil
+}
+
+// CopyScenario copies a scenario file into a different folder under {workspace}/scenarios/.
+// destFolderRelPath is relative to scenarios/ (use "" for the root).
+// Returns the new absolute path on success, or an error.
+func (s *ScenarioService) CopyScenario(srcPath, destFolderRelPath string) (string, error) {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "", fmt.Errorf("no workspace open")
+	}
+	scenDir := filepath.Join(wsPath, "scenarios")
+	rel, err := filepath.Rel(scenDir, srcPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("source is outside the scenarios directory")
+	}
+	var destDir string
+	if destFolderRelPath == "" {
+		destDir = scenDir
+	} else {
+		clean := filepath.Clean(filepath.FromSlash(destFolderRelPath))
+		if strings.HasPrefix(clean, "..") {
+			return "", fmt.Errorf("invalid destination folder path")
+		}
+		destDir = filepath.Join(scenDir, clean)
+	}
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", fmt.Errorf("creating destination: %w", err)
+	}
+	base := filepath.Base(srcPath)
+	newPath := filepath.Join(destDir, base)
+	if _, err := os.Stat(newPath); err == nil {
+		ext := filepath.Ext(base)
+		stem := strings.TrimSuffix(base, ext)
+		for i := 2; ; i++ {
+			if i == 2 {
+				newPath = filepath.Join(destDir, stem+"-copy"+ext)
+			} else {
+				newPath = filepath.Join(destDir, fmt.Sprintf("%s-copy-%d%s", stem, i, ext))
+			}
+			if _, err := os.Stat(newPath); err != nil {
+				break
+			}
+		}
+	}
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return "", fmt.Errorf("reading source: %w", err)
+	}
+	if err := atomicWrite(newPath, data); err != nil {
+		return "", fmt.Errorf("writing copy: %w", err)
+	}
+	return newPath, nil
+}
+
+// CreateScenarioFolder creates a subfolder under {workspace}/scenarios/.
+// folderPath is relative to scenarios/ (e.g. "auth" or "auth/subsection").
+// Returns "" on success or an error message.
+func (s *ScenarioService) CreateScenarioFolder(folderPath string) string {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "no workspace open"
+	}
+	if folderPath == "" {
+		return "folder name is required"
+	}
+	clean := filepath.Clean(filepath.FromSlash(folderPath))
+	if strings.HasPrefix(clean, "..") {
+		return "invalid folder path"
+	}
+	dir := filepath.Join(wsPath, "scenarios", clean)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// RenameScenarioFolder renames the last segment of a folder.
+// folderPath is the current relative path from scenarios/; newName is just the new last segment.
+// Returns the new relative path on success, or "error: ..." on failure.
+func (s *ScenarioService) RenameScenarioFolder(folderPath, newName string) string {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "error: no workspace open"
+	}
+	if newName == "" {
+		return "error: name is required"
+	}
+	clean := filepath.Clean(filepath.FromSlash(folderPath))
+	if strings.HasPrefix(clean, "..") || clean == "." {
+		return "error: invalid folder path"
+	}
+	slug := toSlug(newName)
+	if slug == "" {
+		return "error: invalid folder name"
+	}
+	scenDir := filepath.Join(wsPath, "scenarios")
+	oldAbs := filepath.Join(scenDir, clean)
+	newAbs := filepath.Join(filepath.Dir(oldAbs), slug)
+	if oldAbs == newAbs {
+		return folderPath
+	}
+	if _, err := os.Stat(newAbs); err == nil {
+		return "error: a folder with that name already exists"
+	}
+	if err := os.Rename(oldAbs, newAbs); err != nil {
+		return "error: " + err.Error()
+	}
+	rel, _ := filepath.Rel(scenDir, newAbs)
+	return filepath.ToSlash(rel)
+}
+
+// DeleteScenarioFolder removes a folder and all its contents.
+// folderPath is relative to {workspace}/scenarios/.
+// Returns "" on success or an error message.
+func (s *ScenarioService) DeleteScenarioFolder(folderPath string) string {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return "no workspace open"
+	}
+	clean := filepath.Clean(filepath.FromSlash(folderPath))
+	if strings.HasPrefix(clean, "..") || clean == "." {
+		return "invalid folder path"
+	}
+	dir := filepath.Join(wsPath, "scenarios", clean)
+	if err := os.RemoveAll(dir); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 // FolderRunItemIO is a single request result from a folder run.
@@ -557,19 +779,11 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	var loadedSpec *openapi.Spec
 	var specLoadErr string
 	if sc.SpecFile != "" {
-		specPath := sc.SpecFile
-		if !filepath.IsAbs(specPath) {
-			specPath = filepath.Join(filepath.Dir(path), specPath)
-		}
-		specData, err := os.ReadFile(specPath)
+		specData, specExt, err := loadSpecBytes(sc.SpecFile, filepath.Dir(path))
 		if err != nil {
 			specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
 		} else {
-			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
-			if ext == "" {
-				ext = "yaml"
-			}
-			spec, err := openapi.ParseBytes(specData, ext)
+			spec, err := openapi.ParseBytes(specData, specExt)
 			if err != nil {
 				specLoadErr = fmt.Sprintf("specFile %q: %v", sc.SpecFile, err)
 			} else {
@@ -647,6 +861,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			executed = append(executed, openapi.ExecutedRequest{
 				Method: string(sr.Request.Method),
 				URL:    sr.Request.URL,
+				Passed: sr.Passed,
 			})
 		}
 		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {
@@ -662,10 +877,224 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 				cov.Missed = append(cov.Missed, op.String())
 			}
 			out.Coverage = cov
+
+			// Accumulate into the workspace coverage store.
+			if s.workspace.workspacePath != "" {
+				stored := loadStoredCoverage(s.workspace.workspacePath, sc.SpecFile)
+				stored.TotalRuns++
+				stored.LastRunAt = time.Now()
+				if result.Passed {
+					stored.PassedRuns++
+				} else {
+					stored.FailedRuns++
+				}
+				stored.Exercised = mergeExercised(stored.Exercised, cov.Exercised)
+				stored.TotalOps = cr.Total
+				now := time.Now()
+				if stored.OperationResults == nil {
+					stored.OperationResults = make(map[string]coverage.OperationResult)
+				}
+				for _, er := range cr.ExercisedResults {
+					stored.OperationResults[er.String()] = coverage.OperationResult{
+						LastPassed: er.Passed,
+						LastRunAt:  now,
+					}
+				}
+				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
+					acc := buildAccumulatedCoverageIO(stored, loadedSpec)
+					out.AccumulatedCoverage = &acc
+				}
+			}
 		}
 	}
 
+	// Record this run in the scenario run log (silently — a broken db never blocks results).
+	s.recordScenarioRun(path, out)
+
 	return out
+}
+
+// recordScenarioRun opens the history database and appends a run record.
+// Errors are silently discarded so a broken database never blocks scenario output.
+func (s *ScenarioService) recordScenarioRun(scenarioPath string, out ScenarioResultIO) {
+	dbPath, err := history.DefaultPath()
+	if err != nil {
+		return
+	}
+	store, err := history.Open(dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+
+	counts := result{passed: 0, failed: 0, skipped: 0}
+	steps := make([]history.ScenarioStepSummary, len(out.Steps))
+	for i, sr := range out.Steps {
+		steps[i] = history.ScenarioStepSummary{
+			Label:      sr.Label,
+			Passed:     sr.Passed,
+			Skipped:    sr.Skipped,
+			StatusCode: sr.StatusCode,
+			DurationMs: sr.DurationMs,
+			Error:      sr.Error,
+		}
+		if sr.Skipped {
+			counts.skipped++
+		} else if sr.Passed {
+			counts.passed++
+		} else {
+			counts.failed++
+		}
+	}
+
+	_ = store.RecordScenarioRun(history.ScenarioRunRecord{
+		WorkspacePath: s.workspace.workspacePath,
+		ScenarioPath:  scenarioPath,
+		Title:         out.Title,
+		Passed:        out.Passed,
+		DurationMs:    out.DurationMs,
+		StepTotal:     len(out.Steps),
+		StepPassed:    counts.passed,
+		StepFailed:    counts.failed,
+		StepSkipped:   counts.skipped,
+		Steps:         steps,
+	})
+}
+
+type result struct{ passed, failed, skipped int }
+
+// GetScenarioRunHistory returns recent scenario runs for the current workspace.
+func (s *ScenarioService) GetScenarioRunHistory(limit int) []ScenarioRunEntryIO {
+	if limit <= 0 {
+		limit = 100
+	}
+	dbPath, err := history.DefaultPath()
+	if err != nil {
+		return nil
+	}
+	store, err := history.Open(dbPath)
+	if err != nil {
+		return nil
+	}
+	defer store.Close()
+
+	records, err := store.RecentScenarioRuns(s.workspace.workspacePath, limit)
+	if err != nil {
+		return nil
+	}
+	out := make([]ScenarioRunEntryIO, len(records))
+	for i, r := range records {
+		steps := make([]StepRunEntryIO, len(r.Steps))
+		for j, sr := range r.Steps {
+			steps[j] = StepRunEntryIO{
+				Label:      sr.Label,
+				Passed:     sr.Passed,
+				Skipped:    sr.Skipped,
+				StatusCode: sr.StatusCode,
+				DurationMs: sr.DurationMs,
+				Error:      sr.Error,
+			}
+		}
+		out[i] = ScenarioRunEntryIO{
+			ID:           r.ID,
+			ExecutedAt:   r.ExecutedAt.Format(time.RFC3339),
+			ScenarioPath: r.ScenarioPath,
+			Title:        r.Title,
+			Passed:       r.Passed,
+			DurationMs:   r.DurationMs,
+			StepTotal:    r.StepTotal,
+			StepPassed:   r.StepPassed,
+			StepFailed:   r.StepFailed,
+			StepSkipped:  r.StepSkipped,
+			Steps:        steps,
+		}
+	}
+	return out
+}
+
+// GetAccumulatedCoverage returns the accumulated spec coverage for the given specFile.
+// Returns nil (no error) when no data has been recorded yet.
+func (s *ScenarioService) GetAccumulatedCoverage(specFile string) (*AccumulatedCoverageIO, error) {
+	if s.workspace.workspacePath == "" || specFile == "" {
+		return nil, nil
+	}
+	stored := loadStoredCoverage(s.workspace.workspacePath, specFile)
+	if stored.TotalRuns == 0 {
+		return nil, nil
+	}
+	specData, specExt, err := loadSpecBytes(specFile, "")
+	if err != nil {
+		return nil, fmt.Errorf("loading spec: %w", err)
+	}
+	spec, err := openapi.ParseBytes(specData, specExt)
+	if err != nil {
+		return nil, fmt.Errorf("parsing spec: %w", err)
+	}
+	acc := buildAccumulatedCoverageIO(stored, spec)
+	return &acc, nil
+}
+
+// ResetAccumulatedCoverage deletes the stored coverage data for the given specFile.
+func (s *ScenarioService) ResetAccumulatedCoverage(specFile string) error {
+	if s.workspace.workspacePath == "" || specFile == "" {
+		return nil
+	}
+	return coverage.Reset(s.workspace.workspacePath, specFile)
+}
+
+// ListAccumulatedCoverage returns all stored accumulated coverage entries for the workspace,
+// sorted by most recently run first. Uses cached TotalOps so no spec files are reloaded.
+func (s *ScenarioService) ListAccumulatedCoverage() []AccumulatedCoverageIO {
+	wsPath := s.workspace.workspacePath
+	if wsPath == "" {
+		return nil
+	}
+	reports := coverage.ListAll(wsPath)
+	result := make([]AccumulatedCoverageIO, len(reports))
+	for i, r := range reports {
+		result[i] = reportToIO(r)
+	}
+	return result
+}
+
+// loadSpecBytes fetches the OpenAPI spec at specRef (HTTP/HTTPS URL or file path).
+// scenarioDir is used to resolve relative paths; it is ignored for URLs.
+// Returns the raw bytes and a format hint ("yaml" or "json").
+func loadSpecBytes(specRef, scenarioDir string) (data []byte, format string, err error) {
+	if strings.HasPrefix(specRef, "http://") || strings.HasPrefix(specRef, "https://") {
+		resp, httpErr := http.Get(specRef) //nolint:noctx
+		if httpErr != nil {
+			return nil, "", httpErr
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, "", fmt.Errorf("HTTP %d fetching spec", resp.StatusCode)
+		}
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, "", readErr
+		}
+		// Detect format from URL path; default to yaml.
+		format = "yaml"
+		if strings.HasSuffix(strings.ToLower(specRef), ".json") {
+			format = "json"
+		}
+		return body, format, nil
+	}
+
+	// File path — resolve relative paths against the scenario's directory.
+	if !filepath.IsAbs(specRef) {
+		specRef = filepath.Join(scenarioDir, specRef)
+	}
+	body, readErr := os.ReadFile(specRef)
+	if readErr != nil {
+		return nil, "", readErr
+	}
+	format = strings.TrimPrefix(strings.ToLower(filepath.Ext(specRef)), ".")
+	if format == "" {
+		format = "yaml"
+	}
+	return body, format, nil
 }
 
 // ---- Scenario template gallery ----

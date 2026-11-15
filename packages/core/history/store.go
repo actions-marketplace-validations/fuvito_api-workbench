@@ -150,7 +150,118 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+
+	// scenario_runs: one row per scenario execution from desktop or CLI.
+	if _, err := s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS scenario_runs (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			executed_at    TEXT    NOT NULL,
+			workspace_path TEXT    NOT NULL DEFAULT '',
+			scenario_path  TEXT    NOT NULL DEFAULT '',
+			title          TEXT    NOT NULL DEFAULT '',
+			passed         INTEGER NOT NULL DEFAULT 0,
+			duration_ms    INTEGER NOT NULL DEFAULT 0,
+			step_total     INTEGER NOT NULL DEFAULT 0,
+			step_passed    INTEGER NOT NULL DEFAULT 0,
+			step_failed    INTEGER NOT NULL DEFAULT 0,
+			step_skipped   INTEGER NOT NULL DEFAULT 0,
+			steps_json     TEXT    NOT NULL DEFAULT '[]'
+		)
+	`); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(
+		`CREATE INDEX IF NOT EXISTS idx_scenario_runs_ws ON scenario_runs(workspace_path, id DESC)`,
+	); err != nil {
+		return err
+	}
 	return nil
+}
+
+// ScenarioStepSummary captures the per-step result for a scenario run.
+type ScenarioStepSummary struct {
+	Label      string `json:"label"`
+	Passed     bool   `json:"passed"`
+	Skipped    bool   `json:"skipped"`
+	StatusCode int    `json:"statusCode,omitempty"`
+	DurationMs int64  `json:"durationMs,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+// ScenarioRunRecord is a single recorded scenario execution.
+type ScenarioRunRecord struct {
+	ID            int64
+	ExecutedAt    time.Time
+	WorkspacePath string
+	ScenarioPath  string
+	Title         string
+	Passed        bool
+	DurationMs    int64
+	StepTotal     int
+	StepPassed    int
+	StepFailed    int
+	StepSkipped   int
+	Steps         []ScenarioStepSummary
+}
+
+// RecordScenarioRun appends a scenario execution to the run log.
+func (s *Store) RecordScenarioRun(rec ScenarioRunRecord) error {
+	stepsJSON, err := json.Marshal(rec.Steps)
+	if err != nil {
+		stepsJSON = []byte("[]")
+	}
+	passed := 0
+	if rec.Passed {
+		passed = 1
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO scenario_runs
+		 (executed_at, workspace_path, scenario_path, title, passed, duration_ms,
+		  step_total, step_passed, step_failed, step_skipped, steps_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		time.Now().UTC().Format(time.RFC3339),
+		rec.WorkspacePath, rec.ScenarioPath, rec.Title,
+		passed, rec.DurationMs,
+		rec.StepTotal, rec.StepPassed, rec.StepFailed, rec.StepSkipped,
+		string(stepsJSON),
+	)
+	return err
+}
+
+// RecentScenarioRuns returns up to limit scenario run records for workspacePath, most recent first.
+func (s *Store) RecentScenarioRuns(workspacePath string, limit int) ([]ScenarioRunRecord, error) {
+	rows, err := s.db.Query(
+		`SELECT id, executed_at, workspace_path, scenario_path, title, passed,
+		        duration_ms, step_total, step_passed, step_failed, step_skipped, steps_json
+		 FROM scenario_runs WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
+		workspacePath, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []ScenarioRunRecord
+	for rows.Next() {
+		var r ScenarioRunRecord
+		var executedAt string
+		var passed int
+		var stepsJSON string
+		if err := rows.Scan(
+			&r.ID, &executedAt, &r.WorkspacePath, &r.ScenarioPath, &r.Title,
+			&passed, &r.DurationMs,
+			&r.StepTotal, &r.StepPassed, &r.StepFailed, &r.StepSkipped, &stepsJSON,
+		); err != nil {
+			return nil, err
+		}
+		r.ExecutedAt, _ = time.Parse(time.RFC3339, executedAt)
+		r.Passed = passed != 0
+		if stepsJSON != "" {
+			_ = json.Unmarshal([]byte(stepsJSON), &r.Steps)
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
 }
 
 // Record appends a request/response pair to history and returns the new entry ID.
@@ -173,24 +284,13 @@ func (s *Store) Record(workspacePath, method, url string, statusCode int, status
 	return res.LastInsertId()
 }
 
-// Recent returns up to limit entries, most recent first.
-// If workspacePath is non-empty, only entries for that workspace are returned.
+// Recent returns up to limit entries for workspacePath, most recent first.
 func (s *Store) Recent(workspacePath string, limit int) ([]Entry, error) {
-	var rows *sql.Rows
-	var err error
-	if workspacePath != "" {
-		rows, err = s.db.Query(
-			`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
-			 FROM history WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
-			workspacePath, limit,
-		)
-	} else {
-		rows, err = s.db.Query(
-			`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
-			 FROM history ORDER BY id DESC LIMIT ?`,
-			limit,
-		)
-	}
+	rows, err := s.db.Query(
+		`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
+		 FROM history WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
+		workspacePath, limit,
+	)
 	if err != nil {
 		return nil, err
 	}

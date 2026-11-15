@@ -5,9 +5,13 @@ import {main} from '../models';
 
 export function ActiveEnvironment():Promise<domain.Environment>;
 
+export function ApplyWorkspaceImport(arg1:string,arg2:string):Promise<main.ApplyImportResultIO>;
+
 export function ClearResponseCache(arg1:string):Promise<void>;
 
 export function CloseWorkspace():Promise<void>;
+
+export function CopyRequest(arg1:string,arg2:string):Promise<string>;
 
 export function CreateFolder(arg1:string,arg2:string):Promise<string>;
 
@@ -16,6 +20,8 @@ export function DeleteEnvironment(arg1:string):Promise<void>;
 export function DeleteFolder(arg1:string):Promise<void>;
 
 export function DeleteRequest(arg1:string):Promise<void>;
+
+export function ExportWorkspace():Promise<string>;
 
 export function GetActiveEnvironment():Promise<main.EnvironmentInfoIO>;
 
@@ -64,6 +70,8 @@ export function SaveEnvironmentRaw(arg1:string,arg2:string):Promise<main.Environ
 export function SaveRequest(arg1:main.RequestFileIO):Promise<string>;
 
 export function SaveResponseCache(arg1:string,arg2:main.ResponseCacheIO):Promise<void>;
+
+export function ScanWorkspaceImport():Promise<main.ScanImportResultIO>;
 
 export function SelectEnvironment(arg1:string):Promise<void>;
 

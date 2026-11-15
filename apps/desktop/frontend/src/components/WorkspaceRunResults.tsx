@@ -1,6 +1,5 @@
 import { X, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import type { FolderRunState } from './WorkspacePanel'
-import type { RunAllState } from '@/components/Sidebar'
+import type { FolderRunState, RunAllState } from '@/types'
 import { MethodBadge } from './WorkspaceFileTree'
 
 export function FolderRunResults({ state, onSelectFile, onDismiss }: {
@@ -71,12 +70,15 @@ export function RunAllResults({ state, onSelectScenario, onDismiss }: {
           type="button"
           onClick={() => onSelectScenario?.(r.path, r.name)}
           className="w-full flex items-center gap-1.5 px-2 py-1 text-left hover:bg-[var(--color-border)] transition-colors"
+          title={r.error ?? 'Click to open scenario with results'}
         >
           {r.passed
             ? <CheckCircle2 size={10} className="shrink-0 text-emerald-400" />
             : <XCircle size={10} className="shrink-0 text-red-400" />}
           <span className="flex-1 truncate text-[var(--color-foreground)]">{r.name}</span>
-          <span className="shrink-0 text-[var(--color-muted-foreground)] text-[10px]">{r.durationMs}ms</span>
+          {r.error
+            ? <span className="shrink-0 text-[10px] text-red-400">err</span>
+            : <span className="shrink-0 text-[var(--color-muted-foreground)] text-[10px]">{r.durationMs}ms</span>}
         </button>
       ))}
     </div>

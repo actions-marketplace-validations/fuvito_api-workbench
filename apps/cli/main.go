@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
+	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/history"
@@ -51,6 +52,7 @@ func main() {
 	root.AddCommand(generateCmd())
 	root.AddCommand(conformCmd())
 	root.AddCommand(diffCmd())
+	root.AddCommand(coverageCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -258,6 +260,7 @@ func runCmd() *cobra.Command {
 	var timeoutMs int
 	var specFile string
 	var showCoverage bool
+	var workspacePath string
 
 	cmd := &cobra.Command{
 		Use:   "run <scenario-file>",
@@ -295,8 +298,7 @@ func runCmd() *cobra.Command {
 			}
 
 			// --spec flag overrides specFile: from scenario YAML.
-			// specFile: in the YAML is resolved relative to the scenario file;
-			// --spec on the command line is resolved relative to CWD.
+			// Both file paths and http(s):// URLs are accepted.
 			effectiveSpecFile := s.SpecFile
 			specFromFlag := specFile != ""
 			if specFromFlag {
@@ -307,51 +309,75 @@ func runCmd() *cobra.Command {
 			var loadedSpec *openapi.Spec
 			var runner *scenario.Runner
 			if effectiveSpecFile != "" {
-				specPath := effectiveSpecFile
-				if !filepath.IsAbs(specPath) && !specFromFlag {
-					specPath = filepath.Join(filepath.Dir(scenarioPath), specPath)
+				src := effectiveSpecFile
+				// Resolve relative file paths against the scenario's directory.
+				if !strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://") {
+					if !filepath.IsAbs(src) {
+						src = filepath.Join(filepath.Dir(scenarioPath), src)
+					}
 				}
-				specData, err := os.ReadFile(specPath)
-				if err != nil {
-					return fmt.Errorf("reading spec file %q: %w", specPath, err)
+				specData, specFmt, fetchErr := fetchSpec(src)
+				if fetchErr != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not load spec %q: %v\n", src, fetchErr)
+				} else {
+					loadedSpec, err = openapi.ParseBytes(specData, specFmt)
+					if err != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not parse spec %q: %v\n", src, err)
+						loadedSpec = nil
+					}
 				}
-				ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(specPath)), ".")
-				if ext == "yml" {
-					ext = "yaml"
+				if loadedSpec != nil {
+					runner = scenario.NewWithSpec(exec, loadedSpec)
 				}
-				loadedSpec, err = openapi.ParseBytes(specData, ext)
-				if err != nil {
-					return fmt.Errorf("parsing spec file %q: %w", specPath, err)
-				}
-				runner = scenario.NewWithSpec(exec, loadedSpec)
-			} else {
+			}
+			if runner == nil {
 				runner = scenario.New(exec)
 			}
 			result := runner.Run(context.Background(), s, env)
 
-			// Compute spec coverage when requested (requires a loaded spec)
+			// Compute per-run spec coverage (requires a loaded spec).
 			var cov *openapi.ScenarioCoverageResult
-			if showCoverage {
-				if loadedSpec == nil {
-					fmt.Fprintln(cmd.ErrOrStderr(), "warning: --coverage requires a spec (use --spec or add specFile: to the scenario)")
-				} else {
-					var executed []openapi.ExecutedRequest
-					for _, sr := range result.Steps {
-						if sr.Request != nil && sr.Response != nil {
-							executed = append(executed, openapi.ExecutedRequest{
-								Method: string(sr.Request.Method),
-								URL:    sr.Request.URL,
-							})
-						}
+			if loadedSpec != nil && (showCoverage || workspacePath != "") {
+				var executed []openapi.ExecutedRequest
+				for _, sr := range result.Steps {
+					if sr.Request != nil && sr.Response != nil {
+						executed = append(executed, openapi.ExecutedRequest{
+							Method: string(sr.Request.Method),
+							URL:    sr.Request.URL,
+						})
 					}
-					cov = loadedSpec.ScenarioCoverage(executed)
+				}
+				cov = loadedSpec.ScenarioCoverage(executed)
+			} else if showCoverage && loadedSpec == nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), "warning: --coverage requires a spec (use --spec or add specFile: to the scenario)")
+			}
+
+			// Accumulate coverage into the workspace store when --workspace is set.
+			if workspacePath != "" && loadedSpec != nil && cov != nil {
+				specRef := effectiveSpecFile
+				stored := coverage.Load(workspacePath, specRef)
+				stored.TotalRuns++
+				stored.LastRunAt = time.Now()
+				if result.Passed {
+					stored.PassedRuns++
+				} else {
+					stored.FailedRuns++
+				}
+				var exercised []string
+				for _, op := range cov.Exercised {
+					exercised = append(exercised, op.String())
+				}
+				stored.Exercised = coverage.MergeExercised(stored.Exercised, exercised)
+				stored.TotalOps = cov.Total
+				if err := coverage.Save(workspacePath, stored); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not save coverage: %v\n", err)
 				}
 			}
 
 			var reportBytes []byte
 			switch strings.ToLower(format) {
 			case "json":
-				if cov != nil {
+				if cov != nil && showCoverage {
 					reportBytes, err = reporting.JSONWithCoverage(result, cov)
 				} else {
 					reportBytes, err = reporting.JSON(result)
@@ -366,7 +392,7 @@ func runCmd() *cobra.Command {
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
 			default:
-				if cov != nil {
+				if cov != nil && showCoverage {
 					reportBytes = []byte(reporting.TextWithCoverage(result, cov))
 				} else {
 					reportBytes = []byte(reporting.Text(result))
@@ -395,8 +421,9 @@ func runCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
-	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file to validate responses and compute coverage (overrides specFile: in scenario)")
+	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file or URL (overrides specFile: in scenario)")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Report which spec operations were exercised (requires --spec or specFile: in scenario)")
+	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory to accumulate coverage into")
 
 	return cmd
 }
@@ -903,6 +930,128 @@ Exit codes:
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().BoolVar(&breakingOnly, "breaking-only", false, "Show only breaking changes")
 	return cmd
+}
+
+func coverageCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "coverage",
+		Short: "View and manage accumulated spec coverage for a workspace",
+	}
+	cmd.AddCommand(coverageListCmd())
+	cmd.AddCommand(coverageResetCmd())
+	return cmd
+}
+
+func coverageListCmd() *cobra.Command {
+	var workspacePath string
+	var format string
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List accumulated coverage for all specs in a workspace",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws := workspacePath
+			if ws == "" {
+				return fmt.Errorf("--workspace is required")
+			}
+			reports := coverage.ListAll(ws)
+			if len(reports) == 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), "No coverage data found in workspace.")
+				return nil
+			}
+			switch strings.ToLower(format) {
+			case "json":
+				type jsonEntry struct {
+					SpecFile   string   `json:"specFile"`
+					Covered    int      `json:"covered"`
+					Total      int      `json:"total"`
+					Percent    float64  `json:"percent"`
+					TotalRuns  int      `json:"totalRuns"`
+					PassedRuns int      `json:"passedRuns"`
+					FailedRuns int      `json:"failedRuns"`
+					LastRunAt  string   `json:"lastRunAt,omitempty"`
+					Exercised  []string `json:"exercised"`
+				}
+				out := make([]jsonEntry, len(reports))
+				for i, r := range reports {
+					lastRun := ""
+					if !r.LastRunAt.IsZero() {
+						lastRun = r.LastRunAt.Format(time.RFC3339)
+					}
+					out[i] = jsonEntry{
+						SpecFile:   r.SpecFile,
+						Covered:    r.Covered,
+						Total:      r.Total,
+						Percent:    r.Percent,
+						TotalRuns:  r.TotalRuns,
+						PassedRuns: r.PassedRuns,
+						FailedRuns: r.FailedRuns,
+						LastRunAt:  lastRun,
+						Exercised:  r.Exercised,
+					}
+				}
+				b, _ := json.MarshalIndent(out, "", "  ")
+				fmt.Fprintln(cmd.OutOrStdout(), string(b))
+			default:
+				for _, r := range reports {
+					pct := r.Percent
+					bar := coverageBar(pct, 20)
+					lastRun := ""
+					if !r.LastRunAt.IsZero() {
+						lastRun = "  last run " + r.LastRunAt.Format("2006-01-02 15:04")
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "%s\n  %s  %d/%d (%.1f%%)  %d run(s) · %d passed · %d failed%s\n\n",
+						r.SpecFile, bar, r.Covered, r.Total, pct,
+						r.TotalRuns, r.PassedRuns, r.FailedRuns, lastRun)
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	return cmd
+}
+
+func coverageResetCmd() *cobra.Command {
+	var workspacePath string
+
+	cmd := &cobra.Command{
+		Use:   "reset <spec-file-or-url>",
+		Short: "Delete the accumulated coverage data for a specific spec",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws := workspacePath
+			if ws == "" {
+				return fmt.Errorf("--workspace is required")
+			}
+			specRef := args[0]
+			if err := coverage.Reset(ws, specRef); err != nil {
+				return fmt.Errorf("resetting coverage: %w", err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Coverage reset for %s\n", specRef)
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
+	return cmd
+}
+
+// coverageBar renders a simple ASCII progress bar of the given width.
+func coverageBar(pct float64, width int) string {
+	filled := int(pct / 100 * float64(width))
+	if filled > width {
+		filled = width
+	}
+	bar := make([]byte, width)
+	for i := range bar {
+		if i < filled {
+			bar[i] = '='
+		} else {
+			bar[i] = '.'
+		}
+	}
+	return "[" + string(bar) + "]"
 }
 
 func genSanitizeDirName(s string) string {

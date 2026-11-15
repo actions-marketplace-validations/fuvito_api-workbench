@@ -1,9 +1,10 @@
 schemaVersion: "1"
-name: Health Check
-description: Verify the server is running and returns expected health metadata.
+title: Health Check
+description: Verify the server is up and returning valid health metadata.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
 
 steps:
-  - name: Check health endpoint
+  - label: Check health
     request:
       method: GET
       url: "{{baseUrl}}/health"
@@ -14,7 +15,7 @@ steps:
       - type: jsonpath
         path: "$.status"
         operator: eq
-        expected: ok
+        expected: "ok"
       - type: jsonpath
         path: "$.version"
         operator: ne

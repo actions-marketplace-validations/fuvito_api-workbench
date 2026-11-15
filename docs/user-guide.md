@@ -14,12 +14,14 @@
 6. [Sending requests and reading responses](#6-sending-requests-and-reading-responses)
 7. [Importing an OpenAPI specification](#7-importing-an-openapi-specification)
 8. [Scenarios and contract testing](#8-scenarios-and-contract-testing)
-9. [CLI usage](#9-cli-usage)
-10. [CI/CD integration](#10-cicd-integration)
-11. [Settings](#11-settings)
-12. [File format reference](#12-file-format-reference)
-13. [Keyboard shortcuts](#13-keyboard-shortcuts)
-14. [Troubleshooting](#14-troubleshooting)
+9. [Contracts — coverage tracking](#9-contracts--coverage-tracking)
+10. [CLI usage](#10-cli-usage)
+11. [CI/CD integration](#11-cicd-integration)
+12. [Settings](#12-settings)
+13. [File format reference](#13-file-format-reference)
+14. [Creating files with AI assistance](#14-creating-files-with-ai-assistance)
+15. [Keyboard shortcuts](#15-keyboard-shortcuts)
+16. [Troubleshooting](#16-troubleshooting)
 
 ---
 
@@ -229,10 +231,12 @@ Scenarios are the primary tool for **Spec Conformance Testing**: proving that yo
 
 ```yaml
 schemaVersion: "1"
-name: User lifecycle
+title: User lifecycle
+description: "Verifies CRUD operations for /users. Run after any changes to the users endpoint or auth middleware."
 
 steps:
-  - name: Login
+  - label: Login
+    notes: "Obtain a bearer token. failPolicy stop — all subsequent steps depend on this."
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -245,10 +249,12 @@ steps:
         path: "$.token"
     assertions:
       - type: status
+        operator: eq
         expected: 200
     failPolicy: stop   # stop | continue | skip
 
-  - name: Create user
+  - label: Create user
+    notes: "POST to /users. Extracts the new user's ID for use in later steps."
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -264,13 +270,15 @@ steps:
         path: "$.id"
     assertions:
       - type: status
+        operator: eq
         expected: 201
       - type: jsonpath
         path: "$.name"
         operator: eq
         expected: Alice
 
-  - name: Fetch user
+  - label: Fetch user
+    notes: "Verify the user is readable immediately after creation."
     request:
       method: GET
       url: "{{baseUrl}}/users/{{userId}}"
@@ -279,16 +287,28 @@ steps:
           value: "Bearer {{token}}"
     assertions:
       - type: status
+        operator: eq
         expected: 200
       - type: schema
-        schema: "#/components/schemas/User"
+        schema: getUserById
+    failPolicy: continue
 ```
+
+### Scenario-level fields
+
+| Field | Description |
+|---|---|
+| `title` | Display name shown in the UI and reports. |
+| `description` | Optional prose describing the overall scenario purpose. |
+| `specFile` | Path to an OpenAPI spec (relative to the workspace). When set, Clear Signal maps each executed request to the spec's operations and accumulates coverage data visible in the **Contracts** tab. |
 
 ### Step fields
 
 | Field | Description |
 |---|---|
-| `request` | Inline request definition. Alternatively, use `requestRef: path/to/file.yaml` to reference a saved request file. |
+| `label` | Short action phrase for the step — e.g. "Login", "Create order". Shown in the runner UI and reports. |
+| `notes` | Optional prose explaining the step's purpose and dependencies — e.g. "Requires the token from the Login step". |
+| `request` | Inline request definition. Alternatively, use `requestRef: path/to/file.yaml` to reference a saved request file. Use one or the other, never both. |
 | `extractions` | Pull values from the response into runtime variables for subsequent steps. |
 | `assertions` | Checks that must pass for the step to succeed. |
 | `failPolicy` | What to do if an assertion fails: `stop` (default — skips remaining steps), `continue` (keeps going), `skip` (skips this step if a previous one failed). |
@@ -325,7 +345,62 @@ steps:
 
 ---
 
-## 9. CLI usage
+## 9. Contracts — coverage tracking
+
+The **Contracts** tab tracks which operations in an OpenAPI specification have been exercised by your scenarios, and what the last test result was for each one.
+
+### Enabling coverage tracking
+
+Add a `specFile` field to any scenario pointing at an OpenAPI spec file (relative to the workspace root):
+
+```yaml
+schemaVersion: "1"
+title: User lifecycle
+specFile: requests/My API v1/openapi.yaml
+
+steps:
+  - label: Login
+    ...
+```
+
+After each run, Clear Signal matches every request the scenario made against the spec's path patterns and records whether each matched operation passed or failed.
+
+### The Contracts sidebar
+
+Click the **Contracts** icon (bar chart) in the Activity Rail to open the sidebar. Each spec that has been exercised appears as a card showing:
+
+- Overall coverage percentage and progress bar
+- Number of operations covered out of total
+- Total runs, passed runs, and failed runs
+
+Click a spec card to view its full detail in the main area.
+
+### The Contracts tab (main area)
+
+The detail view shows a table with one row per operation:
+
+| Column | Meaning |
+|---|---|
+| **Method** | HTTP method (GET, POST, PUT, …) |
+| **Path** | URL path pattern from the spec |
+| **Coverage** | ✓ Covered (called at least once) or — (never called) |
+| **Last Result** | ✓ Pass or ✗ Fail from the most recent run that hit this operation |
+| **Last Run** | Relative time of the most recent run |
+
+Operations are grouped into **Covered** and **Not covered** collapsible sections, sorted by path then method.
+
+### Reset and export
+
+- **Reset data** — clears all accumulated coverage for the selected spec.
+- **Export CSV** — downloads a CSV with all operations, their coverage status, last result, and last run time.
+
+### Auto-refresh
+
+The tab refreshes automatically whenever you switch to it and after any scenario run completes (individual or run-all).
+
+---
+
+## 10. CLI usage
 
 The CLI uses the same Go execution engine as the desktop application. Build it once and use it in any terminal or CI pipeline — no behavioural differences between interactive testing and CI.
 
@@ -410,7 +485,7 @@ Use `--format json` for machine-readable output suitable for CI tooling:
 
 ---
 
-## 10. CI/CD integration
+## 11. CI/CD integration
 
 The CLI is the natural integration point for pipelines. Build it as part of your workflow, run your scenarios, and act on the exit code.
 
@@ -475,7 +550,7 @@ Secrets are injected from environment variables at runtime. No secrets appear in
 
 ---
 
-## 11. Settings
+## 12. Settings
 
 Open via the gear icon in the toolbar.
 
@@ -493,7 +568,7 @@ Settings are stored in `~/.clrsig/settings.json`.
 
 ---
 
-## 12. File format reference
+## 13. File format reference
 
 All project files are human-readable YAML (or JSON equivalents). Every file carries a `schemaVersion` field — the current version is `"1"`.
 
@@ -501,31 +576,24 @@ All project files are human-readable YAML (or JSON equivalents). Every file carr
 
 ```yaml
 schemaVersion: "1"
-name: Get user by ID
+title: Get user by ID
 
-request:
-  method: GET
-  url: "{{baseUrl}}/users/{{userId}}"
-  headers:
-    - name: Accept
-      value: application/json
-  queryParams:
-    - name: include
-      value: orders
-  auth:
-    type: bearer
-    token: "{{apiToken}}"
-  timeout: 10000   # milliseconds; 0 = use global default
+method: GET
+url: "{{baseUrl}}/users/{{userId}}"
 
-assertions:
-  - type: status
-    expected: 200
-  - type: jsonpath
-    path: "$.id"
-    operator: eq
-    expected: "{{userId}}"
-  - type: schema
-    schema: "#/components/schemas/User"
+headers:
+  - name: Accept
+    value: application/json
+
+queryParams:
+  - name: include
+    value: orders
+
+auth:
+  type: bearer
+  token: "{{apiToken}}"
+
+timeoutMs: 10000   # 0 = use global default
 ```
 
 ### Environment file
@@ -581,7 +649,40 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ---
 
-## 13. Keyboard shortcuts
+## 14. Creating files with AI assistance
+
+The **Format Spec** tab in the Help panel (the `?` icon in the toolbar) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
+
+### What the AI prompt does
+
+When you paste the prompt into an AI assistant, it follows a four-step workflow:
+
+1. **Discovery survey** — the assistant asks a short set of questions: what you want to build, whether you have an existing OpenAPI spec or curl commands to share, what the base URL and authentication method are, and whether you need multiple environments (dev/staging/prod).
+
+2. **Generate** — based on your answers, the assistant creates one or more YAML files following the Clear Signal format exactly. It automatically extracts the base URL into an environment file, marks secrets as `secret: true`, and structures scenario steps with proper `label` and `notes` fields.
+
+3. **Self-verify** — before delivering, the assistant checks every generated file against the spec: required fields, valid enum values, no invented field names, and that every `{{variable}}` reference is either defined in the environment file or extracted by an earlier scenario step. It fixes any violations it finds.
+
+4. **Deliver** — the assistant presents each file with its suggested filename, a list of variables you need to fill in before running, and any assumptions it made (e.g. base URL inferred from the OpenAPI spec).
+
+### Workflow
+
+1. Click the `?` icon in the toolbar to open the Help panel.
+2. Switch to the **Format Spec** tab.
+3. Click **Copy AI Prompt** — the spec plus the system prompt is now on your clipboard.
+4. Open ChatGPT, Gemini, or any AI assistant and paste into a new conversation.
+5. The assistant will begin the discovery survey. Answer its questions and it will generate valid Clear Signal YAML files.
+6. Copy each generated file and save it to your workspace under `requests/`, `scenarios/`, or `environments/`.
+
+### Tips
+
+- If you have an OpenAPI spec, paste its contents when the assistant asks for source material — it will generate one scenario per workflow rather than per endpoint.
+- If the assistant invents a field name that does not appear in the Format Spec, ask it to re-verify against the spec. The self-verification step catches most of these, but re-running the check is always safe.
+- For multi-environment setups, tell the assistant which environments you need (e.g. dev, staging, production). It will generate one environment file per target with identical variable names so the same scenario runs against all of them.
+
+---
+
+## 15. Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
@@ -592,7 +693,7 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ---
 
-## 14. Troubleshooting
+## 16. Troubleshooting
 
 ### The app does not open after `wails dev`
 

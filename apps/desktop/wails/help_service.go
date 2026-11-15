@@ -56,9 +56,10 @@ Create the requested files following the format spec exactly. Apply all of these
 - For deletion steps (DELETE 204), the status assertion alone is sufficient.
 
 **specFile (OpenAPI spec binding)**
-- If the user wants ` + "`" + `type: schema` + "`" + ` assertions against an OpenAPI spec, you must ask them for the **absolute path** (e.g. ` + "`" + `C:/projects/myapi/openapi.yaml` + "`" + ` on Windows, ` + "`" + `/home/user/myapi/openapi.yaml` + "`" + ` on Mac/Linux) or the full URL to the spec file — never invent or guess a relative path.
-- If the user does not provide a path, ask: *"What is the full path or URL to your OpenAPI spec file?"*
+- If the user wants ` + "`" + `type: schema` + "`" + ` assertions against an OpenAPI spec, you must ask them for either an **absolute file path** (e.g. ` + "`" + `C:/projects/myapi/openapi.yaml` + "`" + ` on Windows, ` + "`" + `/home/user/myapi/openapi.yaml` + "`" + ` on Mac/Linux) or a **full URL** (e.g. ` + "`" + `http://localhost:8090/openapi.yaml` + "`" + `) — never invent or guess a relative path.
+- If the user does not provide a path or URL, ask: *"What is the full path or URL to your OpenAPI spec file? (e.g. C:/path/to/openapi.yaml or http://localhost:8090/openapi.yaml)"*
 - Do not use relative paths like ` + "`" + `../../openapi.yaml` + "`" + ` — they break whenever the scenario file is moved or opened on a different machine.
+- If the user is running the Clear Signal demo server, the spec URL is ` + "`" + `http://localhost:8090/openapi.yaml` + "`" + ` (port may vary — remind them to check).
 
 **General**
 - All ` + "`" + `{{variable}}` + "`" + ` references in a scenario must either exist in the environment file or be extracted by an earlier step in the same scenario. Never reference a variable that has no source.

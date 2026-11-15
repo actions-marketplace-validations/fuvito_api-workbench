@@ -1,0 +1,46 @@
+schemaVersion: "1"
+title: Users — Stale Expectations
+description: |
+  Simulates stale test assumptions: the scenario was written assuming a small dataset
+  and a specific role, but the actual server state is different. Two assertions fail;
+  the status and name checks still pass.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: List users (wrong total assumption)
+    notes: status eq 200 PASS. $.total_pages gt 5 will FAIL — server has 5 users with limit 10, so total_pages is 1.
+    request:
+      method: GET
+      url: "{{baseUrl}}/users"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.total"
+        operator: gt
+        expected: "0"
+      - type: jsonpath
+        path: "$.total_pages"
+        operator: gt
+        expected: "5"
+    failPolicy: continue
+
+  - label: Get user 1 (wrong role assumption)
+    notes: status eq 200 and $.name PASS. $.role eq "superadmin" will FAIL — actual role is "admin".
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/1"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "Alice Smith"
+      - type: jsonpath
+        path: "$.role"
+        operator: eq
+        expected: "superadmin"
+    failPolicy: continue

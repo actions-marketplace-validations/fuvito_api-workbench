@@ -1,0 +1,68 @@
+schemaVersion: "1"
+title: Misc — Core Endpoints
+description: Echo GET, status code endpoint, delayed response, and posts list.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Echo GET
+    request:
+      method: GET
+      url: "{{baseUrl}}/echo"
+      queryParams:
+        - name: source
+          value: test
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.method"
+        operator: eq
+        expected: "GET"
+    failPolicy: continue
+
+  - label: Status endpoint (404)
+    notes: Verifies the server correctly returns arbitrary status codes on demand.
+    request:
+      method: GET
+      url: "{{baseUrl}}/status/404"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 404
+      - type: jsonpath
+        path: "$.code"
+        operator: eq
+        expected: "404"
+    failPolicy: continue
+
+  - label: Slow response (200ms)
+    request:
+      method: GET
+      url: "{{baseUrl}}/slow"
+      queryParams:
+        - name: delay
+          value: "200"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.delay"
+        operator: eq
+        expected: "200"
+    failPolicy: continue
+
+  - label: List posts
+    request:
+      method: GET
+      url: "{{baseUrl}}/posts"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.total"
+        operator: gt
+        expected: "0"
+    failPolicy: continue

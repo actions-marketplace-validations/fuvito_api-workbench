@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Search, X, FileCode } from 'lucide-react'
-import type { FileNode, FolderRunItem } from '@/lib/bridge'
+import type { FileNode } from '@/lib/bridge'
+import type { FolderRunState } from '@/types'
 import { openInExplorer } from '@/lib/bridge'
 import { ContextMenu } from '@/components/ContextMenu'
 import { TreeNode } from './WorkspaceFileTree'
@@ -8,6 +9,7 @@ import { buildFileMenuItems } from './workspaceMenus'
 import { WorkspacePanelHeader } from './WorkspacePanelHeader'
 import { WorkspaceEmptyState } from './WorkspaceEmptyState'
 import { FolderRunResults } from './WorkspaceRunResults'
+import type { FileClipboard } from '@/types'
 
 function filterTree(nodes: FileNode[], query: string): FileNode[] {
   if (!query) return nodes
@@ -23,12 +25,7 @@ function filterTree(nodes: FileNode[], query: string): FileNode[] {
   })
 }
 
-export interface FolderRunState {
-  folderPath: string
-  folderName: string
-  running: boolean
-  results: FolderRunItem[]
-}
+export type { FolderRunState }
 
 type WorkspacePanelProps = {
   workspacePath: string
@@ -57,6 +54,11 @@ type WorkspacePanelProps = {
   onRunFolder?: (folderPath: string) => void
   folderRunState?: FolderRunState | null
   onDismissFolderRun?: () => void
+  clipboard?: FileClipboard | null
+  onCopyFile?: (path: string) => void
+  onCutFile?: (path: string) => void
+  onPasteToFolder?: (folderPath: string) => void
+  onPasteToRoot?: () => void
 }
 
 export function WorkspacePanel({
@@ -86,10 +88,12 @@ export function WorkspacePanel({
   onRunFolder,
   folderRunState,
   onDismissFolderRun,
+  clipboard,
+  onCopyFile,
+  onCutFile,
+  onPasteToFolder,
+  onPasteToRoot,
 }: WorkspacePanelProps) {
-  const folderName = workspacePath
-    ? workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
-    : null
   const [searchQuery, setSearchQuery] = useState('')
   const filteredTree = filterTree(fileTree, searchQuery)
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set())
@@ -118,8 +122,6 @@ export function WorkspacePanel({
       {workspacePath ? (
         <>
           <WorkspacePanelHeader
-            folderName={folderName ?? ''}
-            workspacePath={workspacePath}
             importing={importing}
             onCreateFolder={onCreateFolder}
             onImportOpenAPI={onImportOpenAPI}
@@ -127,6 +129,7 @@ export function WorkspacePanel({
             onImportInsomnia={onImportInsomnia}
             onRefresh={onRefresh}
             onOpenWorkspace={onOpenWorkspace}
+            onPasteToRoot={clipboard?.kind === 'request' ? onPasteToRoot : undefined}
           />
           {fileTree.length > 0 && (
             <div className="flex items-center gap-1.5 px-2 py-1 border-b border-[var(--color-border)]">
@@ -201,6 +204,7 @@ export function WorkspacePanel({
                   onContextMenu={(e, node) => setCtxMenu({ x: e.clientX, y: e.clientY, node })}
                   collapsedPaths={collapsedPaths}
                   onToggleCollapse={handleToggleCollapse}
+                  clipboard={clipboard}
                 />
               ))
             )}
@@ -232,6 +236,11 @@ export function WorkspacePanel({
             onRunFolder,
             onRename: setRenamingPath,
             onOpenInExplorer: handleOpenInExplorer,
+            onCopy: onCopyFile,
+            onCut: onCutFile,
+            onPasteToFolder,
+            clipboard,
+            isRootFolder: ctxMenu.node.isDir && fileTree.some(n => n.path === ctxMenu!.node.path),
           })}
           onClose={() => setCtxMenu(null)}
         />

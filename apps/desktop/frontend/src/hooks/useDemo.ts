@@ -8,10 +8,11 @@ type TabsStateTuple = { tabs: TabState[]; activeTabId: string }
 
 export function useDemo(deps: {
   refreshWorkspace: () => Promise<FileNode[]>
+  refreshHistory: () => Promise<void>
   setTabsState: React.Dispatch<React.SetStateAction<TabsStateTuple>>
   openFirstFileInTree: (tree: FileNode[]) => Promise<void>
 }) {
-  const { refreshWorkspace, setTabsState, openFirstFileInTree } = deps
+  const { refreshWorkspace, refreshHistory, setTabsState, openFirstFileInTree } = deps
 
   const [demoRunning, setDemoRunning] = useState(false)
   const [demoPort, setDemoPort] = useState(0)
@@ -29,7 +30,7 @@ export function useDemo(deps: {
       setDemoRunning(true)
       setDemoPort(result.port)
       const tree = await refreshWorkspace()
-      await openFirstFileInTree(tree)
+      await Promise.all([openFirstFileInTree(tree), refreshHistory()])
     } catch (err) {
       console.error('demo start error:', err)
     } finally {

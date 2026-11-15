@@ -8,7 +8,7 @@ export type TabInfo = {
   name: string | null
   method: string
   isDirty: boolean
-  kind?: 'request' | 'scenario'
+  kind?: 'request' | 'scenario' | 'coverage'
 }
 
 const TAB_METHOD_COLOR: Record<string, string> = {
@@ -118,7 +118,9 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               {tab.isDirty && (
                 <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
               )}
-              {tab.kind === 'scenario' ? (
+              {tab.kind === 'coverage' ? (
+                <span className="shrink-0 font-mono font-bold text-label text-emerald-400">COV</span>
+              ) : tab.kind === 'scenario' ? (
                 <span className="shrink-0 font-mono font-bold text-label text-violet-400">SCN</span>
               ) : (
                 <span className={cn('shrink-0 font-mono font-bold text-label', TAB_METHOD_COLOR[tab.method] ?? '')}>
@@ -126,7 +128,11 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
                 </span>
               )}
               <span className="truncate flex-1 text-xs">
-                {tab.kind === 'scenario' ? (tab.name ?? 'Scenario') : (tab.name ?? 'New Request')}
+                {tab.kind === 'coverage'
+                  ? (tab.name ?? 'Coverage')
+                  : tab.kind === 'scenario'
+                    ? (tab.name ?? 'Scenario')
+                    : (tab.name ?? 'New Request')}
               </span>
               <button
                 type="button"
@@ -169,7 +175,7 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
             {
               kind: 'action',
               label: 'Save',
-              disabled: ctxTab.kind === 'scenario' || !onSave,
+              disabled: ctxTab.kind === 'scenario' || ctxTab.kind === 'coverage' || !onSave,
               onClick: () => onSave?.(ctxMenu.tabId),
             },
             { kind: 'separator' },

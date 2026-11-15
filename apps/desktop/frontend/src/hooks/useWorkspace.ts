@@ -113,7 +113,7 @@ export function useWorkspace(deps: {
       if (path) {
         setWorkspacePath(path)
         const tree = await refreshWorkspace()
-        await openFirstFileInTree(tree)
+        await Promise.all([openFirstFileInTree(tree), refreshHistory()])
       }
     } catch (err) {
       console.error('open workspace:', err)
@@ -126,7 +126,7 @@ export function useWorkspace(deps: {
       if (path) {
         setWorkspacePath(path)
         const tree = await refreshWorkspace()
-        await openFirstFileInTree(tree)
+        await Promise.all([openFirstFileInTree(tree), refreshHistory()])
       }
     } catch (err) {
       console.error('new workspace:', err)
@@ -139,7 +139,7 @@ export function useWorkspace(deps: {
       if (opened) {
         setWorkspacePath(opened)
         const tree = await refreshWorkspace()
-        await openFirstFileInTree(tree)
+        await Promise.all([openFirstFileInTree(tree), refreshHistory()])
       }
     } catch (err) {
       console.error('open workspace by path:', err)

@@ -1,0 +1,27 @@
+schemaVersion: "1"
+title: Health Check
+description: Verify the server is up and returning valid health metadata.
+specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+
+steps:
+  - label: Check health
+    notes: Single-step smoke test — if this fails, the server isn't running.
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.status"
+        operator: eq
+        expected: "ok"
+      - type: jsonpath
+        path: "$.version"
+        operator: ne
+        expected: ""
+      - type: header
+        path: Content-Type
+        operator: contains
+        expected: application/json

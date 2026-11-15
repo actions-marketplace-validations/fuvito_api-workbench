@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FileNode } from '@/lib/bridge'
+import type { FileClipboard } from '@/types'
 
 // ---- Method badge ----
 
@@ -92,6 +93,7 @@ type TreeNodeProps = {
   onContextMenu?: (e: React.MouseEvent, node: FileNode) => void
   collapsedPaths: Set<string>
   onToggleCollapse: (path: string) => void
+  clipboard?: FileClipboard | null
 }
 
 export function TreeNode({
@@ -100,7 +102,7 @@ export function TreeNode({
   onRenameFile, onRenameFolder, onMoveFile,
   activeFilePath, dirtyFilePaths,
   renamingPath, onRenameEnd, onContextMenu,
-  collapsedPaths, onToggleCollapse,
+  collapsedPaths, onToggleCollapse, clipboard,
 }: TreeNodeProps) {
   const [localRenaming, setLocalRenaming] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -157,8 +159,8 @@ export function TreeNode({
             ) : (
               <span
                 className="truncate text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] cursor-default select-none"
-                onDoubleClick={() => setLocalRenaming(true)}
-                title="Double-click to rename"
+                onDoubleClick={depth > 0 ? () => setLocalRenaming(true) : undefined}
+                title={depth > 0 ? 'Double-click to rename' : undefined}
               >
                 {node.name}
               </span>
@@ -220,6 +222,7 @@ export function TreeNode({
             onContextMenu={onContextMenu}
             collapsedPaths={collapsedPaths}
             onToggleCollapse={onToggleCollapse}
+            clipboard={clipboard}
           />
         ))}
       </div>
@@ -227,6 +230,7 @@ export function TreeNode({
   }
 
   const isActive = node.path === activeFilePath
+  const isCut = clipboard?.op === 'cut' && clipboard.srcPath === node.path
   const displayName = node.name.replace(/\.(yaml|yml|json)$/i, '')
 
   return (
@@ -241,6 +245,7 @@ export function TreeNode({
         isActive
           ? 'bg-[var(--color-muted)] text-[var(--color-foreground)] border-l-2 border-[var(--color-accent)]'
           : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] border-l-2 border-transparent',
+        isCut && 'opacity-40 italic',
       )}
       style={{ paddingLeft: `${6 + indent + 15}px` }}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, node) }}

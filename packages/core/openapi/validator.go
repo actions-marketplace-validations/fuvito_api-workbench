@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -262,6 +263,13 @@ func nopCloser(data []byte) *nopCloserReader {
 type ExecutedRequest struct {
 	Method string
 	URL    string
+	Passed bool // whether this step's assertions all passed
+}
+
+// ExercisedResult pairs a matched spec operation with the last-run pass/fail outcome.
+type ExercisedResult struct {
+	CoveredOperation
+	Passed bool
 }
 
 // CoveredOperation identifies a spec operation (method + path pattern) exercised or missed.
@@ -272,14 +280,33 @@ type CoveredOperation struct {
 
 func (o CoveredOperation) String() string { return o.Method + " " + o.Path }
 
+// AllOperations returns every operation declared in the spec as (METHOD, path) pairs,
+// sorted by path then method.
+func (s *Spec) AllOperations() []CoveredOperation {
+	var ops []CoveredOperation
+	for path, item := range s.doc.Paths.Map() {
+		for method := range item.Operations() {
+			ops = append(ops, CoveredOperation{Method: strings.ToUpper(method), Path: path})
+		}
+	}
+	sort.Slice(ops, func(i, j int) bool {
+		if ops[i].Path != ops[j].Path {
+			return ops[i].Path < ops[j].Path
+		}
+		return ops[i].Method < ops[j].Method
+	})
+	return ops
+}
+
 // ScenarioCoverageResult is the coverage computed from matching executed requests
 // against an OpenAPI spec's declared operations.
 type ScenarioCoverageResult struct {
-	Covered   int
-	Total     int
-	Percent   float64
-	Exercised []CoveredOperation
-	Missed    []CoveredOperation
+	Covered          int
+	Total            int
+	Percent          float64
+	Exercised        []CoveredOperation
+	Missed           []CoveredOperation
+	ExercisedResults []ExercisedResult // per-operation last pass/fail outcome
 }
 
 // ScenarioCoverage matches each executed request against the spec's declared operations
@@ -309,6 +336,7 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 	}
 
 	exercised := make(map[opKey]struct{})
+	exercisedPassed := make(map[opKey]bool)
 	for _, ex := range executed {
 		matchURL := ex.URL
 		if specBase != "" {
@@ -324,14 +352,21 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 		if err != nil {
 			continue
 		}
-		exercised[opKey{strings.ToUpper(ex.Method), route.Path}] = struct{}{}
+		k := opKey{strings.ToUpper(ex.Method), route.Path}
+		exercised[k] = struct{}{}
+		exercisedPassed[k] = ex.Passed // last execution wins
 	}
 
 	cr := &ScenarioCoverageResult{Total: len(all)}
 	for k := range exercised {
 		if _, ok := all[k]; ok {
 			cr.Covered++
-			cr.Exercised = append(cr.Exercised, CoveredOperation{Method: k.method, Path: k.path})
+			op := CoveredOperation{Method: k.method, Path: k.path}
+			cr.Exercised = append(cr.Exercised, op)
+			cr.ExercisedResults = append(cr.ExercisedResults, ExercisedResult{
+				CoveredOperation: op,
+				Passed:           exercisedPassed[k],
+			})
 		}
 	}
 	for k := range all {
