@@ -38,7 +38,7 @@ test.describe('App launch (smoke)', () => {
   test('settings panel opens from gear button', async ({ page }) => {
     await page.goto('/')
     await page.getByPlaceholder('https://api.example.com/endpoint').waitFor({ timeout: 15_000 })
-    await page.getByTitle(/settings/i).click()
-    await expect(page.getByText(/font size|theme|timeout/i)).toBeVisible({ timeout: 5_000 })
+    await page.getByTitle('Settings', { exact: true }).click()
+    await expect(page.getByText(/font size|theme|timeout/i).first()).toBeVisible({ timeout: 5_000 })
   })
 })

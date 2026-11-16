@@ -15,19 +15,21 @@ test.describe('Tabs', () => {
 
   test('can open a new blank tab via toolbar button', async ({ page }) => {
     await gotoApp(page)
-    await page.getByTitle('New request tab (Ctrl+N)').click()
+    // AppToolbar "New" button (has visible "New" text label)
+    await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page.getByRole('tab')).toHaveCount(2)
   })
 
   test('can open a new blank tab via tab bar + button', async ({ page }) => {
     await gotoApp(page)
-    await page.getByTitle('New request tab (Ctrl+N)').click()
+    // Tab bar + button is the first element with this title (TabBar renders before AppToolbar)
+    await page.getByTitle('New request tab (Ctrl+N)').first().click()
     await expect(page.getByRole('tab')).toHaveCount(2)
   })
 
   test('new tab is active after opening', async ({ page }) => {
     await gotoApp(page)
-    await page.getByTitle('New request tab (Ctrl+N)').click()
+    await page.getByTitle('New request tab (Ctrl+N)').first().click()
     // The second tab should be active (aria-selected = true)
     const tabs = page.getByRole('tab')
     await expect(tabs.last()).toHaveAttribute('aria-selected', 'true')
@@ -45,7 +47,7 @@ test.describe('Tabs', () => {
     // Fill URL in first tab
     await page.getByPlaceholder('https://api.example.com/endpoint').fill('https://api.example.com/users')
     // Open new tab
-    await page.getByTitle('New request tab (Ctrl+N)').click()
+    await page.getByTitle('New request tab (Ctrl+N)').first().click()
     // New tab URL should be empty
     await expect(page.getByPlaceholder('https://api.example.com/endpoint')).toHaveValue('')
     // Switch back to first tab
@@ -57,7 +59,7 @@ test.describe('Tabs', () => {
   test('can close a clean tab', async ({ page }) => {
     await gotoApp(page)
     // Open a second tab so we always have one left
-    await page.getByTitle('New request tab (Ctrl+N)').click()
+    await page.getByTitle('New request tab (Ctrl+N)').first().click()
     await expect(page.getByRole('tab')).toHaveCount(2)
     // Close the second (last) tab — force click because close button is opacity-0 until hover
     await page.getByTitle('Close tab').last().click({ force: true })
@@ -69,7 +71,7 @@ test.describe('Tabs', () => {
     // Make first tab dirty
     await page.getByPlaceholder('https://api.example.com/endpoint').fill('https://example.com/dirty')
     // Open a second tab
-    await page.getByTitle('New request tab (Ctrl+N)').click()
+    await page.getByTitle('New request tab (Ctrl+N)').first().click()
     await expect(page.getByRole('tab')).toHaveCount(2)
     // Switch to first (dirty) tab and close it
     await page.getByRole('tab').first().click()
