@@ -195,7 +195,9 @@ func (s *RequestService) Execute(input RequestInput) ResponseOutput {
 
 	resp, err := s.exec.Execute(ctx, resolved)
 	if err != nil {
-		return ResponseOutput{Error: err.Error()}
+		out := ResponseOutput{Error: err.Error()}
+		s.recordHistory(input, out)
+		return out
 	}
 
 	out := domainToOutput(resp)
