@@ -94,6 +94,7 @@ import {
   ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
   GetScenarioRunHistory as WailsGetScenarioRunHistory,
+  CancelScenario as WailsCancelScenario,
 } from '@wailsjs/go/main/ScenarioService'
 import {
   GetUserGuide as WailsGetUserGuide,
@@ -645,6 +646,10 @@ export async function loadScenario(path: string): Promise<ScenarioDetail> {
 export async function runScenario(path: string, envPath = '', fromStep = 0): Promise<ScenarioResult> {
   const result = await WailsRunScenario(path, envPath, fromStep)
   return result as unknown as ScenarioResult
+}
+
+export async function cancelScenario(): Promise<void> {
+  await WailsCancelScenario()
 }
 
 export async function loadScenarioRaw(path: string): Promise<string> {

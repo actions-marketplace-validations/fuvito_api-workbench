@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -149,6 +150,8 @@ type ScenarioService struct {
 	ctx       context.Context
 	workspace *WorkspaceService
 	settings  *SettingsService
+	mu        sync.Mutex
+	cancelRun context.CancelFunc
 }
 
 func NewScenarioService(ws *WorkspaceService, ss *SettingsService) *ScenarioService {
@@ -810,7 +813,18 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 	}
 
-	result := runner.RunFrom(s.ctx, sc, env, fromStep)
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.mu.Lock()
+	s.cancelRun = cancel
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		s.mu.Lock()
+		s.cancelRun = nil
+		s.mu.Unlock()
+	}()
+
+	result := runner.RunFrom(ctx, sc, env, fromStep)
 
 	out := ScenarioResultIO{
 		Title:      result.Scenario.Title,
@@ -912,6 +926,16 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	s.recordScenarioRun(path, out)
 
 	return out
+}
+
+// CancelScenario aborts the currently in-flight RunScenario call, if any.
+func (s *ScenarioService) CancelScenario() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelRun != nil {
+		s.cancelRun()
+		s.cancelRun = nil
+	}
 }
 
 // recordScenarioRun opens the history database and appends a run record.

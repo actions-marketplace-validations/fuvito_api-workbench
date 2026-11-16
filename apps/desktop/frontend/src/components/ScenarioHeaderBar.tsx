@@ -1,4 +1,4 @@
-import { Play, Loader2, CheckCircle2, Save, X, Clock, FileCode } from 'lucide-react'
+import { Play, Loader2, CheckCircle2, Save, X, Clock, FileCode, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioResult, EnvInfo } from '@/lib/bridge'
 
@@ -14,6 +14,7 @@ type Props = {
   running: boolean
   onShowStats: () => void
   onRun: () => void
+  onCancel?: () => void
   saveError: string | null
   savedFlash: boolean
   isDirty: boolean
@@ -25,7 +26,7 @@ type Props = {
 export function ScenarioHeaderBar({
   title, saving, detailLoaded,
   environments, selectedEnvPath, onEnvPathChange, onTitleChange,
-  result, running, onShowStats, onRun,
+  result, running, onShowStats, onRun, onCancel,
   saveError, savedFlash, isDirty,
   onDiscard, onSave, onShowYaml,
 }: Props) {
@@ -127,19 +128,29 @@ export function ScenarioHeaderBar({
         </span>
       )}
 
-      <button
-        type="button"
-        onClick={onRun}
-        disabled={running || !detailLoaded}
-        className={cn(
-          'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity bg-[var(--color-accent)] text-white',
-          (running || !detailLoaded) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
-        )}
-      >
-        {running
-          ? <><Loader2 size={12} className="animate-spin" /> Running…</>
-          : <><Play size={12} /> Run</>}
-      </button>
+      {running && onCancel ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors bg-amber-500/15 text-amber-400 hover:bg-amber-500/25"
+        >
+          <Square size={12} /> Stop
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={running || !detailLoaded}
+          className={cn(
+            'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity bg-[var(--color-accent)] text-white',
+            (running || !detailLoaded) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
+          )}
+        >
+          {running
+            ? <><Loader2 size={12} className="animate-spin" /> Running…</>
+            : <><Play size={12} /> Run</>}
+        </button>
+      )}
     </div>
   )
 }

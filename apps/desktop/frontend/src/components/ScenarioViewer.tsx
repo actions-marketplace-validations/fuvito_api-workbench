@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   loadScenario, runScenario, saveScenarioRaw, saveScenarioResult,
-  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage,
+  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario,
 } from '@/lib/bridge'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage } from '@/lib/bridge'
@@ -187,6 +187,11 @@ export function ScenarioViewer({
       onRunningChange(false)
       onRunComplete?.()
     }
+  }
+
+  function handleCancel() {
+    cancelScenario().catch(() => {})
+    // onRunningChange(false) will be called by handleRun/handleRunFrom's finally block
   }
 
   async function handleRunFrom(fromStep: number) {
@@ -394,6 +399,7 @@ export function ScenarioViewer({
         running={running}
         onShowStats={() => setShowStats(true)}
         onRun={handleRun}
+        onCancel={handleCancel}
         saveError={saveError}
         savedFlash={savedFlash}
         isDirty={visualDirty}

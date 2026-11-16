@@ -38,6 +38,7 @@ import {useDemo} from '@/hooks/useDemo'
 import type {ScanImportResult, HistoryEntry, ScenarioDetail} from '@/lib/bridge'
 import {
   cancelRequest,
+  cancelScenario,
   clearResponseCache,
   copyRequest,
   copyScenario,
@@ -307,6 +308,7 @@ export default function App() {
 
   function handleCancelRunAll() {
     runAllCancelRef.current = true
+    cancelScenario().catch(() => {})
   }
 
   async function handleRunScenarioFolder(folderPath: string) {
@@ -905,8 +907,22 @@ export default function App() {
         <QuickOpen
           fileTree={workspace.fileTree}
           scenarios={workspace.scenarioList}
+          environments={workspace.environments}
           onSelect={workspace.handleSelectFile}
           onSelectScenario={(path, name) => tabs.openScenarioAsTab(path, name)}
+          onSelectEnvironment={path => { workspace.handleEnvChange(path); setShowQuickOpen(false) }}
+          onNewRequest={() => { tabs.handleNewTab(); setShowQuickOpen(false) }}
+          onNewScenario={async () => {
+            setShowQuickOpen(false)
+            const result = await createScenario('New Scenario', '')
+            if (result.error || !result.path) { setAppError(result.error ?? 'Failed to create scenario'); return }
+            await workspace.refreshWorkspace()
+            tabs.openScenarioAsTab(result.path, 'New Scenario')
+            setRailTab('scenarios')
+            setSidebarOpen(true)
+            localStorage.setItem('ui.railTab', 'scenarios')
+            localStorage.setItem('ui.sidebarOpen', 'true')
+          }}
           onClose={() => setShowQuickOpen(false)}
         />
       )}
