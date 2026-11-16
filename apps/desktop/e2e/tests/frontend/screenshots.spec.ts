@@ -251,7 +251,6 @@ test('@screenshot scenario — visual editor', async ({ page }) => {
   await page.getByTitle('Scenarios').click()
   await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
   await page.getByText('Login').first().waitFor()
-  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await page.getByPlaceholder('Step label').first().waitFor()
 
   await page.screenshot({ path: shot('08-scenario-editor.png'), animations: 'disabled' })

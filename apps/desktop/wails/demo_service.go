@@ -58,6 +58,30 @@ func (d *DemoService) GetPort() int {
 	return d.port
 }
 
+// cleanupStaleDemoTempDirs removes any clrsig-demo-* directories left behind by
+// previous sessions that crashed before calling StopDemo.
+func cleanupStaleDemoTempDirs(currentTempDir string) {
+	base := os.TempDir()
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasPrefix(name, "clrsig-demo-") {
+			continue
+		}
+		full := filepath.Join(base, name)
+		if full == currentTempDir {
+			continue
+		}
+		os.RemoveAll(full) //nolint:errcheck
+	}
+}
+
 // StartDemo starts the in-process mock server, extracts the demo workspace to a
 // temp directory, and opens it. Safe to call when already running (returns current state).
 func (d *DemoService) StartDemo() DemoResult {
@@ -67,6 +91,8 @@ func (d *DemoService) StartDemo() DemoResult {
 	if d.server != nil {
 		return DemoResult{WorkspacePath: d.tempDir, Port: d.port}
 	}
+
+	cleanupStaleDemoTempDirs("")
 
 	port, err := findFreePort(8090)
 	if err != nil {

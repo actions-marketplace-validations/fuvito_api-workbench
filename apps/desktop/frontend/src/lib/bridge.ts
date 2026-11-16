@@ -44,6 +44,7 @@ import {
   SaveContentToFile as WailsSaveContentToFile,
   PickFile as WailsPickFile,
   ExportWorkspace as WailsExportWorkspace,
+  WorkspaceHasSecrets as WailsWorkspaceHasSecrets,
   ScanWorkspaceImport as WailsScanWorkspaceImport,
   ApplyWorkspaceImport as WailsApplyWorkspaceImport,
 } from '@wailsjs/go/main/WorkspaceService'
@@ -93,6 +94,7 @@ import {
   ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
   GetScenarioRunHistory as WailsGetScenarioRunHistory,
+  CancelScenario as WailsCancelScenario,
 } from '@wailsjs/go/main/ScenarioService'
 import {
   GetUserGuide as WailsGetUserGuide,
@@ -161,6 +163,7 @@ export interface HistoryEntry {
   headers: { name: string; value: string }[]
   bodyType: string
   bodyContent: string
+  auth?: AuthPayload
 }
 
 export interface FileNode {
@@ -646,6 +649,10 @@ export async function runScenario(path: string, envPath = '', fromStep = 0): Pro
   return result as unknown as ScenarioResult
 }
 
+export async function cancelScenario(): Promise<void> {
+  await WailsCancelScenario()
+}
+
 export async function loadScenarioRaw(path: string): Promise<string> {
   return (await WailsLoadScenarioRaw(path)) as unknown as string
 }
@@ -810,6 +817,10 @@ export interface ApplyImportResult {
 // Returns "" on success or an error message. Empty string also returned on cancel.
 export async function exportWorkspace(): Promise<string> {
   return (await WailsExportWorkspace()) as unknown as string
+}
+
+export async function workspaceHasSecrets(): Promise<boolean> {
+  return (await WailsWorkspaceHasSecrets()) as unknown as boolean
 }
 
 export async function scanWorkspaceImport(): Promise<ScanImportResult> {

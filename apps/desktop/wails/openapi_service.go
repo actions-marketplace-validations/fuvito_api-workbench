@@ -58,7 +58,7 @@ func (s *OpenAPIService) ImportOpenAPISpec(baseURL string) ImportResult {
 		},
 	})
 	if err != nil || path == "" {
-		return ImportResult{Error: "no file selected"}
+		return ImportResult{} // cancelled — no error
 	}
 
 	return s.importFromPath(path, baseURL)
@@ -177,6 +177,9 @@ func (s *OpenAPIService) saveGeneratedRequests(title, version string, reqs []ope
 			filename = "request"
 		}
 		savePath := filepath.Join(opDir, filename+".yaml")
+		if _, err := os.Stat(savePath); err == nil {
+			savePath = findNonConflictingPath(savePath)
+		}
 
 		if err := atomicWrite(savePath, yamlData); err != nil {
 			continue

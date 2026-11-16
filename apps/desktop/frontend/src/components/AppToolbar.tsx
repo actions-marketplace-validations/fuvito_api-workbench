@@ -87,29 +87,33 @@ export function AppToolbar({
       </div>
 
       <div className="ml-auto flex items-center gap-1 shrink-0">
-        <button type="button" onClick={onOpenRequest} title="Open request file"
-          className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
-          <FolderOpen size={13} />
-        </button>
-        {activeTab.kind !== 'scenario' && (
+        {activeTab.kind !== 'scenario' && activeTab.kind !== 'runner' && (
+          <button type="button" onClick={onOpenRequest} title="Open request file"
+            className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
+            <FolderOpen size={13} />
+          </button>
+        )}
+        {activeTab.kind !== 'scenario' && activeTab.kind !== 'runner' && (
           <button type="button" onClick={onSaveRequest} title="Save request (Ctrl+S)"
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
             <Save size={13} />
             <span>Save</span>
           </button>
         )}
-        <button type="button" onClick={onNewRequest} title="New request tab (Ctrl+N)"
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
-          <FilePlus size={13} />
-          <span>New</span>
-        </button>
-        {activeTab.kind !== 'scenario' && (
+        {activeTab.kind !== 'scenario' && activeTab.kind !== 'runner' && (
+          <button type="button" onClick={onNewRequest} title="New request tab (Ctrl+N)"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
+            <FilePlus size={13} />
+            <span>New</span>
+          </button>
+        )}
+        {activeTab.kind !== 'scenario' && activeTab.kind !== 'runner' && (
           <button type="button" onClick={onDuplicateTab} title="Duplicate tab"
             className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors">
             <CopyPlus size={13} />
           </button>
         )}
-        {activeTab.kind !== 'scenario' && <SnippetButton tab={activeTab} />}
+        {activeTab.kind !== 'scenario' && activeTab.kind !== 'runner' && <SnippetButton tab={activeTab} />}
       </div>
     </header>
   )

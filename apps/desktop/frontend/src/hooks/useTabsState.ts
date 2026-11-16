@@ -131,6 +131,17 @@ export function useTabsState(deps: {
     toClose.forEach(t => removeTab(t.id))
   }
 
+  function handleCloseAll() {
+    const { tabs: currentTabs } = tabsStateRef.current
+    const hasDirty = currentTabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingBulkClose({ tabIds: currentTabs.map(t => t.id) })
+      return
+    }
+    const blank = createBlankTab()
+    setTabsState({ tabs: [blank], activeTabId: blank.id })
+  }
+
   function confirmBulkClose() {
     if (!pendingBulkClose) return
     const { tabIds, returnToId } = pendingBulkClose
@@ -213,7 +224,10 @@ export function useTabsState(deps: {
   async function saveTabById(tabId: string): Promise<boolean> {
     const tab = tabsStateRef.current.tabs.find(t => t.id === tabId)
     if (!tab) return false
-    if (tab.kind === 'scenario') return false
+    if (tab.kind === 'scenario') {
+      updateTab(tabId, { scenarioSaveSignal: (tab.scenarioSaveSignal ?? 0) + 1 })
+      return true
+    }
     updateTab(tabId, { saveError: null })
     const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
     try {
@@ -271,15 +285,35 @@ export function useTabsState(deps: {
     const bodyType = (['none', 'json', 'raw', 'form-urlencoded', 'multipart'] as const).includes(entry.bodyType as never)
       ? entry.bodyType as BodyState['type'] : 'none'
     const body: BodyState = { type: bodyType, content: entry.bodyContent ?? '' }
-    const savedKey = computeStateKey(method, entry.url, [], headers, body, { type: 'none' }, null, 0)
+
+    const qIdx = entry.url.indexOf('?')
+    const baseUrl = qIdx >= 0 ? entry.url.slice(0, qIdx) : entry.url
+    const queryParams = qIdx >= 0
+      ? entry.url.slice(qIdx + 1).split('&').filter(Boolean).map(pair => {
+          const eqIdx = pair.indexOf('=')
+          const name = decodeURIComponent(eqIdx >= 0 ? pair.slice(0, eqIdx) : pair)
+          const value = eqIdx >= 0 ? decodeURIComponent(pair.slice(eqIdx + 1)) : ''
+          return { id: crypto.randomUUID(), name, value, enabled: true }
+        })
+      : []
+
+    let auth: import('@/types').AuthState = { type: 'none' }
+    const a = entry.auth
+    if (a && a.type !== 'none' && a.type !== '') {
+      if (a.type === 'bearer') auth = { type: 'bearer', token: a.token }
+      else if (a.type === 'basic') auth = { type: 'basic', username: a.username, password: a.password }
+      else if (a.type === 'apikey') auth = { type: 'apikey', key: a.key, value: a.value, location: (a.location as 'header' | 'query') || 'header' }
+    }
+
+    const savedKey = computeStateKey(method, baseUrl, queryParams, headers, body, auth, null, 0)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       method,
-      url: entry.url,
-      queryParams: [],
+      url: baseUrl,
+      queryParams,
       headers,
       body,
-      auth: { type: 'none' },
+      auth,
       timeoutMs: 0,
       name: null,
       filePath: null,
@@ -307,6 +341,38 @@ export function useTabsState(deps: {
   function handleNewRequestInFolder(folderPath: string) {
     const tab = createBlankTab(folderPath)
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
+  }
+
+  function openRunnerTab(): string {
+    const existing = tabsStateRef.current.tabs.find(t => t.kind === 'runner')
+    if (existing) {
+      switchTo(existing.id)
+      return existing.id
+    }
+    const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
+    const newTab: TabState = {
+      id: crypto.randomUUID(),
+      kind: 'runner',
+      name: 'Run Results',
+      method: 'GET',
+      url: '',
+      queryParams: [],
+      headers: [],
+      body: { type: 'none', content: '' },
+      auth: { type: 'none' },
+      timeoutMs: 0,
+      filePath: null,
+      targetDir: null,
+      savedKey: blankKey,
+      response: null,
+      previousResponse: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
+    return newTab.id
   }
 
   function openCoverageTab(): string {
@@ -408,12 +474,12 @@ export function useTabsState(deps: {
     tabs, activeTabId, activeTab,
     setTabsState, tabsStateRef,
     updateTab, switchTo, removeTab,
-    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight, confirmBulkClose,
+    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight, handleCloseAll, confirmBulkClose,
     openFileAsTab, loadCacheIntoTab,
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest, handleSaveAll,
     handleSelectHistory, handleNewRequestInFolder,
-    openCoverageTab, openScenarioAsTab,
+    openRunnerTab, openCoverageTab, openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,
     closingDirtyScenarioTabId, setClosingDirtyScenarioTabId,
     pendingBulkClose, setPendingBulkClose,

@@ -157,6 +157,7 @@ export type RequestEditorProps = {
   onPickFile?: () => Promise<string>
   onSend: () => void
   onCancel?: () => void
+  onCreateVariable?: (name: string) => void
 }
 
 export function RequestEditor({
@@ -164,7 +165,7 @@ export function RequestEditor({
   queryParams, headers, body, auth, timeoutMs, envVarMap,
   onMethodChange, onUrlChange, onUrlPaste,
   onQueryParamsChange, onHeadersChange, onBodyChange, onAuthChange,
-  onTimeoutChange, onPickFile, onSend, onCancel,
+  onTimeoutChange, onPickFile, onSend, onCancel, onCreateVariable,
 }: RequestEditorProps) {
   const [activeTab, setActiveTab] = useState<RequestEditorTab>('Params')
 
@@ -264,6 +265,19 @@ export function RequestEditor({
           {urlVarNames.map(name => {
             const resolved = envVarMap[name]
             const missing = resolved === undefined
+            if (missing && onCreateVariable) {
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => onCreateVariable(name)}
+                  className="text-[10px] font-mono text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                  title="Click to add this variable to the active environment"
+                >
+                  ⚠ {name}
+                </button>
+              )
+            }
             return (
               <span
                 key={name}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -149,6 +150,8 @@ type ScenarioService struct {
 	ctx       context.Context
 	workspace *WorkspaceService
 	settings  *SettingsService
+	mu        sync.Mutex
+	cancelRun context.CancelFunc
 }
 
 func NewScenarioService(ws *WorkspaceService, ss *SettingsService) *ScenarioService {
@@ -810,7 +813,18 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 	}
 
-	result := runner.RunFrom(s.ctx, sc, env, fromStep)
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.mu.Lock()
+	s.cancelRun = cancel
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		s.mu.Lock()
+		s.cancelRun = nil
+		s.mu.Unlock()
+	}()
+
+	result := runner.RunFrom(ctx, sc, env, fromStep)
 
 	out := ScenarioResultIO{
 		Title:      result.Scenario.Title,
@@ -912,6 +926,16 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	s.recordScenarioRun(path, out)
 
 	return out
+}
+
+// CancelScenario aborts the currently in-flight RunScenario call, if any.
+func (s *ScenarioService) CancelScenario() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelRun != nil {
+		s.cancelRun()
+		s.cancelRun = nil
+	}
 }
 
 // recordScenarioRun opens the history database and appends a run record.
@@ -1062,7 +1086,13 @@ func (s *ScenarioService) ListAccumulatedCoverage() []AccumulatedCoverageIO {
 // Returns the raw bytes and a format hint ("yaml" or "json").
 func loadSpecBytes(specRef, scenarioDir string) (data []byte, format string, err error) {
 	if strings.HasPrefix(specRef, "http://") || strings.HasPrefix(specRef, "https://") {
-		resp, httpErr := http.Get(specRef) //nolint:noctx
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, specRef, nil)
+		if reqErr != nil {
+			return nil, "", reqErr
+		}
+		resp, httpErr := http.DefaultClient.Do(req)
 		if httpErr != nil {
 			return nil, "", httpErr
 		}

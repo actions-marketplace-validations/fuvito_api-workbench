@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { inputCls } from '@/lib/styles'
+import type { ScenarioInfo } from '@/lib/bridge'
 
 export function DeleteRequestDialog({
   filePath,
@@ -319,6 +321,164 @@ export function DeleteScenarioDialog({
             Delete
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+export function ExportSecretsWarningDialog({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-foreground)]">Export contains secrets</h3>
+          <p className="text-xs text-[var(--color-muted-foreground)] mt-1">
+            This workspace has environment variables marked as secrets. They will be included in the ZIP as plaintext. Only share the export with people you trust.
+          </p>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-3 py-1 text-xs rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+          >
+            Export anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function NewScenarioFromResponseDialog({
+  defaultName,
+  value,
+  onChange,
+  onCancel,
+  onConfirm,
+  scenarios = [],
+  onAddToExisting,
+}: {
+  defaultName: string
+  value: string
+  onChange: (v: string) => void
+  onCancel: () => void
+  onConfirm: () => void
+  scenarios?: ScenarioInfo[]
+  onAddToExisting?: (path: string, title: string) => void
+}) {
+  const hasExisting = scenarios.length > 0 && !!onAddToExisting
+  const [mode, setMode] = useState<'new' | 'existing'>('new')
+  const [selectedPath, setSelectedPath] = useState(scenarios[0]?.path ?? '')
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-semibold text-[var(--color-foreground)]">Add to scenario</h3>
+
+        {hasExisting && (
+          <div className="flex rounded overflow-hidden border border-[var(--color-border)] text-xs">
+            {(['new', 'existing'] as const).map(m => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={cn(
+                  'flex-1 py-1 transition-colors',
+                  mode === m
+                    ? 'bg-[var(--color-accent)] text-white'
+                    : 'bg-[var(--color-muted)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]',
+                )}
+              >
+                {m === 'new' ? 'New scenario' : 'Add to existing'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === 'new' ? (
+          <>
+            <p className="text-xs text-[var(--color-muted-foreground)] -mt-2">
+              Creates a new scenario with this request as its first step.
+            </p>
+            <input
+              autoFocus
+              type="text"
+              value={value}
+              onChange={e => onChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && value.trim()) onConfirm()
+                if (e.key === 'Escape') onCancel()
+              }}
+              placeholder={defaultName}
+              className={cn(inputCls, 'w-full px-3 py-1.5')}
+            />
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={onCancel}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={onConfirm} disabled={!value.trim()}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-40">
+                Create
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-[var(--color-muted-foreground)] -mt-2">
+              Appends this request as a new step in the selected scenario.
+            </p>
+            <select
+              autoFocus
+              value={selectedPath}
+              onChange={e => setSelectedPath(e.target.value)}
+              className={cn(inputCls, 'w-full px-3 py-1.5')}
+            >
+              {scenarios.map(s => (
+                <option key={s.path} value={s.path}>{s.title}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={onCancel}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors">
+                Cancel
+              </button>
+              <button type="button" onClick={() => {
+                const s = scenarios.find(x => x.path === selectedPath)
+                if (s) onAddToExisting!(s.path, s.title)
+              }} disabled={!selectedPath}
+                className="px-3 py-1 text-xs rounded bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-40">
+                Add step
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

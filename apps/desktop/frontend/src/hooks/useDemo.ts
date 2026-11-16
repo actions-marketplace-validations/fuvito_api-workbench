@@ -16,6 +16,7 @@ export function useDemo(deps: {
 
   const [demoRunning, setDemoRunning] = useState(false)
   const [demoPort, setDemoPort] = useState(0)
+  const [demoWorkspacePath, setDemoWorkspacePath] = useState('')
   const [demoStarting, setDemoStarting] = useState(false)
 
   async function handleStartDemo() {
@@ -29,6 +30,7 @@ export function useDemo(deps: {
       }
       setDemoRunning(true)
       setDemoPort(result.port)
+      setDemoWorkspacePath(result.workspacePath ?? '')
       const tree = await refreshWorkspace()
       await Promise.all([openFirstFileInTree(tree), refreshHistory()])
     } catch (err) {
@@ -41,25 +43,34 @@ export function useDemo(deps: {
   async function handleStopDemo() {
     try {
       const port = demoPort
+      const wsPath = demoWorkspacePath
       await stopDemo()
       setDemoRunning(false)
       setDemoPort(0)
-      if (port > 0) {
-        setTabsState(prev => {
-          const prefix = `http://localhost:${port}`
-          const remaining = prev.tabs.filter(t => !t.url.startsWith(prefix))
-          if (remaining.length === prev.tabs.length) return prev
-          if (remaining.length === 0) {
-            const blank = createBlankTab()
-            return { tabs: [blank], activeTabId: blank.id }
-          }
-          const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
-          return {
-            tabs: remaining,
-            activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
-          }
-        })
-      }
+      setDemoWorkspacePath('')
+      setTabsState(prev => {
+        const urlPrefix = port > 0 ? `http://localhost:${port}` : null
+        const normWs = wsPath ? wsPath.replace(/\\/g, '/') : null
+        const isDemoTab = (t: TabState): boolean => {
+          if (urlPrefix && t.url.startsWith(urlPrefix)) return true
+          const fp = (t.filePath ?? '').replace(/\\/g, '/')
+          if (normWs && fp.startsWith(normWs)) return true
+          const sp = (t.scenarioPath ?? '').replace(/\\/g, '/')
+          if (normWs && sp.startsWith(normWs)) return true
+          return false
+        }
+        const remaining = prev.tabs.filter(t => !isDemoTab(t))
+        if (remaining.length === prev.tabs.length) return prev
+        if (remaining.length === 0) {
+          const blank = createBlankTab()
+          return { tabs: [blank], activeTabId: blank.id }
+        }
+        const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
+        return {
+          tabs: remaining,
+          activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
+        }
+      })
       await refreshWorkspace()
     } catch (err) {
       console.error('demo stop error:', err)
@@ -69,10 +80,11 @@ export function useDemo(deps: {
   function clearDemoState() {
     setDemoRunning(false)
     setDemoPort(0)
+    setDemoWorkspacePath('')
   }
 
   return {
-    demoRunning, demoPort, demoStarting,
+    demoRunning, demoPort, demoWorkspacePath, demoStarting,
     handleStartDemo, handleStopDemo, clearDemoState,
   }
 }

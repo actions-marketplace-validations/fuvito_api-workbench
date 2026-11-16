@@ -1,4 +1,4 @@
-import { FolderOpen, FolderPlus, Play, Clock, ChevronRight, Loader2 } from 'lucide-react'
+import { FolderOpen, FolderPlus, Play, Clock, ChevronRight, Loader2, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -38,12 +38,27 @@ export function LandingPage({
 
         {/* Primary actions */}
         <div className="flex flex-col gap-2 w-full">
+          {recentWorkspaces.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onOpenRecentWorkspace(recentWorkspaces[0])}
+              className={cn(
+                'flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold',
+                'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity',
+              )}
+            >
+              <RotateCcw size={15} className="shrink-0" />
+              <span className="flex-1 text-left truncate">Resume {workspaceName(recentWorkspaces[0])}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onNewWorkspace}
             className={cn(
-              'flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-semibold',
-              'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity',
+              'flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm',
+              recentWorkspaces.length === 0
+                ? 'bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity font-semibold'
+                : 'bg-[var(--color-muted)] text-[var(--color-foreground)] border border-[var(--color-border)] hover:bg-[var(--color-border)] transition-colors',
             )}
           >
             <FolderPlus size={15} className="shrink-0" />
@@ -68,6 +83,7 @@ export function LandingPage({
           <p className="text-xs font-semibold text-[var(--color-foreground)] mb-1">Not sure where to start?</p>
           <p className="text-[11px] text-[var(--color-muted-foreground)] mb-3 leading-relaxed">
             Launch a local sample API server and explore Clear Signal in one click.
+            {' '}<span className="text-[var(--color-muted-foreground)]/60">Opens a temporary demo workspace.</span>
           </p>
           {demoRunning ? (
             <button

@@ -1,22 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { loadScenario, runScenario, loadScenarioRaw, saveScenarioRaw, saveScenarioResult, loadScenarioResult, validateScenarioYAML, getAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
+import {
+  loadScenario, runScenario, saveScenarioRaw, saveScenarioResult,
+  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario,
+} from '@/lib/bridge'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
 import { ScenarioHeaderBar } from './ScenarioHeaderBar'
+import { ScenarioMetaSection } from './ScenarioMetaSection'
 import { StepListPanel } from './ScenarioStepListPanel'
 import { StepDetailPane } from './ScenarioDetailPane'
-import { YamlEditorPane } from './ScenarioYamlPane'
+import { ScenarioYamlDialog } from './ScenarioYamlDialog'
 import { CoverageBanner } from './ScenarioCoverageBanner'
 import { ScenarioStatsDialog } from './ScenarioStatsDialog'
-
-// ---- Props ----
 
 type Props = {
   scenarioPath: string
   scenarioName: string
   result: ScenarioResult | null
   running: boolean
+  isActive?: boolean
+  saveSignal?: number
   theme?: 'dark' | 'light'
   environments?: EnvInfo[]
   activeEnvPath?: string
@@ -26,24 +30,18 @@ type Props = {
   onRunComplete?: () => void
 }
 
-// ---- Main component ----
-
-export function ScenarioViewer({ scenarioPath, scenarioName, result, running, theme = 'dark', environments = [], activeEnvPath = '', onResultChange, onRunningChange, onDirtyChange, onRunComplete }: Props) {
+export function ScenarioViewer({
+  scenarioPath, scenarioName, result, running, isActive = true, saveSignal, theme = 'dark',
+  environments = [], activeEnvPath = '',
+  onResultChange, onRunningChange, onDirtyChange, onRunComplete,
+}: Props) {
   const [detail, setDetail] = useState<ScenarioDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedEnvPath, setSelectedEnvPath] = useState(activeEnvPath)
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null)
 
-  const [mode, setMode] = useState<'view' | 'visual' | 'yaml'>('view')
+  const [showYamlDialog, setShowYamlDialog] = useState(false)
 
-  // YAML editor state
-  const [rawContent, setRawContent] = useState('')
-  const [editorContent, setEditorContent] = useState('')
-  const [loadingRaw, setLoadingRaw] = useState(false)
-  const [rawError, setRawError] = useState<string | null>(null)
-  const [yamlCheckState, setYamlCheckState] = useState<'idle' | 'checking' | 'valid'>('idle')
-
-  // Visual editor state
   const [visualDetail, setVisualDetail] = useState<ScenarioDetail | null>(null)
   const [visualDirty, setVisualDirty] = useState(false)
 
@@ -53,9 +51,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   const [accumulatedCoverage, setAccumulatedCoverage] = useState<AccumulatedCoverage | null>(null)
-
-  const [leftPanelWidth, setLeftPanelWidth] = useState(320)
+  const [leftPanelPct, setLeftPanelPct] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('ui.scenarioStepPanelPct'))
+    return isNaN(saved) || saved === 0 ? 35 : Math.min(50, Math.max(20, saved))
+  })
+  const leftPanelPctRef = useRef(leftPanelPct)
   const [showStats, setShowStats] = useState(false)
+
   const containerRef = useRef<HTMLDivElement>(null)
   const stepListRef = useRef<HTMLDivElement>(null)
   const selectedStepIndexRef = useRef<number | null>(null)
@@ -67,10 +69,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setPrevScenarioPath(scenarioPath)
     setDetail(null)
     setLoadError(null)
-    setMode('view')
-    setRawContent('')
-    setEditorContent('')
-    setRawError(null)
+    setShowYamlDialog(false)
     setSaveError(null)
     setVisualDetail(null)
     setVisualDirty(false)
@@ -79,14 +78,39 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setAccumulatedCoverage(null)
   }
 
+  function initDraft(d: ScenarioDetail) {
+    setVisualDetail({
+      ...d,
+      steps: d.steps.map(s => ({
+        ...s,
+        notes: s.notes ?? '',
+        headers: s.headers ? [...s.headers] : [],
+        queryParams: s.queryParams ? [...s.queryParams] : [],
+        bodyType: s.bodyType ?? 'none',
+        bodyContent: s.bodyContent ?? '',
+        assertions: [...(s.assertions ?? [])],
+        extractions: [...(s.extractions ?? [])],
+        timeoutMs: s.timeoutMs ?? 0,
+        retryMaxAttempts: s.retryMaxAttempts ?? 0,
+        retryDelayMs: s.retryDelayMs ?? 1000,
+      })),
+    })
+    setVisualDirty(false)
+  }
+
   function handleDividerMouseDown(e: React.MouseEvent) {
     e.preventDefault()
     const startX = e.clientX
-    const startWidth = leftPanelWidth
+    const startPct = leftPanelPct
+    const containerWidth = containerRef.current?.clientWidth ?? 800
     function onMouseMove(ev: MouseEvent) {
-      setLeftPanelWidth(Math.max(200, Math.min(600, startWidth + (ev.clientX - startX))))
+      const deltaPct = ((ev.clientX - startX) / containerWidth) * 100
+      const clamped = Math.min(50, Math.max(20, startPct + deltaPct))
+      leftPanelPctRef.current = clamped
+      setLeftPanelPct(clamped)
     }
     function onMouseUp() {
+      localStorage.setItem('ui.scenarioStepPanelPct', String(Math.round(leftPanelPctRef.current)))
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
     }
@@ -94,15 +118,14 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     document.addEventListener('mouseup', onMouseUp)
   }
 
-  // Load scenario data when path changes
   useEffect(() => {
     loadScenario(scenarioPath)
       .then(d => {
         if (d.error) setLoadError(d.error)
         else {
           setDetail(d)
+          initDraft(d)
           if (d.steps.length > 0) setSelectedStepIndex(0)
-          // Load accumulated coverage from the workspace store if the scenario has a specFile
           if (d.specFile) {
             getAccumulatedCoverage(d.specFile)
               .then(acc => { if (acc) setAccumulatedCoverage(acc) })
@@ -116,17 +139,15 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
       .catch(() => {})
   }, [scenarioPath]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll selected step into view and focus the row for keyboard users
   useEffect(() => {
     if (selectedStepIndex === null || !stepListRef.current) return
     const row = stepListRef.current.querySelectorAll<HTMLElement>('[role="option"]')[selectedStepIndex]
     row?.scrollIntoView({ block: 'nearest' })
   }, [selectedStepIndex])
 
-  // Keyboard shortcuts: Alt+Up/Down to reorder steps in visual edit mode
   useEffect(() => {
-    if (mode !== 'visual') return
     function handleKey(e: KeyboardEvent) {
+      if (!isActive) return
       if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
       e.preventDefault()
       const idx = selectedStepIndexRef.current
@@ -135,7 +156,15 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [mode])
+  }, [isActive])
+
+  const handleSaveRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false))
+  useEffect(() => { handleSaveRef.current = handleSave })
+
+  useEffect(() => {
+    if (saveSignal === undefined || saveSignal === 0) return
+    handleSaveRef.current()
+  }, [saveSignal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyRunResult(r: ScenarioResult) {
     onResultChange(r)
@@ -144,6 +173,7 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   }
 
   async function handleRun() {
+    if (visualDirty && !(await handleSave())) return
     onRunningChange(true)
     onResultChange(null)
     try {
@@ -159,7 +189,13 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     }
   }
 
+  function handleCancel() {
+    cancelScenario().catch(() => {})
+    // onRunningChange(false) will be called by handleRun/handleRunFrom's finally block
+  }
+
   async function handleRunFrom(fromStep: number) {
+    if (visualDirty && !(await handleSave())) return
     onRunningChange(true)
     onResultChange(null)
     try {
@@ -183,46 +219,12 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setAccumulatedCoverage(null)
   }
 
-  async function handleEnterYaml() {
-    setLoadingRaw(true)
-    setRawError(null)
-    try {
-      const raw = await loadScenarioRaw(scenarioPath)
-      setRawContent(raw)
-      setEditorContent(raw)
-      setMode('yaml')
-    } catch (e) {
-      setRawError(String(e))
-    } finally {
-      setLoadingRaw(false)
-    }
+  function updateMeta(patch: { title?: string; description?: string; specFile?: string }) {
+    if (!visualDetail) return
+    setVisualDetail({ ...visualDetail, ...patch })
+    setVisualDirty(true)
   }
 
-  function handleEnterVisual() {
-    if (!detail) return
-    const vd: ScenarioDetail = {
-      ...detail,
-      steps: detail.steps.map(s => ({
-        ...s,
-        notes: s.notes ?? '',
-        headers: s.headers ? [...s.headers] : [],
-        queryParams: s.queryParams ? [...s.queryParams] : [],
-        bodyType: s.bodyType ?? 'none',
-        bodyContent: s.bodyContent ?? '',
-        assertions: [...(s.assertions ?? [])],
-        extractions: [...(s.extractions ?? [])],
-        timeoutMs: s.timeoutMs ?? 0,
-        retryMaxAttempts: s.retryMaxAttempts ?? 0,
-        retryDelayMs: s.retryDelayMs ?? 1000,
-      })),
-    }
-    setVisualDetail(vd)
-    setVisualDirty(false)
-    if (selectedStepIndex === null && vd.steps.length > 0) setSelectedStepIndex(0)
-    setMode('visual')
-  }
-
-  // Visual editor step management
   function updateVisualStep(i: number, updates: Partial<StepDetail>) {
     if (!visualDetail) return
     setVisualDetail({ ...visualDetail, steps: visualDetail.steps.map((s, idx) => idx === i ? { ...s, ...updates } : s) })
@@ -285,7 +287,14 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
   function duplicateVisualStep(i: number) {
     if (!visualDetail) return
     const src = visualDetail.steps[i]
-    const copy: StepDetail = { ...src, label: `${src.label} copy`, assertions: [...src.assertions], extractions: [...src.extractions], headers: [...(src.headers ?? [])], queryParams: [...(src.queryParams ?? [])] }
+    const copy: StepDetail = {
+      ...src,
+      label: `${src.label} copy`,
+      assertions: [...src.assertions],
+      extractions: [...src.extractions],
+      headers: [...(src.headers ?? [])],
+      queryParams: [...(src.queryParams ?? [])],
+    }
     const newSteps = [...visualDetail.steps.slice(0, i + 1), copy, ...visualDetail.steps.slice(i + 1)]
     setVisualDetail({ ...visualDetail, steps: newSteps })
     setVisualDirty(true)
@@ -300,137 +309,125 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
     setVisualDirty(true)
   }
 
-  async function handleCheckYaml() {
-    setYamlCheckState('checking')
-    setRawError(null)
-    const err = await validateScenarioYAML(editorContent)
-    if (err) {
-      setRawError(err)
-      setYamlCheckState('idle')
-    } else {
-      setYamlCheckState('valid')
-      setTimeout(() => setYamlCheckState('idle'), 2000)
-    }
-  }
-
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
+    if (!visualDetail) return false
     setSaving(true)
     setSaveError(null)
-    // Validate visual editor state before serializing
-    if (mode === 'visual' && visualDetail) {
-      for (const step of visualDetail.steps) {
-        for (const a of step.assertions) {
-          if ((a.type === 'jsonpath' || a.type === 'header') && !a.path?.trim()) {
-            setSaveError(`Step "${step.label}": ${a.type} assertion requires a path.`)
-            setSaving(false)
-            return
-          }
+    for (const step of visualDetail.steps) {
+      for (const a of step.assertions) {
+        if ((a.type === 'jsonpath' || a.type === 'header') && !a.path?.trim()) {
+          setSaveError(`Step "${step.label}": ${a.type} assertion requires a path.`)
+          setSaving(false)
+          return false
         }
-        for (const e of step.extractions) {
-          if (!e.name?.trim()) {
-            setSaveError(`Step "${step.label}": extraction is missing a variable name.`)
-            setSaving(false)
-            return
-          }
+      }
+      for (const e of step.extractions) {
+        if (!e.name?.trim()) {
+          setSaveError(`Step "${step.label}": extraction is missing a variable name.`)
+          setSaving(false)
+          return false
         }
       }
     }
     try {
-      const content = mode === 'yaml' ? editorContent : serializeScenarioToYAML(visualDetail!)
+      const content = serializeScenarioToYAML(visualDetail)
       const err = await saveScenarioRaw(scenarioPath, content)
-      if (err) { setSaveError(err); return }
-      if (mode === 'yaml') setRawContent(editorContent)
+      if (err) { setSaveError(err); return false }
       const d = await loadScenario(scenarioPath)
-      if (d.error) setLoadError(d.error); else setDetail(d)
+      if (d.error) setLoadError(d.error); else { setDetail(d); initDraft(d) }
       onResultChange(null)
-      setVisualDirty(false)
       setSavedFlash(true)
-      setTimeout(() => { setSavedFlash(false); setMode('view') }, 1500)
+      setTimeout(() => setSavedFlash(false), 1500)
+      return true
     } catch (e) {
       setSaveError(String(e))
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveYaml(content: string): Promise<string | null> {
+    setSaving(true)
+    try {
+      const err = await saveScenarioRaw(scenarioPath, content)
+      if (err) return err
+      const d = await loadScenario(scenarioPath)
+      if (d.error) { setLoadError(d.error); return d.error }
+      setDetail(d)
+      initDraft(d)
+      onResultChange(null)
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1500)
+      setShowYamlDialog(false)
+      return null
+    } catch (e) {
+      return String(e)
     } finally {
       setSaving(false)
     }
   }
 
   function doDiscard() {
-    if (mode === 'yaml') setEditorContent(rawContent)
-    setVisualDirty(false)
+    if (detail) initDraft(detail)
     setSaveError(null)
-    setMode('view')
   }
 
   function handleDiscard() {
-    if (isDirty) { setShowDiscardConfirm(true); return }
+    if (visualDirty) { setShowDiscardConfirm(true); return }
     doDiscard()
   }
 
-  const isEditing = mode === 'visual' || mode === 'yaml'
-  const isDirty = (mode === 'yaml' && editorContent !== rawContent) || (mode === 'visual' && visualDirty)
-
-  useEffect(() => { onDirtyChange?.(isDirty) }, [isDirty]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onDirtyChange?.(visualDirty) }, [visualDirty]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const passed = result ? (result.steps ?? []).filter(s => s.passed && !s.skipped).length : 0
   const failed = result ? (result.steps ?? []).filter(s => !s.passed && !s.skipped).length : 0
   const skipped = result ? (result.steps ?? []).filter(s => s.skipped).length : 0
 
-  // Current steps list (view: from loaded detail, edit: from visualDetail)
-  const viewSteps = detail?.steps ?? []
-  const editSteps = visualDetail?.steps ?? []
-
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
 
       <ScenarioHeaderBar
-        title={detail?.title ?? scenarioName}
-        description={detail?.description}
-        mode={mode}
-        isEditing={isEditing}
+        title={visualDetail?.title ?? scenarioName}
         saving={saving}
-        loadingRaw={loadingRaw}
         detailLoaded={!!detail}
         environments={environments}
         selectedEnvPath={selectedEnvPath}
         onEnvPathChange={setSelectedEnvPath}
+        onTitleChange={t => updateMeta({ title: t })}
         result={result}
         running={running}
         onShowStats={() => setShowStats(true)}
         onRun={handleRun}
+        onCancel={handleCancel}
         saveError={saveError}
         savedFlash={savedFlash}
-        isDirty={isDirty}
-        onModeView={() => setMode('view')}
-        onEnterVisual={handleEnterVisual}
-        onEnterYaml={handleEnterYaml}
+        isDirty={visualDirty}
         onDiscard={handleDiscard}
         onSave={handleSave}
-        onCheckYaml={handleCheckYaml}
-        yamlCheckState={yamlCheckState}
+        onShowYaml={() => setShowYamlDialog(true)}
       />
 
-      {/* Progress bar */}
       {running && (
         <div className="shrink-0 h-1 bg-[var(--color-border)] overflow-hidden">
-          <div className="h-full w-1/3 bg-[var(--color-accent)] opacity-80 animate-[slide_1.4s_ease-in-out_infinite]"
-            style={{animation: 'slide 1.4s ease-in-out infinite'}} />
+          <div className="h-full w-1/3 bg-[var(--color-accent)] opacity-80"
+            style={{ animation: 'slide 1.4s ease-in-out infinite' }} />
         </div>
       )}
       {result && !running && (passed + failed + skipped) > 0 && (
         <div className="shrink-0 h-1 flex">
-          {passed   > 0 && <div className="bg-emerald-500 transition-all" style={{flex: passed}} />}
-          {failed   > 0 && <div className="bg-red-500 transition-all"     style={{flex: failed}} />}
-          {skipped  > 0 && <div className="bg-[var(--color-muted-foreground)]/30 transition-all" style={{flex: skipped}} />}
+          {passed  > 0 && <div className="bg-emerald-500 transition-all" style={{ flex: passed }} />}
+          {failed  > 0 && <div className="bg-red-500 transition-all" style={{ flex: failed }} />}
+          {skipped > 0 && <div className="bg-[var(--color-muted-foreground)]/30 transition-all" style={{ flex: skipped }} />}
         </div>
       )}
 
-      {/* specFile load error — shown when specFile is set but couldn't be loaded */}
       {result?.specError && !running && (
         <div className="shrink-0 px-4 py-2 text-xs text-amber-400 bg-amber-500/10 border-b border-amber-500/20">
           <span className="font-semibold">specFile warning: </span>{result.specError}
         </div>
       )}
 
-      {/* Coverage banner — shows accumulated coverage (across runs) or per-run when no history yet */}
       {(accumulatedCoverage || result?.coverage) && !running && (
         <CoverageBanner
           coverage={result?.coverage}
@@ -439,61 +436,61 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         />
       )}
 
-      {/* Body */}
-      {mode === 'yaml' ? (
-        <YamlEditorPane theme={theme} value={editorContent} error={rawError} onChange={v => { setEditorContent(v); if (yamlCheckState !== 'idle') setYamlCheckState('idle'); if (rawError) setRawError(null) }} />
-      ) : (
-        <div ref={containerRef} className="flex-1 flex overflow-hidden">
+      {visualDetail && (
+        <ScenarioMetaSection
+          description={visualDetail.description ?? ''}
+          specFile={visualDetail.specFile ?? ''}
+          onChange={updateMeta}
+        />
+      )}
 
-          {/* Left panel: step list */}
-          <StepListPanel
-            width={leftPanelWidth}
-            mode={mode}
-            listRef={stepListRef}
-            loadError={loadError}
-            detailLoaded={!!detail}
-            viewSteps={viewSteps}
-            editSteps={editSteps}
-            visualDetail={visualDetail}
-            onMetaChange={patch => { if (visualDetail) { setVisualDetail({ ...visualDetail, ...patch }); setVisualDirty(true) } }}
-            selectedStepIndex={selectedStepIndex}
-            onSelectStep={setSelectedStepIndex}
-            result={result}
-            running={running}
-            onRunFrom={handleRunFrom}
-            onMoveStep={moveVisualStep}
-            onRemoveStep={removeVisualStep}
-            onDuplicateStep={duplicateVisualStep}
-            onToggleDisabled={toggleVisualStepDisabled}
-            onAddStep={addVisualStep}
-          />
+      <div ref={containerRef} className="flex-1 flex overflow-hidden">
+        <StepListPanel
+          widthPct={leftPanelPct}
+          listRef={stepListRef}
+          loadError={loadError}
+          detailLoaded={!!detail}
+          steps={visualDetail?.steps ?? []}
+          selectedStepIndex={selectedStepIndex}
+          onSelectStep={setSelectedStepIndex}
+          result={result}
+          running={running}
+          onMoveStep={moveVisualStep}
+          onRemoveStep={removeVisualStep}
+          onDuplicateStep={duplicateVisualStep}
+          onToggleDisabled={toggleVisualStepDisabled}
+          onAddStep={addVisualStep}
+        />
 
-          {/* Draggable divider */}
-          <div
-            onMouseDown={handleDividerMouseDown}
-            className="group w-[5px] shrink-0 cursor-col-resize flex items-center justify-center hover:bg-[var(--color-accent)]/15 transition-colors active:bg-[var(--color-accent)]/25"
-            title="Drag to resize"
-          >
-            <div className="w-px h-full bg-[var(--color-border)] group-hover:bg-[var(--color-accent)] transition-colors" />
-          </div>
-
-          {/* Right panel */}
-          <StepDetailPane
-            mode={mode}
-            running={running}
-            detail={detail}
-            visualDetail={visualDetail}
-            result={result}
-            selectedStepIndex={selectedStepIndex}
-            editStepCount={editSteps.length}
-            onRunFrom={handleRunFrom}
-            onUpdateStep={updateVisualStep}
-            onRemoveStep={removeVisualStep}
-            onMoveStep={moveVisualStep}
-            onToggleDisabled={toggleVisualStepDisabled}
-          />
-
+        <div
+          onMouseDown={handleDividerMouseDown}
+          className="group w-[5px] shrink-0 cursor-col-resize flex items-center justify-center hover:bg-[var(--color-accent)]/15 transition-colors active:bg-[var(--color-accent)]/25"
+          title="Drag to resize"
+        >
+          <div className="w-px h-full bg-[var(--color-border)] group-hover:bg-[var(--color-accent)] transition-colors" />
         </div>
+
+        <StepDetailPane
+          visualDetail={visualDetail}
+          result={result}
+          running={running}
+          selectedStepIndex={selectedStepIndex}
+          editStepCount={visualDetail?.steps.length ?? 0}
+          onUpdateStep={updateVisualStep}
+          onRemoveStep={removeVisualStep}
+          onMoveStep={moveVisualStep}
+          onToggleDisabled={toggleVisualStepDisabled}
+          onRunFrom={handleRunFrom}
+        />
+      </div>
+
+      {showYamlDialog && visualDetail && (
+        <ScenarioYamlDialog
+          theme={theme}
+          initialContent={serializeScenarioToYAML(visualDetail)}
+          onSave={handleSaveYaml}
+          onClose={() => setShowYamlDialog(false)}
+        />
       )}
 
       {showDiscardConfirm && (
@@ -504,7 +501,6 @@ export function ScenarioViewer({ scenarioPath, scenarioName, result, running, th
         />
       )}
 
-      {/* Stats dialog */}
       {showStats && result && (
         <ScenarioStatsDialog result={result} onClose={() => setShowStats(false)} />
       )}

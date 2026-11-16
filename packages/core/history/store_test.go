@@ -18,11 +18,11 @@ func TestStoreRecordAndRecent(t *testing.T) {
 	defer store.Close()
 
 	headers := []history.Header{{Name: "Accept", Value: "application/json"}, {Name: "Authorization", Value: "Bearer secret"}}
-	id1, err := store.Record("/ws/alpha", "GET", "https://example.com/api/users", 200, "200 OK", 123, 456, headers, "none", "")
+	id1, err := store.Record("/ws/alpha", "GET", "https://example.com/api/users", 200, "200 OK", 123, 456, headers, "none", "", "")
 	if err != nil {
 		t.Fatalf("Record 1: %v", err)
 	}
-	id2, err := store.Record("/ws/alpha", "POST", "https://example.com/api/items", 201, "201 Created", 50, 128, nil, "json", `{"name":"test"}`)
+	id2, err := store.Record("/ws/alpha", "POST", "https://example.com/api/items", 201, "201 Created", 50, 128, nil, "json", `{"name":"test"}`, "")
 	if err != nil {
 		t.Fatalf("Record 2: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestStoreRecentLimit(t *testing.T) {
 	defer store.Close()
 
 	for i := range 5 {
-		if _, err := store.Record("/ws/limit", "GET", "https://example.com", 200, "200 OK", int64(i), 0, nil, "none", ""); err != nil {
+		if _, err := store.Record("/ws/limit", "GET", "https://example.com", 200, "200 OK", int64(i), 0, nil, "none", "", ""); err != nil {
 			t.Fatalf("Record %d: %v", i, err)
 		}
 	}
@@ -90,10 +90,10 @@ func TestStoreWorkspaceIsolation(t *testing.T) {
 	}
 	defer store.Close()
 
-	if _, err := store.Record("/ws/alpha", "GET", "https://alpha.com", 200, "200 OK", 10, 0, nil, "none", ""); err != nil {
+	if _, err := store.Record("/ws/alpha", "GET", "https://alpha.com", 200, "200 OK", 10, 0, nil, "none", "", ""); err != nil {
 		t.Fatalf("Record alpha: %v", err)
 	}
-	if _, err := store.Record("/ws/beta", "POST", "https://beta.com", 201, "201 Created", 20, 0, nil, "none", ""); err != nil {
+	if _, err := store.Record("/ws/beta", "POST", "https://beta.com", 201, "201 Created", 20, 0, nil, "none", "", ""); err != nil {
 		t.Fatalf("Record beta: %v", err)
 	}
 

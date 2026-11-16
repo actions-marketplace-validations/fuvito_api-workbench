@@ -27,11 +27,12 @@ type ActivityRailProps = {
   onShowSettings: () => void
   onShowHelp: () => void
   demoRunning?: boolean
+  onStopDemo?: () => void
 }
 
 export function ActivityRail({
   activeTab, sidebarOpen, expanded,
-  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, demoRunning,
+  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, demoRunning, onStopDemo,
 }: ActivityRailProps) {
   return (
     <div
@@ -39,7 +40,7 @@ export function ActivityRail({
       style={{ width: expanded ? 160 : 44 }}
     >
       {/* Primary nav */}
-      <nav className="flex flex-col py-1 mt-1">
+      <nav role="navigation" aria-label="Activity" className="flex flex-col py-1 mt-1">
         {NAV_ITEMS.map(({ tab, icon: Icon, label, title, activeColor }) => {
           const active = sidebarOpen && activeTab === tab
           return (
@@ -47,6 +48,8 @@ export function ActivityRail({
               key={tab}
               type="button"
               title={expanded ? undefined : title}
+              aria-label={title}
+              aria-current={active ? 'page' : undefined}
               onClick={() => onTabClick(tab)}
               className={cn(
                 'relative flex items-center h-9 transition-colors',
@@ -57,9 +60,9 @@ export function ActivityRail({
               )}
             >
               {active && (
-                <span className="absolute left-0 inset-y-1 w-[3px] rounded-r-full bg-current opacity-70" />
+                <span className="absolute left-0 inset-y-1 w-[3px] rounded-r-full bg-current opacity-70" aria-hidden />
               )}
-              <Icon size={16} className="shrink-0" />
+              <Icon size={16} className="shrink-0" aria-hidden />
               {expanded && (
                 <span className="text-xs font-medium truncate">{label}</span>
               )}
@@ -71,10 +74,19 @@ export function ActivityRail({
       {/* Bottom: settings + help + expand toggle */}
       <div className="mt-auto flex flex-col py-1 border-t border-[var(--color-border)]">
         {demoRunning && (
-          <div className={cn('flex items-center py-1', expanded ? 'px-3 gap-2' : 'justify-center')}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            {expanded && <span className="text-[10px] text-emerald-400">Demo running</span>}
-          </div>
+          <button
+            type="button"
+            onClick={onStopDemo}
+            title="Demo server running — click to stop"
+            aria-label="Stop demo server"
+            className={cn(
+              'flex items-center h-9 text-emerald-400 hover:text-red-400 hover:bg-[var(--color-muted)] transition-colors',
+              expanded ? 'gap-2 px-3' : 'justify-center w-11',
+            )}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse shrink-0" aria-hidden />
+            {expanded && <span className="text-[10px] font-medium flex-1 truncate">Stop Demo</span>}
+          </button>
         )}
 
         {([
@@ -85,13 +97,14 @@ export function ActivityRail({
             key={label}
             type="button"
             title={expanded ? undefined : title}
+            aria-label={title}
             onClick={onClick}
             className={cn(
               'flex items-center h-9 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors',
               expanded ? 'gap-2.5 px-3' : 'justify-center w-11',
             )}
           >
-            <Icon size={16} className="shrink-0" />
+            <Icon size={16} className="shrink-0" aria-hidden />
             {expanded && <span className="text-xs font-medium">{label}</span>}
           </button>
         ))}

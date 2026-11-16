@@ -18,6 +18,7 @@ type ScenariosPanelProps = {
   scenarioError?: string | null
   runAllState?: RunAllState
   onRunAllScenarios?: () => void
+  onCancelRunAll?: () => void
   onDismissRunAll?: () => void
   onSelectScenario?: (path: string, name: string) => void
   onNewScenario?: (name: string, folderPath?: string) => void
@@ -40,7 +41,7 @@ type ScenariosPanelProps = {
 
 export function ScenariosPanel({
   workspacePath, scenarios, scenarioError,
-  runAllState, onRunAllScenarios, onDismissRunAll,
+  runAllState, onRunAllScenarios, onCancelRunAll, onDismissRunAll,
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewFolder, onDeleteScenarioFolder, onRenameScenarioFolder, onRunFolder,
@@ -53,6 +54,7 @@ export function ScenariosPanel({
   const [showTemplates, setShowTemplates] = useState(false)
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [templateError, setTemplateError] = useState<string | null>(null)
   const [scenarioCtxMenu, setScenarioCtxMenu] = useState<{
     x: number; y: number; path: string; name: string
   } | null>(null)
@@ -72,8 +74,13 @@ export function ScenariosPanel({
 
   async function handleUseTemplate(templateID: string, name: string) {
     setShowTemplates(false)
+    setTemplateError(null)
     const result = await createFromTemplate(templateID, name)
-    if (!result.error && result.path) {
+    if (result.error) {
+      setTemplateError(result.error)
+      return
+    }
+    if (result.path) {
       onNewScenarioFile?.(result.path, name)
     }
   }
@@ -109,6 +116,13 @@ export function ScenariosPanel({
           </button>
         ))}
       </div>
+
+      {templateError && (
+        <div className="shrink-0 px-2 py-1.5 text-[10px] text-red-400 bg-red-500/10 border-b border-red-500/20 flex items-center gap-1">
+          <span className="flex-1">Failed to create from template: {templateError}</span>
+          <button type="button" onClick={() => setTemplateError(null)} className="shrink-0 text-red-400/60 hover:text-red-400">✕</button>
+        </div>
+      )}
 
       {activeTab === 'log' && (
         <ScenarioRunLog workspacePath={workspacePath} refreshTrigger={runLogTrigger} onSelectScenario={onSelectScenario} />
@@ -150,6 +164,7 @@ export function ScenariosPanel({
           <RunAllResults
             state={runAllState}
             onSelectScenario={onSelectScenario}
+            onCancel={onCancelRunAll}
             onDismiss={onDismissRunAll}
           />
         )}

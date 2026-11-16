@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -80,6 +82,7 @@ type HistoryEntryIO struct {
 	Headers     []HeaderIO `json:"headers"`
 	BodyType    string     `json:"bodyType"`
 	BodyContent string     `json:"bodyContent"`
+	Auth        *AuthIO    `json:"auth,omitempty"`
 }
 
 // ---- Service ----
@@ -173,11 +176,10 @@ func (s *RequestService) Execute(input RequestInput) ResponseOutput {
 	resolved := resolver.InterpolateRequest(req)
 
 	// Per-request cancellable context so CancelRequest() can abort in-flight calls.
+	// Store only the most recent cancel so the Cancel button in the UI works for the
+	// last-sent request; prior in-flight requests run to completion independently.
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
-	if s.cancelLast != nil {
-		s.cancelLast()
-	}
 	s.cancelLast = cancel
 	s.execGen++
 	gen := s.execGen
@@ -221,6 +223,13 @@ func (s *RequestService) GetHistory() []HistoryEntryIO {
 		for j, h := range e.Headers {
 			headers[j] = HeaderIO{Name: h.Name, Value: h.Value}
 		}
+		var auth *AuthIO
+		if e.AuthJSON != "" {
+			var a AuthIO
+			if json.Unmarshal([]byte(e.AuthJSON), &a) == nil {
+				auth = &a
+			}
+		}
 		out[i] = HistoryEntryIO{
 			ID:          e.ID,
 			ExecutedAt:  e.ExecutedAt.Format(time.RFC3339),
@@ -233,6 +242,7 @@ func (s *RequestService) GetHistory() []HistoryEntryIO {
 			Headers:     headers,
 			BodyType:    e.BodyType,
 			BodyContent: e.BodyContent,
+			Auth:        auth,
 		}
 	}
 	return out
@@ -263,7 +273,7 @@ func (s *RequestService) ClearHistory() {
 }
 
 func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {
-	if s.store == nil || out.Error != "" {
+	if s.store == nil {
 		return
 	}
 	headers := make([]history.Header, len(input.Headers))
@@ -279,9 +289,40 @@ func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {
 	if s.workspace != nil {
 		wsPath = s.workspace.GetWorkspacePath()
 	}
-	if _, err := s.store.Record(wsPath, input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size, headers, bodyType, bodyContent); err != nil {
+	authJSON := authJSONForHistory(input.Auth)
+	if _, err := s.store.Record(wsPath, input.Method, input.URL, out.StatusCode, out.Status, out.DurationMs, out.Size, headers, bodyType, bodyContent, authJSON); err != nil {
 		log.Printf("writing history: %v", err)
 	}
+}
+
+// isVarRef reports whether s contains a {{…}} variable placeholder.
+func isVarRef(s string) bool {
+	return strings.Contains(s, "{{") && strings.Contains(s, "}}")
+}
+
+// authJSONForHistory serializes auth only when at least one sensitive field is a
+// {{var}} reference — literal tokens are never written to the history database.
+func authJSONForHistory(auth *AuthIO) string {
+	if auth == nil || auth.Type == "none" || auth.Type == "" {
+		return ""
+	}
+	hasRef := false
+	switch auth.Type {
+	case "bearer":
+		hasRef = isVarRef(auth.Token)
+	case "basic":
+		hasRef = isVarRef(auth.Username) || isVarRef(auth.Password)
+	case "apikey":
+		hasRef = isVarRef(auth.Value)
+	}
+	if !hasRef {
+		return ""
+	}
+	b, err := json.Marshal(auth)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // ---- mapping helpers ----

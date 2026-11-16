@@ -29,15 +29,17 @@
 
 A **workspace** is an ordinary folder on your filesystem. Clear Signal reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
 
-**To open an existing workspace:** click **Open Existing** in the sidebar, or use the folder icon in the workspace panel header.
+**To open an existing workspace:** use **File → Open Workspace** in the menu bar, or click the folder icon at the top of the Explorer panel in the sidebar.
 
-**To create a new workspace:** click **New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
+**To create a new workspace:** use **File → New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
 
 When a workspace is opened, the first request file found in the tree is loaded automatically into the editor — no need to click a file manually to get started.
 
 **Switching workspaces:** opening or switching to a workspace (via the File menu, the Open Workspace button, or a recent workspace entry) closes the current workspace and all its tabs first. If any tabs have unsaved changes, a confirmation dialog appears before the switch.
 
 The last-used workspace and active environment are remembered between sessions.
+
+**Recent workspaces:** The landing page (shown when no workspace is open) lists your recently used workspaces. If you have opened a workspace before, a **Resume** button appears at the top — it reopens the most recent workspace in one click. The File menu → Recent Workspaces submenu lists up to ten recent paths from anywhere in the app.
 
 ---
 
@@ -49,7 +51,7 @@ Click the `+` icon in the top toolbar (or press **Ctrl+N**). The editor clears a
 
 ### Naming a request
 
-Click the **New Request** label (or any existing request name) in the top bar. It becomes an editable field. Type the name you want and press **Enter** or click away to confirm.
+Click the **New Request** label (or any existing request name) in the request toolbar above the URL bar. It becomes an editable field. Type the name you want and press **Enter** or click away to confirm.
 
 The name you type becomes the filename when you save:
 
@@ -63,7 +65,7 @@ Names are slugified: lowercased, spaces and underscores replaced with hyphens, s
 
 ### Saving a request
 
-**Ctrl+S**, or the save icon in the toolbar.
+**Ctrl+S**, or the **Save** button in the request editor toolbar.
 
 - **New request (no file yet):** saved to `{workspace}/requests/{slug}.yaml`. A workspace must be open.
 - **Existing request, same name:** the file is overwritten in place.
@@ -76,7 +78,9 @@ Click any file in the **Workspace** sidebar tab. If the current request has unsa
 
 ### Opening a request file from anywhere
 
-The file picker button in the toolbar opens a system file picker. The selected file is loaded into the editor and the workspace sidebar highlights it if it is inside the current workspace.
+The folder icon in the request toolbar opens a system file picker. The selected file is loaded into the editor and the workspace sidebar highlights it if it is inside the current workspace.
+
+**Tab context menu:** right-click any tab to get additional actions: **Close**, **Close Others**, **Close to the Right**, **Close All Tabs**, **Copy Path** (copies the file path to the clipboard), and **Reveal in Explorer** (opens the file's containing folder in the system file manager).
 
 ---
 
@@ -107,7 +111,7 @@ Clear Signal supports multiple request tabs. Each tab maintains independent stat
 
 When more tabs are open than fit in the tab bar, gradient fade indicators appear at the left and right edges. The active tab scrolls into view automatically whenever you switch tabs.
 
-**Quick open (Ctrl+P):** press **Ctrl+P** to open a fuzzy-search modal that lists every request file in the current workspace. Type any part of the name to filter, use the arrow keys to navigate, and press **Enter** (or click) to open. Press **Escape** to dismiss without opening.
+**Quick open (Ctrl+P):** press **Ctrl+P** to open a fuzzy-search modal that lists every request file and scenario in the current workspace. Type any part of the name to filter, use the arrow keys to navigate, and press **Enter** (or click) to open. Press **Escape** to dismiss without opening.
 
 ---
 
@@ -137,11 +141,11 @@ An **environment** is a named set of key/value variables stored in `{workspace}/
 
 ### Selecting an environment
 
-The environment selector appears in the top bar whenever a workspace has at least one environment file. Switching environments takes effect on the next request you send.
+The environment selector appears in the **status bar** at the bottom of the window whenever a workspace has at least one environment file. Switching environments takes effect on the next request you send.
 
 ### Creating or editing an environment
 
-Click the pencil icon next to the environment selector. The environment editor opens as an overlay. Add, edit, or delete variables and click **Save**. The updated environment is selected automatically.
+Click the pencil icon in the status bar (bottom of the window) next to the active environment name. The environment editor opens as an overlay. Add, edit, or delete variables and click **Save**. The updated environment is selected automatically.
 
 ### Using variables in requests
 
@@ -155,6 +159,8 @@ Authorization: Bearer {{authToken}}
 **Autocomplete:** typing `{{` in the URL bar or in any value field triggers a dropdown that lists all variables defined in the active environment. Use the arrow keys to navigate the list and press **Enter** or click an item to insert it. The dropdown closes automatically if no environment is active or no variables are defined.
 
 Unresolved references are left as-is and appear literally in the outbound request, making missing configuration easy to spot.
+
+**Missing variable hint:** when a `{{variable}}` in the URL bar cannot be resolved against the active environment, an amber **⚠ varName** badge appears below the URL. Click the badge to open the environment editor with that variable name pre-filled as a new row — just enter the value and save.
 
 ### Secret variables
 
@@ -197,14 +203,20 @@ The right panel shows:
 - **Status code** — colour-coded: green (2xx), blue (3xx), amber (4xx), red (5xx). Error responses show **Network Error** in red.
 - **Duration and size** — total round-trip time and response body size.
 - **Timing breakdown** — a stacked bar showing DNS lookup, TCP connect, TLS handshake, time-to-first-byte, and body transfer time. Hover each segment for the exact millisecond value.
-- **Body** — JSON responses are syntax-highlighted and pretty-printed. Click the toggle to switch to raw view. Click the copy icon to copy the body to the clipboard.
-- **Headers** — full response header table.
+- **Body** — JSON responses are syntax-highlighted and pretty-printed. Click the toggle to switch between pretty and raw view. The search icon (Ctrl+F) opens an in-panel find bar. The copy icon copies the body to the clipboard.
+- **Diff view** — after sending the same request more than once, a diff icon (⇄) appears in the toolbar. Click it to compare the current and previous response bodies side by side.
+- **New scenario from request** — the list icon in the toolbar creates a new scenario file with the current request as its first step and a status assertion pre-wired. The scenario opens immediately in an editor tab.
+- **Headers** — full response header table with a **Copy all** button that copies every header as `name: value` lines to the clipboard.
 
 **Collapsing the response panel:** click the chevron icon on the left edge of the status bar to collapse the response panel to a narrow strip, giving the request editor more room. Click the chevron again to restore it.
 
 ### Request history
 
-Click the **History** tab in the sidebar to see your last 100 requests. Clicking an entry re-populates the method and URL in the editor (the confirmation dialog appears first if there are unsaved changes). The **Clear history** button removes all entries.
+Click the **History** rail tab (clock icon) to see your last 100 requests, grouped by date — **Today**, **Yesterday**, and older dates. Each entry shows the method badge, status code, duration, and URL. 
+
+- **Click an entry** to restore its method, URL, headers, and body into the editor (auth is not stored in history). A confirmation dialog appears first if the current tab has unsaved changes.
+- **Re-run button (↺):** hover over any entry to reveal a re-run button on the right edge. Clicking it restores the request *and* immediately sends it, so you can replay a previous call in one click.
+- **Clear history** shows a confirmation prompt before removing all entries.
 
 ---
 
@@ -552,7 +564,7 @@ Secrets are injected from environment variables at runtime. No secrets appear in
 
 ## 12. Settings
 
-Open via the gear icon in the toolbar.
+Open via the gear icon at the bottom of the Activity Rail (the icon bar on the far left of the window).
 
 | Setting | Description |
 |---|---|
@@ -651,7 +663,7 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ## 14. Creating files with AI assistance
 
-The **Format Spec** tab in the Help panel (the `?` icon in the toolbar) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
+The **Format Spec** tab in the Help panel (accessible via the `?` icon at the bottom of the Activity Rail) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
 
 ### What the AI prompt does
 
@@ -667,7 +679,7 @@ When you paste the prompt into an AI assistant, it follows a four-step workflow:
 
 ### Workflow
 
-1. Click the `?` icon in the toolbar to open the Help panel.
+1. Click the `?` icon at the bottom of the Activity Rail to open the Help panel.
 2. Switch to the **Format Spec** tab.
 3. Click **Copy AI Prompt** — the spec plus the system prompt is now on your clipboard.
 4. Open ChatGPT, Gemini, or any AI assistant and paste into a new conversation.
@@ -687,9 +699,17 @@ When you paste the prompt into an AI assistant, it follows a four-step workflow:
 | Shortcut | Action |
 |---|---|
 | **Enter** (URL field focused) | Send the current request |
+| **Ctrl+Enter** | Send the current request (works from the URL bar and most input fields; blocked only inside multiline text areas so you can type newlines in the body) |
 | **Ctrl+N** | New request tab |
-| **Ctrl+S** | Save the current request |
-| **Ctrl+P** | Quick open — fuzzy-search all request files in the workspace |
+| **Ctrl+W** | Close the current tab |
+| **Ctrl+S** | Save the current request or scenario |
+| **Ctrl+Shift+S** | Save all dirty tabs |
+| **Ctrl+Tab** | Switch to the next tab |
+| **Ctrl+Shift+Tab** | Switch to the previous tab |
+| **Ctrl+1** – **Ctrl+9** | Switch directly to tab N |
+| **Ctrl+B** | Toggle sidebar open/closed |
+| **Ctrl+P** | Quick open — fuzzy-search all requests and scenarios |
+| **Ctrl+F** | Search in the response body (when response panel is focused) |
 
 ---
 
@@ -727,7 +747,7 @@ The executor tests use `httptest.NewServer` and require a free port. No external
 
 ### A `{{variable}}` appears literally in the sent request
 
-The variable is not defined in the active environment. Check the environment editor (pencil icon in the top bar) and confirm the variable name matches exactly, including case.
+The variable is not defined in the active environment. Check the environment editor (pencil icon in the status bar) and confirm the variable name matches exactly, including case.
 
 ### The workspace sidebar is empty after opening a workspace
 

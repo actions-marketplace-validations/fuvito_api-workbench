@@ -8,7 +8,8 @@ export type TabInfo = {
   name: string | null
   method: string
   isDirty: boolean
-  kind?: 'request' | 'scenario' | 'coverage'
+  kind?: 'request' | 'scenario' | 'coverage' | 'runner'
+  filePath?: string | null
 }
 
 const TAB_METHOD_COLOR: Record<string, string> = {
@@ -35,9 +36,12 @@ type TabBarProps = {
   onSave?: (id: string) => void
   onCloseOthers?: (id: string) => void
   onCloseToRight?: (id: string) => void
+  onCloseAll?: () => void
+  onCopyPath?: (filePath: string) => void
+  onRevealInExplorer?: (filePath: string) => void
 }
 
-export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, onCloseOthers, onCloseToRight }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, onCloseOthers, onCloseToRight, onCloseAll, onCopyPath, onRevealInExplorer }: TabBarProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -95,8 +99,25 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
       {/* Scrollable tab strip */}
       <div
         ref={containerRef}
+        role="tablist"
+        aria-label="Editor tabs"
         className="flex flex-1 items-stretch overflow-x-auto"
         style={{ scrollbarWidth: 'none' }}
+        onKeyDown={e => {
+          const idx = tabs.findIndex(t => t.id === activeTabId)
+          if (e.key === 'ArrowRight') {
+            e.preventDefault()
+            const next = (idx + 1) % tabs.length
+            onSelect(tabs[next].id)
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault()
+            const prev = (idx - 1 + tabs.length) % tabs.length
+            onSelect(tabs[prev].id)
+          } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault()
+            onClose(activeTabId)
+          }
+        }}
       >
         {tabs.map(tab => {
           const isActive = tab.id === activeTabId
@@ -105,11 +126,12 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               key={tab.id}
               role="tab"
               aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => onSelect(tab.id)}
               onContextMenu={e => handleContextMenu(e, tab.id)}
               className={cn(
                 'group flex items-center gap-1.5 px-3 h-9 text-xs shrink-0 max-w-[200px] min-w-[80px]',
-                'border-t-[3px] cursor-pointer select-none transition-colors',
+                'border-t-[3px] cursor-pointer select-none transition-colors outline-none',
                 isActive
                   ? 'bg-[var(--color-card)] border-t-[var(--color-accent)] border-l border-r border-[var(--color-border)] text-[var(--color-foreground)]'
                   : 'bg-transparent border-t-transparent text-[var(--color-muted-foreground)] hover:bg-[var(--color-border)] hover:text-[var(--color-foreground)]',
@@ -120,6 +142,8 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               )}
               {tab.kind === 'coverage' ? (
                 <span className="shrink-0 font-mono font-bold text-label text-emerald-400">COV</span>
+              ) : tab.kind === 'runner' ? (
+                <span className="shrink-0 font-mono font-bold text-label text-violet-400">RUN</span>
               ) : tab.kind === 'scenario' ? (
                 <span className="shrink-0 font-mono font-bold text-label text-violet-400">SCN</span>
               ) : (
@@ -130,9 +154,11 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               <span className="truncate flex-1 text-xs">
                 {tab.kind === 'coverage'
                   ? (tab.name ?? 'Coverage')
-                  : tab.kind === 'scenario'
-                    ? (tab.name ?? 'Scenario')
-                    : (tab.name ?? 'New Request')}
+                  : tab.kind === 'runner'
+                    ? (tab.name ?? 'Run Results')
+                    : tab.kind === 'scenario'
+                      ? (tab.name ?? 'Scenario')
+                      : (tab.name ?? 'New Request')}
               </span>
               <button
                 type="button"
@@ -181,6 +207,19 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
             { kind: 'separator' },
             {
               kind: 'action',
+              label: 'Copy Path',
+              disabled: !ctxTab.filePath,
+              onClick: () => ctxTab.filePath && onCopyPath?.(ctxTab.filePath),
+            },
+            {
+              kind: 'action',
+              label: 'Reveal in Explorer',
+              disabled: !ctxTab.filePath,
+              onClick: () => ctxTab.filePath && onRevealInExplorer?.(ctxTab.filePath),
+            },
+            { kind: 'separator' },
+            {
+              kind: 'action',
               label: 'Close Tab',
               onClick: () => onClose(ctxMenu.tabId),
             },
@@ -195,6 +234,12 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               label: 'Close to the Right',
               disabled: ctxTabIndex >= tabs.length - 1 || !onCloseToRight,
               onClick: () => onCloseToRight?.(ctxMenu.tabId),
+            },
+            {
+              kind: 'action',
+              label: 'Close All Tabs',
+              disabled: !onCloseAll,
+              onClick: () => onCloseAll?.(),
             },
           ]}
         />

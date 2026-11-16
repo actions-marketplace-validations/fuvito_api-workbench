@@ -1,4 +1,5 @@
-import { Clock } from 'lucide-react'
+import { useState } from 'react'
+import { Clock, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
@@ -9,6 +10,33 @@ import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
 import type { FileClipboard, RunAllEntry, RunAllState, FolderRunState } from '@/types'
 
 export type { RunAllEntry, RunAllState, FolderRunState }
+
+function groupHistoryByDate(entries: HistoryEntry[]): Array<{ label: string; entries: HistoryEntry[] }> {
+  const now = new Date()
+  const todayStr = now.toDateString()
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const yesterdayStr = yesterday.toDateString()
+  const groups: Map<string, HistoryEntry[]> = new Map()
+  for (const entry of entries) {
+    const d = new Date(entry.executedAt)
+    let label: string
+    if (d.toDateString() === todayStr) {
+      label = 'Today'
+    } else if (d.toDateString() === yesterdayStr) {
+      label = 'Yesterday'
+    } else {
+      label = d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+      })
+    }
+    if (!groups.has(label)) groups.set(label, [])
+    groups.get(label)!.push(entry)
+  }
+  return [...groups.entries()].map(([label, grpEntries]) => ({ label, entries: grpEntries }))
+}
 
 export type SidebarProps = {
   tab: RailTab
@@ -28,6 +56,7 @@ export type SidebarProps = {
   onRenameFolder: (path: string, newName: string) => void
   onMoveFile: (srcPath: string, destDir: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
+  onRerun?: (entry: HistoryEntry) => void
   onClearHistory: () => void
   onImportOpenAPI: () => void
   onImportPostman?: () => void
@@ -51,6 +80,7 @@ export type SidebarProps = {
   runAllState?: RunAllState
   runLogTrigger?: number
   onRunAllScenarios?: () => void
+  onCancelRunAll?: () => void
   onDismissRunAll?: () => void
   scenarioError?: string | null
   onRunFolder?: (folderPath: string) => void
@@ -76,18 +106,20 @@ export function Sidebar({
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder, onMoveFile,
-  onSelectHistory, onClearHistory,
+  onSelectHistory, onRerun, onClearHistory,
   onImportOpenAPI, onImportPostman, onImportInsomnia, onTryDemo, demoStarting, onRefresh, importing, importError,
   activeFilePath, dirtyFilePaths,
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewScenarioFolder, onDeleteScenarioFolder, onRenameScenarioFolder,
-  runAllState, onRunAllScenarios, onDismissRunAll, scenarioError, runLogTrigger,
+  runAllState, onRunAllScenarios, onCancelRunAll, onDismissRunAll, scenarioError, runLogTrigger,
   onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun,
   selectedCoverageSpecFile, onSelectCoverageSpec,
   clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
   onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
 }: SidebarProps) {
+  const [confirmingClear, setConfirmingClear] = useState(false)
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {tab === 'explorer' && (
@@ -133,6 +165,7 @@ export function Sidebar({
           scenarioError={scenarioError}
           runAllState={runAllState}
           onRunAllScenarios={onRunAllScenarios}
+          onCancelRunAll={onCancelRunAll}
           onDismissRunAll={onDismissRunAll}
           onSelectScenario={onSelectScenario}
           onNewScenario={onNewScenario}
@@ -165,14 +198,34 @@ export function Sidebar({
       {tab === 'history' && (
         <div className="flex flex-col flex-1 overflow-hidden">
           {history.length > 0 && (
-            <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0">
-              <button
-                type="button"
-                onClick={onClearHistory}
-                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
-              >
-                Clear history
-              </button>
+            <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0 gap-2">
+              {confirmingClear ? (
+                <>
+                  <span className="text-[10px] text-[var(--color-muted-foreground)]">Clear all history?</span>
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmingClear(false); onClearHistory() }}
+                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors font-semibold"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingClear(false)}
+                    className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingClear(true)}
+                  className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+                >
+                  Clear history
+                </button>
+              )}
             </div>
           )}
           <div className="flex-1 overflow-auto">
@@ -187,37 +240,52 @@ export function Sidebar({
                 Restores method, URL, headers, and body · auth not stored
               </p>
             )}
-            {history.length > 0 && (
-              <ul>
-                {history.map(entry => (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectHistory(entry)}
-                      className={cn(
-                        'w-full text-left px-3 py-2 flex flex-col gap-0.5',
-                        'hover:bg-[var(--color-muted)] transition-colors border-b border-[var(--color-border)]',
+            {history.length > 0 && groupHistoryByDate(history).map(group => (
+              <div key={group.label}>
+                <p className="sticky top-0 px-3 py-0.5 text-[9px] uppercase tracking-wider font-semibold text-[var(--color-muted-foreground)] opacity-60 border-b border-[var(--color-border)] bg-[var(--color-card)]">
+                  {group.label}
+                </p>
+                <ul>
+                  {group.entries.map(entry => (
+                    <li key={entry.id} className="group flex items-stretch border-b border-[var(--color-border)]">
+                      <button
+                        type="button"
+                        onClick={() => onSelectHistory(entry)}
+                        className={cn(
+                          'flex-1 text-left px-3 py-2 flex flex-col gap-0.5 min-w-0',
+                          'hover:bg-[var(--color-muted)] transition-colors',
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn('text-[10px] font-mono font-bold shrink-0', METHOD_BADGE[entry.method] ?? 'text-[var(--color-foreground)]')}>
+                            {entry.method}
+                          </span>
+                          <span className={cn('text-[10px] font-mono', statusColor(entry.statusCode))}>
+                            {entry.statusCode || '—'}
+                          </span>
+                          <span className="ml-auto text-[10px] text-[var(--color-muted-foreground)] shrink-0">
+                            {entry.durationMs}ms
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-[var(--color-muted-foreground)] truncate font-mono w-full">
+                          {entry.url}
+                        </span>
+                      </button>
+                      {onRerun && (
+                        <button
+                          type="button"
+                          onClick={() => onRerun(entry)}
+                          title="Re-run this request"
+                          className="shrink-0 w-7 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+                        >
+                          <RotateCcw size={10} />
+                        </button>
                       )}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn('text-[10px] font-mono font-bold shrink-0', METHOD_BADGE[entry.method] ?? 'text-[var(--color-foreground)]')}>
-                          {entry.method}
-                        </span>
-                        <span className={cn('text-[10px] font-mono', statusColor(entry.statusCode))}>
-                          {entry.statusCode || '—'}
-                        </span>
-                        <span className="ml-auto text-[10px] text-[var(--color-muted-foreground)] shrink-0">
-                          {entry.durationMs}ms
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[var(--color-muted-foreground)] truncate font-mono w-full">
-                        {entry.url}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       )}

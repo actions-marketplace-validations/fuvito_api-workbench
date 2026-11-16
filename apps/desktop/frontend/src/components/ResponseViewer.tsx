@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2, GitCompare, ChevronRight } from 'lucide-react'
+import { Search, X, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2, GitCompare, ChevronRight, ListPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
 import { openInSystemViewer } from '@/lib/bridge'
@@ -21,6 +21,49 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
+// ---- Headers table ----
+
+function HeadersTable({ headers }: { headers: Array<{ name: string; value: string }> }) {
+  const [copied, setCopied] = useState(false)
+
+  function copyAll() {
+    const text = headers.map(h => `${h.name}: ${h.value}`).join('\n')
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-3 py-1 border-b border-[var(--color-border)] shrink-0">
+        <span className="text-[10px] text-[var(--color-muted-foreground)]">{headers.length} headers</span>
+        <button
+          type="button"
+          onClick={copyAll}
+          title="Copy all headers"
+          className="flex items-center gap-1 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+        >
+          {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+          {copied ? 'Copied' : 'Copy all'}
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-xs font-mono">
+          <tbody>
+            {headers.map((h, i) => (
+              <tr key={i} className="border-b border-[var(--color-border)]">
+                <td className="py-1 px-3 text-[var(--color-muted-foreground)] whitespace-nowrap">{h.name}</td>
+                <td className="py-1 pr-3 text-[var(--color-foreground)] break-all">{h.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ---- Main component ----
 
 type ResponseViewerProps = {
@@ -30,9 +73,10 @@ type ResponseViewerProps = {
   cachedAt?: string | null
   onClear?: () => void
   onCollapse?: () => void
+  onAddToScenario?: () => void
 }
 
-export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear, onCollapse }: ResponseViewerProps) {
+export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear, onCollapse, onAddToScenario }: ResponseViewerProps) {
   const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -209,6 +253,17 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
             >
               <ExternalLink size={12} />
             </button>
+            {onAddToScenario && (
+              <button
+                type="button"
+                onClick={onAddToScenario}
+                title="New scenario from this request"
+                aria-label="New scenario from this request"
+                className="p-1 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+              >
+                <ListPlus size={12} />
+              </button>
+            )}
             {onClear && (
               <button
                 type="button"
@@ -308,16 +363,7 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
           <DiffView prev={prevBodyPretty} curr={bodyText} />
         )}
         {!loading && response && !response.error && activeTab === 'Headers' && (
-          <table className="w-full text-xs font-mono">
-            <tbody>
-              {response.headers.map((h, i) => (
-                <tr key={i} className="border-b border-[var(--color-border)]">
-                  <td className="py-1 pr-4 text-[var(--color-muted-foreground)] whitespace-nowrap">{h.name}</td>
-                  <td className="py-1 text-[var(--color-foreground)] break-all">{h.value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <HeadersTable headers={response.headers} />
         )}
       </div>
     </div>

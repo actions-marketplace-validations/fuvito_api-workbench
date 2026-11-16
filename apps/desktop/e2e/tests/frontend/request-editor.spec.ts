@@ -63,11 +63,12 @@ test.describe('Request editor', () => {
     await expect(page.getByText('+ Add row')).toBeVisible()
   })
 
-  test('Body tab: multipart shows KeyValue editor', async ({ page }) => {
+  test('Body tab: multipart shows field editor', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Body' }).click()
     await page.locator('select').nth(1).selectOption('multipart')
-    await expect(page.getByText('+ Add row')).toBeVisible()
+    // MultipartEditor renders an "Add field" button (not the generic "+ Add row")
+    await expect(page.getByText('Add field')).toBeVisible()
   })
 
   test('Auth tab: bearer type shows token field', async ({ page }) => {
@@ -80,8 +81,8 @@ test.describe('Request editor', () => {
 
   test('timeout input accepts a value', async ({ page }) => {
     await gotoApp(page)
-    // The timeout input has placeholder "0"
-    const timeoutInput = page.getByPlaceholder('0')
+    // The timeout input has placeholder "default" (0 means use global default)
+    const timeoutInput = page.getByPlaceholder('default')
     await timeoutInput.fill('5000')
     await expect(timeoutInput).toHaveValue('5000')
   })
