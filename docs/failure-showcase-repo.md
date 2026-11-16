@@ -3,6 +3,8 @@
 **Repository:** `github.com/fuvito/clrsig-failure-catalog` (new, public)
 **Owner:** Fuat Yazar
 **Status:** Pre-build — this document is the source of truth for implementation
+**Product site:** [clrsig.com](https://clrsig.com)
+**Failure mode catalog:** [clrsig.com/failures](https://clrsig.com/failures/)
 
 ---
 
@@ -12,7 +14,7 @@ API contract failures are abstract until a developer sees one caught in their ow
 
 There is currently no public, runnable collection of API failure mode reproductions that:
 - works out of the box with a single binary
-- shows both the failing state and the fix side by side
+- shows the broken state and the fix side by side
 - is kept green by CI so it cannot quietly rot
 
 ---
@@ -23,7 +25,7 @@ There is currently no public, runnable collection of API failure mode reproducti
 |---|---|
 | **Test clrsig in production** | Each sub-project is a live regression test. If a failure mode stops being caught, CI turns red. |
 | **Prove value to evaluators** | Clone one sub-project, run two commands, see `clrsig` catch the problem in under two minutes. |
-| **Feed the product website** | Each sub-project maps to a page at `clrsig.com/failures/<slug>` — a searchable catalog of failure patterns with reproduction steps. |
+| **Feed the product website** | Each sub-project maps to a page at `clrsig.com/failures/fm-NNN/` and is linked from the full catalog at [clrsig.com/failures](https://clrsig.com/failures/). The catalog CI badge appears on [clrsig.com](https://clrsig.com) as a live signal the detection engine is working. |
 | **Show "what good looks like"** | The `fix/` variant in each sub-project demonstrates the corrected spec or server, not just the broken one. |
 
 ## 3. Non-goals
@@ -37,9 +39,9 @@ There is currently no public, runnable collection of API failure mode reproducti
 ## 4. Success Metrics
 
 - 12 sub-projects live, all running in CI, within the first release
-- Every sub-project produces a `clrsig` exit code 1 (failure caught) on the broken server and exit code 0 on the fix
+- Every sub-project produces `clrsig` exit 1 (failure caught) on the broken server and exit 0 on the fix
 - CI badge green on the catalog repo homepage
-- Each sub-project linked from `clrsig.com/failures/`
+- Each sub-project linked from its corresponding `clrsig.com/failures/fm-NNN/` page
 
 ---
 
@@ -59,38 +61,40 @@ There is currently no public, runnable collection of API failure mode reproducti
 
 ```
 clrsig-failure-catalog/
-├── README.md                        # Index — links to every sub-project
+├── README.md                        # Index — links to every sub-project and clrsig.com/failures/
 ├── .github/
 │   └── workflows/
 │       └── catalog.yml              # Runs all sub-projects; nightly + on push
 │
 ├── failures/
-│   ├── 01-missing-required-field/
-│   ├── 02-wrong-type/
-│   ├── 03-undeclared-status-code/
-│   ├── 04-nullable-violation/
-│   ├── 05-enum-out-of-range/
-│   ├── 06-breaking-field-rename/
-│   ├── 07-breaking-field-removal/
-│   ├── 08-array-item-type/
-│   ├── 09-format-violation/
-│   ├── 10-additional-properties-leak/
-│   ├── 11-auth-schema-drift/
-│   └── 12-pagination-contract-break/
+│   ├── fm-001-number-precision/
+│   ├── fm-003-pagination-contract/
+│   ├── fm-004-renamed-removed-field/
+│   ├── fm-005-nullable-required/
+│   ├── fm-010-spec-implementation-drift/
+│   ├── fm-016-rate-limit-schema/
+│   ├── fm-018-idempotency/
+│   ├── fm-022-semantically-invalid/
+│   ├── fm-025-incorrect-http-status/
+│   ├── fm-027-lost-update/
+│   ├── fm-034-http-method-semantics/
+│   └── fm-044-sensitive-data-exposure/
 │
 └── shared/
     ├── go.mod                        # Single Go module for all servers
     └── testutil/
-        └── server.go                 # Shared helpers (port picker, graceful shutdown)
+        └── server.go                 # Port picker, graceful shutdown helpers
 ```
+
+Directory names use the FM number as prefix so they sort in catalog order and link unambiguously to `clrsig.com/failures/fm-NNN/`.
 
 ### 6.2 Sub-project Structure
 
 Every sub-project is self-contained:
 
 ```
-failures/NN-failure-name/
-├── README.md           # PRD content for the product page (see template §6.3)
+failures/fm-NNN-slug/
+├── README.md           # Content for the product page (see template §6.3)
 ├── server/
 │   └── main.go         # Broken server — exhibits the failure
 ├── openapi.yaml        # The declared spec (what the API promises)
@@ -107,15 +111,16 @@ failures/NN-failure-name/
 ### 6.3 Sub-project README Template
 
 ```markdown
-# [NN] Failure name
+# FM-NNN — Failure name
+
+> Full catalog entry: https://clrsig.com/failures/fm-NNN/
 
 **Difficulty:** Easy / Medium / Hard
 **Detected by:** `clrsig run` / `clrsig conform` / `clrsig diff`
-**Slug:** `failure-name` (maps to clrsig.com/failures/failure-name)
 
 ## What this failure is
 
-One paragraph. What breaks, why it happens, what a consumer experiences.
+One paragraph. What breaks, why it happens in practice, what a consumer experiences.
 
 ## Reproduce it
 
@@ -145,7 +150,7 @@ What changed: one sentence.
 
 ## In the wild
 
-When this pattern appears in real projects.
+When and why this pattern appears in real projects.
 ```
 
 ### 6.4 GitHub Actions Workflow
@@ -157,7 +162,7 @@ name: Failure Catalog
 on:
   push:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 6 * * *'   # nightly regression guard
 
 jobs:
   catalog:
@@ -174,84 +179,96 @@ jobs:
         with:
           command: install
 
-      - name: "01 — Missing required field (must fail)"
+      - name: "FM-001 — Number precision (must fail)"
         run: |
-          go run failures/01-missing-required-field/server/main.go &
+          go run failures/fm-001-number-precision/server/main.go &
           sleep 1
-          clrsig run failures/01-missing-required-field/scenarios/detect.yaml \
-            --env failures/01-missing-required-field/environments/local.yaml
-          test $? -eq 1    # exit 1 = clrsig caught the violation — this is correct
+          clrsig run failures/fm-001-number-precision/scenarios/detect.yaml \
+            --env failures/fm-001-number-precision/environments/local.yaml
+          test $? -eq 1    # exit 1 means clrsig caught it — this is correct
+
+      # ... one step per failure mode (same pattern)
+
+      - name: "FM-001 — Number precision fix (must pass)"
+        run: |
+          go run failures/fm-001-number-precision/fix/main.go &
+          sleep 1
+          clrsig run failures/fm-001-number-precision/scenarios/detect.yaml \
+            --env failures/fm-001-number-precision/environments/local.yaml
 ```
 
-**Exit code convention:** `test $? -eq 1` treats a clrsig failure (assertions failed) as CI success. If the broken server unexpectedly passes (`exit 0`), CI fails — detection regressed. The `fix/` variant is tested separately and must exit 0.
+**Exit code convention:** `test $? -eq 1` treats a clrsig assertion failure as CI success. If the broken server unexpectedly passes (`exit 0`), CI fails — detection regressed. The `fix/` variant is tested in a separate step and must exit 0.
 
-### 6.5 Failure Mode Catalog
+### 6.5 V1 Sub-project Catalog
 
-| # | Slug | Difficulty | Detection command | What breaks |
+12 sub-projects for the first release, selected to cover a range of detection methods and difficulty levels. All map to pages in the [clrsig.com/failures](https://clrsig.com/failures/) catalog.
+
+| Directory | Failure mode | Difficulty | Detection | clrsig.com page |
 |---|---|---|---|---|
-| 01 | `missing-required-field` | Easy | `clrsig run` | Response omits a field declared `required` in the schema |
-| 02 | `wrong-type` | Easy | `clrsig run` | `price` returned as `"12.99"` (string); spec declares `number` |
-| 03 | `undeclared-status-code` | Easy | `clrsig conform` | Endpoint returns 422; spec only declares 200 and 400 |
-| 04 | `nullable-violation` | Easy | `clrsig run` | Field returns `null`; spec does not declare `nullable: true` |
-| 05 | `enum-out-of-range` | Easy | `clrsig run` | `status` field returns `"archived"`; enum is `["active","inactive"]` |
-| 06 | `breaking-field-rename` | Medium | `clrsig diff` | `full_name` renamed to `name` between v1 and v2 |
-| 07 | `breaking-field-removal` | Medium | `clrsig diff` | Required field `email` removed from response schema in v2 |
-| 08 | `array-item-type` | Medium | `clrsig run` | Endpoint returns `["a","b"]`; spec declares array of objects |
-| 09 | `format-violation` | Medium | `clrsig run` | `created_at` returns `"2024-11-15"` (date); spec declares `date-time` |
-| 10 | `additional-properties-leak` | Medium | `clrsig run` | Server returns undocumented fields; spec has `additionalProperties: false` |
-| 11 | `auth-schema-drift` | Hard | `clrsig run` | Protected endpoint returns 401; spec does not declare a 401 response |
-| 12 | `pagination-contract-break` | Hard | `clrsig run` | Multi-step scenario: `nextPage` token from page 1 is invalid on page 2 |
+| `fm-001-number-precision` | Currency, Number, and Precision Formatting Failures | Easy | `clrsig run` schema assertion | [FM-001](https://clrsig.com/failures/fm-001/) |
+| `fm-003-pagination-contract` | Pagination Contract Failures | Hard | `clrsig run` multi-step scenario | [FM-003](https://clrsig.com/failures/fm-003/) |
+| `fm-004-renamed-removed-field` | Renamed or Removed Response Fields | Medium | `clrsig diff` v1 vs v2 | [FM-004](https://clrsig.com/failures/fm-004/) |
+| `fm-005-nullable-required` | Incorrect Optional, Nullable, and Required Field Behavior | Easy | `clrsig run` schema assertion | [FM-005](https://clrsig.com/failures/fm-005/) |
+| `fm-010-spec-drift` | OpenAPI Specification and Implementation Drift | Easy | `clrsig conform` | [FM-010](https://clrsig.com/failures/fm-010/) |
+| `fm-016-rate-limit-schema` | Rate-Limit and Throttling Failures | Medium | `clrsig run` undeclared 429 | [FM-016](https://clrsig.com/failures/fm-016/) |
+| `fm-018-idempotency` | Idempotency and Duplicate-Operation Failures | Hard | `clrsig run` multi-step scenario | [FM-018](https://clrsig.com/failures/fm-018/) |
+| `fm-022-semantically-invalid` | Syntactically Valid but Semantically Invalid Payloads | Medium | `clrsig run` jsonpath assertions | [FM-022](https://clrsig.com/failures/fm-022/) |
+| `fm-025-incorrect-status` | Incorrect HTTP Status and Business-Error Semantics | Easy | `clrsig run` status assertion | [FM-025](https://clrsig.com/failures/fm-025/) |
+| `fm-027-lost-update` | Concurrent Update and Lost-Update Failures | Hard | `clrsig run` multi-step scenario | [FM-027](https://clrsig.com/failures/fm-027/) |
+| `fm-034-method-semantics` | HTTP Method and Operation Semantics Failures | Medium | `clrsig conform` + schema assertion | [FM-034](https://clrsig.com/failures/fm-034/) |
+| `fm-044-sensitive-data` | Sensitive Data Exposure in API Responses | Medium | `clrsig run` schema (`additionalProperties: false`) | [FM-044](https://clrsig.com/failures/fm-044/) |
+
+The remaining 38 failure modes in the catalog ([clrsig.com/failures](https://clrsig.com/failures/)) are candidates for future sub-projects. Any contributor can propose one by opening a pull request using the template in §6.3.
 
 ---
 
 ## 7. Task List
 
-Tasks are ordered for sequential execution. Each sub-project (§7.3) can be built in any order once the scaffolding is in place.
-
 ### 7.1 Repository Setup
 
 - [ ] Create `github.com/fuvito/clrsig-failure-catalog` (public)
-- [ ] Add root `README.md` with project purpose and sub-project index table
+- [ ] Add root `README.md` with project purpose, CI badge, and sub-project index table with links to `clrsig.com/failures/fm-NNN/`
 - [ ] Initialise `shared/go.mod` (`module github.com/fuvito/clrsig-failure-catalog`)
 - [ ] Add `.gitignore` (Go binaries, IDE files)
 - [ ] Add `LICENSE` (MIT)
-- [ ] Add `CONTRIBUTING.md` — one-page guide: how to add a new failure mode
+- [ ] Add `CONTRIBUTING.md` — how to add a new failure mode (uses template from §6.3)
 
 ### 7.2 CI Scaffolding
 
 - [ ] Create `.github/workflows/catalog.yml` with the exit-code inversion pattern (§6.4)
-- [ ] Wire one placeholder step (01) to verify the inversion logic works end-to-end
+- [ ] Wire FM-001 as the first step to verify the full pipeline end-to-end
+- [ ] Add separate "fix" step for each sub-project (must exit 0)
 - [ ] Add CI status badge to root `README.md`
-- [ ] Confirm the nightly schedule trigger fires correctly
+- [ ] Confirm nightly schedule trigger fires correctly
 
 ### 7.3 Sub-projects (one task each)
 
 Each task = broken server + spec + scenario + fix + README + CI step.
 
-- [ ] 01 — Missing required field
-- [ ] 02 — Wrong type
-- [ ] 03 — Undeclared status code
-- [ ] 04 — Nullable violation
-- [ ] 05 — Enum out of range
-- [ ] 06 — Breaking field rename
-- [ ] 07 — Breaking field removal
-- [ ] 08 — Array item type mismatch
-- [ ] 09 — Date format violation
-- [ ] 10 — Additional properties leak
-- [ ] 11 — Auth schema drift
-- [ ] 12 — Pagination contract break
+- [ ] [FM-001](https://clrsig.com/failures/fm-001/) — Currency, Number, and Precision Formatting Failures
+- [ ] [FM-003](https://clrsig.com/failures/fm-003/) — Pagination Contract Failures
+- [ ] [FM-004](https://clrsig.com/failures/fm-004/) — Renamed or Removed Response Fields
+- [ ] [FM-005](https://clrsig.com/failures/fm-005/) — Incorrect Optional, Nullable, and Required Field Behavior
+- [ ] [FM-010](https://clrsig.com/failures/fm-010/) — OpenAPI Specification and Implementation Drift
+- [ ] [FM-016](https://clrsig.com/failures/fm-016/) — Rate-Limit and Throttling Failures
+- [ ] [FM-018](https://clrsig.com/failures/fm-018/) — Idempotency and Duplicate-Operation Failures
+- [ ] [FM-022](https://clrsig.com/failures/fm-022/) — Syntactically Valid but Semantically Invalid Payloads
+- [ ] [FM-025](https://clrsig.com/failures/fm-025/) — Incorrect HTTP Status and Business-Error Semantics
+- [ ] [FM-027](https://clrsig.com/failures/fm-027/) — Concurrent Update and Lost-Update Failures
+- [ ] [FM-034](https://clrsig.com/failures/fm-034/) — HTTP Method and Operation Semantics Failures
+- [ ] [FM-044](https://clrsig.com/failures/fm-044/) — Sensitive Data Exposure in API Responses
 
 ### 7.4 Website Integration
 
-- [ ] Confirm slug naming convention with product site (`clrsig.com/failures/<slug>`)
-- [ ] Add `slug:` front-matter field to each sub-project README so the site can consume it
-- [ ] Link each live sub-project from `clrsig.com/failures/`
+- [ ] Confirm `clrsig.com/failures/fm-NNN/` page structure can link to the GitHub directory
+- [ ] Verify each sub-project README renders cleanly as source material for the product page
+- [ ] Link each live sub-project from its corresponding `clrsig.com/failures/fm-NNN/` page
 - [ ] Add CI badge to the product site landing page
 
-### 7.5 Release
+### 7.5 Release Gate
 
 - [ ] All 12 sub-projects passing CI (broken server exits 1, fix exits 0)
-- [ ] Root README index complete and accurate
+- [ ] Root README index complete with correct FM links
 - [ ] Repository announced on product site and in release notes
 
 ---
@@ -260,6 +277,6 @@ Each task = broken server + spec + scenario + fix + README + CI step.
 
 | Question | Options | Decision needed by |
 |---|---|---|
-| Pin to a specific clrsig release or track `@latest`? | Pin = stable catalog; latest = exercises the action continuously | Before CI scaffolding |
-| Ship `fix/` variant for all 12 sub-projects in v1, or optional? | Required for all = consistent; optional = faster first release | Before sub-project work starts |
-| Add a `clrsig conform` conformance run alongside scenario runs? | More coverage; slightly more CI time | Can be added in v1.1 |
+| Pin to a specific clrsig release or track `@latest`? | Pin = stable catalog; latest = exercises the action on every release | Before CI scaffolding |
+| Ship `fix/` for all 12 in v1, or optional? | Required for all = consistent; optional = faster first release | Before sub-project work starts |
+| Add a `clrsig conform` run alongside scenario runs where applicable? | More coverage; slightly more CI time | Can be added in v1.1 |
