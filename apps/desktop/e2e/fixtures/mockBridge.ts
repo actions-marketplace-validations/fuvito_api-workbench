@@ -149,14 +149,14 @@ export function setupMockBridge() {
           return Promise.resolve({ path, error: '' })
         },
         DuplicateScenario: (path: string) => {
-          const scenarios = bridge['scenarios'] as Array<{path: string; name: string}>
+          const scenarios = bridge['scenarios'] as Array<{path: string; title: string; stepCount?: number}>
           const src = scenarios.find(s => s.path === path)
           if (!src) return Promise.resolve({ path: '', error: 'not found' })
           const dir = path.substring(0, path.lastIndexOf('/'))
           const base = path.substring(path.lastIndexOf('/') + 1).replace(/\.(yaml|yml|json)$/i, '')
           const newPath = `${dir}/${base}-copy.yaml`
-          const newName = src.name + ' Copy'
-          scenarios.push({ path: newPath, name: newName, stepCount: src.stepCount ?? 0 })
+          const newTitle = (src.title ?? '') + ' Copy'
+          scenarios.push({ path: newPath, title: newTitle, stepCount: src.stepCount ?? 0 })
           return Promise.resolve({ path: newPath, error: '' })
         },
         DeleteScenario: (path: string) => {
@@ -167,8 +167,8 @@ export function setupMockBridge() {
           const slug = newName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
           const dir = path.substring(0, path.lastIndexOf('/'))
           const newPath = `${dir}/${slug || 'scenario'}.yaml`
-          bridge['scenarios'] = (bridge['scenarios'] as Array<{path: string; name: string}>).map(
-            s => s.path === path ? { ...s, path: newPath, name: newName } : s
+          bridge['scenarios'] = (bridge['scenarios'] as Array<{path: string; title: string}>).map(
+            s => s.path === path ? { ...s, path: newPath, title: newName } : s
           )
           return Promise.resolve(newPath)
         },

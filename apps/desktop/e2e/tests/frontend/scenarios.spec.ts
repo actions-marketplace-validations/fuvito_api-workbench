@@ -1,5 +1,12 @@
-import { test, expect, gotoApp } from '../../fixtures/test.js'
+import { test, expect, gotoApp as _gotoApp } from '../../fixtures/test.js'
 import type { Page } from '@playwright/test'
+
+// All scenario tests need the Scenarios activity-rail tab to be active.
+// This local wrapper navigates to the app and then opens the Scenarios panel.
+async function gotoApp(page: Page) {
+  await _gotoApp(page)
+  await page.getByTitle('Scenarios').click()
+}
 
 const SCENARIO = { title: 'User flow', path: '/ws/scenarios/user-flow.yaml', stepCount: 2 }
 
@@ -92,13 +99,14 @@ async function withWorkspaceOnly(page: Page) {
 test.describe('Scenarios', () => {
   test('no scenarios section shown by default', async ({ page }) => {
     await gotoApp(page)
-    await expect(page.locator('aside').getByText('Scenarios')).not.toBeVisible()
+    // With no scenarios in the workspace, no scenario buttons appear in the list
+    await expect(page.locator('aside').getByRole('button', { name: 'User flow' })).not.toBeVisible()
   })
 
   test('scenarios section appears in sidebar when list has items', async ({ page }) => {
     await withScenarios(page)
     await gotoApp(page)
-    await expect(page.locator('aside').getByText('Scenarios')).toBeVisible()
+    await expect(page.locator('aside').getByText('Scenarios', { exact: true })).toBeVisible()
     await expect(page.locator('aside').getByRole('button', { name: 'User flow' })).toBeVisible()
   })
 
@@ -137,11 +145,12 @@ test.describe('Scenarios', () => {
     await expect(page.getByText('Fetch user').first()).toBeVisible()
   })
 
-  test('right panel prompts to click Run before first run', async ({ page }) => {
+  test('step editor is shown before first run', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText(/Click.*Run/)).toBeVisible()
+    await expect(page.getByText('Create user').first()).toBeVisible()
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
   })
 
   test('Run button shows PASSED badge on success', async ({ page }) => {
@@ -149,7 +158,7 @@ test.describe('Scenarios', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: 'Run', exact: true }).click()
-    await expect(page.getByText('PASSED')).toBeVisible()
+    await expect(page.getByText('PASSED').first()).toBeVisible()
   })
 
   test('shows total duration in header after run', async ({ page }) => {
@@ -168,20 +177,24 @@ test.describe('Scenarios', () => {
     await expect(page.getByText('201', { exact: true })).toBeVisible()
   })
 
-  test('assertion results shown in step result', async ({ page }) => {
+  test('assertion results shown in step result strip after expanding', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL, result: SCENARIO_RESULT })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: 'Run', exact: true }).click()
+    // Expand the result strip for step 1 (collapsed by default for passing steps)
+    await page.getByRole('region', { name: 'Step details' }).getByRole('button').first().click()
     await expect(page.getByText('status = 201').first()).toBeVisible()
   })
 
-  test('extracted variables shown in step result', async ({ page }) => {
+  test('extracted variables shown in step result strip after expanding', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL, result: SCENARIO_RESULT })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: 'Run', exact: true }).click()
-    await expect(page.getByText('→ userId:')).toBeVisible()
+    // Expand the result strip for step 1 (collapsed by default for passing steps)
+    await page.getByRole('region', { name: 'Step details' }).getByRole('button').first().click()
+    await expect(page.getByText('→ userId:').first()).toBeVisible()
   })
 
   test('FAILED badge shown when scenario fails', async ({ page }) => {
@@ -205,7 +218,7 @@ test.describe('Scenarios', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: 'Run', exact: true }).click()
-    await expect(page.getByText('FAILED')).toBeVisible()
+    await expect(page.getByText('FAILED').first()).toBeVisible()
     await expect(page.getByText('status = 201 (got 500)')).toBeVisible()
   })
 })
@@ -214,30 +227,30 @@ test.describe('Scenario management — create', () => {
   test('+ button appears in sidebar when workspace is open', async ({ page }) => {
     await withWorkspaceOnly(page)
     await gotoApp(page)
-    await expect(page.locator('aside').getByTitle('New scenario')).toBeVisible()
+    await expect(page.locator('aside').getByTitle('New scenario', { exact: true })).toBeVisible()
   })
 
   test('clicking + shows inline name input', async ({ page }) => {
     await withWorkspaceOnly(page)
     await gotoApp(page)
-    await page.locator('aside').getByTitle('New scenario').click()
+    await page.locator('aside').getByTitle('New scenario', { exact: true }).click()
     await expect(page.locator('aside').getByRole('textbox')).toBeVisible()
   })
 
   test('pressing Escape cancels without creating a scenario', async ({ page }) => {
     await withWorkspaceOnly(page)
     await gotoApp(page)
-    await page.locator('aside').getByTitle('New scenario').click()
+    await page.locator('aside').getByTitle('New scenario', { exact: true }).click()
     await page.locator('aside').getByRole('textbox').press('Escape')
     await expect(page.locator('aside').getByRole('textbox')).not.toBeVisible()
     // Scenarios section header still present (+ button) but no scenario items
-    await expect(page.locator('aside').getByTitle('New scenario')).toBeVisible()
+    await expect(page.locator('aside').getByTitle('New scenario', { exact: true })).toBeVisible()
   })
 
   test('typing a name and pressing Enter creates scenario and opens a tab', async ({ page }) => {
     await withWorkspaceOnly(page)
     await gotoApp(page)
-    await page.locator('aside').getByTitle('New scenario').click()
+    await page.locator('aside').getByTitle('New scenario', { exact: true }).click()
     await page.locator('aside').getByRole('textbox').fill('My Test Scenario')
     await page.locator('aside').getByRole('textbox').press('Enter')
     // New item appears in sidebar
@@ -262,6 +275,8 @@ test.describe('Scenario management — delete', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).hover()
     await page.locator('aside').getByTitle('Delete scenario').click()
+    // Confirm in the delete dialog
+    await page.locator('.fixed.inset-0').getByRole('button', { name: 'Delete' }).click()
     await expect(page.locator('aside').getByRole('button', { name: 'User flow' })).not.toBeVisible()
   })
 
@@ -274,6 +289,8 @@ test.describe('Scenario management — delete', () => {
     // Delete it
     await page.locator('aside').getByRole('button', { name: 'User flow' }).hover()
     await page.locator('aside').getByTitle('Delete scenario').click()
+    // Confirm in the delete dialog
+    await page.locator('.fixed.inset-0').getByRole('button', { name: 'Delete' }).click()
     await expect(page.getByRole('tab').filter({ hasText: 'User flow' })).not.toBeVisible()
   })
 })
@@ -381,14 +398,14 @@ test.describe('Scenario result persistence', () => {
     `)
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText('PASSED')).toBeVisible()
+    await expect(page.getByText('PASSED').first()).toBeVisible()
   })
 
-  test('right panel prompts to run when no cached result exists', async ({ page }) => {
+  test('step editor shown with no result badge when no cached result exists', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText(/Click.*Run/)).toBeVisible()
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
     await expect(page.getByText('PASSED')).not.toBeVisible()
   })
 })
@@ -483,121 +500,126 @@ test.describe('Scenario env picker', () => {
 })
 
 test.describe('Scenario visual editor', () => {
-  async function openInEditMode(page: Page) {
+  async function openScenario(page: Page) {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    // Wait for the detail to load before Edit becomes enabled
-    await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    // Wait for the step editor to appear (editor is always active — no Edit button needed)
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
   }
 
-  test('Edit button switches to the visual step editor', async ({ page }) => {
+  test('step editor shows first step by default', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // Step name inputs appear (one per step) with correct values
-    await expect(page.getByPlaceholder('Step label')).toHaveCount(2)
+    await openScenario(page)
+    // First step selected by default; editor shows its fields
     await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Create user')
-    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Fetch user')
   })
 
-  test('visual editor shows method and URL fields', async ({ page }) => {
+  test('clicking a step in the list switches the editor to that step', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // URL inputs appear for each step
-    await expect(page.getByPlaceholder('https://api.example.com/path')).toHaveCount(2)
+    await openScenario(page)
+    await page.getByRole('option', { name: /Fetch user/ }).click()
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
+  })
+
+  test('visual editor shows method and URL fields for selected step', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL })
+    await gotoApp(page)
+    await openScenario(page)
     await expect(page.getByPlaceholder('https://api.example.com/path').first()).toHaveValue('https://api.example.com/users')
   })
 
   test('visual editor shows assertion rows with expected values', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
     // Step 1 has a status assertion with expected 201
     await expect(page.getByPlaceholder('expected').first()).toHaveValue('201')
   })
 
-  test('Discard returns to view mode without saving', async ({ page }) => {
+  test('Discard resets unsaved changes', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
     await page.getByPlaceholder('Step label').first().fill('Changed name')
     await page.getByRole('button', { name: 'Discard' }).click()
-    // Back in view mode — Run button visible
+    // Confirm in the discard dialog
+    await page.locator('.fixed.inset-0').getByRole('button', { name: 'Discard' }).click()
+    // Run button always visible; original step name restored
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
-    // Original step name shown (save never happened)
-    await expect(page.getByText('Create user').first()).toBeVisible()
+    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Create user')
   })
 
-  test('Save serializes edits and returns to view mode', async ({ page }) => {
+  test('Save serializes edits to YAML', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // Change URL of first step
+    await openScenario(page)
     await page.getByPlaceholder('https://api.example.com/path').first().fill('https://updated.example.com/users')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    // Returns to view mode
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
-    // The serialized YAML was written to the bridge
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const savedYaml = await page.evaluate(() => (window as any).__bridge.scenarioRaw)
     expect(savedYaml).toContain('https://updated.example.com/users')
   })
 
-  test('Add step button inserts a new step card', async ({ page }) => {
+  test('Add step button inserts a new step in the list', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await expect(page.getByPlaceholder('Step label')).toHaveCount(2)
+    await openScenario(page)
+    const stepList = page.getByRole('listbox', { name: 'Scenario steps' })
+    await expect(stepList.getByRole('option')).toHaveCount(2)
     await page.getByRole('button', { name: 'Add step' }).click()
-    await expect(page.getByPlaceholder('Step label')).toHaveCount(3)
+    await expect(stepList.getByRole('option')).toHaveCount(3)
   })
 
   test('Remove step button deletes the step', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await expect(page.getByPlaceholder('Step label')).toHaveCount(2)
+    await openScenario(page)
+    const stepList = page.getByRole('listbox', { name: 'Scenario steps' })
+    await expect(stepList.getByRole('option')).toHaveCount(2)
+    // Remove button in the step editor header removes the selected (first) step
     await page.getByTitle('Remove step').first().click()
-    await expect(page.getByPlaceholder('Step label')).toHaveCount(1)
-    // The remaining step is "Fetch user"
+    await expect(stepList.getByRole('option')).toHaveCount(1)
     await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
   })
 
   test('Add assertion button inserts a new assertion row', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // SCENARIO_DETAIL: step 1 has 1 assertion, step 2 has 2 → 3 total
-    await expect(page.getByTitle('Remove assertion')).toHaveCount(3)
+    await openScenario(page)
+    // Step 1 (selected) has 1 assertion visible in the editor
+    await expect(page.getByTitle('Remove assertion')).toHaveCount(1)
     await page.getByRole('button', { name: 'Add assertion' }).first().click()
-    await expect(page.getByTitle('Remove assertion')).toHaveCount(4)
+    await expect(page.getByTitle('Remove assertion')).toHaveCount(2)
   })
 
   test('Remove assertion button removes the assertion row', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await expect(page.getByTitle('Remove assertion')).toHaveCount(3)
+    await openScenario(page)
+    await expect(page.getByTitle('Remove assertion')).toHaveCount(1)
     await page.getByTitle('Remove assertion').first().click()
-    await expect(page.getByTitle('Remove assertion')).toHaveCount(2)
+    await expect(page.getByTitle('Remove assertion')).toHaveCount(0)
   })
 
-  test('YAML toggle shows the editor with Save and Discard controls', async ({ page }) => {
+  test('YAML button opens a dialog with YAML content', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'YAML', exact: true }).click()
-    // YAML mode: Save and Discard controls appear
-    await expect(page.getByRole('button', { name: 'Discard' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
+    await page.getByTitle('View / edit YAML').click()
+    // YAML dialog shows with a heading and Check/Save controls
+    await expect(page.locator('.fixed.inset-0').getByText('YAML').first()).toBeVisible()
+    await expect(page.locator('.fixed.inset-0').getByRole('button', { name: 'Check' })).toBeVisible()
   })
 
   test('timeout field defaults to 0 and accepts a numeric value', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
+    // Timeout field is inside the Advanced section — expand it first
+    await page.getByRole('button', { name: 'Advanced' }).click()
     const timeoutInputs = page.getByTitle('Step timeout in milliseconds (0 = use global default)')
     await expect(timeoutInputs.first()).toHaveValue('0')
     await timeoutInputs.first().fill('5000')
@@ -607,7 +629,8 @@ test.describe('Scenario visual editor', () => {
   test('saving with a timeout emits timeoutMs in the YAML', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
+    await page.getByRole('button', { name: 'Advanced' }).click()
     await page.getByTitle('Step timeout in milliseconds (0 = use global default)').first().fill('3000')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
@@ -619,9 +642,11 @@ test.describe('Scenario visual editor', () => {
   test('retry field defaults to 0 and delay input is disabled when attempts is 0', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
+    await page.getByRole('button', { name: 'Advanced' }).click()
     const attemptsInputs = page.getByTitle('Maximum retry attempts (0 = no retry)')
-    const delayInputs = page.getByTitle('Delay between retry attempts in milliseconds')
+    // When attempts is 0 the delay input uses a different title (it's also disabled)
+    const delayInputs = page.getByTitle('Set Retry attempts > 0 to enable delay')
     await expect(attemptsInputs.first()).toHaveValue('0')
     await expect(delayInputs.first()).toBeDisabled()
   })
@@ -629,7 +654,8 @@ test.describe('Scenario visual editor', () => {
   test('setting retry attempts enables delay field', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
+    await page.getByRole('button', { name: 'Advanced' }).click()
     await page.getByTitle('Maximum retry attempts (0 = no retry)').first().fill('3')
     await expect(page.getByTitle('Delay between retry attempts in milliseconds').first()).toBeEnabled()
   })
@@ -637,7 +663,8 @@ test.describe('Scenario visual editor', () => {
   test('saving with retry emits retry block in the YAML', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
+    await page.getByRole('button', { name: 'Advanced' }).click()
     await page.getByTitle('Maximum retry attempts (0 = no retry)').first().fill('3')
     await page.getByTitle('Delay between retry attempts in milliseconds').first().fill('500')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -701,65 +728,69 @@ test.describe('Scenario search/filter', () => {
 })
 
 test.describe('Scenario visual editor — step reordering', () => {
-  async function openInEditMode(page: Page) {
+  async function openScenario(page: Page) {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
   }
 
   test('move-up button is disabled on the first step', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await expect(page.getByTitle('Move step up').first()).toBeDisabled()
+    await openScenario(page)
+    // Step 0 (Create user) is selected by default; its editor's move-up is disabled
+    await expect(page.getByTitle('Move step up')).toBeDisabled()
   })
 
   test('move-down button is disabled on the last step', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await expect(page.getByTitle('Move step down').last()).toBeDisabled()
+    await openScenario(page)
+    // Select the last step (Fetch user) to see its move-down button disabled
+    await page.getByRole('option', { name: /Fetch user/ }).click()
+    await expect(page.getByTitle('Move step down')).toBeDisabled()
   })
 
   test('move-down on first step swaps it with the second', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // Before: step 1 = "Create user", step 2 = "Fetch user"
-    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Create user')
-    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Fetch user')
-    // Click move-down on the first step
-    await page.getByTitle('Move step down').first().click()
-    // After: step 1 = "Fetch user", step 2 = "Create user"
-    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
-    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Create user')
+    await openScenario(page)
+    const stepList = page.getByRole('listbox', { name: 'Scenario steps' })
+    // Before: list order is Create user, Fetch user
+    await expect(stepList.getByRole('option').first()).toContainText('Create user')
+    // Click move-down on the selected step (Create user, index 0)
+    await page.getByTitle('Move step down').click()
+    // After: Create user moved to index 1; Fetch user is now first
+    await expect(stepList.getByRole('option').first()).toContainText('Fetch user')
+    await expect(stepList.getByRole('option').nth(1)).toContainText('Create user')
   })
 
   test('move-up on second step swaps it with the first', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await page.getByTitle('Move step up').nth(1).click()
-    await expect(page.getByPlaceholder('Step label').first()).toHaveValue('Fetch user')
-    await expect(page.getByPlaceholder('Step label').nth(1)).toHaveValue('Create user')
+    await openScenario(page)
+    const stepList = page.getByRole('listbox', { name: 'Scenario steps' })
+    // Select step 1 (Fetch user) and move it up
+    await page.getByRole('option', { name: /Fetch user/ }).click()
+    await page.getByTitle('Move step up').click()
+    // Fetch user is now at index 0
+    await expect(stepList.getByRole('option').first()).toContainText('Fetch user')
+    await expect(stepList.getByRole('option').nth(1)).toContainText('Create user')
   })
 
   test('step numbers update after reorder', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await page.getByTitle('Move step down').first().click()
-    // Step circles should show 1 and 2 — text content check via aria
-    // The step index circles show "1" and "2" as the visible text in the step cards
-    const cards = page.locator('.rounded.border.border-\\[var\\(--color-border\\)\\].bg-\\[var\\(--color-muted\\)\\]')
-    await expect(cards).toHaveCount(2)
+    await openScenario(page)
+    await page.getByTitle('Move step down').click()
+    // Both steps still appear in the step list after reorder
+    await expect(page.getByRole('listbox', { name: 'Scenario steps' }).getByRole('option')).toHaveCount(2)
   })
 
   test('saving after reorder serializes steps in the new order', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    await page.getByTitle('Move step down').first().click()
+    await openScenario(page)
+    await page.getByTitle('Move step down').click()
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -781,12 +812,13 @@ const SCENARIO_DETAIL_WITH_NOTES = {
 }
 
 test.describe('Scenario view mode — description and step notes', () => {
-  test('scenario description is shown in the left panel in view mode', async ({ page }) => {
+  test('scenario description is shown in the meta section', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL_WITH_NOTES })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await expect(page.getByText('End-to-end user lifecycle')).toBeVisible()
+    // Description is always shown in the scenario meta section input
+    await expect(page.getByPlaceholder('What does this scenario test?')).toHaveValue('End-to-end user lifecycle')
   })
 
   test('step description is shown in italic below the step name', async ({ page }) => {
@@ -804,24 +836,22 @@ test.describe('Scenario view mode — description and step notes', () => {
     await expect(page.getByText('Fetch user')).toBeVisible()
   })
 
-  test('description field is present in visual editor and can be edited', async ({ page }) => {
+  test('notes field is present in step editor and can be edited', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
-    // Description inputs visible (one per step)
-    await expect(page.getByPlaceholder('Notes (optional)')).toHaveCount(2)
+    // Only the selected step's editor is shown (step 0 by default)
+    await expect(page.getByPlaceholder('Notes (optional)')).toHaveCount(1)
     await page.getByPlaceholder('Notes (optional)').first().fill('Sends a POST to create user')
     await expect(page.getByPlaceholder('Notes (optional)').first()).toHaveValue('Sends a POST to create user')
   })
 
-  test('saving with a step description emits description in the YAML', async ({ page }) => {
+  test('saving with a step notes emits notes in the YAML', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
     await page.getByPlaceholder('Notes (optional)').first().fill('My step note')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
@@ -832,11 +862,12 @@ test.describe('Scenario view mode — description and step notes', () => {
 })
 
 test.describe('Scenario visual editor — request body', () => {
-  async function openInEditMode(page: Page) {
+  async function openScenario(page: Page) {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
   }
+  // Keep openInEditMode as alias so tests below don't need individual edits
+  const openInEditMode = openScenario
 
   test('body type selector defaults to none', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
@@ -909,7 +940,7 @@ test.describe('Scenario visual editor — request body', () => {
     expect(savedYaml).toContain('Alice')
   })
 
-  test('body type badge shown in view mode when body is non-none', async ({ page }) => {
+  test('body type shown in step editor when body is non-none', async ({ page }) => {
     const detailWithBody = {
       ...SCENARIO_DETAIL,
       steps: SCENARIO_DETAIL.steps.map((s, i) => i === 0 ? { ...s, bodyType: 'json', bodyContent: '{}' } : s),
@@ -918,16 +949,17 @@ test.describe('Scenario visual editor — request body', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await expect(page.getByText('json').first()).toBeVisible()
+    // In always-edit mode the body type select reflects the loaded bodyType
+    await expect(page.getByTitle('Request body type').first()).toHaveValue('json')
   })
 })
 
 test.describe('Scenario visual editor — headers and query params', () => {
-  async function openInEditMode(page: Page) {
+  async function openScenario(page: Page) {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
   }
+  const openInEditMode = openScenario
 
   test('Headers section is present in visual editor', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
@@ -992,7 +1024,7 @@ test.describe('Scenario visual editor — headers and query params', () => {
     expect(savedYaml).toContain('page')
   })
 
-  test('headers are shown as chips in view mode', async ({ page }) => {
+  test('header value is visible in the step editor', async ({ page }) => {
     const detailWithHeaders = {
       ...SCENARIO_DETAIL,
       steps: SCENARIO_DETAIL.steps.map((s, i) =>
@@ -1003,10 +1035,11 @@ test.describe('Scenario visual editor — headers and query params', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await expect(page.getByText('Content-Type: application/json').first()).toBeVisible()
+    // Step 0 (Create user) is selected by default; its header appears in the editor
+    await expect(page.getByPlaceholder('Header-Name').first()).toHaveValue('Content-Type')
   })
 
-  test('query params are shown as chips in view mode', async ({ page }) => {
+  test('query param value is visible in the step editor', async ({ page }) => {
     const detailWithParams = {
       ...SCENARIO_DETAIL,
       steps: SCENARIO_DETAIL.steps.map((s, i) =>
@@ -1017,33 +1050,34 @@ test.describe('Scenario visual editor — headers and query params', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Fetch user').first()).toBeVisible()
-    await expect(page.getByText('?include=roles').first()).toBeVisible()
+    // Select step 1 (Fetch user) which has the query param
+    await page.getByRole('option', { name: /Fetch user/ }).click()
+    await expect(page.getByPlaceholder('param').first()).toHaveValue('include')
   })
 })
 
 test.describe('Scenario visual editor — assertions', () => {
-  async function openInEditMode(page: Page) {
+  async function openScenario(page: Page) {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
-    await expect(page.getByText('Create user').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.getByPlaceholder('Step label').first()).toBeVisible()
   }
 
   test('selecting schema type shows schema input instead of operator and expected', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // SCENARIO_DETAIL has 3 assertion rows total → 3 operator selects before change
-    await expect(page.getByLabel('Assertion operator')).toHaveCount(3)
+    await openScenario(page)
+    // Step 0 (Create user) is selected; it has 1 status assertion → 1 operator select
+    await expect(page.getByLabel('Assertion operator')).toHaveCount(1)
     await page.getByLabel('Assertion type').first().selectOption('schema')
-    // Schema type hides operator + expected for that row → 2 operator selects remain
-    await expect(page.getByLabel('Assertion operator')).toHaveCount(2)
+    // Schema type hides operator + expected for that row → 0 operator selects remain
+    await expect(page.getByLabel('Assertion operator')).toHaveCount(0)
     await expect(page.getByLabel('Schema value').first()).toBeVisible()
   })
 
   test('schema input accepts a text value', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
     await page.getByLabel('Assertion type').first().selectOption('schema')
     await page.getByLabel('Schema value').first().fill('getUserById')
     await expect(page.getByLabel('Schema value').first()).toHaveValue('getUserById')
@@ -1052,7 +1086,7 @@ test.describe('Scenario visual editor — assertions', () => {
   test('saving with a schema assertion emits schema field in YAML', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
+    await openScenario(page)
     await page.getByLabel('Assertion type').first().selectOption('schema')
     await page.getByLabel('Schema value').first().fill('listUsers')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -1066,8 +1100,8 @@ test.describe('Scenario visual editor — assertions', () => {
   test('status type operator select has only 4 options (eq/ne/gt/lt)', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // First assertion is status type — check its operator select
+    await openScenario(page)
+    // Step 0 (Create user) has a status assertion — check its operator select
     const optionCount = await page.getByLabel('Assertion operator').first().evaluate(
       (el: HTMLSelectElement) => el.options.length
     )
@@ -1077,9 +1111,10 @@ test.describe('Scenario visual editor — assertions', () => {
   test('jsonpath type operator select has all 6 options', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // Step 2 has a jsonpath assertion — it's the 3rd assertion row overall
-    const optionCount = await page.getByLabel('Assertion operator').nth(2).evaluate(
+    await openScenario(page)
+    // Select step 1 (Fetch user) which has a jsonpath assertion as its 2nd assertion
+    await page.getByRole('option', { name: /Fetch user/ }).click()
+    const optionCount = await page.getByLabel('Assertion operator').nth(1).evaluate(
       (el: HTMLSelectElement) => el.options.length
     )
     expect(optionCount).toBe(6)
@@ -1088,15 +1123,16 @@ test.describe('Scenario visual editor — assertions', () => {
   test('switching assertion type resets path and expected', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
-    await openInEditMode(page)
-    // Step 2, assertion 2 is jsonpath with path=$.name and expected=Alice
-    await expect(page.getByPlaceholder('expected').nth(2)).toHaveValue('Alice')
+    await openScenario(page)
+    // Select step 1 (Fetch user); assertion 1 is jsonpath with expected=Alice
+    await page.getByRole('option', { name: /Fetch user/ }).click()
+    await expect(page.getByPlaceholder('expected').nth(1)).toHaveValue('Alice')
     // Switch to status type — expected should reset to empty
-    await page.getByLabel('Assertion type').nth(2).selectOption('status')
-    await expect(page.getByPlaceholder('expected').nth(2)).toHaveValue('')
+    await page.getByLabel('Assertion type').nth(1).selectOption('status')
+    await expect(page.getByPlaceholder('expected').nth(1)).toHaveValue('')
   })
 
-  test('schema assertion shown with schema label in view mode', async ({ page }) => {
+  test('schema assertion shown with schema value in step editor', async ({ page }) => {
     const detailWithSchema = {
       ...SCENARIO_DETAIL,
       steps: SCENARIO_DETAIL.steps.map((s, i) =>
@@ -1107,6 +1143,7 @@ test.describe('Scenario visual editor — assertions', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    await expect(page.getByText('schema: createUser').first()).toBeVisible()
+    // Step 0 (Create user) is selected; its schema assertion value is in the schema input
+    await expect(page.getByLabel('Schema value').first()).toHaveValue('createUser')
   })
 })

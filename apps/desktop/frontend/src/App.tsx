@@ -559,7 +559,7 @@ export default function App() {
           {
             kind: 'action',
             label: demo.demoStarting ? 'Starting…' : demo.demoRunning ? 'Stop Demo Server' : 'Start Demo Server',
-            onClick: demo.demoRunning ? demo.handleStopDemo : demo.handleStartDemo,
+            onClick: demo.demoRunning ? demo.handleStopDemo : () => requestWorkspaceSwitch(demo.handleStartDemo),
             disabled: demo.demoStarting,
           },
           { kind: 'separator' },
@@ -881,7 +881,7 @@ export default function App() {
                     onImportOpenAPI={workspace.handleImportOpenAPI}
                     onImportPostman={workspace.handleImportPostman}
                     onImportInsomnia={workspace.handleImportInsomnia}
-                    onTryDemo={demo.handleStartDemo}
+                    onTryDemo={() => requestWorkspaceSwitch(demo.handleStartDemo)}
                     demoStarting={demo.demoStarting}
                     onRefresh={workspace.refreshWorkspace}
                     importing={workspace.importing}
@@ -1138,7 +1138,7 @@ export default function App() {
           onNewWorkspace={workspace.handleNewWorkspace}
           onOpenWorkspace={workspace.handleOpenWorkspace}
           onOpenRecentWorkspace={workspace.handleOpenWorkspaceByPath}
-          onTryDemo={demo.handleStartDemo}
+          onTryDemo={() => requestWorkspaceSwitch(demo.handleStartDemo)}
           onStopDemo={demo.handleStopDemo}
         />
       )}
