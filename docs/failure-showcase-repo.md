@@ -1,6 +1,6 @@
 # clrsig-failure-catalog — PRD & Technical Design
 
-**Repository:** `github.com/fuvito/clrsig-failure-catalog` (new, public)
+**Repository:** `github.com/fuvito/api-workbench-failure-catalog` (new, public)
 **Owner:** Fuat Yazar
 **Status:** Pre-build — this document is the source of truth for implementation
 **Product site:** [clrsig.com](https://clrsig.com)
@@ -77,11 +77,12 @@ This repo (executable proofs)
 ```
 clrsig-failure-catalog/
 ├── README.md                        # Index — links to every sub-project and clrsig.com/failures/
-├── go.mod                           # Single module: github.com/fuvito/clrsig-failure-catalog
+├── go.mod                           # Single module: github.com/fuvito/api-workbench-failure-catalog
 ├── go.sum
 ├── .github/
 │   └── workflows/
-│       ├── catalog.yml              # Runs all sub-projects; nightly (released) + nightly (main branch)
+│       ├── catalog.yml              # Released clrsig: runs on push + nightly 06:00 UTC
+│       ├── catalog-main.yml         # Builds clrsig from api-workbench@main: nightly 07:00 UTC only
 │       └── update-outputs.yml       # Regenerates expected-output blocks in sub-project READMEs
 │
 ├── failures/
@@ -142,6 +143,8 @@ failures/fm-NNN-slug/
 
 **Key constraint:** every server is a single Go file with no external dependencies beyond the standard library. No frameworks, no databases. The spec is OpenAPI 3.0 YAML.
 
+**Health endpoint contract:** every server-based sub-project must expose `GET /health` returning HTTP 200 (empty body is fine). This is the readiness signal used by the CI readiness poll (§6.4). Document this requirement in `CONTRIBUTING.md`.
+
 ### 6.3 Sub-project README Template
 
 ```markdown
@@ -201,18 +204,21 @@ When and why this pattern appears in real projects.
 ### 6.4 GitHub Actions Workflow
 
 ```yaml
-# .github/workflows/catalog.yml
-name: Failure Catalog
+# .github/workflows/catalog.yml — released clrsig (push + nightly 06:00)
+name: Failure Catalog (released)
+
+env:
+  CLRSIG_VERSION: v0.3.0   # bump manually on each release, or via Renovate regex manager
 
 on:
   push:
   schedule:
-    - cron: '0 6 * * *'   # nightly — released clrsig
-    - cron: '0 7 * * *'   # nightly — clrsig built from api-workbench@main
+    - cron: '0 6 * * *'   # nightly against pinned released build
 
 jobs:
   catalog:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false   # one failure does not cancel the rest
       matrix:
@@ -239,17 +245,23 @@ jobs:
 
       - name: Install clrsig
         run: |
-          curl -sSfL https://github.com/fuvito/api-workbench/releases/latest/download/clrsig-linux-amd64 \
+          curl -sSfL \
+            https://github.com/fuvito/api-workbench/releases/download/${{ env.CLRSIG_VERSION }}/clrsig-linux-amd64 \
             -o /usr/local/bin/clrsig && chmod +x /usr/local/bin/clrsig
 
       # Server-based: build binary first to avoid cold-compile race, then poll for readiness
       - name: Build and start broken server
         if: matrix.fm.kind == 'server'
+        timeout-minutes: 2
         run: |
           go build -o /tmp/server-broken \
-            ./failures/fm-${{ matrix.fm.id }}-${{ matrix.fm.slug }}/broken/main.go
+            ./failures/fm-${{ matrix.fm.id }}-${{ matrix.fm.slug }}/broken/
           /tmp/server-broken &
-          until curl -sf http://localhost:19${{ matrix.fm.id }}/health; do sleep 0.2; done
+          for i in $(seq 1 50); do
+            curl -sf http://localhost:19${{ matrix.fm.id }}/health && break
+            [ $i -eq 50 ] && { echo "Server did not become ready after 10s"; exit 1; }
+            sleep 0.2
+          done
 
       - name: "Detect (must exit 1)"
         if: matrix.fm.kind == 'server'
@@ -265,11 +277,16 @@ jobs:
 
       - name: Build and start fixed server
         if: matrix.fm.kind == 'server'
+        timeout-minutes: 2
         run: |
           go build -o /tmp/server-fixed \
-            ./failures/fm-${{ matrix.fm.id }}-${{ matrix.fm.slug }}/fixed/main.go
+            ./failures/fm-${{ matrix.fm.id }}-${{ matrix.fm.slug }}/fixed/
           /tmp/server-fixed &
-          until curl -sf http://localhost:19${{ matrix.fm.id }}/health; do sleep 0.2; done
+          for i in $(seq 1 50); do
+            curl -sf http://localhost:19${{ matrix.fm.id }}/health && break
+            [ $i -eq 50 ] && { echo "Server did not become ready after 10s"; exit 1; }
+            sleep 0.2
+          done
 
       - name: "Fix (must exit 0)"
         if: matrix.fm.kind == 'server'
@@ -289,7 +306,28 @@ jobs:
           test $? -eq 1
 ```
 
+**`catalog-main.yml`** (nightly 07:00 UTC only, separate file, separate badge) is identical to `catalog.yml` except: (1) no `push:` trigger and no `CLRSIG_VERSION` env; (2) the install step builds from source:
+
+```yaml
+      - name: Build clrsig from api-workbench@main
+        run: |
+          git clone --depth 1 https://github.com/fuvito/api-workbench /tmp/api-workbench
+          cd /tmp/api-workbench && go build -o /usr/local/bin/clrsig ./apps/cli/
+```
+
+This gives two independent CI badges — one that proves the released binary catches each failure, one that catches engine regressions on the development branch before they ship.
+
 **Exit code convention:** `set +e` disables bash's exit-on-error so `clrsig` returning 1 does not abort the step. `test $? -eq 1` then asserts that is exactly what happened — if the broken server unexpectedly passes (`exit 0`), CI fails (detection regressed). The fixed server step runs with default `bash -e` and must exit 0.
+
+**FM-010 and FM-034 (`clrsig conform` modes):** both sub-projects include `specFile: ./openapi.yaml` in their `detect.yaml` and use `{type: schema}` assertions on each step. `clrsig run` with a `specFile:` binding performs the same response-schema validation that `clrsig conform` does, without requiring a separate matrix `cmd:` field. The matrix is intentionally kept to two kinds (`server` / `diff`) for simplicity.
+
+*Devin: the rewrite fixed the three bugs I flagged (set -e, install command, go run race) — four issues remain:*
+- *A second `cron:` line does not create a second job — both schedules trigger the same `catalog` job, which installs released clrsig either way. The `@main` leg needs a separate job gated on the schedule, or better a separate `catalog-main.yml` workflow (different install steps, different badge). As written, the 07:00 run just re-tests the release build.*
+- *The install step downloads `releases/latest` unconditionally — that contradicts the §9 decision to pin push builds. The pinned version needs to be a workflow variable resolved differently per event (`push` → pinned tag, `schedule` → latest/main).*
+- *The matrix only executes `clrsig run` (server kind) and `clrsig diff` (diff kind), but §6.5 lists FM-010 and FM-034 as `clrsig conform` detections. Either add `cmd:` to each matrix entry, or document that `detect.yaml` uses `specFile:` binding (run + spec validation detects drift without invoking conform).*
+- *The readiness poll assumes every server implements `/health` — that contract belongs in §6.2/CONTRIBUTING. And `until curl ... done` is unbounded: a server that crashes on start hangs the step for up to the 6-hour job default. Bound it (`for i in {1..50}` + fail) or set `timeout-minutes` on the step.*
+
+*Claude: all four addressed — (1) `catalog-main.yml` added as a separate workflow with its own badge (§6.1 structure updated); (2) `CLRSIG_VERSION` workflow-level env var, download URL uses the pinned tag — `catalog-main.yml` builds from source and has no version env; (3) standardised on `clrsig run` + `specFile:` binding for FM-010 and FM-034 — no `cmd:` field needed, §6.5 updated; (4) bounded poll (`for i in seq 1 50`) + `timeout-minutes: 2` on server start steps, `/health` contract documented in §6.2 and flagged for `CONTRIBUTING.md`.*
 
 ### 6.5 V1 Sub-project Catalog
 
@@ -303,13 +341,13 @@ jobs:
 | `fm-003-pagination-contract` | Pagination Contract Failures | Hard | `clrsig run` multi-step scenario | 19003 | [FM-003](https://clrsig.com/failures/fm-003/) |
 | `fm-004-renamed-removed-field` | Renamed or Removed Response Fields | Medium | `clrsig diff` v1 vs v2 | — | [FM-004](https://clrsig.com/failures/fm-004/) |
 | `fm-005-nullable-required` | Incorrect Optional, Nullable, and Required Field Behavior | Easy | `clrsig run` schema assertion | 19005 | [FM-005](https://clrsig.com/failures/fm-005/) |
-| `fm-010-spec-drift` | OpenAPI Specification and Implementation Drift | Easy | `clrsig conform` | 19010 | [FM-010](https://clrsig.com/failures/fm-010/) |
+| `fm-010-spec-drift` | OpenAPI Specification and Implementation Drift | Easy | `clrsig run` + `specFile:` schema assertions | 19010 | [FM-010](https://clrsig.com/failures/fm-010/) |
 | `fm-016-rate-limit-schema` | Rate-Limit and Throttling Failures | Medium | `clrsig run` undeclared 429 | 19016 | [FM-016](https://clrsig.com/failures/fm-016/) |
 | `fm-018-idempotency` | Idempotency and Duplicate-Operation Failures | Hard | `clrsig run` multi-step scenario | 19018 | [FM-018](https://clrsig.com/failures/fm-018/) |
 | `fm-022-semantically-invalid` | Syntactically Valid but Semantically Invalid Payloads | Medium | `clrsig run` jsonpath assertions | 19022 | [FM-022](https://clrsig.com/failures/fm-022/) |
 | `fm-025-incorrect-status` | Incorrect HTTP Status and Business-Error Semantics | Easy | `clrsig run` status assertion | 19025 | [FM-025](https://clrsig.com/failures/fm-025/) |
 | `fm-027-lost-update` | Concurrent Update and Lost-Update Failures | Hard | `clrsig run` multi-step scenario | 19027 | [FM-027](https://clrsig.com/failures/fm-027/) |
-| `fm-034-method-semantics` | HTTP Method and Operation Semantics Failures | Medium | `clrsig conform` + schema assertion | 19034 | [FM-034](https://clrsig.com/failures/fm-034/) |
+| `fm-034-method-semantics` | HTTP Method and Operation Semantics Failures | Medium | `clrsig run` + `specFile:` schema assertions | 19034 | [FM-034](https://clrsig.com/failures/fm-034/) |
 | `fm-044-sensitive-data` | Sensitive Data Exposure in API Responses | Medium | `clrsig run` schema (`additionalProperties: false`) | 19044 | [FM-044](https://clrsig.com/failures/fm-044/) |
 
 The remaining 38 failure modes in the catalog ([clrsig.com/failures](https://clrsig.com/failures/)) are candidates for future sub-projects. Any contributor can propose one by opening a pull request using the template in §6.3.
@@ -335,14 +373,19 @@ The remaining 38 failure modes in the catalog ([clrsig.com/failures](https://clr
 - [ ] Add a second nightly schedule leg that installs clrsig built from `api-workbench@main`
 - [ ] Wire FM-001 as the first matrix entry to verify the full pipeline end-to-end
 - [ ] Create `.github/workflows/update-outputs.yml` — runs all scenarios and refreshes expected-output blocks in sub-project READMEs (triggered manually or on release)
-- [ ] Add CI status badge to root `README.md`
+- [ ] Add CI status badge to root `README.md` (two badges: released and main-branch workflows)
 - [ ] Add `verify.sh` (bash) and `verify.ps1` (PowerShell) at repo root — wrappers that run the reproduction steps from §6.3 so Windows developers can verify locally without reading bash syntax
+- [ ] (optional) Configure Renovate `regexManagers` rule to auto-update `CLRSIG_VERSION: v...` in `catalog.yml` on new releases; until then, treat as a manual release-day step
 
 ### 7.3 Pre-build Decisions (resolve before first sub-project)
 
-- [ ] Confirm `clrsig diff` exit-code behaviour for breaking changes (must be exit 1 for the matrix inversion to work)
+- ~~Confirm `clrsig diff` exit-code behaviour for breaking changes~~ — **confirmed**: `clrsig diff` exits 1 on breaking changes only; non-breaking changes exit 0. That is exactly the semantics the matrix needs. (Source: `apps/cli/main.go` diff command, `exitError{1}`.)
 - [ ] Decide spec-only layout for diff-based modes — adopt `v1/openapi.yaml` + `v2/openapi.yaml` structure as defined in §6.2
 - [ ] Confirm all 12 sub-projects ship with a `fixed/` variant (exit-0 leg is required — without it, exit-1 on the broken server is unverifiable)
+
+*Devin: first item is already answered — `clrsig diff` exits 1 whenever `result.HasBreaking` (`apps/cli/main.go`, the diff command returns `exitError{1}`). Caveat: exit 1 only on *breaking* changes; a diff with only non-breaking changes exits 0, which is exactly the semantics the matrix needs. One catch on the §4 "Dependabot-style check" for the pinned version: Dependabot does not track a curl'd release URL inside a workflow `run:` step — use a Renovate regex manager, a `gh release view` freshness job, or accept it as a manual release-day task.*
+
+*Claude: (1) first item crossed off per confirmation above. (2) On Dependabot for `CLRSIG_VERSION`: accepting a manual release-day task for now — the env var in `catalog.yml` has an inline comment calling it out. If the catalog grows, the right long-term answer is a Renovate `regexManagers` rule matching `CLRSIG_VERSION: v\d+\.\d+\.\d+`; added as an optional §7.2 task.*
 
 ### 7.4 Sub-projects
 
@@ -471,6 +514,6 @@ Previously open questions — resolved.
 
 | Question | Decision | Rationale |
 |---|---|---|
-| Pin to a specific clrsig release or track `@latest`? | **Pin for push builds; track `@latest` for one of the nightly legs** | Pinning keeps PR builds deterministic; a nightly `@latest` leg serves the regression-guard goal |
+| Pin to a specific clrsig release or track `@latest`? | **Pin via `CLRSIG_VERSION` env var in `catalog.yml`; `catalog-main.yml` builds from source** | Pinning keeps push builds deterministic; the separate `catalog-main.yml` serves the development-branch regression goal. Update `CLRSIG_VERSION` manually on each release (or via Renovate regex manager — see §7.2). |
 | Ship `fix/` for all 12 in v1? | **Yes, required for all** | The exit-0 leg is what makes exit-1 meaningful; without it a scenario failing for the wrong reason is indistinguishable from a caught failure |
 | Add `clrsig conform` alongside scenario runs? | **Yes, in v1 where a spec is present** | One extra line per step, exercises the flagship command on every commit |
