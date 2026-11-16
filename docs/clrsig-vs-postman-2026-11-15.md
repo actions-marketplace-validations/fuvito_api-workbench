@@ -532,3 +532,139 @@ the actual desktop application and execution engine in three dimensions:
 
 The goal is not to have more features than Postman. The goal is to own a
 specific, valuable part of the API engineering workflow.
+
+## 11. Devin's comments
+
+*Written after reviewing the actual codebase, not just the public
+positioning this document is based on. The implementation is ahead of
+what this analysis assumes.*
+
+### What this document gets right
+
+-   **The core thesis.** "Don't become another Postman; own the
+    conformance and quality gate" is correct, and the codebase already
+    reflects it: `clrsig conform`, `clrsig diff`, `clrsig coverage`,
+    JUnit output, and CI-friendly exit codes are the beginnings of
+    exactly the independent quality gate described in §8.
+-   **The coexistence strategy.** §8's architecture exists in embryonic
+    form: `packages/core/importer/` already imports Postman v2.1
+    collections and Insomnia exports. A team can keep Postman for
+    exploration and run Clear Signal as the quality layer today. That
+    importer is the wedge, and it deserves to be promoted in the
+    positioning, not just the feature list.
+-   **The failure-mode catalog as the most defensible differentiator.**
+    Postman could clone `conform` in a quarter. A curated, executable
+    failure taxonomy bound to the user's spec is much harder to
+    reproduce. This should outrank almost everything else on the
+    roadmap.
+-   **"Agent-consumable, not AI-embedded."** §4.3's suggestion to make
+    capabilities useful to coding agents is right, and cheaper than it
+    looks. Every CLI command already emits stable JSON, and
+    `apps/desktop/wails/help/format-spec.md` is maintained as the
+    canonical format reference for AI prompts. Clear Signal's AI story
+    should be "the most agent-usable tool in the category," not an
+    in-product AI feature.
+
+### What I would correct or push back on
+
+-   **The roadmap needs re-baselining against the code.** Several items
+    ranked P0/P1 are already shipped: OpenAPI response *and request*
+    conformance (`conformance.Runner` calling
+    `openapi.ValidateResponseByPath` and `openapi.ValidateRequest`),
+    accumulated coverage reporting (`packages/core/coverage` persists
+    per-spec results in `.clrsig-coverage/`, shared between desktop and
+    CLI), and breaking-change detection (`openapi.Diff` via oasdiff,
+    exposed as `clrsig diff`). The §2 feature table should be
+    regenerated from the code rather than from what is "advertised" —
+    otherwise the roadmap will spend effort re-deciding things that are
+    done.
+-   **"Scenario generation from OpenAPI" is underspecified.**
+    Generating requests is done (`openapi.GenerateRequests`,
+    `clrsig generate`). Generating meaningful *scenarios* is not, and
+    cannot be fully derived from a spec: OpenAPI does not encode
+    workflow order (register → login → create → delete). What is
+    feasible: per-operation happy-path skeletons plus auth-setup steps
+    inferred from `securitySchemes`. Anything richer is heuristic
+    guesswork that will produce confident-looking wrong scenarios.
+    Ship the skeleton and label the rest honestly.
+-   **Drop consumer/provider contract testing (P1).** That is Pact's
+    problem domain — consumer-driven contracts, a broker, versioned
+    expectations. It conflicts with the local-first, spec-as-authority
+    model and with the project's own terminology rule (CLAUDE.md bans
+    bare "contract testing" precisely to avoid Pact connotations). The
+    provider side is already covered by `conform`. Say no.
+-   **Defer the mock server and team collaboration.** Both are already
+    out of MVP scope in CLAUDE.md §9, and neither differentiates. A
+    spec-driven stub is cheap later (the pattern exists in
+    `apps/desktop/wails/demo_server.go`), but it should not displace
+    failure-mode work.
+-   **The §7 coverage example is already real — the "additional quality
+    indicators" are the actual work left.** Computing "missing response
+    schema assertions / untested auth requirements / missing
+    error-response scenarios" is static analysis over the spec plus
+    scenario files. That indicator list, not the percentage, is what
+    makes the report worth reading.
+
+### How to achieve the important points
+
+Ordered by leverage. Every item builds on code that already exists.
+
+1.  **Deepen conformance: negative-path validation.** Today `conform`
+    proves only the happy path conforms. The next lever is generating
+    contract-violating requests per operation — drop a required field,
+    send the wrong type, omit credentials — and asserting the server
+    returns a *declared* error status with a schema-conformant error
+    body. The spec already declares which error codes and schemas
+    exist, so this is mechanical: extend `conformance.Runner` with
+    per-operation negative cases derived from schema mutation. An
+    implementation that accepts garbage is as non-conformant as one
+    returning broken 200s, and no mainstream tool checks this well.
+    This is the single strongest answer to §10's strategic question.
+2.  **Wire diff to impact.** `clrsig diff` already emits breaking
+    changes with method and path; scenario files already declare
+    `specFile:` and contain request paths. Joining the two yields
+    "these 4 scenarios will break when you ship spec v2" — the doc's
+    "identify affected operations and scenarios" — with no new core
+    machinery, just a new `clrsig impact <old> <new> --workspace`
+    command over existing data.
+3.  **Build the failure-mode catalog as data, not code.** A
+    `failuremodes/` package where each mode is a YAML definition: id,
+    category, description, an applicability matcher (tags, path
+    patterns, methods, security requirements), an assertion template,
+    and a scenario template with `{{params}}`. Start with the
+    spec-derivable subset: missing-auth on secured operations,
+    idempotency replay on POST, pagination-walk duplicate detection,
+    invalid-body → declared 4xx, expired-token acceptance. Then
+    `clrsig failures list` and `clrsig failures apply <spec>` emit
+    ordinary scenario files the existing runner already executes. The
+    catalog's value is curation and executability; the runner needs
+    almost no changes.
+4.  **Turn coverage into quality intelligence.** Extend
+    `coverage.BuildReport` to compute the §7 indicator list: operations
+    never exercised, operations exercised only on success paths
+    (per-status-code coverage), operations with security requirements
+    never run authenticated, declared error responses never asserted.
+    The differentiator is presenting "what you have not proven," not
+    "what you ran."
+5.  **MCP server over stdio — the cheap agent play.** All product
+    logic lives in `packages/core` behind small Go APIs, so an MCP
+    server is a thin stdio wrapper exposing `run_scenario`, `conform`,
+    `diff`, and `coverage` as tools. No HTTP listener is required,
+    which keeps it compatible with the security rule against
+    unauthenticated local control servers. Combined with the stable
+    JSON output every command already emits, this is the lowest-effort
+    P1/P2 item on the list.
+6.  **Keep saying no.** Collaboration → git is the collaboration layer.
+    Consumer-driven contracts → Pact's problem. Mock server → defer.
+    Monitoring → also Postman's job. The positioning in this document
+    is only credible while the product stays narrow.
+
+### The §10 question, answered against the code
+
+What makes an engineer say "I need this even though I have Postman"?
+The honest answer from the current implementation: **the enforceable
+gate already exists — `conform` + `diff` + JUnit + exit codes — but it
+only proves the happy path.** The work that converts "nice conformance
+checker" into "I would block a release on this" is items 1–4 above:
+negative-path conformance, diff→impact, the executable failure-mode
+catalog, and quality indicators. Everything else is distribution.
