@@ -1,31 +1,68 @@
-# Failure Modes Showcase Repository
+# clrsig-failure-catalog — PRD & Technical Design
 
-**Purpose:** A standalone GitHub repository containing self-contained sub-projects, each simulating one real-world API contract failure. Every sub-project runs `clrsig` via GitHub Actions and is linked from [clrsig.com/failures](https://clrsig.com/failures/).
-
----
-
-## Goals
-
-1. **Test clrsig in the wild** — each sub-project is a live regression test for the detection engine. If a failure mode stops being caught, CI turns red.
-2. **Prove value to evaluators** — a developer who lands on a failure mode page can clone one sub-project, run it in sixty seconds, and see `clrsig` catch the problem.
-3. **Build a searchable failure catalog** — each sub-project becomes a URL on the product site, discoverable by developers debugging the same issue in their own APIs.
+**Repository:** `github.com/fuvito/clrsig-failure-catalog` (new, public)
+**Owner:** Fuat Yazar
+**Status:** Pre-build — this document is the source of truth for implementation
 
 ---
 
-## Suggested Repository Name
+## 1. Problem
 
-`clrsig-failure-catalog` (public, under the `fuvito` GitHub org)
+API contract failures are abstract until a developer sees one caught in their own CI pipeline. The clrsig documentation explains *what* the tool detects; this catalog proves it by running against real, broken servers on every commit.
+
+There is currently no public, runnable collection of API failure mode reproductions that:
+- works out of the box with a single binary
+- shows both the failing state and the fix side by side
+- is kept green by CI so it cannot quietly rot
 
 ---
 
-## Repository Structure
+## 2. Goals
+
+| Goal | Description |
+|---|---|
+| **Test clrsig in production** | Each sub-project is a live regression test. If a failure mode stops being caught, CI turns red. |
+| **Prove value to evaluators** | Clone one sub-project, run two commands, see `clrsig` catch the problem in under two minutes. |
+| **Feed the product website** | Each sub-project maps to a page at `clrsig.com/failures/<slug>` — a searchable catalog of failure patterns with reproduction steps. |
+| **Show "what good looks like"** | The `fix/` variant in each sub-project demonstrates the corrected spec or server, not just the broken one. |
+
+## 3. Non-goals
+
+- Not a test suite for the clrsig source code (that lives in `fuvito/api-workbench`)
+- Not a general-purpose API testing tutorial
+- Not covering GraphQL, gRPC, or non-OpenAPI APIs
+
+---
+
+## 4. Success Metrics
+
+- 12 sub-projects live, all running in CI, within the first release
+- Every sub-project produces a `clrsig` exit code 1 (failure caught) on the broken server and exit code 0 on the fix
+- CI badge green on the catalog repo homepage
+- Each sub-project linked from `clrsig.com/failures/`
+
+---
+
+## 5. User Stories
+
+**As a developer evaluating clrsig**, I want to run a real failure example locally in under two minutes so I can see exactly what the tool catches and how the output looks.
+
+**As a developer debugging a spec violation**, I want to find a named failure pattern that matches my situation so I can understand the root cause and the fix.
+
+**As a Clear Signal maintainer**, I want a CI-green catalog that breaks immediately if a detection regression is introduced to the engine.
+
+---
+
+## 6. Technical Design
+
+### 6.1 Repository Structure
 
 ```
 clrsig-failure-catalog/
-├── README.md                       # Index of all failure modes
+├── README.md                        # Index — links to every sub-project
 ├── .github/
 │   └── workflows/
-│       └── catalog.yml             # Runs all sub-projects on push + nightly
+│       └── catalog.yml              # Runs all sub-projects; nightly + on push
 │
 ├── failures/
 │   ├── 01-missing-required-field/
@@ -42,97 +79,76 @@ clrsig-failure-catalog/
 │   └── 12-pagination-contract-break/
 │
 └── shared/
-    └── server-template/            # Reusable Go HTTP server base
+    ├── go.mod                        # Single Go module for all servers
+    └── testutil/
+        └── server.go                 # Shared helpers (port picker, graceful shutdown)
 ```
 
----
+### 6.2 Sub-project Structure
 
-## Sub-project Structure
-
-Each sub-project is self-contained and follows this layout:
+Every sub-project is self-contained:
 
 ```
 failures/NN-failure-name/
-├── README.md           # What the failure is, how to reproduce it, how to fix it
+├── README.md           # PRD content for the product page (see template §6.3)
 ├── server/
-│   └── main.go         # Minimal Go HTTP server that exhibits the failure
+│   └── main.go         # Broken server — exhibits the failure
 ├── openapi.yaml        # The declared spec (what the API promises)
 ├── scenarios/
 │   └── detect.yaml     # clrsig scenario that catches the failure
 ├── environments/
-│   └── local.yaml      # baseUrl pointing to the local server
+│   └── local.yaml      # baseUrl + any required variables
 └── fix/
-    └── main.go         # Corrected server (optional — shows the passing state)
+    └── main.go         # Corrected server — same spec, all assertions pass
 ```
 
-The `fix/` directory is intentional: seeing the broken and fixed versions side-by-side makes the failure concrete and the correction obvious.
+**Key constraint:** every server is a single Go file with no external dependencies beyond the standard library. No frameworks, no databases. The spec is OpenAPI 3.0 YAML.
 
----
-
-## Sub-project README Template
-
-Each `README.md` follows this structure:
+### 6.3 Sub-project README Template
 
 ```markdown
 # [NN] Failure name
 
 **Difficulty:** Easy / Medium / Hard
-**Detects with:** clrsig conform / clrsig run / clrsig diff
+**Detected by:** `clrsig run` / `clrsig conform` / `clrsig diff`
+**Slug:** `failure-name` (maps to clrsig.com/failures/failure-name)
 
 ## What this failure is
 
-One paragraph. What breaks, why it happens in practice, what a consumer
-experiences when it does.
+One paragraph. What breaks, why it happens, what a consumer experiences.
 
-## How to reproduce it
+## Reproduce it
 
-1. Start the server: `go run server/main.go`
-2. Run the scenario: `clrsig run scenarios/detect.yaml --env environments/local.yaml`
-3. Expected output: (paste the failing clrsig output)
+\```bash
+go run server/main.go &
+clrsig run scenarios/detect.yaml --env environments/local.yaml
+\```
+
+Expected output:
+\```
+(paste actual clrsig failure output here)
+\```
 
 ## Why clrsig catches it
 
-What assertion or schema check fires. Where in the OpenAPI spec the
-violation is declared.
+Which assertion fires. Where in the OpenAPI spec the violation is declared.
 
-## How to fix it
+## Fix
 
-What to change in the server (or the spec, if the spec is wrong).
-Point to `fix/main.go` for the working implementation.
+\```bash
+go run fix/main.go &
+clrsig run scenarios/detect.yaml --env environments/local.yaml
+# exits 0
+\```
+
+What changed: one sentence.
 
 ## In the wild
 
-One or two lines on when this failure appears in real projects.
+When this pattern appears in real projects.
 ```
 
----
-
-## Planned Sub-projects
-
-Ordered roughly easy → hard.
-
-| # | Name | Difficulty | Detection method |
-|---|---|---|---|
-| 01 | Missing required field | Easy | Schema assertion on response body |
-| 02 | Wrong field type | Easy | Schema assertion (`price` returned as `"12.99"` string, spec says `number`) |
-| 03 | Undeclared status code | Easy | `clrsig conform` — status not in spec's responses map |
-| 04 | Nullable violation | Easy | Field returns `null` but spec does not declare `nullable: true` |
-| 05 | Enum out of range | Easy | Field value outside the spec's declared enum list |
-| 06 | Breaking field rename | Medium | `clrsig diff` between v1 and v2 spec files |
-| 07 | Breaking field removal | Medium | `clrsig diff` — required field dropped from response schema |
-| 08 | Array item type mismatch | Medium | Schema assertion on array response — items are strings, spec says objects |
-| 09 | Date format violation | Medium | `format: date-time` field returns a plain date string |
-| 10 | Additional properties leak | Medium | Server returns undocumented fields when `additionalProperties: false` |
-| 11 | Auth schema drift | Hard | 401 returned on a protected endpoint not declared in the spec's responses |
-| 12 | Pagination contract break | Hard | Multi-step scenario — `nextPage` token extracted from page 1 fails on page 2 |
-
-Additional failure modes from [clrsig.com/failures](https://clrsig.com/failures/) are added as new numbered directories as they are built.
-
----
-
-## GitHub Actions Integration
-
-A single workflow runs all sub-projects. Each step is independent so one failure does not block the others.
+### 6.4 GitHub Actions Workflow
 
 ```yaml
 # .github/workflows/catalog.yml
@@ -141,7 +157,7 @@ name: Failure Catalog
 on:
   push:
   schedule:
-    - cron: '0 6 * * *'   # nightly run to catch regressions
+    - cron: '0 6 * * *'
 
 jobs:
   catalog:
@@ -158,63 +174,92 @@ jobs:
         with:
           command: install
 
-      # One step per failure mode
-      - name: "01 — Missing required field"
+      - name: "01 — Missing required field (must fail)"
         run: |
           go run failures/01-missing-required-field/server/main.go &
           sleep 1
           clrsig run failures/01-missing-required-field/scenarios/detect.yaml \
             --env failures/01-missing-required-field/environments/local.yaml
-        continue-on-error: true   # document the result, don't block the matrix
-
-      - name: "02 — Wrong field type"
-        run: |
-          go run failures/02-wrong-type/server/main.go &
-          sleep 1
-          clrsig run failures/02-wrong-type/scenarios/detect.yaml \
-            --env failures/02-wrong-type/environments/local.yaml
-        continue-on-error: true
-
-      # ... repeated for each sub-project
+          test $? -eq 1    # exit 1 = clrsig caught the violation — this is correct
 ```
 
-`continue-on-error: true` is intentional for most steps: the whole point of these scenarios is that `clrsig` exits `1` (assertions failed). The nightly run is a regression guard — if a step that _should_ fail unexpectedly _passes_, it means detection broke.
+**Exit code convention:** `test $? -eq 1` treats a clrsig failure (assertions failed) as CI success. If the broken server unexpectedly passes (`exit 0`), CI fails — detection regressed. The `fix/` variant is tested separately and must exit 0.
 
-> A future refinement is an inversion wrapper: treat exit code `1` as success (failure detected correctly) and exit code `0` as the failure (detection regressed).
+### 6.5 Failure Mode Catalog
 
----
-
-## Website Integration
-
-Each sub-project maps to a page at `clrsig.com/failures/<slug>`. The README content (what it is, how to reproduce, how to fix) is the source material for that page.
-
-Workflow:
-1. Build the sub-project in this repository.
-2. Verify it catches the failure in CI.
-3. Add the slug to the failures index on the product site, linking to the GitHub directory for the full reproduction steps.
-
-The catalog CI badge appears on the product site landing page as a live signal that the detection engine is working.
-
----
-
-## Getting Started (for contributors)
-
-```bash
-git clone https://github.com/fuvito/clrsig-failure-catalog
-cd clrsig-failure-catalog
-
-# Run one failure mode locally
-go run failures/01-missing-required-field/server/main.go &
-clrsig run failures/01-missing-required-field/scenarios/detect.yaml \
-  --env failures/01-missing-required-field/environments/local.yaml
-```
-
-No dependencies beyond Go and the `clrsig` binary. Each sub-project's server is a single-file Go program with no external packages.
+| # | Slug | Difficulty | Detection command | What breaks |
+|---|---|---|---|---|
+| 01 | `missing-required-field` | Easy | `clrsig run` | Response omits a field declared `required` in the schema |
+| 02 | `wrong-type` | Easy | `clrsig run` | `price` returned as `"12.99"` (string); spec declares `number` |
+| 03 | `undeclared-status-code` | Easy | `clrsig conform` | Endpoint returns 422; spec only declares 200 and 400 |
+| 04 | `nullable-violation` | Easy | `clrsig run` | Field returns `null`; spec does not declare `nullable: true` |
+| 05 | `enum-out-of-range` | Easy | `clrsig run` | `status` field returns `"archived"`; enum is `["active","inactive"]` |
+| 06 | `breaking-field-rename` | Medium | `clrsig diff` | `full_name` renamed to `name` between v1 and v2 |
+| 07 | `breaking-field-removal` | Medium | `clrsig diff` | Required field `email` removed from response schema in v2 |
+| 08 | `array-item-type` | Medium | `clrsig run` | Endpoint returns `["a","b"]`; spec declares array of objects |
+| 09 | `format-violation` | Medium | `clrsig run` | `created_at` returns `"2024-11-15"` (date); spec declares `date-time` |
+| 10 | `additional-properties-leak` | Medium | `clrsig run` | Server returns undocumented fields; spec has `additionalProperties: false` |
+| 11 | `auth-schema-drift` | Hard | `clrsig run` | Protected endpoint returns 401; spec does not declare a 401 response |
+| 12 | `pagination-contract-break` | Hard | `clrsig run` | Multi-step scenario: `nextPage` token from page 1 is invalid on page 2 |
 
 ---
 
-## Open Questions Before Building
+## 7. Task List
 
-- **Repository visibility:** public from day one (showcase value) or private until at least five sub-projects are solid?
-- **Versioning:** should the catalog pin to a specific `clrsig` release tag, or always track `@latest`? Tracking latest exercises the action continuously but could break on a bad release.
-- **Inversion CI:** implement the exit-code inversion wrapper in the first pass, or add it later once the basic catalog is running?
+Tasks are ordered for sequential execution. Each sub-project (§7.3) can be built in any order once the scaffolding is in place.
+
+### 7.1 Repository Setup
+
+- [ ] Create `github.com/fuvito/clrsig-failure-catalog` (public)
+- [ ] Add root `README.md` with project purpose and sub-project index table
+- [ ] Initialise `shared/go.mod` (`module github.com/fuvito/clrsig-failure-catalog`)
+- [ ] Add `.gitignore` (Go binaries, IDE files)
+- [ ] Add `LICENSE` (MIT)
+- [ ] Add `CONTRIBUTING.md` — one-page guide: how to add a new failure mode
+
+### 7.2 CI Scaffolding
+
+- [ ] Create `.github/workflows/catalog.yml` with the exit-code inversion pattern (§6.4)
+- [ ] Wire one placeholder step (01) to verify the inversion logic works end-to-end
+- [ ] Add CI status badge to root `README.md`
+- [ ] Confirm the nightly schedule trigger fires correctly
+
+### 7.3 Sub-projects (one task each)
+
+Each task = broken server + spec + scenario + fix + README + CI step.
+
+- [ ] 01 — Missing required field
+- [ ] 02 — Wrong type
+- [ ] 03 — Undeclared status code
+- [ ] 04 — Nullable violation
+- [ ] 05 — Enum out of range
+- [ ] 06 — Breaking field rename
+- [ ] 07 — Breaking field removal
+- [ ] 08 — Array item type mismatch
+- [ ] 09 — Date format violation
+- [ ] 10 — Additional properties leak
+- [ ] 11 — Auth schema drift
+- [ ] 12 — Pagination contract break
+
+### 7.4 Website Integration
+
+- [ ] Confirm slug naming convention with product site (`clrsig.com/failures/<slug>`)
+- [ ] Add `slug:` front-matter field to each sub-project README so the site can consume it
+- [ ] Link each live sub-project from `clrsig.com/failures/`
+- [ ] Add CI badge to the product site landing page
+
+### 7.5 Release
+
+- [ ] All 12 sub-projects passing CI (broken server exits 1, fix exits 0)
+- [ ] Root README index complete and accurate
+- [ ] Repository announced on product site and in release notes
+
+---
+
+## 8. Open Questions
+
+| Question | Options | Decision needed by |
+|---|---|---|
+| Pin to a specific clrsig release or track `@latest`? | Pin = stable catalog; latest = exercises the action continuously | Before CI scaffolding |
+| Ship `fix/` variant for all 12 sub-projects in v1, or optional? | Required for all = consistent; optional = faster first release | Before sub-project work starts |
+| Add a `clrsig conform` conformance run alongside scenario runs? | More coverage; slightly more CI time | Can be added in v1.1 |
