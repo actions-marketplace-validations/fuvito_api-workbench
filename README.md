@@ -68,6 +68,27 @@ The closest alternative is Bruno: same local-first, git-native philosophy. The g
 
 ---
 
+## How this differs from Pact and consumer-driven contract testing
+
+Developers searching for "contract testing" tools will find Pact. Clear Signal solves a different problem.
+
+**Consumer-driven contract testing (Pact)** is a collaboration protocol between microservices teams. The consumer team writes a contract describing what it expects from the provider, publishes it to a broker, and the provider's CI verifies it can satisfy every consumer's expectations. It is team-coordination tooling. It requires both sides to adopt the same framework and broker infrastructure. It works best when you own both the consumer and the provider.
+
+**Clear Signal is provider-side, spec-driven validation.** You have an OpenAPI specification — a document you already wrote and ship. Clear Signal executes your API and verifies that every response matches what the spec declares: required fields present, types correct, error codes as declared. No consumer team needed. No broker. No framework adoption on either side. The spec *is* the contract.
+
+| Question | Pact | Clear Signal |
+|---|---|---|
+| Who writes the contract? | Consumer team | You write an OpenAPI spec |
+| What is validated? | Consumer expectations against the provider | Provider responses against its own spec |
+| Requires both sides to adopt the tool? | Yes | No — spec-only on the provider side |
+| Works with third-party or public APIs? | No | Yes — any API with an OpenAPI spec |
+| Breaking change detection across versions? | Via pact-broker | `clrsig diff v1.yaml v2.yaml` |
+| Works in CI without coordination? | Needs a shared broker | Single command, single spec file |
+
+The two approaches are complementary, not competing. If you have a mature microservices estate with consumer-driven contracts in Pact, Clear Signal adds a second layer: it catches spec violations that no consumer has yet tested for, and it validates third-party and public APIs where you have no consumer contract at all.
+
+---
+
 ## Install
 
 ### Desktop app

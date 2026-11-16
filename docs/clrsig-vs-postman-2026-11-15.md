@@ -834,8 +834,9 @@ new engineering features. Do them before any outreach.
 - [ ] **Fix the five-minute first experience.** Drop a developer onto the app with no instructions and time them. If they cannot paste an OpenAPI URL and see a conformance report in under five minutes, the onboarding flow needs work. Add a visible "try with a public spec" prompt to the landing page.
   *Why:* First impressions from a cold start determine whether the tool gets shared with a team or quietly deleted.
   *Devin: the raw material already exists — `examples/server` plus 11 runnable scenarios (including 401/405/503, etag, rate-limit, and contract-violation cases) and `docs/demo.tape` auto-regenerating `demo.gif` via CI. This is mostly a surfacing problem, not new work.*
-- [ ] **Add a "How this differs from Pact / consumer-driven contract testing" page or README section.** Use the words "contract testing" once, in that section, to capture the search traffic. Then differentiate clearly.
+- [x] **Add a "How this differs from Pact / consumer-driven contract testing" page or README section.** Use the words "contract testing" once, in that section, to capture the search traffic. Then differentiate clearly.
   *Why:* Developers searching the category will not find the product if the vocabulary is avoided entirely.
+  *Done 2026-11-16: Added "How this differs from Pact and consumer-driven contract testing" section to README.md with a comparison table and clear positioning (provider-side spec validation vs consumer-driven coordination).*
 - [ ] **Open GitHub Discussions** (or a Discord) and answer every question within 24 hours for the first three months.
   *Why:* A tool that feels abandoned after install does not get recommended. Responsiveness is a product signal.
   *Devin: prefer Discussions over Discord at this stage. An empty Discord reads as more abandoned than a quiet Discussions tab; Discussions is searchable, async, and zero-overhead for a small team.*
