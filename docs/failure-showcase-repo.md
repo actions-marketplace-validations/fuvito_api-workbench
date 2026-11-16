@@ -273,7 +273,91 @@ Each task = broken server + spec + scenario + fix + README + CI step.
 
 ---
 
-## 8. Open Questions
+## 8. Backlog — Future Failure Mode Additions
+
+The 38 failure modes not included in v1, with an assessment of build effort and clrsig feasibility. Feasibility reflects what clrsig can do today; the "clrsig work needed" column notes engine improvements that would unlock the full scenario.
+
+Three feasibility ratings:
+- **Ready** — clrsig can detect this today with existing scenario/conform/diff commands
+- **Partial** — detectable with a workaround or only partially; a targeted improvement makes it clean
+- **Needs feature** — requires a new clrsig capability before a useful sub-project can be built
+
+### Category: Data Contracts (remaining)
+
+| FM | Title | Build effort | Feasibility | clrsig work needed |
+|---|---|---|---|---|
+| [FM-002](https://clrsig.com/failures/fm-002/) | Silent Timeout and Incomplete Response Failures | Medium | Partial | Timeout assertion type in scenarios; currently only network-level timeout is enforced |
+| [FM-006](https://clrsig.com/failures/fm-006/) | Mobile and Older-Client Compatibility Failures | Medium | Ready | None — `clrsig diff` with a "legacy" spec file captures this cleanly |
+| [FM-007](https://clrsig.com/failures/fm-007/) | API Versioning and Compatibility Failures | Medium | Ready | None — `clrsig diff v1.yaml v2.yaml` is the primary use case; good showcase |
+| [FM-013](https://clrsig.com/failures/fm-013/) | Undocumented Dependencies and Accumulated Integration Failures | Hard | Ready | None — `additionalProperties: false` in schema catches undocumented fields; scenario tests undocumented behaviour |
+| [FM-014](https://clrsig.com/failures/fm-014/) | Timezone and Daylight-Saving-Time Failures | Medium | Partial | `format: date-time` validates format but not timezone offset; a `matches` regex assertion fills the gap today |
+| [FM-015](https://clrsig.com/failures/fm-015/) | Deprecated Endpoint and Lifecycle Failures | Medium | Ready | None — `clrsig conform` catches 404/410 on removed endpoints; `clrsig diff` flags removals |
+| [FM-021](https://clrsig.com/failures/fm-021/) | File Upload and Downstream Processing Failures | Medium | Partial | `multipart/form-data` body type not yet in executor; needs adding before a file-upload scenario works |
+| [FM-024](https://clrsig.com/failures/fm-024/) | Localization and Machine-Readable Data Failures | Medium | Ready | None — header assertion on `Accept-Language`, then assert stable machine-readable status fields |
+| [FM-047](https://clrsig.com/failures/fm-047/) | Character Encoding and Unicode Handling Failures | Easy | Ready | None — scenario sends Unicode input, asserts round-trip fidelity; straightforward to build |
+| [FM-049](https://clrsig.com/failures/fm-049/) | API Documentation and Example Drift | Easy | Ready | None — this is precisely what `clrsig conform` was built for; highest-value quick win after v1 |
+
+### Category: Authentication and Security (remaining)
+
+| FM | Title | Build effort | Feasibility | clrsig work needed |
+|---|---|---|---|---|
+| [FM-008](https://clrsig.com/failures/fm-008/) | OAuth Implementation and Token-Validation Failures | Hard | Partial | Multi-step scenario covers the happy path; expired/invalid token assertions work today; full OAuth flow (PKCE, refresh) needs an auth-flow step type |
+| [FM-009](https://clrsig.com/failures/fm-009/) | Healthcare Interoperability and HL7 Conformance Failures | Hard | Needs feature | Requires FHIR/HL7 schema validator; outside clrsig's current OpenAPI scope |
+| [FM-011](https://clrsig.com/failures/fm-011/) | Payment Gateway Certification and Protocol Conformance Failures | Hard | Partial | Schema assertions cover field/type validation; payment-protocol-specific rules (e.g. Luhn check) need custom assertion type |
+| [FM-023](https://clrsig.com/failures/fm-023/) | Broken Object-Level Authorization and Tenant Isolation | Medium | Ready | None — multi-step scenario with two auth tokens; User A cannot read User B's resource; clean demo |
+| [FM-030](https://clrsig.com/failures/fm-030/) | API Key and Client-Credential Rotation Failures | Hard | Partial | Scenario simulates expired key returning 401; full rotation lifecycle (revoke + reissue) needs time-based step support |
+| [FM-037](https://clrsig.com/failures/fm-037/) | Input Injection and Unsafe Interpretation Failures | Medium | Partial | Scenario verifies injection inputs return declared error codes (not 500/200); clrsig cannot do active exploit detection — that is out of scope by design |
+| [FM-043](https://clrsig.com/failures/fm-043/) | Mass Assignment and Unauthorized Field Modification | Easy | Ready | None — scenario sends extra fields (e.g. `role: admin`), asserts they are absent on read-back; clean and impactful |
+| [FM-045](https://clrsig.com/failures/fm-045/) | Authentication and Authorization Confusion Across Services | Hard | Partial | Needs two cooperating servers in one sub-project; feasible but complex to set up cleanly |
+| [FM-046](https://clrsig.com/failures/fm-046/) | Security Policy and Secret Leakage Failures | Medium | Ready | None — jsonpath assertions confirm no credential fields in error responses; pairs well with FM-044 |
+
+### Category: HTTP and Request Handling (remaining)
+
+| FM | Title | Build effort | Feasibility | clrsig work needed |
+|---|---|---|---|---|
+| [FM-012](https://clrsig.com/failures/fm-012/) | Accessibility Conformance Failures in API-Driven Applications | Medium | Partial | clrsig can assert error response structure (machine-readable `code`, `message`); actual ARIA/WCAG validation is out of scope |
+| [FM-026](https://clrsig.com/failures/fm-026/) | HTTP Content-Negotiation Failures | Easy | Ready | None — scenario sends `Accept: application/xml`, asserts 406 or checks `Content-Type` response header; easy sub-project |
+| [FM-031](https://clrsig.com/failures/fm-031/) | CORS and Browser-Based API Access Failures | Easy | Ready | None — header assertion on `Access-Control-Allow-Origin`; quick sub-project, high visibility |
+| [FM-032](https://clrsig.com/failures/fm-032/) | TLS/mTLS and Certificate Lifecycle Failures | Medium | Partial | clrsig supports TLS skip-verify and standard TLS; mTLS (client certificates) not yet supported — needs adding to executor |
+| [FM-033](https://clrsig.com/failures/fm-033/) | API Gateway Routing and Policy Drift Failures | Medium | Ready | None — multi-environment scenario (local vs staging env files); highlights clrsig's environment model |
+| [FM-035](https://clrsig.com/failures/fm-035/) | Request Header Handling and Validation Failures | Easy | Ready | None — scenario sends correlation headers, asserts they are echoed back or handled correctly |
+| [FM-036](https://clrsig.com/failures/fm-036/) | Request Size and Resource Exhaustion Failures | Medium | Ready | None — scenario sends oversized body, asserts 413 is declared in spec and returned correctly |
+
+### Category: Time, State, and Async (remaining)
+
+| FM | Title | Build effort | Feasibility | clrsig work needed |
+|---|---|---|---|---|
+| [FM-017](https://clrsig.com/failures/fm-017/) | Stale Cache and Cache-Invalidation Failures | Hard | Partial | Multi-step write-then-read scenario works; asserting `Cache-Control` headers is ready today; detecting stale data requires a timing step |
+| [FM-019](https://clrsig.com/failures/fm-019/) | Webhook Delivery and Event-Processing Failures | Hard | Needs feature | clrsig is a client tool; receiving and asserting on inbound webhooks requires a listener mode not yet implemented |
+| [FM-020](https://clrsig.com/failures/fm-020/) | Distributed Transaction and Partial-Workflow Failures | Hard | Partial | Multi-step scenario can simulate (create partial state, assert inconsistency); multiple cooperating servers complicate setup |
+| [FM-028](https://clrsig.com/failures/fm-028/) | Long-Running Operation and Asynchronous API Failures | Medium | Partial | Scenario can poll a job-status endpoint; a dedicated `retry` step with `until` condition would make this much cleaner |
+| [FM-029](https://clrsig.com/failures/fm-029/) | Bulk API Partial-Success Failures | Medium | Ready | None — jsonpath assertions on per-item error fields in batch response; straightforward sub-project |
+| [FM-038](https://clrsig.com/failures/fm-038/) | Eventual Consistency and Read-After-Write Failures | Medium | Partial | Multi-step write-then-read; `retry.maxAttempts` + `retry.delay` on the read step covers this cleanly today |
+| [FM-039](https://clrsig.com/failures/fm-039/) | Out-of-Order Event and State Transition Failures | Hard | Needs feature | Requires event ordering and async delivery; outside clrsig's current synchronous request model |
+| [FM-050](https://clrsig.com/failures/fm-050/) | Environment Configuration and Feature-Flag Drift | Medium | Ready | None — multi-environment scenario; different env files expose different behaviour; natural clrsig showcase |
+
+### Category: Distributed Systems and Infrastructure (remaining)
+
+| FM | Title | Build effort | Feasibility | clrsig work needed |
+|---|---|---|---|---|
+| [FM-040](https://clrsig.com/failures/fm-040/) | Database Transaction and Atomicity Failures | Hard | Partial | Scenario verifies post-error state via read-back assertions; actual DB atomicity requires a stateful server and careful setup |
+| [FM-041](https://clrsig.com/failures/fm-041/) | Retry Storm and Cascading Failure | Hard | Needs feature | Requires load/concurrency simulation; clrsig is single-threaded by design; out of scope without a load-testing mode |
+| [FM-042](https://clrsig.com/failures/fm-042/) | Dependency Failure and Fault Isolation | Hard | Partial | Scenario can simulate a degraded dependency (server returns 503); two cooperating servers complicate setup |
+| [FM-048](https://clrsig.com/failures/fm-048/) | Streaming and Large-Response Handling Failures | Hard | Needs feature | clrsig reads the full response body; streaming/chunked transfer assertion requires a streaming response mode |
+
+### Backlog Summary
+
+| Feasibility | Count | Failure modes |
+|---|---|---|
+| **Ready** — build now | 16 | FM-006, FM-007, FM-013, FM-015, FM-023, FM-024, FM-026, FM-029, FM-031, FM-033, FM-035, FM-036, FM-043, FM-046, FM-047, FM-049, FM-050 |
+| **Partial** — small improvement unlocks it | 17 | FM-002, FM-008, FM-011, FM-012, FM-014, FM-017, FM-020, FM-021, FM-028, FM-030, FM-032, FM-037, FM-038, FM-040, FM-042, FM-045 |
+| **Needs feature** — significant clrsig work first | 5 | FM-009, FM-019, FM-039, FM-041, FM-048 |
+
+The 16 "Ready" modes are the highest-value additions after v1 ships — no engine work required, just sub-project authoring. The "Partial" group doubles as a roadmap input for the clrsig engine: each one names a concrete, motivated improvement.
+
+---
+
+## 9. Open Questions
 
 | Question | Options | Decision needed by |
 |---|---|---|
