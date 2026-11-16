@@ -369,6 +369,7 @@ export default function App() {
         localStorage.setItem('ui.sidebarWidth', String(sidebarWidthRef.current))
       } else if (draggingRef.current === 'response') {
         localStorage.setItem('ui.responsePct', String(Math.round(responsePctRef.current)))
+      }
       draggingRef.current = null
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
