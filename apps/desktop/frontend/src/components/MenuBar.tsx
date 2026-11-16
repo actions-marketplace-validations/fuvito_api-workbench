@@ -115,7 +115,7 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
       role="menubar"
       className="flex items-center shrink-0 bg-[var(--color-card)] border-b border-[var(--color-border)] relative z-50"
     >
-      {menus.map((menu, mi) => (
+      {menus.map((menu) => (
         <div key={menu.label} className="relative">
           <button
             type="button"
