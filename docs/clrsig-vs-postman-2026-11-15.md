@@ -821,9 +821,10 @@ has been applied to the Go core.
 These are low-cost, high-visibility changes that unblock growth without
 new engineering features. Do them before any outreach.
 
-- [ ] **Audit and fix the user guide end-to-end.** Walk through every step as a first-time user. Remove or update every reference to a control that has moved. Screenshots must match the current UI.
+- [x] **Audit and fix the user guide end-to-end.** Walk through every step as a first-time user. Remove or update every reference to a control that has moved. Screenshots must match the current UI.
   *Why:* A stale guide is a credibility killer in a five-minute evaluation.
   *Devin: note there are two maintained copies — `docs/user-guide.md` and `apps/desktop/wails/help/user-guide.md`. The audit should deduplicate them or generate one from the other, or they will diverge again by the next release.*
+  *Done 2026-11-16: `docs/user-guide.md` deleted; `apps/desktop/wails/help/user-guide.md` is the single source of truth. Updated with command palette, history auth restoration, cancelable runs, runner tab, add-to-existing scenario, and keyboard shortcut changes.*
 - [x] **Rewrite the README as a product pitch, not an installation guide.** Lead with the problem ("You ship an API. How do you know it conforms to its contract?"), show a one-command output, link to the guide.
   *Why:* The README is the first thing a developer reads on GitHub. It currently reads like internal notes.
   *Done 2026-11-16: README.md replaced with product pitch (problem statement, CLI output demo, comparison table, install, 60-second workflow, YAML example). Developer content moved to README-DEVELOPER.md.*
