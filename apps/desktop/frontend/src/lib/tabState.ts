@@ -4,7 +4,7 @@ import type { HttpMethod } from './httpUtils'
 
 export type TabState = {
   id: string
-  kind?: 'request' | 'scenario' | 'coverage'
+  kind?: 'request' | 'scenario' | 'coverage' | 'runner'
   // request tab fields
   method: HttpMethod
   url: string
@@ -86,11 +86,11 @@ export function createBlankTab(targetDir: string | null = null): TabState {
 
 export function isTabDirty(tab: TabState): boolean {
   if (tab.kind === 'scenario') return tab.scenarioDirty === true
-  if (tab.kind === 'coverage') return false
+  if (tab.kind === 'coverage' || tab.kind === 'runner') return false
   return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs) !== tab.savedKey
 }
 
 export function isBlankTab(tab: TabState): boolean {
-  if (tab.kind === 'scenario' || tab.kind === 'coverage') return false
+  if (tab.kind === 'scenario' || tab.kind === 'coverage' || tab.kind === 'runner') return false
   return tab.url === '' && tab.name === null && tab.filePath === null && !isTabDirty(tab)
 }

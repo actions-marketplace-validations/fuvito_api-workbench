@@ -16,6 +16,7 @@ import {ResponseViewer} from '@/components/ResponseViewer'
 import {ChevronLeft} from 'lucide-react'
 import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
+import {RunnerTab} from '@/components/RunnerTab'
 import {WorkspaceImportDialog} from '@/components/WorkspaceImportDialog'
 import {Sidebar} from '@/components/Sidebar'
 import {AboutDialog} from '@/components/AboutDialog'
@@ -316,6 +317,7 @@ export default function App() {
     if (!list.length) return
     const envPath = workspace.activeEnv?.path ?? ''
     runAllCancelRef.current = false
+    tabs.openRunnerTab()
     setRunAllState({ running: true, done: 0, total: list.length, passed: 0, results: [] })
     let passedCount = 0
     for (const s of list) {
@@ -354,6 +356,7 @@ export default function App() {
     if (!list.length) return
     const envPath = workspace.activeEnv?.path ?? ''
     runAllCancelRef.current = false
+    tabs.openRunnerTab()
     setRunAllState({ running: true, done: 0, total: list.length, passed: 0, results: [] })
     let passedCount = 0
     for (const s of list) {
@@ -752,7 +755,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage',
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner',
     filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
@@ -952,6 +955,7 @@ export default function App() {
               onShowSettings={() => settings.setShowSettings(true)}
               onShowHelp={() => setShowHelp(true)}
               demoRunning={demo.demoRunning}
+              onStopDemo={demo.handleStopDemo}
             />
 
             {sidebarOpen && (
@@ -1121,6 +1125,23 @@ export default function App() {
               />
 
               <div className="flex-1 flex overflow-hidden relative">
+                {/* Runner tab (single instance) */}
+                {tabList.filter(t => t.kind === 'runner').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <RunnerTab
+                      runAllState={runAllState}
+                      onSelectScenario={tabs.openScenarioAsTab}
+                      onCancel={handleCancelRunAll}
+                      onDismiss={() => setRunAllState(null)}
+                      onRunAll={handleRunAll}
+                    />
+                  </div>
+                ))}
+
                 {/* Coverage tab (single instance) */}
                 {tabList.filter(t => t.kind === 'coverage').map(t => (
                   <div
@@ -1162,7 +1183,7 @@ export default function App() {
                 ))}
 
                 {/* Request panel: only mount when active tab is a request */}
-                {activeTab.kind !== 'scenario' && activeTab.kind !== 'coverage' && (
+                {activeTab.kind !== 'scenario' && activeTab.kind !== 'coverage' && activeTab.kind !== 'runner' && (
                   <>
                     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                       <RequestEditor

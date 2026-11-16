@@ -335,6 +335,38 @@ export function useTabsState(deps: {
     setTabsState(prev => ({ tabs: [...prev.tabs, tab], activeTabId: tab.id }))
   }
 
+  function openRunnerTab(): string {
+    const existing = tabsStateRef.current.tabs.find(t => t.kind === 'runner')
+    if (existing) {
+      switchTo(existing.id)
+      return existing.id
+    }
+    const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
+    const newTab: TabState = {
+      id: crypto.randomUUID(),
+      kind: 'runner',
+      name: 'Run Results',
+      method: 'GET',
+      url: '',
+      queryParams: [],
+      headers: [],
+      body: { type: 'none', content: '' },
+      auth: { type: 'none' },
+      timeoutMs: 0,
+      filePath: null,
+      targetDir: null,
+      savedKey: blankKey,
+      response: null,
+      previousResponse: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
+    return newTab.id
+  }
+
   function openCoverageTab(): string {
     const existing = tabsStateRef.current.tabs.find(t => t.kind === 'coverage')
     if (existing) {
@@ -439,7 +471,7 @@ export function useTabsState(deps: {
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest, handleSaveAll,
     handleSelectHistory, handleNewRequestInFolder,
-    openCoverageTab, openScenarioAsTab,
+    openRunnerTab, openCoverageTab, openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,
     closingDirtyScenarioTabId, setClosingDirtyScenarioTabId,
     pendingBulkClose, setPendingBulkClose,

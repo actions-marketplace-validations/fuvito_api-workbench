@@ -169,6 +169,14 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
                           role="menuitem"
                           aria-haspopup="menu"
                           disabled={item.disabled || item.items.length === 0}
+                          onKeyDown={e => {
+                            if ((e.key === 'ArrowRight' || e.key === 'Enter') && !item.disabled && item.items.length > 0) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const submenu = e.currentTarget.parentElement?.querySelector<HTMLButtonElement>('ul [role="menuitem"]:not(:disabled)')
+                              submenu?.focus()
+                            }
+                          }}
                           className={cn(
                             'w-full flex items-center justify-between px-3 py-1 text-xs',
                             item.disabled || item.items.length === 0
@@ -195,6 +203,15 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
                                     disabled={sub.disabled}
                                     title={sub.title}
                                     onMouseDown={() => { if (!sub.disabled) { close(); sub.onClick() } }}
+                                    onKeyDown={e => {
+                                      if (e.key === 'ArrowLeft' || e.key === 'Escape') {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        // Return focus to the parent submenu button
+                                        const parentBtn = e.currentTarget.closest('li.group')?.querySelector<HTMLButtonElement>(':scope > button[role="menuitem"]')
+                                        parentBtn?.focus()
+                                      }
+                                    }}
                                     className={cn(
                                       'w-full flex items-center px-3 py-1 text-xs truncate outline-none',
                                       sub.disabled
