@@ -66,6 +66,8 @@ Postman tests what you explicitly assert. Clear Signal validates against the con
 
 The closest alternative is Bruno: same local-first, git-native philosophy. The gap is contract validation — Bruno runs your requests, Clear Signal proves they conform to the spec.
 
+**What about Dredd and Prism?** Focused OpenAPI validators exist. Dredd replays your spec's example requests and checks responses; Prism can mock a server or proxy requests and flag schema violations. If raw spec validation in CI is all you need, either works. Clear Signal goes further: multi-step scenarios let you test stateful flows (login → create → verify → delete) that single-request replayers cannot express, the coverage report shows which operations have never been exercised, `clrsig diff` flags breaking changes before you ship, and the desktop GUI makes all of it accessible without leaving the tool. If you are already happy with Dredd or Prism for smoke-testing, Clear Signal is the layer you add when "it validates" is no longer enough.
+
 ---
 
 ## How this differs from Pact and consumer-driven contract testing
