@@ -538,7 +538,7 @@ cd apps/desktop/e2e && npx playwright test --grep "@screenshot"
 
 Then verify manually:
 
-- [ ] Version bumped in `apps/desktop/frontend/src/components/AboutDialog.tsx`, `docs/user-guide.md`, and `apps/desktop/wails/help/user-guide.md`
+- [ ] Version bumped in `apps/desktop/frontend/src/components/AboutDialog.tsx` and `apps/desktop/wails/help/user-guide.md`
 - [ ] Release notes entry added in `AboutDialog.tsx` (`RELEASE_NOTES` array)
 - [ ] Screenshots in `docs/images/` look correct in the README
 
