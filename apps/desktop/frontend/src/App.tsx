@@ -1,45 +1,70 @@
-import { useState, useEffect, useRef } from 'react'
-import { QuickOpen } from '@/components/QuickOpen'
-import { MenuBar } from '@/components/MenuBar'
-import type { MenuDef } from '@/components/MenuBar'
-import { TabBar } from '@/components/TabBar'
-import { AppToolbar } from '@/components/AppToolbar'
-import { ActivityRail } from '@/components/ActivityRail'
-import type { RailTab } from '@/components/ActivityRail'
-import { StatusBar } from '@/components/StatusBar'
-import { LandingPage } from '@/components/LandingPage'
-import { SettingsPanel } from '@/components/SettingsPanel'
-import { HelpPanel } from '@/components/HelpPanel'
-import { EnvironmentEditor } from '@/components/EnvironmentEditor'
-import { RequestEditor } from '@/components/RequestEditor'
-import { ResponseViewer } from '@/components/ResponseViewer'
-import { ChevronLeft } from 'lucide-react'
-import { ScenarioViewer } from '@/components/ScenarioViewer'
-import { CoverageTab } from '@/components/CoverageTab'
-import { WorkspaceImportDialog } from '@/components/WorkspaceImportDialog'
-import { Sidebar } from '@/components/Sidebar'
-import { AboutDialog } from '@/components/AboutDialog'
+import {useEffect, useRef, useState} from 'react'
+import {QuickOpen} from '@/components/QuickOpen'
+import type {MenuDef} from '@/components/MenuBar'
+import {MenuBar} from '@/components/MenuBar'
+import {TabBar} from '@/components/TabBar'
+import {AppToolbar} from '@/components/AppToolbar'
+import type {RailTab} from '@/components/ActivityRail'
+import {ActivityRail} from '@/components/ActivityRail'
+import {StatusBar} from '@/components/StatusBar'
+import {LandingPage} from '@/components/LandingPage'
+import {SettingsPanel} from '@/components/SettingsPanel'
+import {HelpPanel} from '@/components/HelpPanel'
+import {EnvironmentEditor} from '@/components/EnvironmentEditor'
+import {RequestEditor} from '@/components/RequestEditor'
+import {ResponseViewer} from '@/components/ResponseViewer'
+import {ChevronLeft} from 'lucide-react'
+import {ScenarioViewer} from '@/components/ScenarioViewer'
+import {CoverageTab} from '@/components/CoverageTab'
+import {WorkspaceImportDialog} from '@/components/WorkspaceImportDialog'
+import {Sidebar} from '@/components/Sidebar'
+import {AboutDialog} from '@/components/AboutDialog'
 import {
-  DeleteRequestDialog,
-  DeleteFolderDialog,
-  NewFolderDialog,
   CloseDirtyTabDialog,
-  DiscardChangesDialog,
+  DeleteFolderDialog,
+  DeleteRequestDialog,
   DeleteScenarioDialog,
+  DiscardChangesDialog,
   ImportFromURLDialog,
+  NewFolderDialog,
 } from '@/components/ConfirmDialogs'
-import { useTabsState } from '@/hooks/useTabsState'
-import { useWorkspace } from '@/hooks/useWorkspace'
-import { useSettings } from '@/hooks/useSettings'
-import { useDemo } from '@/hooks/useDemo'
-import { executeRequest, cancelRequest, saveResponseCache, clearResponseCache, selectEnvironment, createScenario, duplicateScenario, deleteScenario, renameScenario, runScenario, saveScenarioResult, runFolder, quitApp, saveContentToFile, pickFile, stopDemo, openDemoSpec, createScenarioFolder, renameScenarioFolder, deleteScenarioFolder, moveRequest, copyRequest, moveScenario, copyScenario, exportWorkspace, scanWorkspaceImport } from '@/lib/bridge'
-import type { ScanImportResult } from '@/lib/bridge'
-import type { FileClipboard, RunAllState, FolderRunState } from '@/types'
-import { authStateToPayload } from '@/lib/httpUtils'
-import { parseCurl } from '@/lib/curlImport'
-import { isTabDirty } from '@/lib/tabState'
-import { cn } from '@/lib/utils'
-import type { KVPair } from '@/types'
+import {useTabsState} from '@/hooks/useTabsState'
+import {useWorkspace} from '@/hooks/useWorkspace'
+import {useSettings} from '@/hooks/useSettings'
+import {useDemo} from '@/hooks/useDemo'
+import type {ScanImportResult} from '@/lib/bridge'
+import {
+  cancelRequest,
+  clearResponseCache,
+  copyRequest,
+  copyScenario,
+  createScenario,
+  createScenarioFolder,
+  deleteScenario,
+  deleteScenarioFolder,
+  duplicateScenario,
+  executeRequest,
+  exportWorkspace,
+  moveRequest,
+  moveScenario,
+  openDemoSpec,
+  pickFile,
+  quitApp,
+  renameScenario,
+  renameScenarioFolder,
+  runFolder,
+  runScenario,
+  saveContentToFile,
+  saveResponseCache,
+  saveScenarioResult,
+  scanWorkspaceImport,
+  selectEnvironment,
+  stopDemo
+} from '@/lib/bridge'
+import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
+import {authStateToPayload} from '@/lib/httpUtils'
+import {parseCurl} from '@/lib/curlImport'
+import {isTabDirty} from '@/lib/tabState'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
