@@ -9,6 +9,7 @@ export type TabInfo = {
   method: string
   isDirty: boolean
   kind?: 'request' | 'scenario' | 'coverage'
+  filePath?: string | null
 }
 
 const TAB_METHOD_COLOR: Record<string, string> = {
@@ -35,9 +36,12 @@ type TabBarProps = {
   onSave?: (id: string) => void
   onCloseOthers?: (id: string) => void
   onCloseToRight?: (id: string) => void
+  onCloseAll?: () => void
+  onCopyPath?: (filePath: string) => void
+  onRevealInExplorer?: (filePath: string) => void
 }
 
-export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, onCloseOthers, onCloseToRight }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, onCloseOthers, onCloseToRight, onCloseAll, onCopyPath, onRevealInExplorer }: TabBarProps) {
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -181,6 +185,19 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
             { kind: 'separator' },
             {
               kind: 'action',
+              label: 'Copy Path',
+              disabled: !ctxTab.filePath,
+              onClick: () => ctxTab.filePath && onCopyPath?.(ctxTab.filePath),
+            },
+            {
+              kind: 'action',
+              label: 'Reveal in Explorer',
+              disabled: !ctxTab.filePath,
+              onClick: () => ctxTab.filePath && onRevealInExplorer?.(ctxTab.filePath),
+            },
+            { kind: 'separator' },
+            {
+              kind: 'action',
               label: 'Close Tab',
               onClick: () => onClose(ctxMenu.tabId),
             },
@@ -195,6 +212,12 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               label: 'Close to the Right',
               disabled: ctxTabIndex >= tabs.length - 1 || !onCloseToRight,
               onClick: () => onCloseToRight?.(ctxMenu.tabId),
+            },
+            {
+              kind: 'action',
+              label: 'Close All Tabs',
+              disabled: !onCloseAll,
+              onClick: () => onCloseAll?.(),
             },
           ]}
         />

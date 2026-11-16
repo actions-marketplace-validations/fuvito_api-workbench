@@ -131,6 +131,17 @@ export function useTabsState(deps: {
     toClose.forEach(t => removeTab(t.id))
   }
 
+  function handleCloseAll() {
+    const { tabs: currentTabs } = tabsStateRef.current
+    const hasDirty = currentTabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
+    if (hasDirty) {
+      setPendingBulkClose({ tabIds: currentTabs.map(t => t.id) })
+      return
+    }
+    const blank = createBlankTab()
+    setTabsState({ tabs: [blank], activeTabId: blank.id })
+  }
+
   function confirmBulkClose() {
     if (!pendingBulkClose) return
     const { tabIds, returnToId } = pendingBulkClose
@@ -423,7 +434,7 @@ export function useTabsState(deps: {
     tabs, activeTabId, activeTab,
     setTabsState, tabsStateRef,
     updateTab, switchTo, removeTab,
-    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight, confirmBulkClose,
+    handleNewTab, handleDuplicateTab, handleSelectTab, handleCloseTab, handleCloseOthers, handleCloseToRight, handleCloseAll, confirmBulkClose,
     openFileAsTab, loadCacheIntoTab,
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest, handleSaveAll,

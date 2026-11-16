@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
@@ -89,6 +90,8 @@ export function Sidebar({
   clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
   onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
 }: SidebarProps) {
+  const [confirmingClear, setConfirmingClear] = useState(false)
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {tab === 'explorer' && (
@@ -167,14 +170,34 @@ export function Sidebar({
       {tab === 'history' && (
         <div className="flex flex-col flex-1 overflow-hidden">
           {history.length > 0 && (
-            <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0">
-              <button
-                type="button"
-                onClick={onClearHistory}
-                className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
-              >
-                Clear history
-              </button>
+            <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0 gap-2">
+              {confirmingClear ? (
+                <>
+                  <span className="text-[10px] text-[var(--color-muted-foreground)]">Clear all history?</span>
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmingClear(false); onClearHistory() }}
+                    className="text-[10px] text-red-400 hover:text-red-300 transition-colors font-semibold"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingClear(false)}
+                    className="text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingClear(true)}
+                  className="text-[10px] text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors"
+                >
+                  Clear history
+                </button>
+              )}
             </div>
           )}
           <div className="flex-1 overflow-auto">

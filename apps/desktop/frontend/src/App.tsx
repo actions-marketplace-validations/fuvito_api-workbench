@@ -61,7 +61,8 @@ import {
   saveScenarioResult,
   scanWorkspaceImport,
   selectEnvironment,
-  stopDemo
+  stopDemo,
+  openInExplorer,
 } from '@/lib/bridge'
 import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
 import {authStateToPayload} from '@/lib/httpUtils'
@@ -91,12 +92,7 @@ export default function App() {
   // eslint-disable-next-line react/refs
   refreshWorkspaceRef.current = workspace.refreshFileTree
 
-  useEffect(() => {
-    const name = workspace.workspacePath
-      ? workspace.workspacePath.replace(/\\/g, '/').split('/').filter(Boolean).pop()
-      : null
-    document.title = name ? `Clear Signal — ${name}` : 'Clear Signal'
-  }, [workspace.workspacePath])
+  // Window title is set by the Go side via runtime.WindowSetTitle — no React duplicate needed.
 
   // Layout state
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -524,7 +520,7 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         const el = document.activeElement
-        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+        if (el instanceof HTMLTextAreaElement) return
         e.preventDefault()
         handleSendRef.current?.()
       }
@@ -686,6 +682,7 @@ export default function App() {
     method: t.method,
     isDirty: isTabDirty(t),
     kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage',
+    filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
   return (
@@ -1024,6 +1021,9 @@ export default function App() {
                 onSave={tabs.saveTabById}
                 onCloseOthers={tabs.handleCloseOthers}
                 onCloseToRight={tabs.handleCloseToRight}
+                onCloseAll={tabs.handleCloseAll}
+                onCopyPath={p => navigator.clipboard.writeText(p).catch(() => {})}
+                onRevealInExplorer={p => openInExplorer(p).catch(() => {})}
               />
 
               <AppToolbar
