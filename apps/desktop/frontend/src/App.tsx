@@ -50,6 +50,7 @@ import {
   executeRequest,
   exportWorkspace,
   workspaceHasSecrets,
+  loadScenario,
   moveRequest,
   moveScenario,
   openDemoSpec,
@@ -534,6 +535,44 @@ export default function App() {
     }
   }
 
+  async function handleAddToExistingScenario(scenarioPath: string, scenarioTitle: string) {
+    setPendingAddToScenario(null)
+    const { activeTab } = tabs
+    if (!activeTab.response || !workspace.workspacePath) return
+    try {
+      const existing = await loadScenario(scenarioPath)
+      if (existing.error) { setAppError(existing.error); return }
+      const stepLabel = `${activeTab.method} ${activeTab.url}`.slice(0, 60)
+      const updated = {
+        ...existing,
+        steps: [
+          ...existing.steps,
+          {
+            label: stepLabel,
+            method: activeTab.method,
+            url: activeTab.url,
+            headers: activeTab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
+            queryParams: activeTab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
+            bodyType: activeTab.body.type !== 'none' ? activeTab.body.type : undefined,
+            bodyContent: activeTab.body.type !== 'none' ? activeTab.body.content : undefined,
+            assertions: [{ type: 'status', operator: 'eq', expected: activeTab.response.statusCode }],
+            extractions: [],
+          },
+        ],
+      }
+      const yaml = serializeScenarioToYAML(updated)
+      const saveErr = await saveScenarioRaw(scenarioPath, yaml)
+      if (saveErr) { setAppError(saveErr); return }
+      tabs.openScenarioAsTab(scenarioPath, scenarioTitle)
+      setRailTab('scenarios')
+      setSidebarOpen(true)
+      localStorage.setItem('ui.railTab', 'scenarios')
+      localStorage.setItem('ui.sidebarOpen', 'true')
+    } catch (e) {
+      setAppError(String(e).replace(/^Error: /, ''))
+    }
+  }
+
   function handleCreateVariableFromHint(name: string) {
     setPrefilledVarName(name)
     setEditingEnvPath(workspace.activeEnv?.path ?? null)
@@ -786,6 +825,8 @@ export default function App() {
           onChange={setNewScenarioName}
           onCancel={() => setPendingAddToScenario(null)}
           onConfirm={confirmAddToScenario}
+          scenarios={workspace.scenarioList.filter(s => !s.isFolder)}
+          onAddToExisting={handleAddToExistingScenario}
         />
       )}
       {workspace.deletingFilePath && (

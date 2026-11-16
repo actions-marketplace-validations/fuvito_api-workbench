@@ -297,7 +297,15 @@ export function useTabsState(deps: {
         })
       : []
 
-    const savedKey = computeStateKey(method, baseUrl, queryParams, headers, body, { type: 'none' }, null, 0)
+    let auth: import('@/types').AuthState = { type: 'none' }
+    const a = entry.auth
+    if (a && a.type !== 'none' && a.type !== '') {
+      if (a.type === 'bearer') auth = { type: 'bearer', token: a.token }
+      else if (a.type === 'basic') auth = { type: 'basic', username: a.username, password: a.password }
+      else if (a.type === 'apikey') auth = { type: 'apikey', key: a.key, value: a.value, location: (a.location as 'header' | 'query') || 'header' }
+    }
+
+    const savedKey = computeStateKey(method, baseUrl, queryParams, headers, body, auth, null, 0)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       method,
@@ -305,7 +313,7 @@ export function useTabsState(deps: {
       queryParams,
       headers,
       body,
-      auth: { type: 'none' },
+      auth,
       timeoutMs: 0,
       name: null,
       filePath: null,

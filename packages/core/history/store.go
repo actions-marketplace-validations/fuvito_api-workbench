@@ -31,6 +31,7 @@ type Entry struct {
 	Headers     []Header
 	BodyType    string
 	BodyContent string
+	AuthJSON    string // JSON-serialized auth — only stored when values are {{var}} refs
 }
 
 // Store is a persistent history of executed requests.
@@ -111,6 +112,7 @@ func (s *Store) migrate() error {
 		`ALTER TABLE history ADD COLUMN body_type      TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE history ADD COLUMN body_content   TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE history ADD COLUMN workspace_path TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE history ADD COLUMN auth_json      TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
@@ -266,17 +268,18 @@ func (s *Store) RecentScenarioRuns(workspacePath string, limit int) ([]ScenarioR
 
 // Record appends a request/response pair to history and returns the new entry ID.
 // Sensitive header values (Authorization, Cookie, etc.) are redacted before storage.
-func (s *Store) Record(workspacePath, method, url string, statusCode int, statusText string, durationMs, sizeBytes int64, headers []Header, bodyType, bodyContent string) (int64, error) {
+// authJSON should be a JSON-serialized auth object; pass "" to omit.
+func (s *Store) Record(workspacePath, method, url string, statusCode int, statusText string, durationMs, sizeBytes int64, headers []Header, bodyType, bodyContent, authJSON string) (int64, error) {
 	hJSON, err := json.Marshal(redactHeaders(headers))
 	if err != nil {
 		hJSON = []byte("[]")
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO history (executed_at, workspace_path, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO history (executed_at, workspace_path, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content, auth_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		time.Now().UTC().Format(time.RFC3339),
 		workspacePath, method, url, statusCode, statusText, durationMs, sizeBytes,
-		string(hJSON), bodyType, bodyContent,
+		string(hJSON), bodyType, bodyContent, authJSON,
 	)
 	if err != nil {
 		return 0, err
@@ -287,7 +290,7 @@ func (s *Store) Record(workspacePath, method, url string, statusCode int, status
 // Recent returns up to limit entries for workspacePath, most recent first.
 func (s *Store) Recent(workspacePath string, limit int) ([]Entry, error) {
 	rows, err := s.db.Query(
-		`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content
+		`SELECT id, executed_at, method, url, status_code, status_text, duration_ms, size_bytes, headers, body_type, body_content, auth_json
 		 FROM history WHERE workspace_path = ? ORDER BY id DESC LIMIT ?`,
 		workspacePath, limit,
 	)
@@ -300,7 +303,7 @@ func (s *Store) Recent(workspacePath string, limit int) ([]Entry, error) {
 	for rows.Next() {
 		var e Entry
 		var executedAt, headersJSON string
-		if err := rows.Scan(&e.ID, &executedAt, &e.Method, &e.URL, &e.StatusCode, &e.StatusText, &e.DurationMs, &e.SizeBytes, &headersJSON, &e.BodyType, &e.BodyContent); err != nil {
+		if err := rows.Scan(&e.ID, &executedAt, &e.Method, &e.URL, &e.StatusCode, &e.StatusText, &e.DurationMs, &e.SizeBytes, &headersJSON, &e.BodyType, &e.BodyContent, &e.AuthJSON); err != nil {
 			return nil, err
 		}
 		e.ExecutedAt, _ = time.Parse(time.RFC3339, executedAt)

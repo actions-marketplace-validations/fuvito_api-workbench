@@ -163,6 +163,7 @@ export interface HistoryEntry {
   headers: { name: string; value: string }[]
   bodyType: string
   bodyContent: string
+  auth?: AuthPayload
 }
 
 export interface FileNode {
