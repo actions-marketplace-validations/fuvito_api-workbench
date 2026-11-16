@@ -89,3 +89,52 @@ jobs:
       - name: Build desktop Go
         run: go build ./...
         working-directory: apps/desktop/wails
+
+  quickstart:
+    name: "60s quickstart (CI)"
+    runs-on: ubuntu-latest
+    needs: cli-build
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Build clrsig
+        run: go build -o /tmp/clrsig ./
+        working-directory: apps/cli
+
+      - name: Build and start example server
+        timeout-minutes: 2
+        run: |
+          go build -o /tmp/example-server ./
+          /tmp/example-server &
+          for i in $(seq 1 50); do
+            curl -sf http://localhost:8080/health && break
+            [ $i -eq 50 ] && { echo "Server did not start"; exit 1; }
+            sleep 0.2
+          done
+        working-directory: examples/server
+
+      - name: "clrsig conform (must pass)"
+        run: >
+          /tmp/clrsig conform examples/server/openapi.yaml
+          --base-url http://localhost:8080
+          --env examples/environments/demo-conform.yaml
+
+      - name: "clrsig run user-lifecycle (must pass)"
+        run: >
+          /tmp/clrsig run examples/scenarios/user-lifecycle.yaml
+          --env examples/environments/local.yaml
+
+      - name: "clrsig diff (must detect breaking changes)"
+        run: |
+          set +e
+          /tmp/clrsig diff \
+            examples/specs/users-api-v1.yaml \
+            examples/specs/users-api-v2.yaml \
+            --breaking-only
+          test $? -eq 1

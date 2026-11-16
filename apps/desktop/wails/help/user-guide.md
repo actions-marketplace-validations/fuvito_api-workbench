@@ -111,7 +111,9 @@ Clear Signal supports multiple request tabs. Each tab maintains independent stat
 
 When more tabs are open than fit in the tab bar, gradient fade indicators appear at the left and right edges. The active tab scrolls into view automatically whenever you switch tabs.
 
-**Quick open (Ctrl+P):** press **Ctrl+P** to open a fuzzy-search modal that lists every request file and scenario in the current workspace. Type any part of the name to filter, use the arrow keys to navigate, and press **Enter** (or click) to open. Press **Escape** to dismiss without opening.
+**Quick open / command palette (Ctrl+P):** press **Ctrl+P** to open the command palette. It lists every request file, scenario, and environment in the current workspace, plus two commands (New Request, New Scenario). Type any part of a name to filter; use the arrow keys to navigate; press **Enter** or click to open. Selecting an environment switches it immediately. Press **Escape** to dismiss.
+
+Type **`>`** at the start of the query to enter command mode — only commands and environments are shown, so you can switch environments or trigger actions without leaving the keyboard. The footer hint at the bottom of the palette reminds you of the `>` shortcut.
 
 ---
 
@@ -205,7 +207,7 @@ The right panel shows:
 - **Timing breakdown** — a stacked bar showing DNS lookup, TCP connect, TLS handshake, time-to-first-byte, and body transfer time. Hover each segment for the exact millisecond value.
 - **Body** — JSON responses are syntax-highlighted and pretty-printed. Click the toggle to switch between pretty and raw view. The search icon (Ctrl+F) opens an in-panel find bar. The copy icon copies the body to the clipboard.
 - **Diff view** — after sending the same request more than once, a diff icon (⇄) appears in the toolbar. Click it to compare the current and previous response bodies side by side.
-- **New scenario from request** — the list icon in the toolbar creates a new scenario file with the current request as its first step and a status assertion pre-wired. The scenario opens immediately in an editor tab.
+- **New scenario from request** — the list icon in the toolbar opens a dialog. If you have no existing scenarios in the workspace, it creates a new scenario file with the current request as the first step. If scenarios already exist, the dialog shows two tabs: **New** (create a new scenario file) and **Add to existing** (pick a scenario from the list to append the current request as a new step). The scenario opens immediately in an editor tab either way.
 - **Headers** — full response header table with a **Copy all** button that copies every header as `name: value` lines to the clipboard.
 
 **Collapsing the response panel:** click the chevron icon on the left edge of the status bar to collapse the response panel to a narrow strip, giving the request editor more room. Click the chevron again to restore it.
@@ -214,9 +216,11 @@ The right panel shows:
 
 Click the **History** rail tab (clock icon) to see your last 100 requests, grouped by date — **Today**, **Yesterday**, and older dates. Each entry shows the method badge, status code, duration, and URL. 
 
-- **Click an entry** to restore its method, URL, headers, and body into the editor (auth is not stored in history). A confirmation dialog appears first if the current tab has unsaved changes.
+- **Click an entry** to restore its method, URL, headers, body, and auth into the editor. A confirmation dialog appears first if the current tab has unsaved changes. Auth is restored only when its values were `{{variable}}` references at the time the request was sent — literal tokens are never written to the history database.
 - **Re-run button (↺):** hover over any entry to reveal a re-run button on the right edge. Clicking it restores the request *and* immediately sends it, so you can replay a previous call in one click.
 - **Clear history** shows a confirmation prompt before removing all entries.
+
+Network errors (DNS failure, connection refused, TLS errors, timeout) are recorded in history with a **Network Error** status and 0ms duration, so failed requests appear alongside successful ones.
 
 ---
 
@@ -354,6 +358,23 @@ steps:
 | `jsonpath` | Extracts from the response body using a JSONPath expression |
 | `header` | Extracts a response header value |
 | `status` | Extracts the numeric status code |
+
+### Running a scenario
+
+Open a scenario tab and click **Run** in the scenario header bar. While the scenario is running the button changes to **Stop** (amber square icon) — click it at any time to cancel the in-flight run. Steps that have already completed are preserved in the results view; the remaining steps are marked cancelled.
+
+### Running all scenarios (Run All)
+
+Click **Run All** in the Scenarios sidebar or in the scenario header bar. All scenarios in the workspace execute in sequence. A dedicated **Runner** tab opens (or becomes active) and shows:
+
+- A progress bar across the top while running.
+- A table with one row per scenario — pass/fail icon, scenario name, and total duration.
+- A live counter in the header ("Running 2 / 5…").
+- When finished: a summary line ("All passed" or "N failed") with totals.
+- **Stop** button (amber) while running — cancels the current and remaining scenarios.
+- **Run Again** and **Clear** buttons after the run completes.
+
+Click any row in the runner table to open that scenario's full result in an editor tab.
 
 ---
 
@@ -707,6 +728,8 @@ When you paste the prompt into an AI assistant, it follows a four-step workflow:
 | **Ctrl+Tab** | Switch to the next tab |
 | **Ctrl+Shift+Tab** | Switch to the previous tab |
 | **Ctrl+1** – **Ctrl+9** | Switch directly to tab N |
+| **← / →** (tab bar focused) | Navigate between tabs with the arrow keys |
+| **Delete / Backspace** (tab bar focused) | Close the focused tab |
 | **Ctrl+B** | Toggle sidebar open/closed |
 | **Ctrl+P** | Quick open — fuzzy-search all requests and scenarios |
 | **Ctrl+F** | Search in the response body (when response panel is focused) |

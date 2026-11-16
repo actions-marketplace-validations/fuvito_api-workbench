@@ -1171,15 +1171,17 @@ export default function App() {
                 onRevealInExplorer={p => openInExplorer(p).catch(() => {})}
               />
 
-              <AppToolbar
-                activeTab={activeTab}
-                activeTabId={activeTabId}
-                updateTab={updateTab}
-                onOpenRequest={workspace.handleOpenRequest}
-                onSaveRequest={tabs.handleSaveRequest}
-                onNewRequest={tabs.handleNewTab}
-                onDuplicateTab={tabs.handleDuplicateTab}
-              />
+              {activeTab.kind !== 'coverage' && activeTab.kind !== 'runner' && (
+                <AppToolbar
+                  activeTab={activeTab}
+                  activeTabId={activeTabId}
+                  updateTab={updateTab}
+                  onOpenRequest={workspace.handleOpenRequest}
+                  onSaveRequest={tabs.handleSaveRequest}
+                  onNewRequest={tabs.handleNewTab}
+                  onDuplicateTab={tabs.handleDuplicateTab}
+                />
+              )}
 
               <div className="flex-1 flex overflow-hidden relative">
                 {/* Runner tab (single instance) */}

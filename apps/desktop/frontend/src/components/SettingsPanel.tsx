@@ -16,6 +16,7 @@ type SettingsPanelProps = {
 
 const DEFAULTS: AppSettings = {
   theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false,
+  telemetryEnabled: false,
 }
 
 export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }: SettingsPanelProps) {
@@ -138,6 +139,28 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
 
             </div>
           </section>
+          {/* Privacy */}
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Privacy</h3>
+            <div className="flex flex-col gap-3">
+
+              <Row label="Anonymous telemetry" changed={isChanged('telemetryEnabled')}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={local.telemetryEnabled}
+                    onChange={e => set('telemetryEnabled', e.target.checked)}
+                    className="accent-[var(--color-accent)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-background)]"
+                  />
+                  <span className="text-xs text-[var(--color-muted-foreground)]">
+                    Send command counts and durations — no URLs, headers, or bodies
+                  </span>
+                </label>
+              </Row>
+
+            </div>
+          </section>
+
         </div>
 
         {/* Footer */}

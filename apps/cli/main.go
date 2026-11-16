@@ -23,6 +23,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
+	"github.com/fuvito/api-workbench/packages/core/telemetry"
 	"github.com/fuvito/api-workbench/packages/core/variables"
 	"github.com/spf13/cobra"
 )
@@ -53,6 +54,7 @@ func main() {
 	root.AddCommand(conformCmd())
 	root.AddCommand(diffCmd())
 	root.AddCommand(coverageCmd())
+	root.AddCommand(telemetryCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -261,6 +263,7 @@ func runCmd() *cobra.Command {
 	var specFile string
 	var showCoverage bool
 	var workspacePath string
+	var runStart = time.Now()
 
 	cmd := &cobra.Command{
 		Use:   "run <scenario-file>",
@@ -410,6 +413,20 @@ func runCmd() *cobra.Command {
 				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
 			}
 
+			tel := newTelemetryClient()
+			runTelResult := "pass"
+			if !result.Passed {
+				runTelResult = "fail"
+			}
+			rPassed, rFailed, _ := result.Counts()
+			rAsserted, _ := result.AssertionCounts()
+			tel.Record(telemetry.Event{
+				Command:        "run",
+				Result:         runTelResult,
+				DurationMs:     time.Since(runStart).Milliseconds(),
+				StepCount:      rPassed + rFailed,
+				AssertionCount: rAsserted,
+			})
 			if !result.Passed {
 				return &exitError{1}
 			}
@@ -576,6 +593,7 @@ func conformCmd() *cobra.Command {
 	var requestTimeout int
 	var failFast bool
 	var showCoverage bool
+	var start = time.Now()
 
 	cmd := &cobra.Command{
 		Use:   "conform <spec-file-or-url>",
@@ -684,6 +702,18 @@ Exit codes:
 			}
 
 			_, failed, _ := result.Counts()
+			tel := newTelemetryClient()
+			telResult := "pass"
+			if failed > 0 {
+				telResult = "fail"
+			}
+			passed, failedCount, _ := result.Counts()
+			tel.Record(telemetry.Event{
+				Command:        "conform",
+				Result:         telResult,
+				DurationMs:     time.Since(start).Milliseconds(),
+				AssertionCount: passed + failedCount,
+			})
 			if failed > 0 {
 				return &exitError{1}
 			}
@@ -1053,6 +1083,117 @@ func coverageBar(pct float64, width int) string {
 	}
 	return "[" + string(bar) + "]"
 }
+
+// --- Telemetry helpers ---
+
+func clrsigDataDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".clrsig")
+}
+
+func isTelemetryEnabled() bool {
+	dir := clrsigDataDir()
+	if dir == "" {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		return false
+	}
+	var s struct {
+		TelemetryEnabled bool `json:"telemetryEnabled"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return false
+	}
+	return s.TelemetryEnabled
+}
+
+func newTelemetryClient() *telemetry.Client {
+	return telemetry.New(isTelemetryEnabled(), clrsigDataDir(), version)
+}
+
+func writeTelemetrySetting(enabled bool) error {
+	dir := clrsigDataDir()
+	if dir == "" {
+		return fmt.Errorf("could not determine home directory")
+	}
+	path := filepath.Join(dir, "settings.json")
+
+	s := domain.DefaultSettings()
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &s)
+	}
+	s.TelemetryEnabled = enabled
+
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func telemetryCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "telemetry",
+		Short: "Manage opt-in anonymous usage telemetry",
+	}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "enable",
+		Short: "Opt in to anonymous usage telemetry",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := writeTelemetrySetting(true); err != nil {
+				return fmt.Errorf("updating settings: %w", err)
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "Telemetry enabled.")
+			fmt.Fprintln(cmd.OutOrStdout(), "What is sent: command name, result (pass/fail), duration, step/assertion counts.")
+			fmt.Fprintln(cmd.OutOrStdout(), "No request URLs, headers, bodies, or personal data are ever sent.")
+			fmt.Fprintln(cmd.OutOrStdout(), "Run 'clrsig telemetry disable' to opt out at any time.")
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "disable",
+		Short: "Opt out of anonymous usage telemetry",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := writeTelemetrySetting(false); err != nil {
+				return fmt.Errorf("updating settings: %w", err)
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "Telemetry disabled.")
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Show current telemetry opt-in status",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if isTelemetryEnabled() {
+				fmt.Fprintln(cmd.OutOrStdout(), "Telemetry: enabled")
+				fmt.Fprintln(cmd.OutOrStdout(), "What is sent: command name, result, duration, step/assertion counts.")
+			} else {
+				fmt.Fprintln(cmd.OutOrStdout(), "Telemetry: disabled (run 'clrsig telemetry enable' to opt in)")
+			}
+			return nil
+		},
+	})
+
+	return cmd
+}
+
+// --- End telemetry ---
 
 func genSanitizeDirName(s string) string {
 	var b strings.Builder

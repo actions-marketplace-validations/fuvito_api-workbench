@@ -149,6 +149,7 @@ export interface AppSettings {
   defaultTimeoutMs: number
   proxyUrl: string
   tlsSkipVerify: boolean
+  telemetryEnabled: boolean
 }
 
 export interface HistoryEntry {

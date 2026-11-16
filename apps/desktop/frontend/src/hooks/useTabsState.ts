@@ -349,9 +349,10 @@ export function useTabsState(deps: {
       switchTo(existing.id)
       return existing.id
     }
+    const id = crypto.randomUUID()
     const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
     const newTab: TabState = {
-      id: crypto.randomUUID(),
+      id,
       kind: 'runner',
       name: 'Run Results',
       method: 'GET',
@@ -371,8 +372,12 @@ export function useTabsState(deps: {
       saveError: null,
       editingName: false,
     }
-    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
-    return newTab.id
+    setTabsState(prev => {
+      const dup = prev.tabs.find(t => t.kind === 'runner')
+      if (dup) return { ...prev, activeTabId: dup.id }
+      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+    })
+    return id
   }
 
   function openCoverageTab(): string {
@@ -381,9 +386,10 @@ export function useTabsState(deps: {
       switchTo(existing.id)
       return existing.id
     }
+    const id = crypto.randomUUID()
     const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
     const newTab: TabState = {
-      id: crypto.randomUUID(),
+      id,
       kind: 'coverage',
       coverageSpecFile: null,
       name: 'Contracts',
@@ -404,8 +410,14 @@ export function useTabsState(deps: {
       saveError: null,
       editingName: false,
     }
-    setTabsState(prev => ({ tabs: [...prev.tabs, newTab], activeTabId: newTab.id }))
-    return newTab.id
+    // Use functional update to guard against duplicate creation when called twice
+    // before a re-render (e.g. auto-select in CoverageSidebarPanel + user click).
+    setTabsState(prev => {
+      const dup = prev.tabs.find(t => t.kind === 'coverage')
+      if (dup) return { ...prev, activeTabId: dup.id }
+      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+    })
+    return id
   }
 
   function openScenarioAsTab(scenarioPath: string, scenarioName: string): string {

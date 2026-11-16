@@ -668,3 +668,222 @@ only proves the happy path.** The work that converts "nice conformance
 checker" into "I would block a release on this" is items 1–4 above:
 negative-path conformance, diff→impact, the executable failure-mode
 catalog, and quality indicators. Everything else is distribution.
+
+## 12. Claude's comments
+
+*Written as the engineer who has implemented every line of this product.
+The previous sections are optimistic. This one is not.*
+
+### The uncomfortable truth about the niche
+
+API contract validation is genuinely valuable — and genuinely small.
+The addressable market is not "every developer using an API." It is the
+subset of teams that (a) write OpenAPI specs, (b) have enough test
+discipline to run contract checks in CI, and (c) are not already
+satisfied by Postman Newman, Dredd, Schemathesis, or their internal test
+harness. That is not a large population today.
+
+The document frames "use both Postman and Clear Signal" as a coexistence
+strategy. In practice, it is a liability. Developers do not go looking
+for a second API tool. They tolerate the one they already have. Every
+"and also install this" pitch loses to inertia, every time, unless the
+new tool delivers an inarguable win that the existing one structurally
+cannot. The inarguable win for Clear Signal — negative-path conformance
+with zero test-writing effort — is not shipped yet. Until it is, the
+elevator pitch does not close.
+
+### The organic growth problem
+
+Local-first architecture is a principled choice, and the right one for
+a privacy-conscious developer tool. It is also structurally hostile to
+organic growth.
+
+There is no sharing. There is no network. A developer cannot paste a
+link to their scenario and have a colleague open it. There is no public
+collection library, no template gallery, no community space where
+someone discovers Clear Signal because a colleague shared something
+useful. Every user the product gains must be individually convinced,
+usually by one champion who already installed it and persuaded their
+team. That is the slowest possible acquisition funnel.
+
+Without solving this — a hosted scenario sharing service, a VS Code
+extension with one-click install, a prominent GitHub Actions marketplace
+listing, an appearance in every "API testing tools" roundup — the user
+count will grow in single digits per month regardless of technical
+quality.
+
+### The documentation is a credibility problem
+
+The user guide has known errors against the current UI, flagged in
+multiple audit reports. For a product that positions itself as a serious
+engineering tool — something you would block a release on — documentation
+that describes controls that have moved or no longer exist tells an
+evaluating developer exactly one thing: this product is not production
+ready. First impressions from documentation are not recoverable in a
+five-minute evaluation. Fix the guide before the next outreach push, not
+after.
+
+### The naming rule may be costing discoverability
+
+CLAUDE.md explicitly bans the phrase "contract testing" because of Pact
+connotations. That rule is correct internally. It is a problem
+externally. Developers searching for tools type "API contract testing,"
+"contract test framework," "contract testing CI." If the website, the
+README, and the documentation avoid those exact terms, Clear Signal does
+not appear in those searches. Pact owns the top results today partly
+because it owns the vocabulary. Either the product needs an SEO strategy
+that works around this constraint, or the positioning page needs a
+"how this differs from consumer-driven contract testing (Pact)" section
+that uses the words once and then contextualizes them — capturing the
+search traffic while clarifying the distinction.
+
+### The failure-mode catalog is the right idea but requires a commitment the roadmap does not make
+
+Building a curated, executable failure taxonomy is a genuinely
+differentiated idea. It is also an editorial commitment, not an
+engineering one. The catalog is only as valuable as it is accurate,
+current, and comprehensive. Someone with deep API domain expertise needs
+to author the entries, validate the assertion templates against real
+APIs, review them when the spec evolves, and keep the coverage honest.
+
+The current plan — "build as data, not code" — solves the architecture.
+It does not solve the content problem. A failure-mode catalog with 12
+entries covering obvious cases will be dismissed. A catalog with 150
+entries, each with a worked example, a real-world incident reference,
+and an executable scenario is a reason to pay for a product. That gap
+is not an engineering sprint; it is months of research and writing.
+Treat it as a content product, not a feature, or do not ship it at all —
+a thin catalog is worse than no catalog because it signals the team
+did not think this through.
+
+### What would actually move user engagement
+
+None of this is about the codebase. The codebase is ahead of the
+positioning. The gap is entirely in the things that make developers find,
+try, and keep using a tool:
+
+1. **A five-minute win.** A developer should be able to paste in an
+   OpenAPI URL, click one button, and see a conformance report with
+   real violations on a real public API — without creating a workspace,
+   without reading a guide. If that does not work in five minutes with
+   no prior knowledge, the product will not grow through word of mouth.
+
+2. **A GitHub Actions listing in the marketplace.** A one-step
+   `clrsig conform` action that runs against a spec and fails the build
+   on violations is a beachhead. Developers who find it via the
+   Actions marketplace arrive with intent. That listing does not exist.
+
+3. **An opinionated blog post or write-up** that places Clear Signal in
+   "the API testing landscape" and explains precisely what it does that
+   Postman, Dredd, and Schemathesis do not. Without that piece, there is
+   nothing to link to in Hacker News comments, in Reddit threads, in
+   team Slack channels where the right audience lives.
+
+4. **A community loop.** A Discord, a GitHub Discussions space, or even
+   a mailing list — anywhere a user can ask a question and get an answer
+   within 24 hours. Developer tools that feel abandoned after install do
+   not get recommended. Responsiveness is a product feature.
+
+5. **Telemetry, even opt-in.** Right now there is no way to know whether
+   anyone is using the product, which features they reach, or where they
+   drop off. Building without usage data is building blind. Add opt-in
+   anonymous telemetry — even just counting `clrsig conform` invocations
+   and scenario step counts — before the first public launch, not after.
+
+### The honest prognosis
+
+The technical foundation is genuinely strong. `packages/core` is clean,
+the CLI is solid, the scenario engine works, and the desktop app is
+functional. The engineering is not the problem.
+
+Unless the team invests equally in distribution, documentation quality,
+the five-minute first experience, and one genuinely unignorable
+technical differentiator — negative-path conformance is the best
+candidate — this will remain a tool that a small number of careful
+developers discover, appreciate, and quietly use alone. That is not
+failure, but it is also not a product.
+
+The window for a focused contract-and-conformance tool to establish
+itself as the category default is probably two to three years before the
+large platforms absorb enough of this problem space to make it
+difficult. That window is open now. What it requires is treating
+distribution and onboarding with the same engineering discipline that
+has been applied to the Go core.
+
+— **Claude Code (Anthropic), code author, November 2026**
+
+---
+
+## 13. Action items
+
+### Short-term (next 4–6 weeks)
+
+These are low-cost, high-visibility changes that unblock growth without
+new engineering features. Do them before any outreach.
+
+- [x] **Audit and fix the user guide end-to-end.** Walk through every step as a first-time user. Remove or update every reference to a control that has moved. Screenshots must match the current UI.
+  *Why:* A stale guide is a credibility killer in a five-minute evaluation.
+  *Devin: note there are two maintained copies — `docs/user-guide.md` and `apps/desktop/wails/help/user-guide.md`. The audit should deduplicate them or generate one from the other, or they will diverge again by the next release.*
+  *Done 2026-11-16: `docs/user-guide.md` deleted; `apps/desktop/wails/help/user-guide.md` is the single source of truth. Updated with command palette, history auth restoration, cancelable runs, runner tab, add-to-existing scenario, and keyboard shortcut changes.*
+- [x] **Rewrite the README as a product pitch, not an installation guide.** Lead with the problem ("You ship an API. How do you know it conforms to its contract?"), show a one-command output, link to the guide.
+  *Why:* The README is the first thing a developer reads on GitHub. It currently reads like internal notes.
+  *Done 2026-11-16: README.md replaced with product pitch (problem statement, CLI output demo, comparison table, install, 60-second workflow, YAML example). Developer content moved to README-DEVELOPER.md.*
+- [x] **Publish a GitHub Actions marketplace action** for `clrsig conform`. A single `uses: clrsig/conform-action@v1` with an OpenAPI path and a base URL is the cheapest possible install path for CI users, and it appears in search results.
+  *Why:* Actions marketplace is the highest-intent discovery channel for CI tooling.
+  *Devin: partly done — `action.yml` already ships in-repo as a composite action covering run/conform/diff/request/validate with automatic release-binary install. The remaining work is the Marketplace listing itself plus a README usage snippet, not building the action.*
+  *Done 2026-11-16: `action.yml` confirmed in repo root, fully wired (run/conform/diff/validate/request, cross-platform binary download, exit-code output). Remaining work: submit to GitHub Marketplace (requires a tagged release and clicking "Publish to Marketplace" in the GitHub UI — not a code task).*
+- [ ] **Fix the five-minute first experience.** Drop a developer onto the app with no instructions and time them. If they cannot paste an OpenAPI URL and see a conformance report in under five minutes, the onboarding flow needs work. Add a visible "try with a public spec" prompt to the landing page.
+  *Why:* First impressions from a cold start determine whether the tool gets shared with a team or quietly deleted.
+  *Devin: the raw material already exists — `examples/server` plus 11 runnable scenarios (including 401/405/503, etag, rate-limit, and contract-violation cases) and `docs/demo.tape` auto-regenerating `demo.gif` via CI. This is mostly a surfacing problem, not new work.*
+- [x] **Add a "How this differs from Pact / consumer-driven contract testing" page or README section.** Use the words "contract testing" once, in that section, to capture the search traffic. Then differentiate clearly.
+  *Why:* Developers searching the category will not find the product if the vocabulary is avoided entirely.
+  *Done 2026-11-16: Added "How this differs from Pact and consumer-driven contract testing" section to README.md with a comparison table and clear positioning (provider-side spec validation vs consumer-driven coordination).*
+- [ ] **Open GitHub Discussions** (or a Discord) and answer every question within 24 hours for the first three months.
+  *Why:* A tool that feels abandoned after install does not get recommended. Responsiveness is a product signal.
+  *Devin: prefer Discussions over Discord at this stage. An empty Discord reads as more abandoned than a quiet Discussions tab; Discussions is searchable, async, and zero-overhead for a small team.*
+- [x] **Add opt-in anonymous telemetry** — CLI command counts, scenario step counts, conform run counts. No PII, no request contents. Ship this before any public launch push.
+  *Why:* Building without usage data means building blind. The first version does not need to be sophisticated.
+  *Devin — objection: defer this. It cuts against the local-first privacy positioning that is itself a differentiator, and at pre-launch volume typical opt-in rates (5–15%) produce noise, not signal — it cannot answer engagement questions with n this small. Passive signals exist that cost nothing and phone nothing home: release download counts, Docker pulls, Action usage, Discussions activity. Revisit once there is a user base worth measuring; if shipped then, keep it event-counts-only, disclosed prominently, and never blocking on network.*
+  *Done 2026-11-16: engineering implemented — `packages/core/telemetry/` package, `clrsig telemetry enable|disable|status` command, Settings toggle in desktop app. Off by default. No network call when disabled. Devin's timing objection noted — the code is ready to ship when the user base warrants it; hold the release flag until then.*
+- [ ] **Write one technical blog post or long-form README section**: "What Clear Signal does that Postman cannot." Concrete, with a worked example (a spec violation that Newman passes and `clrsig conform` catches). Post it on the project site and wherever the target audience reads (Dev.to, Hacker News, relevant subreddits).
+  *Why:* Without a shareable artefact that explains the differentiation, word-of-mouth cannot start.
+- [x] **Ship a verified 60-second CLI quickstart.** A copy-pasteable sequence — run `examples/server`, run `clrsig conform examples/server/openapi.yaml`, see violations — pinned at the top of the README and kept green by CI so it can never silently rot.
+  *Why:* The CLI is the lowest-friction first contact; a guaranteed-working demo converts evaluation into adoption better than any feature description.
+  *Done 2026-11-16: "Try it in under two minutes" section added near top of README with copy-pasteable commands using the real example server. `quickstart` CI job added to `ci.yml` — runs conform, user-lifecycle scenario, and diff on every push; failures are impossible to miss.*
+- [ ] **Promote the Postman/Insomnia importer as the onboarding hook.** "Import your existing collection" should be a first-class UI affordance and README bullet — it is the practical half of the coexistence strategy and is already implemented in `packages/core/importer`.
+  *Why:* Nobody migrates to a second API tool; everybody imports what they already have. This is the activation path for the entire §8 architecture.
+- [ ] **Document a scheduled-conformance monitoring recipe.** A GitHub Actions cron workflow running `clrsig conform` nightly against staging — zero product code, and it honestly covers the "monitoring" gap the comparison table lists as a weakness.
+  *Why:* Turns a missing feature into a documented workflow. Prospects asking "does it do monitoring?" get a yes-with-an-asterisk instead of a no.
+
+---
+
+### Long-term (3–12 months)
+
+These require sustained engineering or editorial investment. They are
+listed in the order that maximises differentiation before the market
+consolidates.
+
+- [ ] **Ship negative-path conformance.** Extend `conformance.Runner` to generate contract-violating requests per operation (drop required fields, wrong types, missing credentials) and assert the server returns a declared error status with a conformant error body.
+  *Value:* This is the single most defensible answer to "why not just use Postman." No mainstream tool does this well. It makes `clrsig conform` block-worthy.
+- [ ] **Build the `clrsig impact` command.** Join `clrsig diff` output (breaking changes with method + path) against scenario `specFile:` declarations to produce "these scenarios will break when you ship spec v2." Requires no new core machinery.
+  *Value:* Turns a diff report into an actionable risk assessment. This is high enterprise value.
+- [ ] **Build the failure-mode catalog as a content product.** Commission and validate 50+ failure modes — not just the YAML schema but worked examples, real-world incident references, and executable scenarios. Assign an owner who is responsible for accuracy and growth, not just the data format.
+  *Value:* The catalog is the most defensible long-term moat — harder to clone than a feature. It fails if thin. It succeeds if deep and maintained.
+- [ ] **Extend coverage reporting to quality indicators.** Compute "operations never exercised," "operations tested only on happy path," "secured operations never tested authenticated," "declared error responses never asserted." Present "what you have not proven," not just "what you ran."
+  *Value:* This is what makes the coverage report worth reading in a team meeting. Percentage alone is not actionable.
+- [ ] **Ship an MCP server over stdio.** Expose `run_scenario`, `conform`, `diff`, and `coverage` as MCP tools. No HTTP listener needed — a thin stdio wrapper over `packages/core`. Makes Clear Signal the most agent-friendly tool in the category.
+  *Value:* Coding agents invoking `clrsig` without human intervention is a low-effort P1/P2 item with high strategic value as AI-assisted development grows.
+- [ ] **Publish a VS Code extension** with one-click `clrsig run` for the open scenario file and inline annotation of conformance violations.
+  *Value:* Removes the install barrier for the largest slice of the developer audience and embeds the tool in the daily workflow rather than a separate app.
+  *Devin: agree on the channel, flag the cost — this is a second maintained frontend with its own release cadence. Validate demand via Discussions first, and consider JetBrains Marketplace as an equal or better first target: the spec-authoring backend audience skews IntelliJ/GoLand.*
+- [ ] **Establish a scenario template library.** A publicly browsable, forkable collection of scenarios for popular public APIs (GitHub, Stripe, OpenAI) that demonstrate real contract validation. Hosted on GitHub, linked from the README.
+  *Value:* Templates lower the activation energy for new users and generate organic discovery via forks and stars.
+- [ ] **Define a sustainable monetisation path before the user base requires it.** Options consistent with the local-first model: a paid desktop tier with advanced reporting, an enterprise CLI licence, or hosted CI runs. Decide this before growth forces a rushed decision that alienates early adopters.
+  *Value:* A product with no revenue model eventually competes with the founder's ability to maintain it. The community needs to know the product will still exist in two years.
+  *Devin: agree on the timing; one hard constraint — the conformance gate itself (`conform`, `diff`, `run`, `coverage`) must stay free. Gating the gate kills the adoption story this entire document argues for. Monetise the layers around it: org-wide reporting, hosted trend storage, team features.*
+- [ ] **Add `clrsig trends`.** Historical regression and conformance trends rendered from the existing SQLite history store and `.clrsig-coverage` data — pass/fail trajectory per spec, violation counts over time, coverage drift.
+  *Value:* Pillar 4 lists "historical regression trends" but no roadmap item addresses it. The data is already persisted; this is a reporting problem, not new infrastructure.
+- [ ] **Add `clrsig report` — a shareable workspace quality report.** Aggregate coverage, conformance, and diff results across all specs in a workspace into a single HTML or Markdown artefact suitable for a pull request comment or team review.
+  *Value:* The quality-intelligence pillar needs a deliverable humans actually circulate. A static report is the local-first answer to Postman's dashboards.
+
+*Italic annotations and items 9+ added by Devin, 2026-11-15.*
