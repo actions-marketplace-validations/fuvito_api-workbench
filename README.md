@@ -136,7 +136,37 @@ docker run --rm -v "$PWD:/workspace" ghcr.io/fuvito/api-workbench:latest \
 
 ---
 
-## Workflow in 60 seconds
+## Try it in under two minutes
+
+The repo includes a working demo server and a full example scenario set. Clone it and run:
+
+```bash
+git clone https://github.com/fuvito/api-workbench
+cd api-workbench
+
+# Start the included demo API server
+go run ./examples/server &
+
+# Validate every declared operation conforms to the spec
+clrsig conform examples/server/openapi.yaml \
+  --base-url http://localhost:8080 \
+  --env examples/environments/demo-conform.yaml
+
+# Run the multi-step scenario: login → create → fetch → delete
+clrsig run examples/scenarios/user-lifecycle.yaml \
+  --env examples/environments/local.yaml
+
+# Detect a breaking change before it ships
+clrsig diff examples/specs/users-api-v1.yaml \
+  examples/specs/users-api-v2.yaml \
+  --breaking-only
+```
+
+These three commands are run in CI on every push — they cannot silently rot.
+
+---
+
+## Workflow against your own API
 
 ```bash
 # 1. Point at your spec
