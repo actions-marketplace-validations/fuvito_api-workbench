@@ -211,7 +211,11 @@ func (w *WorkspaceService) ListRequests() []FileNodeIO {
 	if w.workspacePath == "" {
 		return nil
 	}
-	nodes, err := buildFileTree(w.workspacePath, w.workspacePath, true)
+	requestsDir := filepath.Join(w.workspacePath, "requests")
+	if _, err := os.Stat(requestsDir); os.IsNotExist(err) {
+		return nil
+	}
+	nodes, err := buildFileTree(requestsDir)
 	if err != nil {
 		log.Printf("listing requests: %v", err)
 		return nil
@@ -815,7 +819,7 @@ func peekMethod(path string) string {
 	return strings.ToUpper(out.Method)
 }
 
-func buildFileTree(root, dir string, skipSpecialDirs bool) ([]FileNodeIO, error) {
+func buildFileTree(dir string) ([]FileNodeIO, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -824,16 +828,12 @@ func buildFileTree(root, dir string, skipSpecialDirs bool) ([]FileNodeIO, error)
 	var nodes []FileNodeIO
 	for _, e := range entries {
 		name := e.Name()
-		// Skip hidden files/dirs and the managed directories at root level
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
 		path := filepath.Join(dir, name)
 		if e.IsDir() {
-			if skipSpecialDirs && (path == filepath.Join(root, "environments") || path == filepath.Join(root, "scenarios")) {
-				continue
-			}
-			children, err := buildFileTree(root, path, false)
+			children, err := buildFileTree(path)
 			if err != nil {
 				continue
 			}

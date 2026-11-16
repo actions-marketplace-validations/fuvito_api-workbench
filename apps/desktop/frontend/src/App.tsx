@@ -27,6 +27,7 @@ import {
   DiscardChangesDialog,
   ImportFromURLDialog,
   NewFolderDialog,
+  ExportSecretsWarningDialog,
 } from '@/components/ConfirmDialogs'
 import {useTabsState} from '@/hooks/useTabsState'
 import {useWorkspace} from '@/hooks/useWorkspace'
@@ -45,6 +46,7 @@ import {
   duplicateScenario,
   executeRequest,
   exportWorkspace,
+  workspaceHasSecrets,
   moveRequest,
   moveScenario,
   openDemoSpec,
@@ -201,8 +203,20 @@ export default function App() {
 
   // Workspace export / import
   const [pendingImport, setPendingImport] = useState<ScanImportResult | null>(null)
+  const [showExportSecretsWarning, setShowExportSecretsWarning] = useState(false)
 
   async function handleExportWorkspace() {
+    const hasSecrets = await workspaceHasSecrets()
+    if (hasSecrets) {
+      setShowExportSecretsWarning(true)
+      return
+    }
+    const err = await exportWorkspace()
+    if (err) setAppError(err)
+  }
+
+  async function doExportWorkspace() {
+    setShowExportSecretsWarning(false)
     const err = await exportWorkspace()
     if (err) setAppError(err)
   }
@@ -686,6 +700,12 @@ export default function App() {
       )}
 
       {/* Dialogs */}
+      {showExportSecretsWarning && (
+        <ExportSecretsWarningDialog
+          onCancel={() => setShowExportSecretsWarning(false)}
+          onConfirm={doExportWorkspace}
+        />
+      )}
       {workspace.deletingFilePath && (
         <DeleteRequestDialog
           filePath={workspace.deletingFilePath}

@@ -64,7 +64,7 @@ func scenarioYAML(url string) string {
 	return fmt.Sprintf(`schemaVersion: "1"
 title: "ping"
 steps:
-  - title: "get root"
+  - label: "get root"
     request:
       method: GET
       url: "%s"

@@ -44,6 +44,7 @@ import {
   SaveContentToFile as WailsSaveContentToFile,
   PickFile as WailsPickFile,
   ExportWorkspace as WailsExportWorkspace,
+  WorkspaceHasSecrets as WailsWorkspaceHasSecrets,
   ScanWorkspaceImport as WailsScanWorkspaceImport,
   ApplyWorkspaceImport as WailsApplyWorkspaceImport,
 } from '@wailsjs/go/main/WorkspaceService'
@@ -810,6 +811,10 @@ export interface ApplyImportResult {
 // Returns "" on success or an error message. Empty string also returned on cancel.
 export async function exportWorkspace(): Promise<string> {
   return (await WailsExportWorkspace()) as unknown as string
+}
+
+export async function workspaceHasSecrets(): Promise<boolean> {
+  return (await WailsWorkspaceHasSecrets()) as unknown as boolean
 }
 
 export async function scanWorkspaceImport(): Promise<ScanImportResult> {
