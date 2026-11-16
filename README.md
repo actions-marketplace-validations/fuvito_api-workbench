@@ -12,6 +12,8 @@ That is the problem Clear Signal solves.
 
 ## See it in action
 
+![Clear Signal demo — scenario run and conformance check](docs/demo.gif)
+
 ```
 $ clrsig conform openapi.yaml --base-url http://localhost:8080
 
