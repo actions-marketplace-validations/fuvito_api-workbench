@@ -328,7 +328,8 @@ func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
 	targetPath := filepath.Join(targetDir, slug+".yaml")
 
 	// Conflict: target exists and is a different file from the one we loaded.
-	if targetPath != req.FilePath {
+	// Use case-insensitive comparison to handle case-only renames on Windows/macOS.
+	if !strings.EqualFold(targetPath, req.FilePath) {
 		if _, err := os.Stat(targetPath); err == nil {
 			return "", fmt.Errorf("a request named %q already exists in this folder — rename it first", name)
 		}
@@ -344,7 +345,8 @@ func (w *WorkspaceService) SaveRequest(req RequestFileIO) (string, error) {
 	}
 
 	// Name changed → delete the old file after the new one is written.
-	if req.FilePath != "" && req.FilePath != targetPath {
+	// Skip for case-only renames (same file, different case) to avoid self-deletion.
+	if req.FilePath != "" && !strings.EqualFold(req.FilePath, targetPath) {
 		_ = os.Remove(req.FilePath)
 	}
 
@@ -758,8 +760,12 @@ func (w *WorkspaceService) OpenWorkspaceByPath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("path is required")
 	}
-	if _, err := os.Stat(path); err != nil {
+	fi, err := os.Stat(path)
+	if err != nil {
 		return "", fmt.Errorf("workspace not found: %s", path)
+	}
+	if !fi.IsDir() {
+		return "", fmt.Errorf("path is not a directory: %s", path)
 	}
 	w.workspacePath = path
 	w.addRecentWorkspace(path)
@@ -891,6 +897,12 @@ func requestFileIOToDomain(r RequestFileIO) *domain.Request {
 	}
 	if r.Body != nil {
 		req.Body = &domain.RequestBody{Type: domain.BodyType(r.Body.Type), Content: r.Body.Content}
+	}
+	if r.Auth != nil {
+		req.Auth = inputAuthToDomain(r.Auth)
+	}
+	if r.TimeoutMs > 0 {
+		req.Timeout = time.Duration(r.TimeoutMs) * time.Millisecond
 	}
 	return req
 }
@@ -1090,6 +1102,42 @@ type ApplyImportResultIO struct {
 	Skipped  int    `json:"skipped"`
 	Renamed  int    `json:"renamed"`
 	Error    string `json:"error"`
+}
+
+// WorkspaceHasSecrets returns true if any environment file in the workspace
+// contains at least one variable marked secret: true with a non-empty value.
+func (w *WorkspaceService) WorkspaceHasSecrets() bool {
+	if w.workspacePath == "" {
+		return false
+	}
+	envDir := filepath.Join(w.workspacePath, "environments")
+	entries, err := os.ReadDir(envDir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") && !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(envDir, name))
+		if err != nil {
+			continue
+		}
+		env, err := serialization.ParseEnvironmentFile(data, name)
+		if err != nil {
+			continue
+		}
+		for _, v := range env.Variables {
+			if v.Secret && v.Value != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ExportWorkspace packs requests/, scenarios/, and environments/ into a ZIP

@@ -239,6 +239,13 @@ function SpecDetailPanel({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function csvCell(v: string): string {
+  if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+    return '"' + v.replace(/"/g, '""') + '"'
+  }
+  return v
+}
+
 function exportCSV(specFile: string, entry: AccumulatedCoverage) {
   const rows = ['Method,Path,Coverage,Last Result,Last Run']
   for (const op of [...(entry.exercised ?? [])].sort()) {
@@ -246,11 +253,11 @@ function exportCSV(specFile: string, entry: AccumulatedCoverage) {
     const r = entry.operationResults?.[op]
     const result = r ? (r.lastPassed ? 'Pass' : 'Fail') : ''
     const runAt = r?.lastRunAt ? new Date(r.lastRunAt).toISOString() : ''
-    rows.push(`${method},${path},Covered,${result},${runAt}`)
+    rows.push([method, path, 'Covered', result, runAt].map(csvCell).join(','))
   }
   for (const op of [...(entry.missed ?? [])].sort()) {
     const { method, path } = parseOp(op)
-    rows.push(`${method},${path},Not Covered,,`)
+    rows.push([method, path, 'Not Covered', '', ''].map(csvCell).join(','))
   }
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
@@ -267,12 +274,16 @@ export function CoverageTab({ workspacePath, specFile, refreshTrigger }: Props) 
   const [specEntry, setSpecEntry] = useState<AccumulatedCoverage | null>(null)
   const [loading, setLoading] = useState(false)
 
+  const [loadError, setLoadError] = useState<string | null>(null)
   const refresh = useCallback(async () => {
     if (!workspacePath || !specFile) { setSpecEntry(null); return }
     setLoading(true)
+    setLoadError(null)
     try {
       const data = await getAccumulatedCoverage(specFile)
       setSpecEntry(data)
+    } catch (e) {
+      setLoadError(String(e))
     } finally {
       setLoading(false)
     }
@@ -353,6 +364,11 @@ export function CoverageTab({ workspacePath, specFile, refreshTrigger }: Props) 
         <div className="flex flex-col items-center justify-center flex-1 gap-3">
           <RefreshCw size={20} className="animate-spin text-[var(--color-muted-foreground)]" />
           <p className="text-sm text-[var(--color-muted-foreground)]">Loading…</p>
+        </div>
+      ) : loadError ? (
+        <div className="flex flex-col items-center justify-center flex-1 gap-3">
+          <p className="text-sm text-red-400">{loadError}</p>
+          <button type="button" onClick={refresh} className="text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">Retry</button>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center flex-1 gap-3">

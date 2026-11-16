@@ -29,9 +29,9 @@
 
 A **workspace** is an ordinary folder on your filesystem. Clear Signal reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
 
-**To open an existing workspace:** click **Open Existing** in the sidebar, or use the folder icon in the workspace panel header.
+**To open an existing workspace:** use **File → Open Workspace** in the menu bar, or click the folder icon at the top of the Explorer panel in the sidebar.
 
-**To create a new workspace:** click **New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
+**To create a new workspace:** use **File → New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
 
 When a workspace is opened, the first request file found in the tree is loaded automatically into the editor — no need to click a file manually to get started.
 
@@ -63,7 +63,7 @@ Names are slugified: lowercased, spaces and underscores replaced with hyphens, s
 
 ### Saving a request
 
-**Ctrl+S**, or the save icon in the toolbar.
+**Ctrl+S**, or the **Save** button in the request editor toolbar.
 
 - **New request (no file yet):** saved to `{workspace}/requests/{slug}.yaml`. A workspace must be open.
 - **Existing request, same name:** the file is overwritten in place.
@@ -107,7 +107,7 @@ Clear Signal supports multiple request tabs. Each tab maintains independent stat
 
 When more tabs are open than fit in the tab bar, gradient fade indicators appear at the left and right edges. The active tab scrolls into view automatically whenever you switch tabs.
 
-**Quick open (Ctrl+P):** press **Ctrl+P** to open a fuzzy-search modal that lists every request file in the current workspace. Type any part of the name to filter, use the arrow keys to navigate, and press **Enter** (or click) to open. Press **Escape** to dismiss without opening.
+**Quick open (Ctrl+P):** press **Ctrl+P** to open a fuzzy-search modal that lists every request file and scenario in the current workspace. Type any part of the name to filter, use the arrow keys to navigate, and press **Enter** (or click) to open. Press **Escape** to dismiss without opening.
 
 ---
 
@@ -141,7 +141,7 @@ The environment selector appears in the top bar whenever a workspace has at leas
 
 ### Creating or editing an environment
 
-Click the pencil icon next to the environment selector. The environment editor opens as an overlay. Add, edit, or delete variables and click **Save**. The updated environment is selected automatically.
+Click the pencil icon in the status bar (bottom of the window) next to the active environment name. The environment editor opens as an overlay. Add, edit, or delete variables and click **Save**. The updated environment is selected automatically.
 
 ### Using variables in requests
 
@@ -552,7 +552,7 @@ Secrets are injected from environment variables at runtime. No secrets appear in
 
 ## 12. Settings
 
-Open via the gear icon in the toolbar.
+Open via the gear icon at the bottom of the Activity Rail (the icon bar on the far left of the window).
 
 | Setting | Description |
 |---|---|
@@ -651,7 +651,7 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ## 14. Creating files with AI assistance
 
-The **Format Spec** tab in the Help panel (the `?` icon in the toolbar) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
+The **Format Spec** tab in the Help panel (accessible via the `?` icon at the bottom of the Activity Rail) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
 
 ### What the AI prompt does
 
@@ -667,7 +667,7 @@ When you paste the prompt into an AI assistant, it follows a four-step workflow:
 
 ### Workflow
 
-1. Click the `?` icon in the toolbar to open the Help panel.
+1. Click the `?` icon at the bottom of the Activity Rail to open the Help panel.
 2. Switch to the **Format Spec** tab.
 3. Click **Copy AI Prompt** — the spec plus the system prompt is now on your clipboard.
 4. Open ChatGPT, Gemini, or any AI assistant and paste into a new conversation.
@@ -687,9 +687,17 @@ When you paste the prompt into an AI assistant, it follows a four-step workflow:
 | Shortcut | Action |
 |---|---|
 | **Enter** (URL field focused) | Send the current request |
+| **Ctrl+Enter** | Send the current request (when focus is not in a text field) |
 | **Ctrl+N** | New request tab |
-| **Ctrl+S** | Save the current request |
-| **Ctrl+P** | Quick open — fuzzy-search all request files in the workspace |
+| **Ctrl+W** | Close the current tab |
+| **Ctrl+S** | Save the current request or scenario |
+| **Ctrl+Shift+S** | Save all dirty tabs |
+| **Ctrl+Tab** | Switch to the next tab |
+| **Ctrl+Shift+Tab** | Switch to the previous tab |
+| **Ctrl+1** – **Ctrl+9** | Switch directly to tab N |
+| **Ctrl+B** | Toggle sidebar open/closed |
+| **Ctrl+P** | Quick open — fuzzy-search all requests and scenarios |
+| **Ctrl+F** | Search in the response body (when response panel is focused) |
 
 ---
 
@@ -727,7 +735,7 @@ The executor tests use `httptest.NewServer` and require a free port. No external
 
 ### A `{{variable}}` appears literally in the sent request
 
-The variable is not defined in the active environment. Check the environment editor (pencil icon in the top bar) and confirm the variable name matches exactly, including case.
+The variable is not defined in the active environment. Check the environment editor (pencil icon in the status bar) and confirm the variable name matches exactly, including case.
 
 ### The workspace sidebar is empty after opening a workspace
 

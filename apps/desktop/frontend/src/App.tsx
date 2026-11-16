@@ -76,11 +76,15 @@ export default function App() {
     const v = parseInt(localStorage.getItem('ui.sidebarWidth') ?? '')
     return isNaN(v) ? 224 : Math.max(160, Math.min(480, v))
   })
-  const [responseWidth, setResponseWidth] = useState(() => {
-    const v = parseInt(localStorage.getItem('ui.responseWidth') ?? '')
-    return isNaN(v) ? 0 : Math.max(0, v)
+  const [responsePct, setResponsePct] = useState(() => {
+    const v = parseFloat(localStorage.getItem('ui.responsePct') ?? '')
+    return isNaN(v) || v === 0 ? 50 : Math.min(80, Math.max(10, v))
   })
-  const [railTab, setRailTab] = useState<RailTab>('explorer')
+  const [railTab, setRailTab] = useState<RailTab>(() => {
+    const saved = localStorage.getItem('ui.railTab')
+    const valid: RailTab[] = ['explorer', 'scenarios', 'coverage', 'history']
+    return valid.includes(saved as RailTab) ? (saved as RailTab) : 'explorer'
+  })
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })
@@ -88,20 +92,17 @@ export default function App() {
     return localStorage.getItem('ui.railExpanded') === 'true'
   })
 
+  const [appError, setAppError] = useState<string | null>(null)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
   const [responseCollapsed, setResponseCollapsed] = useState(false)
 
   const draggingRef = useRef<'sidebar' | 'response' | null>(null)
   const sidebarWidthRef = useRef(sidebarWidth)
-  const responseWidthRef = useRef(responseWidth)
+  const responsePctRef = useRef(responsePct)
   useEffect(() => { sidebarWidthRef.current = sidebarWidth }, [sidebarWidth])
-  useEffect(() => { responseWidthRef.current = responseWidth }, [responseWidth])
+  useEffect(() => { responsePctRef.current = responsePct }, [responsePct])
 
   function handleRailTabClick(tab: RailTab) {
-    if (tab === 'coverage') {
-      tabs.openCoverageTab()
-      setCoverageRefreshTrigger(t => t + 1)
-    }
     if (tab === railTab && sidebarOpen) {
       setSidebarOpen(false)
       localStorage.setItem('ui.sidebarOpen', 'false')
@@ -163,6 +164,7 @@ export default function App() {
 
   // Run All Scenarios state
   const [runAllState, setRunAllState] = useState<RunAllState | null>(null)
+  const runAllCancelRef = useRef(false)
 
   // Bump after each scenario run to refresh the run log
   const [runLogTrigger, setRunLogTrigger] = useState(0)
@@ -177,13 +179,13 @@ export default function App() {
 
   async function handleExportWorkspace() {
     const err = await exportWorkspace()
-    if (err) alert(err)
+    if (err) setAppError(err)
   }
 
   async function handleImportWorkspace() {
     const scan = await scanWorkspaceImport()
     if (!scan.zipPath) return  // cancelled or error
-    if (scan.error) { alert(scan.error); return }
+    if (scan.error) { setAppError(scan.error); return }
     setPendingImport(scan)
   }
 
@@ -216,7 +218,7 @@ export default function App() {
         setFileClipboard(null)
       }
       await workspace.refreshWorkspace()
-    } catch { /* silent */ }
+    } catch (e) { setAppError(String(e).replace(/^Error: /, '')) }
   }
 
   async function handlePasteToScenarioFolder(relFolderPath: string) {
@@ -237,7 +239,7 @@ export default function App() {
         setFileClipboard(null)
       }
       await workspace.refreshWorkspace()
-    } catch { /* silent */ }
+    } catch (e) { setAppError(String(e).replace(/^Error: /, '')) }
   }
 
   async function handleMoveScenario(srcPath: string, destFolderRelPath: string) {
@@ -254,7 +256,11 @@ export default function App() {
         }))
         await workspace.refreshWorkspace()
       }
-    } catch { /* silent */ }
+    } catch (e) { setAppError(String(e).replace(/^Error: /, '')) }
+  }
+
+  function handleCancelRunAll() {
+    runAllCancelRef.current = true
   }
 
   async function handleRunScenarioFolder(folderPath: string) {
@@ -264,9 +270,11 @@ export default function App() {
       : all.filter(s => s.folder === folderPath || s.folder?.startsWith(folderPath + '/'))
     if (!list.length) return
     const envPath = workspace.activeEnv?.path ?? ''
+    runAllCancelRef.current = false
     setRunAllState({ running: true, done: 0, total: list.length, passed: 0, results: [] })
     let passedCount = 0
     for (const s of list) {
+      if (runAllCancelRef.current) break
       try {
         const r = await runScenario(s.path, envPath)
         if (r.passed) passedCount++
@@ -300,9 +308,11 @@ export default function App() {
     const list = workspace.scenarioList
     if (!list.length) return
     const envPath = workspace.activeEnv?.path ?? ''
+    runAllCancelRef.current = false
     setRunAllState({ running: true, done: 0, total: list.length, passed: 0, results: [] })
     let passedCount = 0
     for (const s of list) {
+      if (runAllCancelRef.current) break
       try {
         const r = await runScenario(s.path, envPath)
         if (r.passed) passedCount++
@@ -345,9 +355,12 @@ export default function App() {
       if (draggingRef.current === 'sidebar') {
         setSidebarWidth(prev => Math.max(160, Math.min(480, prev + e.movementX)))
       } else if (draggingRef.current === 'response') {
-        setResponseWidth(prev => {
-          const current = prev > 0 ? prev : window.innerWidth * 0.45
-          return Math.max(200, Math.min(window.innerWidth - 400, current - e.movementX))
+        setResponsePct(prev => {
+          const availableWidth = window.innerWidth - sidebarWidthRef.current
+          const deltaPct = -(e.movementX / availableWidth) * 100
+          const next = Math.min(80, Math.max(10, prev + deltaPct))
+          responsePctRef.current = next
+          return next
         })
       }
     }
@@ -355,8 +368,7 @@ export default function App() {
       if (draggingRef.current === 'sidebar') {
         localStorage.setItem('ui.sidebarWidth', String(sidebarWidthRef.current))
       } else if (draggingRef.current === 'response') {
-        localStorage.setItem('ui.responseWidth', String(responseWidthRef.current))
-      }
+        localStorage.setItem('ui.responsePct', String(Math.round(responsePctRef.current)))
       draggingRef.current = null
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
@@ -432,7 +444,7 @@ export default function App() {
         return
       }
       const qIdx = raw.indexOf('?')
-      if (qIdx === -1) return
+      if (qIdx <= 0) return  // no '?' or starts with '?' — don't clobber existing URL
       const baseUrl = raw.slice(0, qIdx)
       const search = raw.slice(qIdx + 1)
       const parsed = new URLSearchParams(search)
@@ -640,6 +652,13 @@ export default function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       <MenuBar menus={menus} />
 
+      {appError && (
+        <div className="shrink-0 px-4 py-2 bg-red-500/15 border-b border-red-500/30 flex items-center gap-2 text-sm text-red-400">
+          <span className="flex-1">{appError}</span>
+          <button type="button" onClick={() => setAppError(null)} className="text-red-400/60 hover:text-red-400 transition-colors text-xs">Dismiss</button>
+        </div>
+      )}
+
       {/* Dialogs */}
       {workspace.deletingFilePath && (
         <DeleteRequestDialog
@@ -759,7 +778,9 @@ export default function App() {
       {showQuickOpen && (
         <QuickOpen
           fileTree={workspace.fileTree}
+          scenarios={workspace.scenarioList}
           onSelect={workspace.handleSelectFile}
+          onSelectScenario={(path, name) => tabs.openScenarioAsTab(path, name)}
           onClose={() => setShowQuickOpen(false)}
         />
       )}
@@ -846,6 +867,7 @@ export default function App() {
                     scenarioError={scenarioRenameError}
                     runAllState={runAllState ?? undefined}
                     onRunAllScenarios={handleRunAll}
+                    onCancelRunAll={handleCancelRunAll}
                     onDismissRunAll={() => setRunAllState(null)}
                     runLogTrigger={runLogTrigger}
                     onRunFolder={handleRunFolder}
@@ -853,12 +875,16 @@ export default function App() {
                     folderRunState={folderRunState}
                     onDismissFolderRun={() => setFolderRunState(null)}
                     selectedCoverageSpecFile={selectedCoverageSpecFile}
-                    onSelectCoverageSpec={setSelectedCoverageSpecFile}
+                    onSelectCoverageSpec={specFile => {
+                      setSelectedCoverageSpecFile(specFile)
+                      tabs.openCoverageTab()
+                      setCoverageRefreshTrigger(t => t + 1)
+                    }}
                     clipboard={fileClipboard}
                     onCopyFile={path => setFileClipboard({ op: 'copy', kind: 'request', srcPath: path })}
                     onCutFile={path => setFileClipboard({ op: 'cut', kind: 'request', srcPath: path })}
                     onPasteToRequestFolder={handlePasteToRequestFolder}
-                    onPasteToRequestRoot={() => handlePasteToRequestFolder(`${workspace.workspacePath}\\requests`)}
+                    onPasteToRequestRoot={() => handlePasteToRequestFolder(`${workspace.workspacePath.replace(/\\/g, '/')}/requests`)}
                     onMoveScenario={handleMoveScenario}
                     onCopyScenario={path => setFileClipboard({ op: 'copy', kind: 'scenario', srcPath: path })}
                     onCutScenario={path => setFileClipboard({ op: 'cut', kind: 'scenario', srcPath: path })}
@@ -882,9 +908,9 @@ export default function App() {
                       }
                     }}
                     onDeleteScenarioFolder={async (folderPath) => {
-                      const scenDir = `${workspace.workspacePath}\\scenarios\\`
+                      const scenDir = `${workspace.workspacePath.replace(/\\/g, '/')}/scenarios/`
                       const matchingTabs = tabs.tabs.filter(t =>
-                        t.kind === 'scenario' && (t.scenarioPath ?? '').startsWith(scenDir + folderPath.replace(/\//g, '\\'))
+                        t.kind === 'scenario' && (t.scenarioPath ?? '').replace(/\\/g, '/').startsWith(scenDir + folderPath)
                       )
                       const err = await deleteScenarioFolder(folderPath)
                       if (!err) {
@@ -992,6 +1018,8 @@ export default function App() {
                       scenarioName={t.scenarioName ?? ''}
                       result={t.scenarioResult ?? null}
                       running={t.scenarioRunning ?? false}
+                      isActive={t.id === activeTabId}
+                      saveSignal={t.scenarioSaveSignal}
                       theme={settings.settings.theme}
                       environments={workspace.environments}
                       activeEnvPath={workspace.activeEnv?.path ?? ''}
@@ -1052,8 +1080,8 @@ export default function App() {
                         />
 
                         <div
-                          className={cn('flex flex-col overflow-hidden min-w-0 shrink-0', responseWidth === 0 && 'w-[45%]')}
-                          style={responseWidth > 0 ? { width: responseWidth } : {}}
+                          className="flex flex-col overflow-hidden min-w-0 shrink-0"
+                          style={{ width: `${responsePct}%` }}
                         >
                           <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} onCollapse={() => setResponseCollapsed(true)} />
                         </div>

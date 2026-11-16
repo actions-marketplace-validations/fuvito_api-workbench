@@ -149,3 +149,7 @@ export function SelectEnvironment(arg1) {
 export function ValidateEnvironmentYAML(arg1) {
   return window['go']['main']['WorkspaceService']['ValidateEnvironmentYAML'](arg1);
 }
+
+export function WorkspaceHasSecrets() {
+  return window['go']['main']['WorkspaceService']['WorkspaceHasSecrets']();
+}

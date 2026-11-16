@@ -76,3 +76,5 @@ export function ScanWorkspaceImport():Promise<main.ScanImportResultIO>;
 export function SelectEnvironment(arg1:string):Promise<void>;
 
 export function ValidateEnvironmentYAML(arg1:string):Promise<string>;
+
+export function WorkspaceHasSecrets():Promise<boolean>;

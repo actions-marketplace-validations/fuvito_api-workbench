@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { EnvInfo } from '@/lib/bridge'
 
@@ -25,31 +25,31 @@ export function StatusBar({
   return (
     <footer className="flex items-center gap-2 px-2 h-7 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-card)]">
       <div className="flex items-center gap-1.5 min-w-0 flex-1 text-xs">
-        {environments.length > 0 && (
+        {workspacePath && (
           <>
-            <select
-              value={activeEnv?.path ?? ''}
-              onChange={e => onEnvChange(e.target.value)}
-              className={cn(
-                'bg-transparent border-none outline-none cursor-pointer text-xs max-w-[140px]',
-                activeEnv ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]',
-              )}
-            >
-              <option value="">No environment</option>
-              {environments.map(env => (
-                <option key={env.path} value={env.path}>{env.name}</option>
-              ))}
-            </select>
-            {workspacePath && (
-              <button
-                type="button"
-                onClick={onEditEnv}
-                title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'Create environment'}
-                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors leading-none"
+            {environments.length > 0 && (
+              <select
+                value={activeEnv?.path ?? ''}
+                onChange={e => onEnvChange(e.target.value)}
+                className={cn(
+                  'bg-transparent border-none outline-none cursor-pointer text-xs max-w-[140px]',
+                  activeEnv ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]',
+                )}
               >
-                <Pencil size={10} />
-              </button>
+                <option value="">No environment</option>
+                {environments.map(env => (
+                  <option key={env.path} value={env.path}>{env.name}</option>
+                ))}
+              </select>
             )}
+            <button
+              type="button"
+              onClick={onEditEnv}
+              title={activeEnv ? `Edit environment: ${activeEnv.name}` : 'Create environment'}
+              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors leading-none"
+            >
+              <Pencil size={10} />
+            </button>
             {demoRunning && <span className="w-px h-3 bg-[var(--color-border)]" />}
           </>
         )}
@@ -71,7 +71,7 @@ export function StatusBar({
               title="Stop demo server"
               className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors leading-none"
             >
-              ✕
+              <X size={10} />
             </button>
           </>
         )}

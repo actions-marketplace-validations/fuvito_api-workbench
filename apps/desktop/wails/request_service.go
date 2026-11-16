@@ -173,11 +173,10 @@ func (s *RequestService) Execute(input RequestInput) ResponseOutput {
 	resolved := resolver.InterpolateRequest(req)
 
 	// Per-request cancellable context so CancelRequest() can abort in-flight calls.
+	// Store only the most recent cancel so the Cancel button in the UI works for the
+	// last-sent request; prior in-flight requests run to completion independently.
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
-	if s.cancelLast != nil {
-		s.cancelLast()
-	}
 	s.cancelLast = cancel
 	s.execGen++
 	gen := s.execGen
@@ -263,7 +262,7 @@ func (s *RequestService) ClearHistory() {
 }
 
 func (s *RequestService) recordHistory(input RequestInput, out ResponseOutput) {
-	if s.store == nil || out.Error != "" {
+	if s.store == nil {
 		return
 	}
 	headers := make([]history.Header, len(input.Headers))

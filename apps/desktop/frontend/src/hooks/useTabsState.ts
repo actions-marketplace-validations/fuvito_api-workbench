@@ -213,7 +213,10 @@ export function useTabsState(deps: {
   async function saveTabById(tabId: string): Promise<boolean> {
     const tab = tabsStateRef.current.tabs.find(t => t.id === tabId)
     if (!tab) return false
-    if (tab.kind === 'scenario') return false
+    if (tab.kind === 'scenario') {
+      updateTab(tabId, { scenarioSaveSignal: (tab.scenarioSaveSignal ?? 0) + 1 })
+      return true
+    }
     updateTab(tabId, { saveError: null })
     const name = tab.name?.trim() || tab.url.trim().split('/').filter(Boolean).pop() || 'request'
     try {
@@ -271,12 +274,24 @@ export function useTabsState(deps: {
     const bodyType = (['none', 'json', 'raw', 'form-urlencoded', 'multipart'] as const).includes(entry.bodyType as never)
       ? entry.bodyType as BodyState['type'] : 'none'
     const body: BodyState = { type: bodyType, content: entry.bodyContent ?? '' }
-    const savedKey = computeStateKey(method, entry.url, [], headers, body, { type: 'none' }, null, 0)
+
+    const qIdx = entry.url.indexOf('?')
+    const baseUrl = qIdx >= 0 ? entry.url.slice(0, qIdx) : entry.url
+    const queryParams = qIdx >= 0
+      ? entry.url.slice(qIdx + 1).split('&').filter(Boolean).map(pair => {
+          const eqIdx = pair.indexOf('=')
+          const name = decodeURIComponent(eqIdx >= 0 ? pair.slice(0, eqIdx) : pair)
+          const value = eqIdx >= 0 ? decodeURIComponent(pair.slice(eqIdx + 1)) : ''
+          return { id: crypto.randomUUID(), name, value, enabled: true }
+        })
+      : []
+
+    const savedKey = computeStateKey(method, baseUrl, queryParams, headers, body, { type: 'none' }, null, 0)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       method,
-      url: entry.url,
-      queryParams: [],
+      url: baseUrl,
+      queryParams,
       headers,
       body,
       auth: { type: 'none' },

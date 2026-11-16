@@ -227,7 +227,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             value={step.label}
             onChange={e => onChange({ label: e.target.value })}
             placeholder="Step label"
-            className="flex-1 min-w-0 bg-transparent border-b border-transparent focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-foreground)] font-semibold py-0.5"
+            className="flex-1 min-w-0 bg-transparent border-b border-[var(--color-border)] hover:border-[var(--color-muted-foreground)] focus:border-[var(--color-accent)] outline-none text-xs text-[var(--color-foreground)] font-semibold py-0.5 transition-colors"
           />
           <div className="flex items-center shrink-0">
             <button

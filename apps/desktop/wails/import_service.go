@@ -124,6 +124,9 @@ func (s *ImportService) saveImportedRequests(collectionName string, requests []i
 			filename = "request"
 		}
 		savePath := filepath.Join(destDir, filename+".yaml")
+		if _, err := os.Stat(savePath); err == nil {
+			savePath = findNonConflictingPath(savePath)
+		}
 
 		if err := atomicWrite(savePath, yamlData); err != nil {
 			result.Skipped++

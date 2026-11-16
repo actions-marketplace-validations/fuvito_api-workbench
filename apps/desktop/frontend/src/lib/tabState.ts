@@ -29,6 +29,7 @@ export type TabState = {
   scenarioResult?: ScenarioResult | null
   scenarioRunning?: boolean
   scenarioDirty?: boolean
+  scenarioSaveSignal?: number
   // coverage tab fields
   coverageSpecFile?: string | null
 }

@@ -1062,7 +1062,13 @@ func (s *ScenarioService) ListAccumulatedCoverage() []AccumulatedCoverageIO {
 // Returns the raw bytes and a format hint ("yaml" or "json").
 func loadSpecBytes(specRef, scenarioDir string) (data []byte, format string, err error) {
 	if strings.HasPrefix(specRef, "http://") || strings.HasPrefix(specRef, "https://") {
-		resp, httpErr := http.Get(specRef) //nolint:noctx
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, specRef, nil)
+		if reqErr != nil {
+			return nil, "", reqErr
+		}
+		resp, httpErr := http.DefaultClient.Do(req)
 		if httpErr != nil {
 			return nil, "", httpErr
 		}

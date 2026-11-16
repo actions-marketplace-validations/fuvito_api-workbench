@@ -45,10 +45,11 @@ export function FolderRunResults({ state, onSelectFile, onDismiss }: {
   )
 }
 
-export function RunAllResults({ state, onSelectScenario, onDismiss }: {
+export function RunAllResults({ state, onSelectScenario, onDismiss, onCancel }: {
   state: RunAllState
   onSelectScenario?: (path: string, name: string) => void
   onDismiss?: () => void
+  onCancel?: () => void
 }) {
   return (
     <div className="mx-2 mt-2 mb-1 rounded border border-[var(--color-border)] bg-[var(--color-muted)] text-xs overflow-hidden">
@@ -58,6 +59,9 @@ export function RunAllResults({ state, onSelectScenario, onDismiss }: {
             ? <span className="flex items-center gap-1.5"><Loader2 size={10} className="animate-spin" /> Running {state.done + 1}/{state.total}…</span>
             : `${state.passed}/${state.total} passed`}
         </span>
+        {state.running && onCancel && (
+          <button type="button" onClick={onCancel} className="text-amber-400 hover:text-amber-300 text-[10px] font-medium transition-colors">Stop</button>
+        )}
         {!state.running && onDismiss && (
           <button type="button" onClick={onDismiss} className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
             <X size={10} />
