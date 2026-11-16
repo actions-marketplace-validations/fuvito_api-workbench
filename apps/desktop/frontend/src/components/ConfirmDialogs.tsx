@@ -367,6 +367,68 @@ export function ExportSecretsWarningDialog({
   )
 }
 
+export function NewScenarioFromResponseDialog({
+  defaultName,
+  value,
+  onChange,
+  onCancel,
+  onConfirm,
+}: {
+  defaultName: string
+  value: string
+  onChange: (v: string) => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg p-5 w-80 shadow-2xl flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-foreground)]">New scenario from request</h3>
+          <p className="text-xs text-[var(--color-muted-foreground)] mt-0.5">
+            Creates a new scenario with this request as its first step.
+          </p>
+        </div>
+        <input
+          autoFocus
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && value.trim()) onConfirm()
+            if (e.key === 'Escape') onCancel()
+          }}
+          placeholder={defaultName}
+          className={cn(inputCls, 'w-full px-3 py-1.5')}
+        />
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 text-xs rounded bg-[var(--color-muted)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!value.trim()}
+            className="px-3 py-1 text-xs rounded bg-[var(--color-accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CloseDirtyTabDialog({
   tabName,
   onCancel,

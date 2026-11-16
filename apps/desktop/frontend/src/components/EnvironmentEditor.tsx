@@ -18,6 +18,7 @@ type Props = {
   onClose: () => void
   onSaved: (env: EnvInfo) => void
   onDeleted: () => void
+  prefilledVarName?: string
 }
 
 function envToYAML(name: string, variables: EnvVar[]): string {
@@ -39,7 +40,7 @@ function yamlScalar(s: string): string {
   return s
 }
 
-export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, onDeleted }: Props) {
+export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, onDeleted, prefilledVarName }: Props) {
   const [mode, setMode] = useState<'form' | 'yaml'>('form')
   const [name, setName] = useState('')
   const [variables, setVariables] = useState<EnvVar[]>([])
@@ -59,7 +60,9 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
     setMode('form')
     if (!envPath) {
       setName('')
-      setVariables([])
+      setVariables(prefilledVarName
+        ? [{ id: crypto.randomUUID(), name: prefilledVarName, value: '', secret: false }]
+        : [])
       setYamlText('')
       setError('')
       return
@@ -69,11 +72,16 @@ export function EnvironmentEditor({ envPath, workspacePath, onClose, onSaved, on
     getEnvironment(envPath)
       .then(env => {
         setName(env.name)
-        setVariables(env.variables.map(v => ({ id: crypto.randomUUID(), ...v })))
+        const vars = env.variables.map(v => ({ id: crypto.randomUUID(), ...v }))
+        if (prefilledVarName && !vars.some(v => v.name === prefilledVarName)) {
+          setVariables([...vars, { id: crypto.randomUUID(), name: prefilledVarName, value: '', secret: false }])
+        } else {
+          setVariables(vars)
+        }
       })
       .catch(err => setError(String(err)))
       .finally(() => setLoading(false))
-  }, [envPath])
+  }, [envPath, prefilledVarName])
   /* eslint-enable react/set-state-in-effect */
 
   async function handleCheckYaml() {

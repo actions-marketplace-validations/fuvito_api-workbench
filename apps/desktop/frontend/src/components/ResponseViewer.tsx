@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Search, X, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2, GitCompare, ChevronRight } from 'lucide-react'
+import { Search, X, Copy, Check, AlignLeft, Code2, ExternalLink, Trash2, GitCompare, ChevronRight, ListPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { statusColor, formatSize, prettyBody } from '@/lib/httpUtils'
 import { openInSystemViewer } from '@/lib/bridge'
@@ -73,9 +73,10 @@ type ResponseViewerProps = {
   cachedAt?: string | null
   onClear?: () => void
   onCollapse?: () => void
+  onAddToScenario?: () => void
 }
 
-export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear, onCollapse }: ResponseViewerProps) {
+export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear, onCollapse, onAddToScenario }: ResponseViewerProps) {
   const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -252,6 +253,17 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
             >
               <ExternalLink size={12} />
             </button>
+            {onAddToScenario && (
+              <button
+                type="button"
+                onClick={onAddToScenario}
+                title="New scenario from this request"
+                aria-label="New scenario from this request"
+                className="p-1 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+              >
+                <ListPlus size={12} />
+              </button>
+            )}
             {onClear && (
               <button
                 type="button"

@@ -28,12 +28,13 @@ import {
   ImportFromURLDialog,
   NewFolderDialog,
   ExportSecretsWarningDialog,
+  NewScenarioFromResponseDialog,
 } from '@/components/ConfirmDialogs'
 import {useTabsState} from '@/hooks/useTabsState'
 import {useWorkspace} from '@/hooks/useWorkspace'
 import {useSettings} from '@/hooks/useSettings'
 import {useDemo} from '@/hooks/useDemo'
-import type {ScanImportResult} from '@/lib/bridge'
+import type {ScanImportResult, HistoryEntry, ScenarioDetail} from '@/lib/bridge'
 import {
   cancelRequest,
   clearResponseCache,
@@ -58,6 +59,7 @@ import {
   runScenario,
   saveContentToFile,
   saveResponseCache,
+  saveScenarioRaw,
   saveScenarioResult,
   scanWorkspaceImport,
   selectEnvironment,
@@ -67,6 +69,7 @@ import {
 import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
 import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
+import {serializeScenarioToYAML} from '@/components/scenario-yaml'
 import {isTabDirty} from '@/lib/tabState'
 
 export default function App() {
@@ -200,6 +203,13 @@ export default function App() {
   // Workspace export / import
   const [pendingImport, setPendingImport] = useState<ScanImportResult | null>(null)
   const [showExportSecretsWarning, setShowExportSecretsWarning] = useState(false)
+
+  // New scenario from response dialog
+  const [pendingAddToScenario, setPendingAddToScenario] = useState<{ defaultName: string } | null>(null)
+  const [newScenarioName, setNewScenarioName] = useState('')
+
+  // Prefilled variable name for inline env creation
+  const [prefilledVarName, setPrefilledVarName] = useState<string | null>(null)
 
   async function handleExportWorkspace() {
     const hasSecrets = await workspaceHasSecrets()
@@ -464,6 +474,67 @@ export default function App() {
     cancelRequest().catch(() => {})
   }
 
+  function handleRerunHistory(entry: HistoryEntry) {
+    tabs.handleSelectHistory(entry)
+    setTimeout(() => handleSendRef.current?.(), 0)
+  }
+
+  function openAddToScenarioDialog() {
+    const { activeTab } = tabs
+    if (!activeTab.response || activeTab.response.error || !workspace.workspacePath) return
+    const urlPart = activeTab.url.replace(/^https?:\/\//, '').split('?')[0]
+      .split('/').filter(Boolean).pop() ?? 'request'
+    const defaultName = `${activeTab.method.toLowerCase()}-${urlPart}`.slice(0, 40)
+    setNewScenarioName(defaultName)
+    setPendingAddToScenario({ defaultName })
+  }
+
+  async function confirmAddToScenario() {
+    const name = newScenarioName.trim()
+    if (!name) return
+    setPendingAddToScenario(null)
+    const { activeTab } = tabs
+    if (!activeTab.response || !workspace.workspacePath) return
+    const stepLabel = `${activeTab.method} ${activeTab.url}`.slice(0, 60)
+    const scenario: ScenarioDetail = {
+      path: '',
+      title: name,
+      description: '',
+      steps: [{
+        label: stepLabel,
+        method: activeTab.method,
+        url: activeTab.url,
+        headers: activeTab.headers.filter(h => h.enabled && h.name.trim()).map(h => ({ name: h.name, value: h.value })),
+        queryParams: activeTab.queryParams.filter(p => p.enabled && p.name.trim()).map(p => ({ name: p.name, value: p.value })),
+        bodyType: activeTab.body.type !== 'none' ? activeTab.body.type : undefined,
+        bodyContent: activeTab.body.type !== 'none' ? activeTab.body.content : undefined,
+        assertions: [{ type: 'status', operator: 'eq', expected: activeTab.response.statusCode }],
+        extractions: [],
+      }],
+    }
+    const yaml = serializeScenarioToYAML(scenario)
+    try {
+      const result = await createScenario(name, '')
+      if (result.error || !result.path) { setAppError(result.error ?? 'Failed to create scenario'); return }
+      const saveErr = await saveScenarioRaw(result.path, yaml)
+      if (saveErr) { setAppError(saveErr); return }
+      await workspace.refreshWorkspace()
+      tabs.openScenarioAsTab(result.path, name)
+      setRailTab('scenarios')
+      setSidebarOpen(true)
+      localStorage.setItem('ui.railTab', 'scenarios')
+      localStorage.setItem('ui.sidebarOpen', 'true')
+    } catch (e) {
+      setAppError(String(e).replace(/^Error: /, ''))
+    }
+  }
+
+  function handleCreateVariableFromHint(name: string) {
+    setPrefilledVarName(name)
+    setEditingEnvPath(workspace.activeEnv?.path ?? null)
+    setShowEnvEditor(true)
+  }
+
   function handleUrlPaste(raw: string) {
     const { activeTabId, activeTab, updateTab } = tabs
     try {
@@ -703,6 +774,15 @@ export default function App() {
           onConfirm={doExportWorkspace}
         />
       )}
+      {pendingAddToScenario && (
+        <NewScenarioFromResponseDialog
+          defaultName={pendingAddToScenario.defaultName}
+          value={newScenarioName}
+          onChange={setNewScenarioName}
+          onCancel={() => setPendingAddToScenario(null)}
+          onConfirm={confirmAddToScenario}
+        />
+      )}
       {workspace.deletingFilePath && (
         <DeleteRequestDialog
           filePath={workspace.deletingFilePath}
@@ -842,15 +922,18 @@ export default function App() {
         <EnvironmentEditor
           envPath={editingEnvPath}
           workspacePath={workspace.workspacePath}
-          onClose={() => setShowEnvEditor(false)}
+          prefilledVarName={prefilledVarName ?? undefined}
+          onClose={() => { setShowEnvEditor(false); setPrefilledVarName(null) }}
           onSaved={async saved => {
             setShowEnvEditor(false)
+            setPrefilledVarName(null)
             await workspace.refreshWorkspace()
             try { await selectEnvironment(saved.path) } catch { /* best-effort */ }
             await workspace.refreshWorkspace()
           }}
           onDeleted={async () => {
             setShowEnvEditor(false)
+            setPrefilledVarName(null)
             await workspace.refreshWorkspace()
           }}
         />
@@ -894,6 +977,7 @@ export default function App() {
                     onRenameFolder={workspace.handleRenameFolder}
                     onMoveFile={workspace.handleMoveFile}
                     onSelectHistory={tabs.handleSelectHistory}
+                    onRerun={handleRerunHistory}
                     onClearHistory={workspace.handleClearHistory}
                     onImportOpenAPI={workspace.handleImportOpenAPI}
                     onImportPostman={workspace.handleImportPostman}
@@ -1102,6 +1186,7 @@ export default function App() {
                         envVarMap={workspace.envVarMap}
                         onSend={handleSend}
                         onCancel={handleCancel}
+                        onCreateVariable={handleCreateVariableFromHint}
                       />
                     </div>
 
@@ -1129,7 +1214,7 @@ export default function App() {
                           className="flex flex-col overflow-hidden min-w-0 shrink-0"
                           style={{ width: `${responsePct}%` }}
                         >
-                          <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} onCollapse={() => setResponseCollapsed(true)} />
+                          <ResponseViewer response={activeTab.response} previousResponse={activeTab.previousResponse} loading={activeTab.loading} cachedAt={activeTab.responseCachedAt} onClear={handleClearResponse} onCollapse={() => setResponseCollapsed(true)} onAddToScenario={workspace.workspacePath ? openAddToScenarioDialog : undefined} />
                         </div>
                       </>
                     )}

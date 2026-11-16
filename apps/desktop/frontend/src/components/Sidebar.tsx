@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { METHOD_BADGE, statusColor } from '@/lib/httpUtils'
 import { WorkspacePanel } from '@/components/WorkspacePanel'
@@ -10,6 +10,33 @@ import type { HistoryEntry, FileNode, ScenarioInfo } from '@/lib/bridge'
 import type { FileClipboard, RunAllEntry, RunAllState, FolderRunState } from '@/types'
 
 export type { RunAllEntry, RunAllState, FolderRunState }
+
+function groupHistoryByDate(entries: HistoryEntry[]): Array<{ label: string; entries: HistoryEntry[] }> {
+  const now = new Date()
+  const todayStr = now.toDateString()
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const yesterdayStr = yesterday.toDateString()
+  const groups: Map<string, HistoryEntry[]> = new Map()
+  for (const entry of entries) {
+    const d = new Date(entry.executedAt)
+    let label: string
+    if (d.toDateString() === todayStr) {
+      label = 'Today'
+    } else if (d.toDateString() === yesterdayStr) {
+      label = 'Yesterday'
+    } else {
+      label = d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+      })
+    }
+    if (!groups.has(label)) groups.set(label, [])
+    groups.get(label)!.push(entry)
+  }
+  return [...groups.entries()].map(([label, grpEntries]) => ({ label, entries: grpEntries }))
+}
 
 export type SidebarProps = {
   tab: RailTab
@@ -29,6 +56,7 @@ export type SidebarProps = {
   onRenameFolder: (path: string, newName: string) => void
   onMoveFile: (srcPath: string, destDir: string) => void
   onSelectHistory: (entry: HistoryEntry) => void
+  onRerun?: (entry: HistoryEntry) => void
   onClearHistory: () => void
   onImportOpenAPI: () => void
   onImportPostman?: () => void
@@ -78,7 +106,7 @@ export function Sidebar({
   onOpenWorkspace, onNewWorkspace,
   onSelectFile, onDeleteFile, onDuplicateFile, onDeleteFolder, onNewRequestInFolder, onCreateFolder,
   onRenameFile, onRenameFolder, onMoveFile,
-  onSelectHistory, onClearHistory,
+  onSelectHistory, onRerun, onClearHistory,
   onImportOpenAPI, onImportPostman, onImportInsomnia, onTryDemo, demoStarting, onRefresh, importing, importError,
   activeFilePath, dirtyFilePaths,
   onSelectScenario, onNewScenario, onNewScenarioFile,
@@ -212,37 +240,52 @@ export function Sidebar({
                 Restores method, URL, headers, and body · auth not stored
               </p>
             )}
-            {history.length > 0 && (
-              <ul>
-                {history.map(entry => (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelectHistory(entry)}
-                      className={cn(
-                        'w-full text-left px-3 py-2 flex flex-col gap-0.5',
-                        'hover:bg-[var(--color-muted)] transition-colors border-b border-[var(--color-border)]',
+            {history.length > 0 && groupHistoryByDate(history).map(group => (
+              <div key={group.label}>
+                <p className="sticky top-0 px-3 py-0.5 text-[9px] uppercase tracking-wider font-semibold text-[var(--color-muted-foreground)] opacity-60 border-b border-[var(--color-border)] bg-[var(--color-card)]">
+                  {group.label}
+                </p>
+                <ul>
+                  {group.entries.map(entry => (
+                    <li key={entry.id} className="group flex items-stretch border-b border-[var(--color-border)]">
+                      <button
+                        type="button"
+                        onClick={() => onSelectHistory(entry)}
+                        className={cn(
+                          'flex-1 text-left px-3 py-2 flex flex-col gap-0.5 min-w-0',
+                          'hover:bg-[var(--color-muted)] transition-colors',
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn('text-[10px] font-mono font-bold shrink-0', METHOD_BADGE[entry.method] ?? 'text-[var(--color-foreground)]')}>
+                            {entry.method}
+                          </span>
+                          <span className={cn('text-[10px] font-mono', statusColor(entry.statusCode))}>
+                            {entry.statusCode || '—'}
+                          </span>
+                          <span className="ml-auto text-[10px] text-[var(--color-muted-foreground)] shrink-0">
+                            {entry.durationMs}ms
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-[var(--color-muted-foreground)] truncate font-mono w-full">
+                          {entry.url}
+                        </span>
+                      </button>
+                      {onRerun && (
+                        <button
+                          type="button"
+                          onClick={() => onRerun(entry)}
+                          title="Re-run this request"
+                          className="shrink-0 w-7 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+                        >
+                          <RotateCcw size={10} />
+                        </button>
                       )}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn('text-[10px] font-mono font-bold shrink-0', METHOD_BADGE[entry.method] ?? 'text-[var(--color-foreground)]')}>
-                          {entry.method}
-                        </span>
-                        <span className={cn('text-[10px] font-mono', statusColor(entry.statusCode))}>
-                          {entry.statusCode || '—'}
-                        </span>
-                        <span className="ml-auto text-[10px] text-[var(--color-muted-foreground)] shrink-0">
-                          {entry.durationMs}ms
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[var(--color-muted-foreground)] truncate font-mono w-full">
-                        {entry.url}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       )}
