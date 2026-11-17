@@ -30,13 +30,13 @@ async function openBuilder(page: Page, theme: 'dark' | 'light') {
   )
   await gotoApp(page)
   await page.getByRole('button', { name: 'CLI Command Builder' }).click()
-  await page.getByLabel('Choose Scenario from the workspace').selectOption('/workspace/scenarios/user-lifecycle.yaml')
+  await page.getByLabel('Choose Scenario or folder from the workspace').selectOption('/workspace/scenarios')
   await page.getByLabel('Choose Environment from the workspace').selectOption('/workspace/environments/ci.yaml')
   await page.getByLabel('Coverage report').check()
   await page.getByLabel('Report format').selectOption('html')
-  await page.getByRole('button', { name: 'Use reports/run-user-lifecycle.html' }).click()
+  await page.getByRole('button', { name: 'Use reports/run-scenarios.html' }).click()
   await page.getByText('Set these where the command runs').waitFor({ timeout: 5_000 })
-  await page.getByTestId('cli-command').filter({ hasText: '--output reports/run-user-lifecycle.html' }).waitFor({ timeout: 5_000 })
+  await page.getByTestId('cli-command').filter({ hasText: '--output reports/run-scenarios.html' }).waitFor({ timeout: 5_000 })
   await page.getByText(/printed to the screen/).waitFor({ state: 'detached', timeout: 5_000 })
 }
 
@@ -61,7 +61,7 @@ for (const theme of ['dark', 'light'] as const) {
     await gotoApp(page)
     await page.getByRole('button', { name: 'CLI Command Builder' }).click()
     await page.getByLabel('Coverage report').check()
-    await page.getByText('Scenario is required').waitFor({ timeout: 5_000 })
+    await page.getByText('Scenario or folder is required').waitFor({ timeout: 5_000 })
     await page.screenshot({ path: shot(`14-cli-builder-problems${suffix}.png`), animations: 'disabled' })
   })
 }

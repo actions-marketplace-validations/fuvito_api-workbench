@@ -14,7 +14,7 @@ inputs:
 
   # --- run / validate ---
   scenario:
-    description: 'Path to scenario file (run, validate)'
+    description: 'Path to a scenario file, or for run a folder of scenarios (run, validate)'
     required: false
 
   # --- conform ---

@@ -485,7 +485,7 @@ You do not have to assemble a command by hand. The **CLI Command Builder** is a 
 
 **Open it** from the terminal icon (**CLI Command Builder**) near the bottom of the Activity Rail, or from the terminal button in a scenario's header bar, which opens it with that scenario already chosen.
 
-1. **Pick what you want to do** — run a scenario, check an API against its OpenAPI spec, or detect breaking changes between two specs.
+1. **Pick what you want to do** — run scenarios (one file or a whole folder), check an API against its OpenAPI spec, or detect breaking changes between two specs.
 2. **Fill in the fields.** Each one says in plain words what it is and what is expected. Choose files from the **Workspace…** list (it shows the scenarios, environments and OpenAPI documents found in your workspace), browse for any other file, or type a path or web address. Less common options are under **More options**.
 3. **Read the result** on the right: the command, a list of anything to fix, and an explanation.
 4. **Copy** it into your terminal or CI pipeline. **Copy** stays disabled while there is a problem to fix.
@@ -495,6 +495,7 @@ What the builder does for you:
 - **Relative paths, written for where you run the command.** Paths in the command are relative to the **Run from folder** (by default your repository root, found by looking for `.git`). That is why a command copied from here works the same on your machine and on a CI runner that checks out the repository. A path outside that folder is written as an absolute path, with a warning that it will not exist on another machine.
 - **The right shell.** Choose **bash**, **PowerShell** or **cmd**; the quoting and line continuation are adjusted for each. **One line** switches off the line breaks.
 - **Checks with the real parsers.** The scenario, environment and spec you pick are opened the same way the CLI opens them, so you see "valid, 4 steps", the OpenAPI title and number of operations, or the exact problem, before anything runs.
+- **Files or whole folders.** For **Scenario or folder**, pick one scenario, or a folder (the list starts with the workspace's scenario folders and how many scenarios each holds). The builder shows what the CLI will find — "3 scenarios found in scenarios and its sub-folders, all valid; 1 other file skipped" — and names any broken scenario, because a broken one would stop the run. **Stop at the first failing scenario** and **Do not search sub-folders** are under More options.
 - **Missing pieces.** It warns when a scenario uses a `{{variable}}` that the environment does not define, and when `--coverage` or `--workspace` has no spec to work with (a `specFile:` inside the scenario counts).
 - **Variables to set in CI.** If your environment file reads values such as `${API_TOKEN}`, the builder lists them under **Set these where the command runs** and marks the secret ones. Secret values are never shown or stored.
 - **Report format and file name.** Choose `text`, `json`, `junit` or `html`. For a non-text format, the builder suggests a file such as `reports/run-user-lifecycle.html`; click **Use …** to take it. It tells you when a file will be overwritten or a folder created. See [Output formats](#output-formats).
@@ -512,14 +513,28 @@ go run ./apps/cli run <scenario-file>
 
 ### `clrsig run`
 
-Executes a scenario file and prints results.
+Runs scenario files and prints the results. Give it one file, several, or a folder.
 
 ```bash
 clrsig run ./scenarios/user-lifecycle.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --env ./environments/dev.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --format json
 clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --workspace .
+
+# every scenario in a folder and its sub-folders
+clrsig run ./scenarios --env ./environments/ci.yaml
 ```
+
+#### Running many scenarios
+
+- **A folder runs everything inside it**, including sub-folders. Add `--no-recursive` to look only at the folder itself.
+- **Several arguments** work too (`clrsig run a.yaml b.yaml ./more`); a scenario named twice runs once. Scenarios run one after another in path order.
+- **Other files are skipped, not run.** Environment, request and spec files in the same folder are not scenarios; they are listed in a note, never counted as failures. A file you name directly is always treated as a scenario.
+- **Nothing runs if anything is broken.** All scenarios are read first. If one cannot be read or parsed, the command stops with exit code `2` and names the file, before a single request is sent. A folder with no scenarios is also an error.
+- **One combined report and one exit code.** The text report shows each scenario and then `Run PASSED 2/3 scenarios passed …`. `junit` has one test suite per scenario, `html` one section per scenario, and `json` a `scenarios` list. With `--coverage`, coverage is combined per spec, and `--workspace` records every scenario's run.
+- **`--fail-fast`** stops after the first scenario that fails; the rest are listed as not run.
+- The options `--env`, `--spec`, `--coverage`, `--workspace` and `--timeout` apply to every scenario. A scenario's own `specFile:` is still relative to that scenario file.
+- **One file** behaves exactly as before: the same report and the same exit codes.
 
 | Flag | Default | Description |
 |---|---|---|
@@ -530,14 +545,16 @@ clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --work
 | `--coverage` | off | Report which spec operations the scenario exercised (needs a spec). |
 | `--workspace`, `-w` | (none) | Accumulate coverage into this workspace, so it appears on the Contracts page. |
 | `--timeout` | `0` | Global step timeout in milliseconds; overrides per-step values. `0` uses the per-step value. |
+| `--fail-fast` | off | With several scenarios, stop after the first one that fails. |
+| `--no-recursive` | off | With a folder, only run the scenarios directly inside it, not in its sub-folders. |
 
 ### Exit codes
 
 | Code | Meaning |
 |---|---|
-| `0` | All steps passed all assertions. |
-| `1` | One or more assertions failed. |
-| `2` | A network, parse, or configuration error occurred. |
+| `0` | All steps passed all assertions (in every scenario, when running several). |
+| `1` | One or more assertions failed (in any scenario). |
+| `2` | A network, parse, or configuration error occurred. When running several scenarios this includes a scenario that cannot be read (nothing runs) and a folder with no scenarios. |
 
 ### Output formats
 
@@ -553,6 +570,7 @@ Report commands choose their format with `--format` (`-f`) and print to the scre
 ```bash
 clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml -f junit -o reports/run.xml
 clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml -f html  -o reports/run.html
+clrsig run scenarios --env environments/ci.yaml -f junit -o reports/all.xml   # a whole folder, one report
 ```
 
 The HTML report is one self-contained file (no external scripts, fonts or images), follows your light or dark system theme, and prints cleanly. It shows the same results as the text report — pass/fail per step, assertions, violations, coverage — but leaves out **extracted variable values**, so a token pulled from a login response does not end up in a file you share. To produce several formats from one run, run the command once per format.

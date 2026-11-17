@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/fuvito/api-workbench/packages/core/clibuild"
 	"github.com/fuvito/api-workbench/packages/core/clispec"
+	"github.com/fuvito/api-workbench/packages/core/scenario"
 )
 
 // CliBuilderService backs the CLI Command Builder page. It describes the clrsig commands,
@@ -66,11 +68,14 @@ type CliFileIO struct {
 }
 
 type CliContextIO struct {
-	Workspace    string      `json:"workspace"`
-	RunFrom      string      `json:"runFrom"`
-	Scenarios    []CliFileIO `json:"scenarios"`
-	Environments []CliFileIO `json:"environments"`
-	Specs        []CliFileIO `json:"specs"`
+	Workspace string      `json:"workspace"`
+	RunFrom   string      `json:"runFrom"`
+	Scenarios []CliFileIO `json:"scenarios"`
+	// ScenarioFolders are the folders a run can be pointed at, each with how many scenarios
+	// it holds (sub-folders included).
+	ScenarioFolders []CliFileIO `json:"scenarioFolders"`
+	Environments    []CliFileIO `json:"environments"`
+	Specs           []CliFileIO `json:"specs"`
 }
 
 type CliBuildInput struct {
@@ -156,12 +161,13 @@ func (s *CliBuilderService) GetCliCatalog() []CliCommandIO {
 // are best run from.
 func (s *CliBuilderService) GetCliContext() CliContextIO {
 	ws := s.ws.GetWorkspacePath()
-	ctx := CliContextIO{Workspace: ws, Scenarios: []CliFileIO{}, Environments: []CliFileIO{}, Specs: []CliFileIO{}}
+	ctx := CliContextIO{Workspace: ws, Scenarios: []CliFileIO{}, ScenarioFolders: []CliFileIO{}, Environments: []CliFileIO{}, Specs: []CliFileIO{}}
 	if ws == "" {
 		return ctx
 	}
 	ctx.RunFrom = clibuild.DefaultRunFrom(ws)
 	ctx.Scenarios = listFiles(ws, "scenarios")
+	ctx.ScenarioFolders = scenarioFolders(ws)
 	ctx.Environments = listFiles(ws, "environments")
 	ctx.Specs = findSpecs(ws)
 	return ctx
@@ -245,6 +251,35 @@ func nonNil[T any](s []T) []T {
 		return []T{}
 	}
 	return s
+}
+
+// scenarioFolders lists the workspace's scenarios folder and each folder below it that holds
+// scenarios, with the number of scenarios a run of that folder would execute.
+func scenarioFolders(workspace string) []CliFileIO {
+	const maxFolders = 40
+	out := []CliFileIO{}
+	root := filepath.Join(workspace, "scenarios")
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() || len(out) >= maxFolders {
+			return nil
+		}
+		if path != root && strings.HasPrefix(d.Name(), ".") {
+			return fs.SkipDir
+		}
+		found, err := scenario.Discover([]string{path}, true)
+		if err != nil || len(found.Files) == 0 {
+			return nil
+		}
+		n := len(found.Files)
+		label := relLabel(workspace, path) + "/"
+		noun := "scenarios"
+		if n == 1 {
+			noun = "scenario"
+		}
+		out = append(out, CliFileIO{Path: path, Label: fmt.Sprintf("%s — %d %s", label, n, noun)})
+		return nil
+	})
+	return out
 }
 
 var dataExts = map[string]bool{".yaml": true, ".yml": true, ".json": true}

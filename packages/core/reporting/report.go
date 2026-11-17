@@ -585,27 +585,7 @@ func TextWithCoverage(result *scenario.Result, cov *openapi.ScenarioCoverageResu
 	if cov == nil {
 		return base
 	}
-	var b strings.Builder
-	b.WriteString(base)
-	b.WriteByte('\n')
-	fmt.Fprintf(&b, "Spec coverage: %d / %d operations (%.0f%%)\n", cov.Covered, cov.Total, cov.Percent)
-	exercised := sortedCovOps(cov.Exercised)
-	missed := sortedCovOps(cov.Missed)
-	if len(exercised) > 0 {
-		b.WriteByte('\n')
-		fmt.Fprintln(&b, "Covered:")
-		for _, op := range exercised {
-			fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
-		}
-	}
-	if len(missed) > 0 {
-		b.WriteByte('\n')
-		fmt.Fprintln(&b, "Not covered:")
-		for _, op := range missed {
-			fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
-		}
-	}
-	return b.String()
+	return base + "\n" + CoverageText(cov, "")
 }
 
 func sortedCovOps(ops []openapi.CoveredOperation) []openapi.CoveredOperation {
@@ -631,20 +611,7 @@ func JSONWithCoverage(result *scenario.Result, cov *openapi.ScenarioCoverageResu
 	if err := json.Unmarshal(b, &report); err != nil {
 		return b, nil // shouldn't happen; return plain report
 	}
-	jc := &JSONScenarioCoverage{
-		Total:     cov.Total,
-		Covered:   cov.Covered,
-		Percent:   cov.Percent,
-		Exercised: make([]JSONCoverageOp, 0, len(cov.Exercised)),
-		Missed:    make([]JSONCoverageOp, 0, len(cov.Missed)),
-	}
-	for _, op := range sortedCovOps(cov.Exercised) {
-		jc.Exercised = append(jc.Exercised, JSONCoverageOp{Method: op.Method, Path: op.Path})
-	}
-	for _, op := range sortedCovOps(cov.Missed) {
-		jc.Missed = append(jc.Missed, JSONCoverageOp{Method: op.Method, Path: op.Path})
-	}
-	report.Coverage = jc
+	report.Coverage = jsonCoverage(cov)
 	return json.MarshalIndent(report, "", "  ")
 }
 

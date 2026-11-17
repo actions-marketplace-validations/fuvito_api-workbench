@@ -518,7 +518,7 @@ export async function importBundle(text: string, specFile: string, strategy: Bun
 
 // ---- CLI Command Builder ----
 
-export type CliInputKind = 'file' | 'fileOrURL' | 'dir' | 'outputFile' | 'url' | 'enum' | 'int' | 'bool' | 'string'
+export type CliInputKind = 'file' | 'fileOrURL' | 'dir' | 'path' | 'outputFile' | 'url' | 'enum' | 'int' | 'bool' | 'string'
 
 export interface CliInput {
   name: string
@@ -561,6 +561,7 @@ export interface CliContext {
   workspace: string
   runFrom: string
   scenarios: CliFile[]
+  scenarioFolders: CliFile[]
   environments: CliFile[]
   specs: CliFile[]
 }

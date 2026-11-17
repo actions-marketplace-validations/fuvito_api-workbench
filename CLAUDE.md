@@ -390,3 +390,10 @@ Do not implement or stub any of these without explicit user direction.
 - **Test debt cleared:** the four Playwright "Run All" tests (stale since Run All results moved from the sidebar to the Runner tab) now assert on the Run Results tab; the whole frontend e2e project passes (135 tests).
 - **Not yet (later phases):** "Test it here" (run the command from the desktop), shipping the CLI with the app, `bundle run`/`impact`/`coverage`/`generate`/`request`/`validate`, Docker and GitHub Action targets, multi-step pipeline snippets.
 
+### 2026-11-17 — Run scenarios from folders (design: `docs/enhancements/2026-11-17-run-scenarios-from-folders.md`)
+
+- **CLI:** `clrsig run <file-or-folder>...` runs one or many scenarios. A folder is searched recursively (`--no-recursive` to opt out); `--fail-fast` stops after the first failing scenario. All scenarios are parsed before any request is sent (unreadable file or empty folder → exit 2); one combined report and one exit code for several scenarios; a single file is unchanged. `run` moved to `apps/cli/run.go` (load → execute → report).
+- **Core:** `scenario.Discover` (files taken as given; scanned files need a top-level `steps` key, others are skipped and listed; hidden folders and `node_modules` skipped; de-duplicated, sorted). `reporting.MergeCoverage`, `CoverageText`, `TextMulti`, `JSONMulti`; `HTMLMulti` accepts coverage. `TextWithCoverage` and `JSONWithCoverage` now share those helpers (output unchanged).
+- **Builder:** `run`'s input is "Scenario or folder" (`clispec.KindPath`) with `--fail-fast` and `--no-recursive`; `clibuild` previews what the CLI will find (count, skipped files, each broken scenario), the service lists workspace scenario folders, the page has separate "browse file" and "browse folder" buttons.
+- **Docs:** user guide (CLI usage "Running many scenarios", builder, output formats), `README-DEVELOPER.md`, Action input description.
+

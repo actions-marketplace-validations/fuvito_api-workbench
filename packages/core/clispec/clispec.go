@@ -14,6 +14,7 @@ const (
 	KindFile       Kind = "file"       // an existing local file
 	KindFileOrURL  Kind = "fileOrURL"  // an existing local file or an http(s) URL
 	KindDir        Kind = "dir"        // an existing folder
+	KindPath       Kind = "path"       // an existing file or folder
 	KindOutputFile Kind = "outputFile" // a file the command will create
 	KindURL        Kind = "url"        // an http(s) URL
 	KindEnum       Kind = "enum"       // one of a fixed set of values

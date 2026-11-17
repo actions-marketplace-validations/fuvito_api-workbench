@@ -108,6 +108,9 @@ func TestCliBuilder_ContextListsWorkspaceFiles(t *testing.T) {
 	if got := labels(ctx.Scenarios); got != "scenarios/ping.yaml,scenarios/sub/other.json" {
 		t.Errorf("scenarios = %s", got)
 	}
+	if got := labels(ctx.ScenarioFolders); got != "scenarios/ — 2 scenarios,scenarios/sub/ — 1 scenario" {
+		t.Errorf("scenario folders = %s", got)
+	}
 	if got := labels(ctx.Environments); got != "environments/ci.yaml" {
 		t.Errorf("environments = %s", got)
 	}
@@ -148,7 +151,7 @@ func TestCliBuilder_Build(t *testing.T) {
 	if len(out.Needs) != 1 || out.Needs[0].Name != "API_BASE_URL" {
 		t.Errorf("needs = %+v", out.Needs)
 	}
-	if out.Explanation.Goal != "Run a scenario" || len(out.Explanation.Parts) < 4 {
+	if out.Explanation.Goal != "Run scenarios (a file or a whole folder)" || len(out.Explanation.Parts) < 4 {
 		t.Errorf("explanation = %+v", out.Explanation)
 	}
 }

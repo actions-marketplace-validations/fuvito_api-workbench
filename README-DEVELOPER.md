@@ -152,10 +152,10 @@ The `clrsig` CLI exposes eleven commands: `run`, `conform`, `diff`, `impact`, `g
 
 Formats are opt-in; no command writes a file unless `--output` is given. The exit code is independent of the format. Renderers live in `packages/core/reporting` (`html.go` builds one document model and renders it with `html/template`, so all untrusted text is escaped; extracted variable values are never included).
 
-### `run` — execute a scenario
+### `run` — execute scenarios
 
 ```bash
-clrsig run <scenario-file> [flags]
+clrsig run <scenario-file-or-folder>... [flags]
 
   -e, --env <file>       Environment file (YAML or JSON)
   -s, --spec <file>      OpenAPI spec to validate responses against (relative to the current directory)
@@ -164,7 +164,11 @@ clrsig run <scenario-file> [flags]
   -f, --format           Output format: text (default), json, junit, html
   -o, --output <file>    Write report to file
       --timeout <ms>     Global step timeout (overrides per-step setting)
+      --fail-fast        With several scenarios, stop after the first failure
+      --no-recursive     With a folder, do not search its sub-folders
 ```
+
+A folder runs every scenario in it and its sub-folders (`scenario.Discover` in `packages/core/scenario`). Files without a top-level `steps` key (environments, requests, specs) are skipped and listed on stderr; a file named on the command line is always a scenario. All scenarios are parsed before any request is sent: an unreadable one, or an empty folder, exits `2`. Several scenarios give one combined report (`reporting.TextMulti`, `JSONMulti`, `JUnitMulti`, `HTMLMulti`) and one exit code; coverage is merged per spec and `--workspace` accumulates per scenario. A single file keeps the original single-scenario report. Design: [`docs/enhancements/2026-11-17-run-scenarios-from-folders.md`](docs/enhancements/2026-11-17-run-scenarios-from-folders.md).
 
 **Example — scenario with spec validation and coverage:**
 
@@ -201,7 +205,11 @@ Not covered:
 
 You can also embed the spec path in the scenario YAML with `specFile: ./openapi.yaml` so it loads automatically without the flag.
 
-**Exit codes:** `0` = all passed · `1` = assertion failures · `2` = parse or config error
+```bash
+clrsig run scenarios --env environments/ci.yaml --format junit --output reports/all.xml
+```
+
+**Exit codes:** `0` = all passed · `1` = assertion failures · `2` = parse or config error (including an unreadable scenario or an empty folder)
 
 ---
 

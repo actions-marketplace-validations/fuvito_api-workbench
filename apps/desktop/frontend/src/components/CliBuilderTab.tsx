@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal, Copy, Check, FolderOpen, AlertTriangle, XCircle, CheckCircle2 } from 'lucide-react'
+import { Terminal, Copy, Check, FolderOpen, FileText, AlertTriangle, XCircle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   getCliCatalog, getCliContext, buildCliCommand, pickCliFile, pickCliFolder,
@@ -40,7 +40,7 @@ function MessageLine({ m }: { m: CliMessage }) {
 
 function filesFor(role: CliInput['role'], ctx: CliContext | null): CliFile[] {
   if (!ctx) return []
-  if (role === 'scenario') return ctx.scenarios
+  if (role === 'scenario') return [...ctx.scenarioFolders, ...ctx.scenarios]
   if (role === 'environment') return ctx.environments
   if (role === 'spec') return ctx.specs
   return []
@@ -57,10 +57,10 @@ type FieldProps = {
 
 function Field({ input, value, files, messages, suggestion, onChange }: FieldProps) {
   const id = `cli-${input.name}`
-  const isPath = input.kind === 'file' || input.kind === 'fileOrURL' || input.kind === 'dir'
+  const isPath = input.kind === 'file' || input.kind === 'fileOrURL' || input.kind === 'dir' || input.kind === 'path'
 
-  async function browse() {
-    const picked = input.kind === 'dir' ? await pickCliFolder(input.label) : await pickCliFile(input.label)
+  async function browse(folder: boolean) {
+    const picked = folder ? await pickCliFolder(input.label) : await pickCliFile(input.label)
     if (picked) onChange(picked)
   }
 
@@ -105,15 +105,38 @@ function Field({ input, value, files, messages, suggestion, onChange }: FieldPro
             {files.map(f => <option key={f.path} value={f.path}>{f.label}</option>)}
           </select>
         )}
-        <button
-          type="button"
-          onClick={browse}
-          title={`Browse for ${input.label}`}
-          aria-label={`Browse for ${input.label}`}
-          className="shrink-0 px-2 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
-        >
-          <FolderOpen size={13} />
-        </button>
+        {input.kind === 'path' ? (
+          <>
+            <button
+              type="button"
+              onClick={() => browse(false)}
+              title="Browse for a file"
+              aria-label={`Browse for ${input.label} (file)`}
+              className="shrink-0 px-2 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+            >
+              <FileText size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => browse(true)}
+              title="Browse for a folder"
+              aria-label={`Browse for ${input.label} (folder)`}
+              className="shrink-0 px-2 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+            >
+              <FolderOpen size={13} />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => browse(input.kind === 'dir')}
+            title={`Browse for ${input.label}`}
+            aria-label={`Browse for ${input.label}`}
+            className="shrink-0 px-2 rounded border border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+          >
+            <FolderOpen size={13} />
+          </button>
+        )}
       </div>
     )
   } else {

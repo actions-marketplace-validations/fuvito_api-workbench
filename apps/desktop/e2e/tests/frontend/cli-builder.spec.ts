@@ -11,7 +11,7 @@ test.describe('CLI Command Builder', () => {
     const command = page.getByTestId('cli-command')
     await expect(command).toContainText('Fill in the fields')
 
-    await page.getByLabel('Choose Scenario from the workspace').selectOption('/workspace/scenarios/user-lifecycle.yaml')
+    await page.getByLabel('Choose Scenario or folder from the workspace').selectOption('/workspace/scenarios/user-lifecycle.yaml')
     await page.getByLabel('Coverage report').check()
     await expect(command).toContainText('clrsig run scenarios/user-lifecycle.yaml')
     await expect(command).toContainText('--coverage')
@@ -25,10 +25,23 @@ test.describe('CLI Command Builder', () => {
     await expect(page.getByRole('region', { name: 'Explanation' })).toContainText('The pipeline step fails')
   })
 
+  test('runs a whole folder: shows what the CLI will find and uses the folder name for the report', async ({ page }) => {
+    await gotoApp(page)
+    await page.getByRole('button', { name: 'CLI Command Builder' }).click()
+    await page.getByLabel('Choose Scenario or folder from the workspace').selectOption('/workspace/scenarios')
+
+    const command = page.getByTestId('cli-command')
+    await expect(command).toContainText('clrsig run scenarios')
+    await expect(page.getByText('3 scenarios found in scenarios and its sub-folders')).toBeVisible()
+
+    await page.getByLabel('Report format').selectOption('junit')
+    await expect(page.getByRole('button', { name: 'Use reports/run-scenarios.xml' })).toBeVisible()
+  })
+
   test('suggests a file name for a non-text report and uses it', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'CLI Command Builder' }).click()
-    await page.getByLabel('Choose Scenario from the workspace').selectOption('/workspace/scenarios/user-lifecycle.yaml')
+    await page.getByLabel('Choose Scenario or folder from the workspace').selectOption('/workspace/scenarios/user-lifecycle.yaml')
     await page.getByLabel('Report format').selectOption('html')
 
     const command = page.getByTestId('cli-command')
@@ -45,7 +58,7 @@ test.describe('CLI Command Builder', () => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'CLI Command Builder' }).click()
     await page.getByLabel('Coverage report').check()
-    await expect(page.getByText('Scenario is required')).toBeVisible()
+    await expect(page.getByText('Scenario or folder is required')).toBeVisible()
     await expect(page.getByRole('button', { name: /Copy/ })).toBeDisabled()
   })
 

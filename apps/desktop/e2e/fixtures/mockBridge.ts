@@ -50,9 +50,9 @@ export function setupMockBridge() {
     pickedFile: '' as string,
     cliCatalog: [
       {
-        name: 'run', goal: 'Run a scenario', summary: 'Runs a scenario file step by step: sends each request, extracts values, and checks every assertion.', when: 'To check a workflow such as login, create, fetch, delete — locally or as a CI gate.',
+        name: 'run', goal: 'Run scenarios (a file or a whole folder)', summary: 'Runs scenario files step by step: sends each request, extracts values, and checks every assertion. Give it one file, several, or a folder to run everything inside it.', when: 'To check a workflow such as login, create, fetch, delete, or a whole suite, locally or as a CI gate.',
         inputs: [
-          { name: 'scenario-file', short: '', positional: true, required: true, kind: 'file', role: 'scenario', accepts: ['.yaml'], enum: [], default: '', label: 'Scenario', help: 'The scenario file to run. It lists the steps, requests and assertions.', example: 'scenarios/user-lifecycle.yaml', group: 'essential' },
+          { name: 'scenario-file', short: '', positional: true, required: true, kind: 'path', role: 'scenario', accepts: ['.yaml'], enum: [], default: '', label: 'Scenario or folder', help: 'A scenario file, or a folder to run every scenario inside it (and in its sub-folders). With several scenarios you get one combined report and one exit code.', example: 'scenarios/user-lifecycle.yaml', group: 'essential' },
           { name: 'env', short: 'e', positional: false, required: false, kind: 'file', role: 'environment', accepts: ['.yaml'], enum: [], default: '', label: 'Environment', help: 'Variables used by placeholders in your requests, such as baseUrl and tokens.', example: 'environments/ci.yaml', group: 'essential' },
           { name: 'coverage', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Coverage report', help: 'After the run, list which operations of the spec the scenario exercised.', example: '', group: 'essential' },
           { name: 'format', short: 'f', positional: false, required: false, kind: 'enum', role: '', accepts: [], enum: ['text', 'json', 'junit', 'html'], default: 'text', label: 'Report format', help: 'How the report is written. text is for people reading a terminal or CI log; json is for scripts; junit is for CI test dashboards; html is a single page you can open in a browser or keep as a build artifact.', example: '', group: 'essential' },
@@ -69,6 +69,7 @@ export function setupMockBridge() {
     cliContext: {
       workspace: '/workspace', runFrom: '/workspace',
       scenarios: [{ path: '/workspace/scenarios/user-lifecycle.yaml', label: 'scenarios/user-lifecycle.yaml' }],
+      scenarioFolders: [{ path: '/workspace/scenarios', label: 'scenarios/ — 1 scenario' }],
       environments: [{ path: '/workspace/environments/ci.yaml', label: 'environments/ci.yaml' }],
       specs: [],
     } as unknown,
@@ -113,8 +114,15 @@ export function setupMockBridge() {
             suggestions.push({ field: 'output', value: `reports/${input.command}${subject ? '-' + subject : ''}.${ext}`, why: 'keeps reports together, named after the command and what it checks' })
             messages.push({ field: 'output', severity: 'warning', text: `without a file, the whole ${fmt.toUpperCase()} report is printed to the screen; choose where to save it` })
           }
-          if (input.values['scenario-file']) {
-            messages.push({ field: 'scenario-file', severity: 'info', text: 'valid, 4 steps' })
+          const target = input.values['scenario-file']
+          if (target) {
+            const isFolder = !/[.](ya?ml|json)$/.test(target)
+            messages.push({
+              field: 'scenario-file', severity: 'info',
+              text: isFolder
+                ? '3 scenarios found in ' + rel(target) + ' and its sub-folders, all valid; 1 other file skipped (not scenarios)'
+                : 'valid, 4 steps',
+            })
           }
           const first = 'clrsig ' + [input.command, ...positional].join(' ')
           const lines = [first, ...flags]

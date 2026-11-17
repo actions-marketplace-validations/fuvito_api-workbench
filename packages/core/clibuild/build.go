@@ -171,7 +171,11 @@ func Build(req Request, runFrom string) Result {
 			display := text
 			switch input.Role {
 			case clispec.RoleScenario:
-				inspectScenario(abs, display, &in, add)
+				if st, err := os.Stat(abs); err == nil && st.IsDir() {
+					in.scenarioDir = &folderRef{abs: abs, display: display}
+				} else {
+					inspectScenario(abs, display, &in, add)
+				}
 			case clispec.RoleEnvironment:
 				inspectEnvironment(abs, display, &in, add)
 			case clispec.RoleSpec:
@@ -192,6 +196,16 @@ func Build(req Request, runFrom string) Result {
 			continue
 		}
 		flags = append(flags, arg{text: "--" + input.Name, flagName: true}, arg{text: text, path: isPath})
+	}
+
+	if in.scenarioDir != nil {
+		inspectScenarioFolder(*in.scenarioDir, values["no-recursive"] != "true", &in, add)
+	} else if values["scenario-file"] != "" {
+		for _, flag := range []string{"fail-fast", "no-recursive"} {
+			if values[flag] == "true" {
+				add(Message{Field: flag, Severity: Warning, Text: "has no effect when you run a single scenario file; it only applies to folders and several scenarios"})
+			}
+		}
 	}
 
 	checkRequirements(cmd, values, in, add)
@@ -276,6 +290,14 @@ func resolveValue(input clispec.Input, raw, root string, add func(Message)) (tex
 			return fail("%s must be a file, but %s is a folder", input.Label, raw)
 		}
 		if len(input.Accepts) > 0 && !hasExt(full, input.Accepts) {
+			add(Message{Field: input.Name, Severity: Warning, Text: fmt.Sprintf("expected a %s file", strings.Join(input.Accepts, " / "))})
+		}
+	case clispec.KindPath:
+		st, err := os.Stat(full)
+		if err != nil {
+			return fail("%s not found: %s", input.Label, raw)
+		}
+		if !st.IsDir() && len(input.Accepts) > 0 && !hasExt(full, input.Accepts) {
 			add(Message{Field: input.Name, Severity: Warning, Text: fmt.Sprintf("expected a %s file", strings.Join(input.Accepts, " / "))})
 		}
 	case clispec.KindDir:

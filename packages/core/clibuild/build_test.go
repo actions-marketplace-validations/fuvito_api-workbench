@@ -171,9 +171,9 @@ func TestBuild_Errors(t *testing.T) {
 		values map[string]string
 		want   string
 	}{
-		{"missing required", "run", map[string]string{}, "Scenario is required"},
-		{"file not found", "run", map[string]string{"scenario-file": "nope.yaml"}, "Scenario not found: nope.yaml"},
-		{"folder given for file", "run", map[string]string{"scenario-file": "scenarios"}, "must be a file"},
+		{"missing required", "run", map[string]string{}, "Scenario or folder is required"},
+		{"file not found", "run", map[string]string{"scenario-file": "nope.yaml"}, "Scenario or folder not found: nope.yaml"},
+		{"folder given where only a file fits", "conform", map[string]string{"spec": "scenarios"}, "must be a file"},
 		{"coverage needs spec", "run", map[string]string{"scenario-file": "scenarios/s.yaml", "coverage": "true"}, "--coverage needs openapi spec"},
 		{"workspace needs spec", "run", map[string]string{"scenario-file": "scenarios/s.yaml", "workspace": "."}, "--workspace needs openapi spec"},
 		{"bad int", "run", map[string]string{"scenario-file": "scenarios/s.yaml", "timeout": "-5"}, "whole number"},
@@ -434,7 +434,7 @@ func TestBuild_Explanation(t *testing.T) {
 		"scenario-file": "scenarios/s.yaml", "spec": "openapi.yaml", "coverage": "true",
 	}}, root)
 	ex := r.Explanation
-	if ex.Goal != "Run a scenario" || len(ex.ExitCodes) != 3 || len(ex.Outputs) == 0 {
+	if ex.Goal != "Run scenarios (a file or a whole folder)" || len(ex.ExitCodes) != 3 || len(ex.Outputs) == 0 {
 		t.Errorf("explanation incomplete: %+v", ex)
 	}
 	tokens := map[string]string{}

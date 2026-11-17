@@ -114,4 +114,34 @@ func TestBuilderCommandsRun(t *testing.T) {
 			t.Errorf("diff HTML report missing or wrong: %v", err)
 		}
 	})
+
+	t.Run("run a whole folder", func(t *testing.T) {
+		writeFiles(t, root, map[string]string{"scenarios/sub/t.yaml": scenarioYAML(srv.URL)})
+		res := clibuild.Build(clibuild.Request{Command: "run", Values: map[string]string{
+			"scenario-file": "scenarios", "env": "environments/ci.yaml", "fail-fast": "true",
+			"format": "junit", "output": "reports/all.xml",
+		}}, root)
+		if !res.Valid {
+			t.Fatalf("builder rejected the folder command: %+v", res.Messages)
+		}
+		found := false
+		for _, m := range res.Messages {
+			if strings.Contains(m.Text, "2 scenarios found in scenarios and its sub-folders") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("the builder should preview the 2 scenarios the CLI is about to run: %+v", res.Messages)
+		}
+
+		t.Chdir(root)
+		out, err := exec(t, res.Argv[1:]...)
+		if err != nil {
+			t.Fatalf("folder run failed: %v: %s", err, out)
+		}
+		data, err := os.ReadFile(filepath.Join(root, "reports", "all.xml"))
+		if err != nil || strings.Count(string(data), "<testsuite ") != 2 {
+			t.Errorf("want one test suite per scenario in the combined report (%v):\n%s", err, data)
+		}
+	})
 }

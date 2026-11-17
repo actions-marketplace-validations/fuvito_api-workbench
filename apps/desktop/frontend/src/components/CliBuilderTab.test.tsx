@@ -21,7 +21,7 @@ const catalog: CliCommand[] = [
   {
     name: 'run', goal: 'Run a scenario', summary: 'Runs a scenario.', when: 'To check a workflow.',
     inputs: [
-      { name: 'scenario-file', short: '', positional: true, required: true, kind: 'file', role: 'scenario', accepts: ['.yaml'], enum: [], default: '', label: 'Scenario', help: 'The scenario to run.', example: 'scenarios/x.yaml', group: 'essential' },
+      { name: 'scenario-file', short: '', positional: true, required: true, kind: 'path', role: 'scenario', accepts: ['.yaml'], enum: [], default: '', label: 'Scenario or folder', help: 'The scenario to run.', example: 'scenarios/x.yaml', group: 'essential' },
       { name: 'env', short: 'e', positional: false, required: false, kind: 'file', role: 'environment', accepts: ['.yaml'], enum: [], default: '', label: 'Environment', help: 'Variables.', example: '', group: 'essential' },
       { name: 'coverage', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Coverage report', help: 'List exercised operations.', example: '', group: 'essential' },
       { name: 'timeout', short: '', positional: false, required: false, kind: 'int', role: '', accepts: [], enum: [], default: '0', label: 'Step timeout (ms)', help: 'Per-step timeout.', example: '10000', group: 'advanced' },
@@ -42,6 +42,7 @@ const catalog: CliCommand[] = [
 const context: CliContext = {
   workspace: '/repo/ws', runFrom: '/repo',
   scenarios: [{ path: '/repo/ws/scenarios/a.yaml', label: 'scenarios/a.yaml' }],
+  scenarioFolders: [{ path: '/repo/ws/scenarios', label: 'scenarios/ — 3 scenarios' }],
   environments: [{ path: '/repo/ws/environments/ci.yaml', label: 'environments/ci.yaml' }],
   specs: [],
 }
@@ -112,8 +113,31 @@ describe('CliBuilderTab', () => {
 
   it('picks a discovered workspace file', async () => {
     await ready()
-    fireEvent.change(screen.getByLabelText('Choose Scenario from the workspace'), { target: { value: '/repo/ws/scenarios/a.yaml' } })
+    fireEvent.change(screen.getByLabelText('Choose Scenario or folder from the workspace'), { target: { value: '/repo/ws/scenarios/a.yaml' } })
     expect(screen.getByLabelText(/Scenario/, { selector: 'input' })).toHaveValue('/repo/ws/scenarios/a.yaml')
+  })
+
+  it('offers workspace folders before files, and a folder can be chosen', async () => {
+    await ready()
+    const select = screen.getByLabelText('Choose Scenario or folder from the workspace') as HTMLSelectElement
+    expect(Array.from(select.options).map(o => o.textContent)).toEqual(['Workspace…', 'scenarios/ — 3 scenarios', 'scenarios/a.yaml'])
+    fireEvent.change(select, { target: { value: '/repo/ws/scenarios' } })
+    expect(screen.getByLabelText(/Scenario or folder/, { selector: 'input' })).toHaveValue('/repo/ws/scenarios')
+    await waitFor(() => expect(b.buildCliCommand).toHaveBeenLastCalledWith(expect.objectContaining({
+      values: { 'scenario-file': '/repo/ws/scenarios' },
+    })))
+  })
+
+  it('has separate buttons to browse for a file and for a folder when both are allowed', async () => {
+    b.pickCliFile.mockResolvedValue('/elsewhere/s.yaml')
+    b.pickCliFolder.mockResolvedValue('/elsewhere/suite')
+    await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse for Scenario or folder (file)' }))
+    await waitFor(() => expect(screen.getByLabelText(/Scenario or folder/, { selector: 'input' })).toHaveValue('/elsewhere/s.yaml'))
+    fireEvent.click(screen.getByRole('button', { name: 'Browse for Scenario or folder (folder)' }))
+    await waitFor(() => expect(screen.getByLabelText(/Scenario or folder/, { selector: 'input' })).toHaveValue('/elsewhere/suite'))
+    expect(b.pickCliFile).toHaveBeenCalledWith('Scenario or folder')
+    expect(b.pickCliFolder).toHaveBeenCalledWith('Scenario or folder')
   })
 
   it('browses for a file', async () => {

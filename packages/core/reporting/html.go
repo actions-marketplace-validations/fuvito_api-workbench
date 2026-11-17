@@ -182,20 +182,24 @@ func HTML(result *scenario.Result, cov *openapi.ScenarioCoverageResult) ([]byte,
 		Sections: []htmlSection{scenarioSection(result)},
 	}
 	if cov != nil {
-		doc.Sections = append(doc.Sections, htmlSection{
-			Heading: "Spec coverage",
-			Footer:  fmt.Sprintf("%d / %d operations (%.0f%%)", cov.Covered, cov.Total, cov.Percent),
-			Lists: []htmlList{
-				{Heading: "Covered", Items: opLines(cov.Exercised)},
-				{Heading: "Not covered", Items: opLines(cov.Missed)},
-			},
-		})
+		doc.Sections = append(doc.Sections, coverageSection("Spec coverage", cov))
 	}
 	return renderHTML(doc)
 }
 
+func coverageSection(heading string, cov *openapi.ScenarioCoverageResult) htmlSection {
+	return htmlSection{
+		Heading: heading,
+		Footer:  fmt.Sprintf("%d / %d operations (%.0f%%)", cov.Covered, cov.Total, cov.Percent),
+		Lists: []htmlList{
+			{Heading: "Covered", Items: opLines(cov.Exercised)},
+			{Heading: "Not covered", Items: opLines(cov.Missed)},
+		},
+	}
+}
+
 // HTMLMulti returns one HTML report covering several scenarios, for runs such as a bundle.
-func HTMLMulti(title string, results []*scenario.Result, total time.Duration) ([]byte, error) {
+func HTMLMulti(title string, results []*scenario.Result, total time.Duration, cov ...SpecCoverage) ([]byte, error) {
 	passedScenarios, steps, assertsPassed, assertsTotal := 0, 0, 0, 0
 	doc := htmlDoc{Title: title, Subtitle: "Bundle run"}
 	for _, r := range results {
@@ -215,6 +219,13 @@ func HTMLMulti(title string, results []*scenario.Result, total time.Duration) ([
 		}
 		sec.Heading = fmt.Sprintf("%s — %s", r.Scenario.Title, verdict)
 		doc.Sections = append(doc.Sections, sec)
+	}
+	for _, c := range cov {
+		heading := "Spec coverage"
+		if len(cov) > 1 {
+			heading += " (" + c.Spec + ")"
+		}
+		doc.Sections = append(doc.Sections, coverageSection(heading, c.Result))
 	}
 	doc.Passed = passedScenarios == len(results)
 	doc.Summary = fmt.Sprintf("%d/%d scenarios passed  (%d steps, %d/%d assertions passed)  %dms",

@@ -17,16 +17,20 @@ const (
 var catalog = []Command{
 	{
 		Name:    "run",
-		Goal:    "Run a scenario",
-		Summary: "Runs a scenario file step by step: sends each request, extracts values, and checks every assertion.",
-		When:    "To check a workflow such as login → create → fetch → delete, locally or as a CI gate.",
+		Goal:    "Run scenarios (a file or a whole folder)",
+		Summary: "Runs scenario files step by step: sends each request, extracts values, and checks every assertion. Give it one file, several, or a folder to run everything inside it.",
+		When:    "To check a workflow such as login → create → fetch → delete, or a whole suite, locally or as a CI gate.",
 		Inputs: []Input{
 			{
+				// The name is kept for compatibility; the input takes a file or a folder.
 				Name: "scenario-file", Positional: true, Required: true,
-				Kind: KindFile, Role: RoleScenario, Accepts: specExts,
-				Label:   "Scenario",
-				Help:    "The scenario file to run. It lists the steps, requests and assertions.",
-				Example: "scenarios/user-lifecycle.yaml",
+				Kind: KindPath, Role: RoleScenario, Accepts: specExts,
+				Label: "Scenario or folder",
+				Help: "A scenario file, or a folder to run every scenario inside it (and in its sub-folders, unless " +
+					"you turn that off). All scenarios are read first, and nothing runs if one of them is broken. " +
+					"With several scenarios you get one combined report and one exit code. Other files in the folder " +
+					"(environments, requests, specs) are skipped and listed.",
+				Example: "scenarios/",
 				Group:   GroupEssential,
 			},
 			{
@@ -65,6 +69,18 @@ var catalog = []Command{
 				Group:    GroupAdvanced,
 			},
 			{
+				Name: "fail-fast", Kind: KindBool, Default: "false",
+				Label: "Stop at the first failing scenario",
+				Help:  "When running several scenarios, stop after the first one that fails instead of running them all.",
+				Group: GroupAdvanced,
+			},
+			{
+				Name: "no-recursive", Kind: KindBool, Default: "false",
+				Label: "Do not search sub-folders",
+				Help:  "When you give a folder, only run the scenarios directly inside it, not those in its sub-folders.",
+				Group: GroupAdvanced,
+			},
+			{
 				Name: "timeout", Kind: KindInt, Default: "0",
 				Label:   "Step timeout (ms)",
 				Help:    "Give every step this many milliseconds before it is abandoned. 0 keeps each step's own timeout.",
@@ -82,13 +98,13 @@ var catalog = []Command{
 			},
 		},
 		Outputs: []string{
-			"A report of every step and assertion, on the screen (or in the file you choose).",
-			"With a workspace: coverage recorded for the desktop Contracts page.",
+			"A report of every step and assertion, on the screen (or in the file you choose). With several scenarios, one combined report with an overall summary.",
+			"With a workspace: coverage recorded for the desktop Contracts page, scenario by scenario.",
 		},
 		ExitCodes: []ExitCode{
-			{0, "Every step passed every assertion.", "The pipeline step succeeds."},
-			{1, "At least one assertion failed.", "The pipeline step fails: the API no longer behaves as the scenario expects."},
-			{2, "The run could not happen: a file could not be read or parsed, or a configuration error.", "The pipeline step fails: fix the command or the files before trusting any result."},
+			{0, "Every step of every scenario passed every assertion.", "The pipeline step succeeds."},
+			{1, "At least one assertion failed in at least one scenario.", "The pipeline step fails: the API no longer behaves as the scenarios expect."},
+			{2, "The run could not happen: a file could not be read or parsed (so nothing ran), nothing was found in a folder, or a configuration error.", "The pipeline step fails: fix the command or the files before trusting any result."},
 		},
 	},
 	{
