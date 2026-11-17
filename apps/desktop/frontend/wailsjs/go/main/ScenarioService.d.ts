@@ -18,6 +18,10 @@ export function DeleteScenarioFolder(arg1:string):Promise<string>;
 
 export function DuplicateScenario(arg1:string):Promise<main.CreateScenarioResultIO>;
 
+export function ExportCoverageReport(arg1:string,arg2:string):Promise<main.CoverageReportIO>;
+
+export function ExportRunReport(arg1:string,arg2:Array<string>):Promise<main.RunReportIO>;
+
 export function GetAccumulatedCoverage(arg1:string):Promise<main.AccumulatedCoverageIO>;
 
 export function GetScenarioRunHistory(arg1:number):Promise<Array<main.ScenarioRunEntryIO>>;

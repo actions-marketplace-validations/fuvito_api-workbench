@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { RotateCcw, RefreshCw, BarChart2, AlertCircle, ChevronDown, ChevronRight, Download, ChevronDown as ChevronDownSm } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AccumulatedCoverage } from '@/lib/bridge'
-import { getAccumulatedCoverage, resetAccumulatedCoverage, saveContentToFile, openInSystemViewer } from '@/lib/bridge'
+import { getAccumulatedCoverage, resetAccumulatedCoverage, saveContentToFile, openInSystemViewer, exportCoverageReport } from '@/lib/bridge'
 import { QualityPanel } from './QualityPanel'
-import { parseOp, specLabel, buildCsvRows, generateMarkdownReport } from '@/lib/coverage-report'
+import { parseOp, specLabel } from '@/lib/coverage-report'
 
 type Props = {
   workspacePath: string
@@ -232,136 +232,29 @@ function SpecDetailPanel({
   )
 }
 
-// ── Report generators ─────────────────────────────────────────────────────────
-
-function generateMarkdown(specFile: string, entry: AccumulatedCoverage): string {
-  return generateMarkdownReport(specFile, entry)
-}
-
-const METHOD_HEX: Record<string, string> = {
-  GET: '#0ea5e9', POST: '#10b981', PUT: '#f59e0b',
-  PATCH: '#f97316', DELETE: '#ef4444', HEAD: '#a855f7', OPTIONS: '#ec4899',
-}
-
-function generateHTMLReport(specFile: string, entry: AccumulatedCoverage): string {
-  const label = specLabel(specFile)
-  const pct = Math.round(entry.percent)
-  const barColor = pct >= 80 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
-  const now = new Date().toLocaleString()
-
-  function methodBadge(method: string) {
-    const color = METHOD_HEX[method] ?? '#6b7280'
-    return `<span style="font-family:monospace;font-weight:700;font-size:11px;color:${color};background:${color}18;padding:1px 5px;border-radius:3px">${method}</span>`
-  }
-
-  const allOps = [...(entry.exercised ?? []), ...(entry.missed ?? [])].sort((a, b) => {
-    const pa = parseOp(a), pb = parseOp(b)
-    return pa.path !== pb.path ? pa.path.localeCompare(pb.path) : pa.method.localeCompare(pb.method)
-  })
-
-  const opRows = allOps.map(op => {
-    const { method, path } = parseOp(op)
-    const covered = (entry.exercised ?? []).includes(op)
-    const r = entry.operationResults?.[op]
-    const result = r
-      ? r.lastPassed
-        ? `<span style="color:#059669;font-weight:600">✓ Pass</span>`
-        : `<span style="color:#dc2626;font-weight:600">✗ Fail</span>`
-      : `<span style="color:#9ca3af">—</span>`
-    const runAt = r?.lastRunAt ? relTime(r.lastRunAt) : '—'
-    return `<tr>
-      <td>${methodBadge(method)}</td>
-      <td style="font-family:monospace;font-size:12px">${path}</td>
-      <td>${covered ? '<span style="color:#059669;font-weight:600">✓ Covered</span>' : '<span style="color:#9ca3af">—</span>'}</td>
-      <td>${result}</td>
-      <td style="color:#6b7280;font-size:12px">${runAt}</td>
-    </tr>`
-  }).join('\n')
-
-  const q = entry.quality
-  let qualityHTML = ''
-  if (q) {
-    const gaps: string[] = []
-
-    if (q.happyPathOnly.length > 0) {
-      gaps.push(`<h3 style="margin:1.5rem 0 0.4rem;font-size:0.95rem;color:#b45309">Happy-path only (${q.happyPathOnly.length})</h3>
-<p style="margin:0 0 0.5rem;font-size:0.8rem;color:#6b7280">Only 2xx responses observed — declared error paths untested.</p>
-<ul style="margin:0;padding-left:1.5rem">${q.happyPathOnly.map(op => `<li style="font-family:monospace;font-size:12px;padding:1px 0">${op}</li>`).join('')}</ul>`)
-    }
-
-    if (q.errorsNeverTriggered.length > 0) {
-      const rows = q.errorsNeverTriggered.map(gap =>
-        `<tr><td style="font-family:monospace;font-size:12px">${gap.operation}</td><td>${gap.missing.map(c => `<span style="background:#fff3cd;padding:1px 4px;border-radius:3px;font-size:11px;font-weight:600">${c}</span>`).join(' ')}</td></tr>`
-      ).join('')
-      gaps.push(`<h3 style="margin:1.5rem 0 0.4rem;font-size:0.95rem;color:#b45309">Error responses never triggered (${q.errorsNeverTriggered.length})</h3>
-<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280">Operation</th><th style="text-align:left;padding:4px 8px;border-bottom:1px solid #e5e7eb;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280">Missing codes</th></tr></thead><tbody>${rows}</tbody></table>`)
-    }
-
-    if (q.securedNeverAuthed.length > 0) {
-      gaps.push(`<h3 style="margin:1.5rem 0 0.4rem;font-size:0.95rem;color:#1d4ed8">Secured — never tested with auth (${q.securedNeverAuthed.length})</h3>
-<p style="margin:0 0 0.5rem;font-size:0.8rem;color:#6b7280">Operations requiring credentials but always called without.</p>
-<ul style="margin:0;padding-left:1.5rem">${q.securedNeverAuthed.map(op => `<li style="font-family:monospace;font-size:12px;padding:1px 0">${op}</li>`).join('')}</ul>`)
-    }
-
-    qualityHTML = `<h2 style="font-size:1.1rem;border-bottom:1px solid #e5e7eb;padding-bottom:0.3rem;margin-top:2rem">Quality Gaps</h2>
-${gaps.length > 0 ? gaps.join('\n') : '<p style="color:#059669;font-size:0.9rem">All quality signals clear.</p>'}`
-  }
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Contracts Report — ${label}</title>
-<style>
-*{box-sizing:border-box}
-body{font-family:system-ui,-apple-system,sans-serif;max-width:960px;margin:0 auto;padding:2rem;color:#111;font-size:14px;line-height:1.5}
-h1{font-size:1.4rem;margin:0 0 0.25rem}
-h2{font-size:1.1rem;border-bottom:1px solid #e5e7eb;padding-bottom:0.3rem;margin-top:2rem}
-table{width:100%;border-collapse:collapse;margin-top:0.5rem}
-th{text-align:left;padding:5px 8px;border-bottom:2px solid #e5e7eb;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;white-space:nowrap}
-td{padding:5px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
-tr:last-child td{border-bottom:none}
-.stat{display:inline-block;margin-right:1.5rem;font-size:0.85rem;color:#6b7280}
-.stat strong{color:#111}
-@media print{body{padding:0}@page{margin:1.5cm}}
-</style>
-</head>
-<body>
-<h1>Contracts Report — ${label}</h1>
-<p style="margin:0.25rem 0 1rem;font-size:0.85rem;color:#6b7280">Generated ${now}</p>
-
-<div style="margin-bottom:1rem">
-  <span style="font-size:2rem;font-weight:700;color:${barColor}">${pct}%</span>
-  <span style="margin-left:0.75rem;font-size:0.95rem;color:#374151">${entry.covered} / ${entry.total} operations covered</span>
-  <div style="margin-top:0.5rem;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;max-width:400px">
-    <div style="height:100%;background:${barColor};border-radius:999px;width:${Math.min(pct, 100)}%"></div>
-  </div>
-</div>
-<div>
-  <span class="stat"><strong>${entry.totalRuns}</strong> run${entry.totalRuns !== 1 ? 's' : ''}</span>
-  <span class="stat"><strong style="color:#059669">${entry.passedRuns}</strong> passed</span>
-  ${entry.failedRuns > 0 ? `<span class="stat"><strong style="color:#dc2626">${entry.failedRuns}</strong> failed</span>` : ''}
-  ${entry.lastRunAt ? `<span class="stat">Last run <strong>${new Date(entry.lastRunAt).toLocaleString()}</strong></span>` : ''}
-</div>
-
-<h2>Operations</h2>
-<table>
-  <thead><tr>
-    <th>Method</th><th>Path</th><th>Coverage</th><th>Last Result</th><th>Last Run</th>
-  </tr></thead>
-  <tbody>${opRows}</tbody>
-</table>
-
-${qualityHTML}
-</body>
-</html>`
-}
-
 // ── Export menu ───────────────────────────────────────────────────────────────
 
-function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedCoverage }) {
+// The reports are built by the Go core (the same renderers the CLI uses); this menu only saves or
+// opens what comes back.
+function ExportMenu({ specFile }: { specFile: string }) {
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+
+  async function fetchReport(format: 'csv' | 'markdown' | 'html'): Promise<string | null> {
+    setError(null)
+    try {
+      const res = await exportCoverageReport(specFile, format)
+      if (res.error) {
+        setError(res.error)
+        return null
+      }
+      return res.content
+    } catch (e) {
+      setError(String(e))
+      return null
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -374,25 +267,27 @@ function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedC
 
   async function handleCSV() {
     setOpen(false)
-    exportCSV(specFile, entry)
+    const csv = await fetchReport('csv')
+    if (csv !== null) downloadText(csv, `${baseName(specFile)}-contracts.csv`, 'text/csv')
   }
 
   async function handleMarkdown() {
     setOpen(false)
-    const md = generateMarkdown(specFile, entry)
-    const name = `${specLabel(specFile).replace(/\.(yaml|yml|json)$/i, '')}-contracts.md`
-    await saveContentToFile(md, name)
+    const md = await fetchReport('markdown')
+    if (md !== null) await saveContentToFile(md, `${baseName(specFile)}-contracts.md`)
   }
 
   async function handleHTML() {
     setOpen(false)
-    const html = generateHTMLReport(specFile, entry)
+    const html = await fetchReport('html')
+    if (html === null) return
     const err = await openInSystemViewer(html, 'html')
     if (err) console.error('open report:', err)
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative flex items-center gap-2">
+      {error && <span role="alert" className="text-[11px] text-red-400 max-w-[260px] truncate" title={error}>{error}</span>}
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -424,13 +319,16 @@ function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedC
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function exportCSV(specFile: string, entry: AccumulatedCoverage) {
-  const rows = buildCsvRows(entry)
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+function baseName(specFile: string): string {
+  return specLabel(specFile).replace(/\.(yaml|yml|json)$/i, '')
+}
+
+function downloadText(text: string, filename: string, type: string) {
+  const blob = new Blob([text], { type })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${specLabel(specFile).replace(/\.(yaml|yml|json)$/i, '')}-contracts.csv`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -493,7 +391,7 @@ export function CoverageTab({ workspacePath, specFile, refreshTrigger }: Props) 
               )}
             </div>
             <div className="shrink-0 flex items-center gap-2">
-              {specEntry && <ExportMenu specFile={specFile} entry={specEntry} />}
+              {specEntry && <ExportMenu specFile={specFile} />}
               <button
                 type="button"
                 onClick={refresh}

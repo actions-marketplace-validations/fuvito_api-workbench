@@ -4,7 +4,7 @@ import type { HttpMethod } from './httpUtils'
 
 export type TabState = {
   id: string
-  kind?: 'request' | 'scenario' | 'coverage' | 'runner'
+  kind?: 'request' | 'scenario' | 'coverage' | 'runner' | 'cli'
   // request tab fields
   method: HttpMethod
   url: string
@@ -84,13 +84,18 @@ export function createBlankTab(targetDir: string | null = null): TabState {
   }
 }
 
+// Page tabs show an app screen (not a request or scenario file), so they are never dirty or blank.
+export function isPageTab(kind: TabState['kind']): boolean {
+  return kind === 'coverage' || kind === 'runner' || kind === 'cli'
+}
+
 export function isTabDirty(tab: TabState): boolean {
   if (tab.kind === 'scenario') return tab.scenarioDirty === true
-  if (tab.kind === 'coverage' || tab.kind === 'runner') return false
+  if (isPageTab(tab.kind)) return false
   return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs) !== tab.savedKey
 }
 
 export function isBlankTab(tab: TabState): boolean {
-  if (tab.kind === 'scenario' || tab.kind === 'coverage' || tab.kind === 'runner') return false
+  if (tab.kind === 'scenario' || isPageTab(tab.kind)) return false
   return tab.url === '' && tab.name === null && tab.filePath === null && !isTabDirty(tab)
 }

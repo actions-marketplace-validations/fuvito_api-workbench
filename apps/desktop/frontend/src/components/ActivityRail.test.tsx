@@ -26,6 +26,16 @@ describe('ActivityRail', () => {
     expect(screen.getByTitle('Expand rail')).toBeInTheDocument()
   })
 
+  it('shows the CLI Builder button only when it can be opened', () => {
+    const { unmount } = setup()
+    expect(screen.queryByRole('button', { name: 'CLI Command Builder' })).not.toBeInTheDocument()
+    unmount()
+    const onOpenCliBuilder = vi.fn()
+    setup({ onOpenCliBuilder })
+    fireEvent.click(screen.getByRole('button', { name: 'CLI Command Builder' }))
+    expect(onOpenCliBuilder).toHaveBeenCalledTimes(1)
+  })
+
   it('marks only the active tab as current when the sidebar is open', () => {
     setup({ activeTab: 'history' })
     expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-current', 'page')

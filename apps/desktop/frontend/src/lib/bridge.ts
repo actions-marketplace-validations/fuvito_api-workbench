@@ -64,6 +64,13 @@ import {
   ExportBundle as WailsExportBundle,
 } from '@wailsjs/go/main/BundleService'
 import {
+  GetCliCatalog as WailsGetCliCatalog,
+  GetCliContext as WailsGetCliContext,
+  BuildCliCommand as WailsBuildCliCommand,
+  PickCliFile as WailsPickCliFile,
+  PickCliFolder as WailsPickCliFolder,
+} from '@wailsjs/go/main/CliBuilderService'
+import {
   GetSettings as WailsGetSettings,
   SaveSettings as WailsSaveSettings,
   ResetSettings as WailsResetSettings,
@@ -99,6 +106,8 @@ import {
   GetAccumulatedCoverage as WailsGetAccumulatedCoverage,
   ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
+  ExportCoverageReport as WailsExportCoverageReport,
+  ExportRunReport as WailsExportRunReport,
   GetScenarioRunHistory as WailsGetScenarioRunHistory,
   CancelScenario as WailsCancelScenario,
 } from '@wailsjs/go/main/ScenarioService'
@@ -509,6 +518,126 @@ export async function importBundle(text: string, specFile: string, strategy: Bun
   return (await WailsImportBundle(text, specFile, strategy)) as unknown as BundleImportResult
 }
 
+// ---- CLI Command Builder ----
+
+export type CliInputKind = 'file' | 'fileOrURL' | 'dir' | 'path' | 'outputFile' | 'url' | 'enum' | 'int' | 'bool' | 'string'
+
+export interface CliInput {
+  name: string
+  short: string
+  positional: boolean
+  required: boolean
+  kind: CliInputKind
+  role: '' | 'scenario' | 'environment' | 'spec' | 'workspace'
+  accepts: string[]
+  enum: string[]
+  default: string
+  label: string
+  help: string
+  example: string
+  group: 'essential' | 'advanced'
+}
+
+export interface CliExitCode {
+  code: number
+  meaning: string
+  forCI: string
+}
+
+export interface CliCommand {
+  name: string
+  goal: string
+  summary: string
+  when: string
+  inputs: CliInput[]
+  outputs: string[]
+  exitCodes: CliExitCode[]
+}
+
+export interface CliFile {
+  path: string
+  label: string
+}
+
+export interface CliContext {
+  workspace: string
+  runFrom: string
+  scenarios: CliFile[]
+  scenarioFolders: CliFile[]
+  environments: CliFile[]
+  specs: CliFile[]
+}
+
+export interface CliBuildInput {
+  command: string
+  values: Record<string, string>
+  runFrom: string
+}
+
+export interface CliMessage {
+  field: string
+  severity: 'error' | 'warning' | 'info'
+  text: string
+}
+
+export interface CliNeed {
+  name: string
+  secret: boolean
+  from: string
+}
+
+export interface CliSuggestion {
+  field: string
+  value: string
+  why: string
+}
+
+export type CliShell = 'bash' | 'powershell' | 'cmd'
+
+export interface CliRendering {
+  shell: CliShell
+  multiline: string
+  oneline: string
+}
+
+export interface CliBuildOutput {
+  command: string
+  valid: boolean
+  argv: string[]
+  renderings: CliRendering[]
+  messages: CliMessage[]
+  needs: CliNeed[]
+  suggestions: CliSuggestion[]
+  explanation: {
+    goal: string
+    summary: string
+    when: string
+    parts: { token: string; meaning: string }[]
+    outputs: string[]
+    exitCodes: CliExitCode[]
+  }
+}
+
+export async function getCliCatalog(): Promise<CliCommand[]> {
+  return (await WailsGetCliCatalog()) as unknown as CliCommand[]
+}
+
+export async function getCliContext(): Promise<CliContext> {
+  return (await WailsGetCliContext()) as unknown as CliContext
+}
+
+export async function buildCliCommand(input: CliBuildInput): Promise<CliBuildOutput> {
+  return (await WailsBuildCliCommand(input as never)) as unknown as CliBuildOutput
+}
+
+export async function pickCliFile(title: string): Promise<string> {
+  return WailsPickCliFile(title)
+}
+
+export async function pickCliFolder(title: string): Promise<string> {
+  return WailsPickCliFolder(title)
+}
+
 // ---- Settings ----
 
 export async function getSettings(): Promise<AppSettings> {
@@ -829,6 +958,31 @@ export async function listTemplates(): Promise<TemplateInfo[]> {
 export async function createFromTemplate(templateID: string, name: string): Promise<CreateScenarioResult> {
   const result = await WailsCreateFromTemplate(templateID, name)
   return result as unknown as CreateScenarioResult
+}
+
+export type RunReportFormat = 'html' | 'junit' | 'json' | 'markdown' | 'text'
+
+export interface RunReport {
+  content: string
+  error?: string
+}
+
+// Renders the latest results of the given scenarios with the Go reporting package, the same code
+// (and the same redaction of secrets) the CLI uses.
+export async function exportRunReport(format: RunReportFormat, paths: string[]): Promise<RunReport> {
+  return (await WailsExportRunReport(format, paths)) as unknown as RunReport
+}
+
+export type CoverageReportFormat = 'csv' | 'markdown' | 'html'
+
+export interface CoverageReport {
+  content: string
+  error?: string
+}
+
+// The report is rendered by the Go core, with the same code the CLI's coverage command uses.
+export async function exportCoverageReport(specFile: string, format: CoverageReportFormat): Promise<CoverageReport> {
+  return (await WailsExportCoverageReport(specFile, format)) as unknown as CoverageReport
 }
 
 export async function getAccumulatedCoverage(specFile: string): Promise<AccumulatedCoverage | null> {

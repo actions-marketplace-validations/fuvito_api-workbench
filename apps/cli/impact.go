@@ -17,9 +17,10 @@ import (
 func impactCmd() *cobra.Command {
 	var format string
 	var outputFile string
+	var noRecursive bool
 
 	cmd := &cobra.Command{
-		Use:   "impact <base-spec> <revision-spec> <scenario-file>...",
+		Use:   "impact <base-spec> <revision-spec> <scenario-file-or-folder>...",
 		Short: "Show which scenarios will break when a spec change ships",
 		Long: `Compare two OpenAPI specs and cross-reference breaking changes against
 scenario files. Reports which scenarios contain steps that match a breaking
@@ -61,7 +62,10 @@ Exit codes:
 				}
 			}
 
-			scenarioPaths := args[2:]
+			scenarioPaths, err := expandScenarioArgs(cmd, args[2:], noRecursive)
+			if err != nil {
+				return err
+			}
 			var affected []impactScenario
 			for _, path := range scenarioPaths {
 				data, err := os.ReadFile(path)
@@ -205,6 +209,7 @@ Exit codes:
 		},
 	}
 
+	cmd.Flags().BoolVar(&noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file")
 	return cmd

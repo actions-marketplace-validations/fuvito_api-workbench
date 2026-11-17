@@ -58,6 +58,7 @@ func main() {
 	root.AddCommand(mcpCmd())
 	root.AddCommand(telemetryCmd())
 	root.AddCommand(bundleCmd())
+	root.AddCommand(importCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -103,6 +104,9 @@ func requestCmd() *cobra.Command {
 				}
 			}
 
+			if env, err = finishEnvironment(cmd, env, nil); err != nil {
+				return err
+			}
 			resolver := variables.NewResolver(env)
 			resolved := resolver.InterpolateRequest(req)
 
@@ -142,9 +146,10 @@ func requestCmd() *cobra.Command {
 func validateCmd() *cobra.Command {
 	var format string
 	var outputFile string
+	var noRecursive bool
 
 	cmd := &cobra.Command{
-		Use:   "validate <scenario-file> [file2...]",
+		Use:   "validate <scenario-file-or-folder> [more...]",
 		Short: "Check scenario files for errors without executing them",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -154,8 +159,13 @@ func validateCmd() *cobra.Command {
 				err    error
 			}
 
-			results := make([]result, 0, len(args))
-			for _, path := range args {
+			files, err := expandScenarioArgs(cmd, args, noRecursive)
+			if err != nil {
+				return err
+			}
+
+			results := make([]result, 0, len(files))
+			for _, path := range files {
 				data, err := os.ReadFile(path)
 				if err != nil {
 					results = append(results, result{path: path, err: fmt.Errorf("reading file: %w", err)})
@@ -253,213 +263,9 @@ func validateCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().BoolVar(&noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
-	return cmd
-}
-
-func runCmd() *cobra.Command {
-	var envFile string
-	var format string
-	var outputFile string
-	var timeoutMs int
-	var specFile string
-	var showCoverage bool
-	var workspacePath string
-	var runStart = time.Now()
-
-	cmd := &cobra.Command{
-		Use:   "run <scenario-file>",
-		Short: "Execute a scenario and report results",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			scenarioPath := args[0]
-
-			data, err := os.ReadFile(scenarioPath)
-			if err != nil {
-				return fmt.Errorf("reading scenario: %w", err)
-			}
-
-			s, err := serialization.ParseScenarioFile(data, scenarioPath)
-			if err != nil {
-				return fmt.Errorf("parsing scenario: %w", err)
-			}
-
-			if timeoutMs > 0 {
-				for i := range s.Steps {
-					s.Steps[i].TimeoutMs = timeoutMs
-				}
-			}
-
-			var env *domain.Environment
-			if envFile != "" {
-				envData, err := os.ReadFile(envFile)
-				if err != nil {
-					return fmt.Errorf("reading environment: %w", err)
-				}
-				env, err = serialization.ParseEnvironmentFile(envData, envFile)
-				if err != nil {
-					return fmt.Errorf("parsing environment: %w", err)
-				}
-			}
-
-			// --spec flag overrides specFile: from scenario YAML.
-			// Both file paths and http(s):// URLs are accepted.
-			// A --spec path is relative to the current directory; a specFile: inside the
-			// scenario is relative to the scenario file. effectiveSpecFile stays as written
-			// because it is also the key coverage is accumulated under.
-			effectiveSpecFile := s.SpecFile
-			loadSrc := s.SpecFile
-			if specFile != "" {
-				effectiveSpecFile = specFile
-				loadSrc = cwdSpecPath(specFile)
-			}
-
-			loadedSpec := newSpecLoader(cmd).load(loadSrc, filepath.Dir(scenarioPath))
-			runner := newScenarioRunner(loadedSpec)
-
-			// Steps that use requestRef need their request files loaded first. Look next to the
-			// scenario, then in the requests/ folder beside its scenarios/ folder, then in the
-			// workspace's requests/ folder when --workspace is given.
-			refDirs := []string{filepath.Dir(scenarioPath), filepath.Join(filepath.Dir(scenarioPath), "..", "requests")}
-			if workspacePath != "" {
-				refDirs = append(refDirs, filepath.Join(workspacePath, "requests"))
-			}
-			for _, ref := range scenario.ResolveRequestRefs(s, refDirs...) {
-				fmt.Fprintf(cmd.ErrOrStderr(), "warning: requestRef %q could not be loaded\n", ref)
-			}
-			result := runner.Run(context.Background(), s, env)
-
-			// Compute per-run spec coverage (requires a loaded spec).
-			var cov *openapi.ScenarioCoverageResult
-			if loadedSpec != nil && (showCoverage || workspacePath != "") {
-				var executed []openapi.ExecutedRequest
-				for _, sr := range result.Steps {
-					if sr.Request != nil && sr.Response != nil {
-						executed = append(executed, openapi.ExecutedRequest{
-							Method:     string(sr.Request.Method),
-							URL:        sr.Request.URL,
-							StatusCode: sr.Response.StatusCode,
-							HadAuth:    sr.Request.Auth != nil,
-							Passed:     sr.Passed,
-						})
-					}
-				}
-				cov = loadedSpec.ScenarioCoverage(executed)
-			} else if showCoverage && loadedSpec == nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "warning: --coverage requires a spec (use --spec or add specFile: to the scenario)")
-			}
-
-			// Accumulate coverage into the workspace store when --workspace is set.
-			if workspacePath != "" && loadedSpec != nil && cov != nil {
-				specRef := effectiveSpecFile
-				stored := coverage.Load(workspacePath, specRef)
-				stored.TotalRuns++
-				stored.LastRunAt = time.Now()
-				if result.Passed {
-					stored.PassedRuns++
-				} else {
-					stored.FailedRuns++
-				}
-				var exercised []string
-				for _, op := range cov.Exercised {
-					exercised = append(exercised, op.String())
-				}
-				stored.Exercised = coverage.MergeExercised(stored.Exercised, exercised)
-				stored.TotalOps = cov.Total
-				// Merge per-operation quality signals (status codes seen, auth presence).
-				now := time.Now()
-				if stored.OperationResults == nil {
-					stored.OperationResults = make(map[string]coverage.OperationResult)
-				}
-				for _, er := range cov.ExercisedResults {
-					prev := stored.OperationResults[er.String()]
-					stored.OperationResults[er.String()] = coverage.OperationResult{
-						LastPassed:  er.Passed,
-						LastRunAt:   now,
-						StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
-						HadAuth:     prev.HadAuth || er.HadAuth,
-					}
-				}
-				if err := coverage.Save(workspacePath, stored); err != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not save coverage: %v\n", err)
-				}
-			}
-
-			var reportBytes []byte
-			switch strings.ToLower(format) {
-			case "json":
-				if cov != nil && showCoverage {
-					reportBytes, err = reporting.JSONWithCoverage(result, cov)
-				} else {
-					reportBytes, err = reporting.JSON(result)
-				}
-				if err != nil {
-					return fmt.Errorf("generating JSON report: %w", err)
-				}
-				reportBytes = append(reportBytes, '\n')
-			case "junit":
-				reportBytes, err = reporting.JUnit(result)
-				if err != nil {
-					return fmt.Errorf("generating JUnit report: %w", err)
-				}
-			case "html":
-				var htmlCov *openapi.ScenarioCoverageResult
-				if showCoverage {
-					htmlCov = cov
-				}
-				reportBytes, err = reporting.HTML(result, htmlCov)
-				if err != nil {
-					return fmt.Errorf("generating HTML report: %w", err)
-				}
-			default:
-				if cov != nil && showCoverage {
-					reportBytes = []byte(reporting.TextWithCoverage(result, cov))
-				} else {
-					reportBytes = []byte(reporting.Text(result))
-				}
-			}
-
-			if outputFile != "" {
-				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
-					return fmt.Errorf("creating output directory: %w", err)
-				}
-				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
-					return fmt.Errorf("writing output file: %w", err)
-				}
-			} else {
-				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
-			}
-
-			tel := newTelemetryClient()
-			runTelResult := "pass"
-			if !result.Passed {
-				runTelResult = "fail"
-			}
-			rPassed, rFailed, _ := result.Counts()
-			rAsserted, _ := result.AssertionCounts()
-			tel.Record(telemetry.Event{
-				Command:        "run",
-				Result:         runTelResult,
-				DurationMs:     time.Since(runStart).Milliseconds(),
-				StepCount:      rPassed + rFailed,
-				AssertionCount: rAsserted,
-			})
-			if !result.Passed {
-				return &exitError{1}
-			}
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file (YAML or JSON)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
-	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
-	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
-	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file or URL (overrides specFile: in scenario)")
-	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Report which spec operations were exercised (requires --spec or specFile: in scenario)")
-	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory to accumulate coverage into")
-
 	return cmd
 }
 
@@ -610,6 +416,8 @@ func conformCmd() *cobra.Command {
 	var outputFile string
 	var requestTimeout int
 	var failFast bool
+	var vars []string
+	var reports []string
 	var showCoverage bool
 	var runNegative bool
 	var start = time.Now()
@@ -628,6 +436,11 @@ Exit codes:
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src := args[0]
+
+			plan, err := planReports(format, reports, outputFile)
+			if err != nil {
+				return err
+			}
 
 			data, specFormat, err := fetchSpec(src)
 			if err != nil {
@@ -649,6 +462,10 @@ Exit codes:
 				if err != nil {
 					return fmt.Errorf("parsing environment: %w", err)
 				}
+			}
+
+			if env, err = finishEnvironment(cmd, env, vars); err != nil {
+				return err
 			}
 
 			opts := conformance.Options{
@@ -692,45 +509,42 @@ Exit codes:
 				negResult = negRunner.Run(context.Background(), spec, baseURL, env, opts)
 			}
 
-			var reportBytes []byte
-			switch strings.ToLower(format) {
-			case "json":
-				reportBytes, err = reporting.ConformJSON(result, cov)
-				if err != nil {
-					return fmt.Errorf("generating JSON report: %w", err)
+			render := func(f string) ([]byte, error) {
+				switch f {
+				case "json":
+					b, err := reporting.ConformJSON(result, cov)
+					if err != nil {
+						return nil, fmt.Errorf("generating JSON report: %w", err)
+					}
+					return append(b, '\n'), nil
+				case "junit":
+					b, err := reporting.ConformJUnit(result)
+					if err != nil {
+						return nil, fmt.Errorf("generating JUnit report: %w", err)
+					}
+					return b, nil
+				case "html":
+					b, err := reporting.ConformHTML(result, cov, negResult)
+					if err != nil {
+						return nil, fmt.Errorf("generating HTML report: %w", err)
+					}
+					return b, nil
+				case "markdown":
+					return reporting.ConformMarkdown(result, cov, negResult), nil
 				}
-				reportBytes = append(reportBytes, '\n')
-			case "junit":
-				reportBytes, err = reporting.ConformJUnit(result)
-				if err != nil {
-					return fmt.Errorf("generating JUnit report: %w", err)
-				}
-			case "html":
-				reportBytes, err = reporting.ConformHTML(result, cov, negResult)
-				if err != nil {
-					return fmt.Errorf("generating HTML report: %w", err)
-				}
-			default:
-				reportBytes = []byte(reporting.ConformText(result, cov))
+				text := reporting.ConformText(result, cov)
 				if negResult != nil {
-					reportBytes = append(reportBytes, []byte(reporting.NegativeText(negResult))...)
+					text += reporting.NegativeText(negResult)
 				}
+				return []byte(text), nil
 			}
-
-			if outputFile != "" {
-				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
-					return fmt.Errorf("creating output directory: %w", err)
-				}
-				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
-					return fmt.Errorf("writing output file: %w", err)
-				}
-			} else {
-				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
+			if err := plan.emit(cmd, outputFile, render); err != nil {
+				return err
 			}
 
 			// Print cumulative coverage in text mode when --coverage is set and
 			// there is more than one run recorded for this spec.
-			if showCoverage && strings.ToLower(format) == "text" {
+			if showCoverage && plan.format == "text" {
 				printCumulativeCoverage(cmd, specHash)
 			}
 
@@ -760,9 +574,11 @@ Exit codes:
 
 	cmd.Flags().StringVarP(&baseURL, "base-url", "b", "", "Base URL to send requests to (overrides spec servers[0])")
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file for variable resolution")
+	cmd.Flags().StringArrayVar(&vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
+	cmd.Flags().StringArrayVar(&reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/conform.xml (repeatable)")
 	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
@@ -856,155 +672,6 @@ func fetchSpec(src string) (data []byte, format string, err error) {
 	return data, format, nil
 }
 
-func diffCmd() *cobra.Command {
-	var format string
-	var outputFile string
-	var breakingOnly bool
-
-	cmd := &cobra.Command{
-		Use:   "diff <base-spec> <revision-spec>",
-		Short: "Compare two OpenAPI specs and report breaking and non-breaking changes",
-		Long: `Parse two OpenAPI 3.0/3.1 specs and classify every change as breaking
-(ERR), potentially breaking (WARN), or informational (INFO).
-
-Exit codes:
-  0  no breaking changes found
-  1  one or more breaking changes found
-  2  spec parse or configuration error`,
-		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			baseData, baseFmt, err := fetchSpec(args[0])
-			if err != nil {
-				return err
-			}
-			revData, revFmt, err := fetchSpec(args[1])
-			if err != nil {
-				return err
-			}
-
-			baseSpec, err := openapi.ParseBytes(baseData, baseFmt)
-			if err != nil {
-				return fmt.Errorf("parsing base spec: %w", err)
-			}
-			revSpec, err := openapi.ParseBytes(revData, revFmt)
-			if err != nil {
-				return fmt.Errorf("parsing revision spec: %w", err)
-			}
-
-			result, err := openapi.Diff(baseSpec, revSpec)
-			if err != nil {
-				return fmt.Errorf("diffing specs: %w", err)
-			}
-
-			changes := result.Changes
-			if breakingOnly {
-				filtered := changes[:0]
-				for _, c := range changes {
-					if c.Breaking {
-						filtered = append(filtered, c)
-					}
-				}
-				changes = filtered
-			}
-
-			var reportBytes []byte
-			switch strings.ToLower(format) {
-			case "junit":
-				reportBytes, err = reporting.DiffJUnit(result)
-				if err != nil {
-					return fmt.Errorf("generating JUnit report: %w", err)
-				}
-			case "html":
-				reportBytes, err = reporting.DiffHTML(result, changes)
-				if err != nil {
-					return fmt.Errorf("generating HTML report: %w", err)
-				}
-			case "json":
-				type jsonChange struct {
-					ID       string `json:"id"`
-					Level    string `json:"level"`
-					Breaking bool   `json:"breaking"`
-					Method   string `json:"method,omitempty"`
-					Path     string `json:"path,omitempty"`
-					Text     string `json:"text"`
-				}
-				type jsonOut struct {
-					HasBreaking bool         `json:"hasBreaking"`
-					Changes     []jsonChange `json:"changes"`
-				}
-				out := jsonOut{HasBreaking: result.HasBreaking}
-				for _, c := range changes {
-					out.Changes = append(out.Changes, jsonChange{
-						ID:       c.ID,
-						Level:    c.Level,
-						Breaking: c.Breaking,
-						Method:   c.Method,
-						Path:     c.Path,
-						Text:     c.Text,
-					})
-				}
-				b, _ := json.MarshalIndent(out, "", "  ")
-				reportBytes = append(b, '\n')
-			default:
-				var sb strings.Builder
-				if len(changes) == 0 {
-					if breakingOnly {
-						fmt.Fprintln(&sb, "No breaking changes.")
-					} else {
-						fmt.Fprintln(&sb, "No changes.")
-					}
-				} else {
-					for _, c := range changes {
-						mark := " "
-						if c.Breaking {
-							mark = "!"
-						}
-						loc := ""
-						if c.Method != "" && c.Path != "" {
-							loc = fmt.Sprintf("  %s %s", c.Method, c.Path)
-						}
-						fmt.Fprintf(&sb, "  [%s] %s  %s%s\n", c.Level, mark, c.Text, loc)
-					}
-					fmt.Fprintln(&sb)
-					breaking := 0
-					for _, c := range changes {
-						if c.Breaking {
-							breaking++
-						}
-					}
-					if result.HasBreaking {
-						fmt.Fprintf(&sb, "%d change(s)  ·  %d breaking\n", len(changes), breaking)
-					} else {
-						fmt.Fprintf(&sb, "%d change(s)  ·  no breaking changes\n", len(changes))
-					}
-				}
-				reportBytes = []byte(sb.String())
-			}
-
-			if outputFile != "" {
-				if err := os.MkdirAll(filepath.Dir(outputFile), 0o755); err != nil {
-					return fmt.Errorf("creating output directory: %w", err)
-				}
-				if err := os.WriteFile(outputFile, reportBytes, 0o644); err != nil {
-					return fmt.Errorf("writing output file: %w", err)
-				}
-			} else {
-				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
-			}
-
-			if result.HasBreaking {
-				return &exitError{1}
-			}
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
-	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
-	cmd.Flags().BoolVar(&breakingOnly, "breaking-only", false, "Show only breaking changes")
-	return cmd
-}
-
 func coverageCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "coverage",
@@ -1019,6 +686,7 @@ func coverageCmd() *cobra.Command {
 func coverageListCmd() *cobra.Command {
 	var workspacePath string
 	var format string
+	var outputFile string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -1029,6 +697,13 @@ func coverageListCmd() *cobra.Command {
 				return fmt.Errorf("--workspace is required")
 			}
 			reports := coverage.ListAll(ws)
+			if f := strings.ToLower(format); isContractsFormat(f) {
+				data, err := contractsListReport(f, reports)
+				if err != nil {
+					return err
+				}
+				return writeReport(cmd, outputFile, data)
+			}
 			if len(reports) == 0 {
 				fmt.Fprintln(cmd.OutOrStdout(), "No coverage data found in workspace.")
 				return nil
@@ -1083,13 +758,15 @@ func coverageListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", contractsFormatUsage)
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
 	return cmd
 }
 
 func coverageQualityCmd() *cobra.Command {
 	var workspacePath string
 	var format string
+	var outputFile string
 
 	cmd := &cobra.Command{
 		Use:   "quality <spec-file-or-url>",
@@ -1134,6 +811,21 @@ Exit codes:
 
 			stored := coverage.Load(workspacePath, specArg)
 			report := coverage.BuildReport(stored, allOpStrs)
+
+			if f := strings.ToLower(format); isContractsFormat(f) {
+				q := coverage.ComputeQuality(report, meta.DeclaredStatusCodes, meta.SecuredOps)
+				data, err := contractsReport(f, specArg, report, q)
+				if err != nil {
+					return err
+				}
+				if err := writeReport(cmd, outputFile, data); err != nil {
+					return err
+				}
+				if qualityHasGaps(q) {
+					return &exitError{1}
+				}
+				return nil
+			}
 
 			if report.TotalRuns == 0 {
 				fmt.Fprintf(cmd.OutOrStdout(), "No coverage data found for %s in %s.\nRun scenarios with --workspace and --spec to accumulate coverage.\n", specArg, workspacePath)
@@ -1249,7 +941,8 @@ Exit codes:
 		},
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", contractsFormatUsage)
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
 	return cmd
 }
 

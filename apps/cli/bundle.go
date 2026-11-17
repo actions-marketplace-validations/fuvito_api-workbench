@@ -134,6 +134,9 @@ func writeReport(cmd *cobra.Command, outputFile string, data []byte) error {
 
 func bundleRunCmd() *cobra.Command {
 	var envName, envFile, specFile, format, outputFile string
+	var vars []string
+	var reports []string
+	var showExtracted bool
 	var only []string
 
 	cmd := &cobra.Command{
@@ -153,6 +156,11 @@ Exit codes:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			start := time.Now()
 			bundlePath := args[0]
+
+			plan, err := planReports(format, reports, outputFile)
+			if err != nil {
+				return err
+			}
 
 			b, err := loadBundle(bundlePath)
 			if err != nil {
@@ -176,6 +184,10 @@ Exit codes:
 				return err
 			}
 
+			if env, err = finishEnvironment(cmd, env, vars); err != nil {
+				return err
+			}
+
 			runs, unmatched := bundle.FilterRunnables(bundle.Materialize(b, opts), only)
 			if len(unmatched) > 0 {
 				return fmt.Errorf("no scenario matches %s (use a scenario's title or file name)", strings.Join(unmatched, ", "))
@@ -192,14 +204,16 @@ Exit codes:
 					fmt.Fprintf(cmd.ErrOrStderr(), "warning: scenario %q: requestRef %q could not be loaded\n", r.Scenario.Title, ref)
 				}
 				runner := newScenarioRunner(loader.load(r.Scenario.SpecFile, baseDir))
-				results = append(results, runner.Run(context.Background(), r.Scenario, env))
+				res := runner.Run(context.Background(), r.Scenario, env)
+				res.RevealExtracted = showExtracted
+				results = append(results, res)
 			}
 
-			report, err := bundleReport(format, b.Title, results, time.Since(start))
+			total := time.Since(start)
+			err = plan.emit(cmd, outputFile, func(f string) ([]byte, error) {
+				return bundleReport(f, b.Title, results, total)
+			})
 			if err != nil {
-				return err
-			}
-			if err := writeReport(cmd, outputFile, report); err != nil {
 				return err
 			}
 
@@ -227,10 +241,13 @@ Exit codes:
 	}
 
 	cmd.Flags().StringVarP(&envName, "env", "e", "", "Name of the bundle's environment to use (needed when it has several)")
+	cmd.Flags().StringArrayVar(&reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/bundle.xml (repeatable)")
+	cmd.Flags().BoolVar(&showExtracted, "show-extracted", false, "Show extracted values whose names look secret (tokens, passwords, keys); secret environment values are always hidden")
+	cmd.Flags().StringArrayVar(&vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().StringVar(&envFile, "env-file", "", "Use an environment file instead of the bundle's own (YAML or JSON)")
 	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file or URL; replaces the spec of every scenario")
 	cmd.Flags().StringSliceVar(&only, "scenario", nil, "Run only the scenario with this title or file name (repeatable)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
 	return cmd
 }
@@ -240,6 +257,9 @@ func bundleReport(format, title string, results []*scenario.Result, total time.D
 		title = "Bundle"
 	}
 	switch strings.ToLower(format) {
+	case "markdown":
+		return reporting.MarkdownMulti(title, results, total), nil
+
 	case "junit":
 		out, err := reporting.JUnitMulti(title, results)
 		if err != nil {

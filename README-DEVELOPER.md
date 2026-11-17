@@ -149,22 +149,33 @@ The `clrsig` CLI exposes eleven commands: `run`, `conform`, `diff`, `impact`, `g
 | `json` | Machine-readable | `run`, `conform`, `diff`, `impact`, `validate`, `generate`, `request`, `coverage list\|quality`, `bundle run` |
 | `junit` | CI test dashboards, PR annotation | `run`, `conform`, `diff`, `bundle run` |
 | `html` | Human-readable, self-contained single file (inline CSS, light/dark, print-friendly) | `run`, `conform`, `diff`, `bundle run` |
+| `markdown` | Pull-request comments and `$GITHUB_STEP_SUMMARY` | `run`, `conform`, `diff`, `bundle run` |
+| `csv` / `markdown` / `html` | Contracts (accumulated coverage) reports, shared with the desktop Export menu | `coverage list`, `coverage quality` |
 
-Formats are opt-in; no command writes a file unless `--output` is given. The exit code is independent of the format. Renderers live in `packages/core/reporting` (`html.go` builds one document model and renders it with `html/template`, so all untrusted text is escaped; extracted variable values are never included).
+`--report format=file` (repeatable, validated before anything runs; `reports.go`) writes extra formats from the same run. Formats are opt-in; no command writes a file unless `--output` or `--report` is given. The exit code is independent of the format. Renderers live in `packages/core/reporting` (`html.go` builds one document model and renders it with `html/template`, so all untrusted text is escaped; extracted variable values are never included).
 
-### `run` — execute a scenario
+### `run` — execute scenarios
 
 ```bash
-clrsig run <scenario-file> [flags]
+clrsig run <scenario-file-or-folder>... [flags]
 
   -e, --env <file>       Environment file (YAML or JSON)
   -s, --spec <file>      OpenAPI spec to validate responses against (relative to the current directory)
       --coverage         Report which spec operations the scenario exercised
   -w, --workspace <dir>  Accumulate coverage into this workspace (shown on the Contracts page)
-  -f, --format           Output format: text (default), json, junit, html
+  -f, --format           Output format: text (default), json, junit, html, markdown
   -o, --output <file>    Write report to file
+      --report fmt=file  Also write a report in another format (repeatable)
+      --var name=value   Set or override an environment variable (repeatable)
+      --show-extracted   Show secret-looking extracted values (secrets are redacted by default)
       --timeout <ms>     Global step timeout (overrides per-step setting)
+      --fail-fast        With several scenarios, stop after the first failure
+      --no-recursive     With a folder, do not search its sub-folders
 ```
+
+**Secrets and environment variables.** `${NAME}` in an environment value is expanded from the process environment by `variables.NewResolver` when a run starts (never at parse or save time, so a real secret is never written to disk); `$${NAME}` is a literal. `variables.MissingEnv` drives the one-per-variable warning, and `variables.SecretValues` feeds `scenario.Result.Secrets`, which `reporting` uses (`redact.go`) to replace secret values in every report; secret-looking extracted names (`IsSecretName`) are masked unless `--show-extracted` sets `Result.RevealExtracted`.
+
+A folder runs every scenario in it and its sub-folders (`scenario.Discover` in `packages/core/scenario`). Files without a top-level `steps` key (environments, requests, specs) are skipped and listed on stderr; a file named on the command line is always a scenario. All scenarios are parsed before any request is sent: an unreadable one, or an empty folder, exits `2`. Several scenarios give one combined report (`reporting.TextMulti`, `JSONMulti`, `JUnitMulti`, `HTMLMulti`) and one exit code; coverage is merged per spec and `--workspace` accumulates per scenario. A single file keeps the original single-scenario report. Design: [`docs/enhancements/2026-11-17-run-scenarios-from-folders.md`](docs/enhancements/2026-11-17-run-scenarios-from-folders.md).
 
 **Example — scenario with spec validation and coverage:**
 
@@ -201,7 +212,11 @@ Not covered:
 
 You can also embed the spec path in the scenario YAML with `specFile: ./openapi.yaml` so it loads automatically without the flag.
 
-**Exit codes:** `0` = all passed · `1` = assertion failures · `2` = parse or config error
+```bash
+clrsig run scenarios --env environments/ci.yaml --format junit --output reports/all.xml
+```
+
+**Exit codes:** `0` = all passed · `1` = assertion failures · `2` = parse or config error (including an unreadable scenario or an empty folder)
 
 ---
 
@@ -221,7 +236,9 @@ clrsig conform <spec-file-or-url> [flags]
                              missing auth, missing params
       --fail-fast            Stop after first violation
       --request-timeout <ms> Per-request timeout (default 10 000)
-  -f, --format               text (default), json, junit, html
+      --var name=value       Set or override an environment variable (repeatable)
+      --report fmt=file      Also write a report in another format (repeatable)
+  -f, --format               text (default), json, junit, html, markdown
   -o, --output <file>        Write report to file
 ```
 
@@ -247,9 +264,14 @@ clrsig conform https://petstore.swagger.io/v2/swagger.json \
 clrsig diff <base-spec> <revision-spec> [flags]
 
       --breaking-only    Only report breaking changes
-  -f, --format           text (default), json, junit, html
+      --fail-on <level>  breaking (default) | warning | info: how serious a change must be to fail
+      --against <ref>    One spec file, compared with its version at this git ref (needs git)
+      --report fmt=file  Also write a report in another format (repeatable)
+  -f, --format           text (default), json, junit, html, markdown
   -o, --output <file>    Write report to file
 ```
+
+`--fail-on` drives the exit code and the JUnit, HTML and Markdown verdicts (`openapi.FailOn`, `DiffJUnitOn`, `DiffHTMLOn`, `DiffMarkdown`); it cannot be combined with `--breaking-only`. `--against` runs `git rev-parse --show-toplevel` and `git show <ref>:<path>` next to the spec (`gitSpecAt` in `apps/cli/diff.go`) and turns the usual git failures (no git, not a repository, unknown ref, file absent at the ref) into explanatory errors.
 
 ```bash
 clrsig diff openapi-v1.yaml openapi-v2.yaml
@@ -274,6 +296,16 @@ Result: BREAKING CHANGES DETECTED (2 total changes)
 ```bash
 go test -v -run TestSpecDiff ./examples/server
 ```
+
+---
+
+### `import` — Postman / Insomnia to request files
+
+```bash
+clrsig import postman|insomnia <file> [-o requests] [--dry-run] [-f text|json]
+```
+
+Uses `importer.ParsePostmanCollection` / `ParseInsomniaExport` and `importer.Save`, the same function the desktop import calls (naming, folders, `-2`/`-3` suffixes, atomic writes). Exit `0` converted · `1` some requests not written · `2` unreadable or unsupported file.
 
 ---
 
@@ -344,8 +376,8 @@ clrsig validate scenarios/*.yaml
 ### `coverage` — accumulated spec coverage for a workspace
 
 ```bash
-clrsig coverage list    --workspace <dir> [--format text|json]
-clrsig coverage quality <spec-file-or-url> --workspace <dir> [--format text|json]
+clrsig coverage list    --workspace <dir> [--format text|json|csv|markdown|html] [--output <file>]
+clrsig coverage quality <spec-file-or-url> --workspace <dir> [--format text|json|csv|markdown|html] [--output <file>]
 clrsig coverage reset   <spec-file-or-url> --workspace <dir>
 ```
 
@@ -385,6 +417,20 @@ clrsig telemetry status | enable | disable
 ```
 
 Off by default. The desktop app exposes the same switch in Settings.
+
+---
+
+## CLI Command Builder
+
+The desktop app has a **CLI Command Builder** page (Activity Rail → terminal icon, or the terminal button on a scenario) that builds, checks and explains a `clrsig` command. Design and decisions: [`docs/enhancements/2026-11-17-cli-command-builder.md`](docs/enhancements/2026-11-17-cli-command-builder.md).
+
+- **`packages/core/clispec`** is the catalog: each command's inputs (kind, role, plain-language help, defaults, requirements), outputs and exit codes.
+- **`packages/core/clibuild`** turns the user's choices into an argument vector plus renderings for bash, PowerShell and cmd, resolves paths against the run-from folder, opens the picked files with the real parsers, and returns messages, needed environment variables, suggested report names and an explanation. It never executes anything.
+- **`apps/desktop/wails/cli_builder_service.go`** exposes both to the frontend; **`CliBuilderTab.tsx`** is the page.
+
+**When you add, rename or remove a flag** on `run`, `conform` or `diff`, update `packages/core/clispec/catalog.go`. `TestCatalogMatchesCobra` (in `apps/cli`) compares the catalog with the real cobra command tree in both directions and fails CI on any difference. To cover another command, add its constructor to `cobraFor` in `apps/cli/clispec_parity_test.go` and its entry to the catalog. `TestBuilderCommandsRun` builds commands with the builder and executes them through the real command tree, including every report format.
+
+Screenshots for the docs are generated with `pnpm test -- --grep @screenshot-cli` (in `apps/desktop/e2e`) into `docs/images/13-*` and `14-*`.
 
 ---
 
@@ -518,6 +564,8 @@ api-workbench/
 │       ├── assertions/     # Assertion evaluation (status, header, jsonpath, schema)
 │       ├── scenario/       # Multi-step scenario runner with FailPolicy and variable extraction
 │       ├── openapi/        # OpenAPI 3.0/3.1 + Swagger 2.0 parser, generator, validator, diff
+│       ├── clispec/        # Catalog of the clrsig CLI (commands, inputs, exit codes) — drives the CLI Command Builder
+│       ├── clibuild/       # Builds, checks and explains a command line (paths, shell quoting, report names)
 │       ├── conformance/    # Conformance runner — all spec operations, negative probes, violations
 │       ├── coverage/       # Accumulated spec coverage store + quality signals
 │       ├── bundle/         # Single-file bundles: parse, validate, import, export, run

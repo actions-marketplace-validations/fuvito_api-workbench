@@ -9,6 +9,7 @@ vi.mock('@/lib/bridge', () => ({
   resetAccumulatedCoverage: vi.fn(),
   saveContentToFile: vi.fn(),
   openInSystemViewer: vi.fn(),
+  exportCoverageReport: vi.fn(),
 }))
 
 const b = vi.mocked(bridge)
@@ -39,6 +40,7 @@ beforeEach(() => {
   b.resetAccumulatedCoverage.mockResolvedValue(undefined as never)
   b.saveContentToFile.mockResolvedValue(undefined as never)
   b.openInSystemViewer.mockResolvedValue('' as never)
+  b.exportCoverageReport.mockImplementation(async (_spec, format) => ({ content: `report:${format}` }))
 })
 
 describe('CoverageTab — empty states', () => {
@@ -265,37 +267,33 @@ describe('CoverageTab — export', () => {
     expect(screen.getByText('Export CSV')).toBeInTheDocument()
   })
 
-  it('downloads a CSV named after the spec', async () => {
+  it('downloads the CSV the Go core produced, named after the spec', async () => {
     await openMenu()
     fireEvent.click(screen.getByText('Export CSV'))
-    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1))
+    expect(b.exportCoverageReport).toHaveBeenCalledWith('specs/users-api.yaml', 'csv')
     const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
     expect(blob.type).toBe('text/csv')
+    expect(await blob.text()).toBe('report:csv')
     expect(anchorClick).toHaveBeenCalledTimes(1)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock')
     expect(screen.queryByText('Export CSV')).not.toBeInTheDocument()
   })
 
-  it('saves a Markdown report with a derived filename', async () => {
+  it('saves the Markdown report with a derived filename', async () => {
     await openMenu()
     fireEvent.click(screen.getByText('Export Markdown'))
     await waitFor(() => expect(b.saveContentToFile).toHaveBeenCalledTimes(1))
-    const [content, name] = b.saveContentToFile.mock.calls[0]
-    expect(name).toBe('users-api-contracts.md')
-    expect(content).toContain('users-api')
+    expect(b.exportCoverageReport).toHaveBeenCalledWith('specs/users-api.yaml', 'markdown')
+    expect(b.saveContentToFile).toHaveBeenCalledWith('report:markdown', 'users-api-contracts.md')
   })
 
-  it('opens an HTML report in the system viewer', async () => {
+  it('opens the HTML report in the system viewer', async () => {
     await openMenu()
     fireEvent.click(screen.getByText('Export HTML'))
     await waitFor(() => expect(b.openInSystemViewer).toHaveBeenCalledTimes(1))
-    const [html, fmt] = b.openInSystemViewer.mock.calls[0]
-    expect(fmt).toBe('html')
-    expect(html).toContain('<!DOCTYPE html>')
-    expect(html).toContain('Contracts Report — users-api.yaml')
-    expect(html).toContain('✓ Pass')
-    expect(html).toContain('✗ Fail')
-    expect(html).toContain('</strong> failed')
+    expect(b.exportCoverageReport).toHaveBeenCalledWith('specs/users-api.yaml', 'html')
+    expect(b.openInSystemViewer).toHaveBeenCalledWith('report:html', 'html')
   })
 
   it('logs when the viewer reports an error', async () => {
@@ -307,54 +305,30 @@ describe('CoverageTab — export', () => {
     err.mockRestore()
   })
 
-  it('includes every quality section in the HTML report', async () => {
-    b.getAccumulatedCoverage.mockResolvedValue(cov({
-      quality: {
-        neverExercised: [],
-        happyPathOnly: ['GET /users'],
-        securedNeverAuthed: ['GET /admin'],
-        errorsNeverTriggered: [{ operation: 'GET /users', missing: [404] }],
-      },
-    }))
+  it('shows the reason when the report cannot be made, and saves nothing', async () => {
+    b.exportCoverageReport.mockResolvedValue({ content: '', error: 'no coverage has been recorded for this spec yet' })
     await openMenu()
-    fireEvent.click(screen.getByText('Export HTML'))
-    await waitFor(() => expect(b.openInSystemViewer).toHaveBeenCalled())
-    const html = b.openInSystemViewer.mock.calls[0][0] as string
-    expect(html).toContain('Happy-path only (1)')
-    expect(html).toContain('Error responses never triggered (1)')
-    expect(html).toContain('Secured — never tested with auth (1)')
+    fireEvent.click(screen.getByText('Export Markdown'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('no coverage has been recorded')
+    expect(b.saveContentToFile).not.toHaveBeenCalled()
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
   })
 
-  it('reports clear quality signals in the HTML report', async () => {
-    b.getAccumulatedCoverage.mockResolvedValue(cov({
-      quality: { neverExercised: [], happyPathOnly: [], securedNeverAuthed: [], errorsNeverTriggered: [] },
-    }))
+  it('shows an error when the call itself fails', async () => {
+    b.exportCoverageReport.mockRejectedValue(new Error('boom'))
     await openMenu()
     fireEvent.click(screen.getByText('Export HTML'))
-    await waitFor(() => expect(b.openInSystemViewer).toHaveBeenCalled())
-    expect(b.openInSystemViewer.mock.calls[0][0]).toContain('All quality signals clear.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('boom')
+    expect(b.openInSystemViewer).not.toHaveBeenCalled()
   })
 
-  it('omits the quality section and failed/last-run stats when absent', async () => {
-    b.getAccumulatedCoverage.mockResolvedValue(cov({ failedRuns: 0, lastRunAt: undefined, totalRuns: 1, passedRuns: 1 }))
+  it('clears an earlier error on the next export', async () => {
+    b.exportCoverageReport.mockResolvedValueOnce({ content: '', error: 'first problem' })
     await openMenu()
-    fireEvent.click(screen.getByText('Export HTML'))
-    await waitFor(() => expect(b.openInSystemViewer).toHaveBeenCalled())
-    const html = b.openInSystemViewer.mock.calls[0][0] as string
-    expect(html).not.toContain('Quality Gaps')
-    expect(html).not.toContain('failed</span>')
-    expect(html).toContain('<strong>1</strong> run<')
-  })
-
-  it.each([
-    [90, '#10b981'],
-    [50, '#f59e0b'],
-    [10, '#ef4444'],
-  ])('colours the HTML progress bar for %i%% coverage', async (percent, hex) => {
-    b.getAccumulatedCoverage.mockResolvedValue(cov({ percent }))
-    await openMenu()
-    fireEvent.click(screen.getByText('Export HTML'))
-    await waitFor(() => expect(b.openInSystemViewer).toHaveBeenCalled())
-    expect(b.openInSystemViewer.mock.calls[0][0]).toContain(`color:${hex}">${percent}%`)
+    fireEvent.click(screen.getByText('Export CSV'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('first problem')
+    fireEvent.click(screen.getByRole('button', { name: 'Export' }))
+    fireEvent.click(screen.getByText('Export CSV'))
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
 })

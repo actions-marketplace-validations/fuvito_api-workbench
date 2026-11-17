@@ -1,4 +1,4 @@
-import { Play, Loader2, CheckCircle2, Save, X, Clock, FileCode, Square } from 'lucide-react'
+import { Play, Loader2, CheckCircle2, Save, X, Clock, FileCode, Square, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioResult, EnvInfo } from '@/lib/bridge'
 
@@ -21,6 +21,7 @@ type Props = {
   onDiscard: () => void
   onSave: () => void
   onShowYaml: () => void
+  onGetCliCommand?: () => void
 }
 
 export function ScenarioHeaderBar({
@@ -28,7 +29,7 @@ export function ScenarioHeaderBar({
   environments, selectedEnvPath, onEnvPathChange, onTitleChange,
   result, running, onShowStats, onRun, onCancel,
   saveError, savedFlash, isDirty,
-  onDiscard, onSave, onShowYaml,
+  onDiscard, onSave, onShowYaml, onGetCliCommand,
 }: Props) {
   const steps = result?.steps ?? []
   const passed = steps.filter(s => s.passed && !s.skipped).length
@@ -52,6 +53,18 @@ export function ScenarioHeaderBar({
       >
         <FileCode size={14} />
       </button>
+
+      {onGetCliCommand && (
+        <button
+          type="button"
+          onClick={onGetCliCommand}
+          title="Get the CLI command for this scenario"
+          aria-label="Get CLI command"
+          className="shrink-0 p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+        >
+          <Terminal size={14} />
+        </button>
+      )}
 
       {environments.length > 0 && (
         <select

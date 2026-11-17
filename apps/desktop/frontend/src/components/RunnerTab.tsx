@@ -1,5 +1,8 @@
-import { CheckCircle2, XCircle, Loader2, Play } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CheckCircle2, XCircle, Loader2, Play, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { exportRunReport, saveContentToFile, openInSystemViewer } from '@/lib/bridge'
+import type { RunReportFormat } from '@/lib/bridge'
 import type { RunAllState } from '@/types'
 
 type RunnerTabProps = {
@@ -8,6 +11,79 @@ type RunnerTabProps = {
   onCancel?: () => void
   onDismiss?: () => void
   onRunAll?: () => void
+}
+
+const EXPORTS: { format: RunReportFormat; label: string; file: string }[] = [
+  { format: 'html', label: 'HTML report', file: '' },
+  { format: 'junit', label: 'JUnit XML', file: 'run-results.xml' },
+  { format: 'json', label: 'JSON', file: 'run-results.json' },
+  { format: 'markdown', label: 'Markdown', file: 'run-results.md' },
+  { format: 'text', label: 'Plain text', file: 'run-results.txt' },
+]
+
+// The reports are built by the Go core, the same renderers the CLI uses; this menu only saves or
+// opens what comes back.
+function ExportMenu({ paths }: { paths: string[] }) {
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  async function run(item: (typeof EXPORTS)[number]) {
+    setOpen(false)
+    setError(null)
+    try {
+      const res = await exportRunReport(item.format, paths)
+      if (res.error) {
+        setError(res.error)
+        return
+      }
+      if (item.format === 'html') {
+        const err = await openInSystemViewer(res.content, 'html')
+        if (err) setError(err)
+      } else {
+        await saveContentToFile(res.content, item.file)
+      }
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative flex items-center gap-2">
+      {error && <span role="alert" className="text-[11px] text-red-400 max-w-[220px] truncate" title={error}>{error}</span>}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] border border-[var(--color-border)] rounded transition-colors"
+      >
+        <Download size={12} />
+        Export report
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1 text-xs">
+          {EXPORTS.map(item => (
+            <button
+              key={item.format}
+              type="button"
+              onClick={() => run(item)}
+              className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-muted)] text-[var(--color-foreground)] transition-colors"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function RunnerTab({ runAllState, onSelectScenario, onCancel, onDismiss, onRunAll }: RunnerTabProps) {
@@ -75,6 +151,7 @@ export function RunnerTab({ runAllState, onSelectScenario, onCancel, onDismiss, 
               Stop
             </button>
           )}
+          {!running && results.length > 0 && <ExportMenu paths={results.map(r => r.path)} />}
           {!running && onRunAll && (
             <button
               type="button"

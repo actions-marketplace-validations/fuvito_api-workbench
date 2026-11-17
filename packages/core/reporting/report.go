@@ -17,6 +17,7 @@ import (
 // Uses plain ASCII (no ANSI codes) so it is safe in CI logs.
 func Text(result *scenario.Result) string {
 	var b strings.Builder
+	x := redactorFor(result)
 
 	fmt.Fprintf(&b, "Scenario: %s\n", result.Scenario.Title)
 	if result.Scenario.Description != "" {
@@ -43,7 +44,7 @@ func Text(result *scenario.Result) string {
 		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Label, suffix)
 
 		if sr.Error != "" {
-			fmt.Fprintf(&b, "         error: %s\n", sr.Error)
+			fmt.Fprintf(&b, "         error: %s\n", x.text(sr.Error))
 		}
 
 		for _, ar := range sr.Assertions {
@@ -55,12 +56,13 @@ func Text(result *scenario.Result) string {
 			if ar.Passed {
 				fmt.Fprintf(&b, "         %s %s\n", mark, label)
 			} else {
-				fmt.Fprintf(&b, "         %s %s: %s\n", mark, label, ar.Message)
+				fmt.Fprintf(&b, "         %s %s: %s\n", mark, label, x.text(ar.Message))
 			}
 		}
 
-		for name, val := range sr.Extracted {
-			fmt.Fprintf(&b, "         → %s = %q\n", name, val)
+		shown := x.extracted(sr.Extracted)
+		for _, name := range sortedKeys(shown) {
+			fmt.Fprintf(&b, "         → %s = %q\n", name, shown[name])
 		}
 	}
 
@@ -224,6 +226,7 @@ func marshalJUnit(report jUnitTestSuites) ([]byte, error) {
 
 func junitSuiteFor(result *scenario.Result) jUnitSuite {
 	_, failed, _ := result.Counts()
+	x := redactorFor(result)
 
 	suite := jUnitSuite{
 		Name:     result.Scenario.Title,
@@ -248,12 +251,12 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 			tc.Skipped = &skipped
 		case sr.Error != "":
 			suite.Errors++
-			tc.Error = &jUnitError{Message: sr.Error, Text: sr.Error}
+			tc.Error = &jUnitError{Message: x.text(sr.Error), Text: x.text(sr.Error)}
 		case !sr.Passed:
 			var lines []string
 			for _, ar := range sr.Assertions {
 				if !ar.Passed {
-					lines = append(lines, fmt.Sprintf("  ✗ %s: %s", assertionLabel(ar.Assertion), ar.Message))
+					lines = append(lines, fmt.Sprintf("  ✗ %s: %s", assertionLabel(ar.Assertion), x.text(ar.Message)))
 				}
 			}
 			tc.Failure = &jUnitFailure{
@@ -521,12 +524,13 @@ func NegativeText(result *conformance.NegativeResult) string {
 // Each change is emitted as a test case; breaking changes (ERR level) are
 // marked as failures so PR annotation tools can surface them inline.
 func DiffJUnit(result *openapi.DiffResult) ([]byte, error) {
-	breaking := 0
-	for _, c := range result.Changes {
-		if c.Breaking {
-			breaking++
-		}
-	}
+	return DiffJUnitOn(result, openapi.FailOnBreaking)
+}
+
+// DiffJUnitOn is DiffJUnit with a chosen --fail-on threshold: every change at or above it is a
+// failure.
+func DiffJUnitOn(result *openapi.DiffResult, on openapi.FailOn) ([]byte, error) {
+	breaking := result.FailCount(on)
 
 	var cases []jUnitCase
 	if len(result.Changes) == 0 {
@@ -550,7 +554,7 @@ func DiffJUnit(result *openapi.DiffResult) ([]byte, error) {
 				ClassName: "openapi.diff",
 				Time:      "0.000",
 			}
-			if c.Breaking {
+			if c.Fails(on) {
 				tc.Failure = &jUnitFailure{Message: detail, Text: detail}
 			}
 			cases = append(cases, tc)
@@ -585,27 +589,7 @@ func TextWithCoverage(result *scenario.Result, cov *openapi.ScenarioCoverageResu
 	if cov == nil {
 		return base
 	}
-	var b strings.Builder
-	b.WriteString(base)
-	b.WriteByte('\n')
-	fmt.Fprintf(&b, "Spec coverage: %d / %d operations (%.0f%%)\n", cov.Covered, cov.Total, cov.Percent)
-	exercised := sortedCovOps(cov.Exercised)
-	missed := sortedCovOps(cov.Missed)
-	if len(exercised) > 0 {
-		b.WriteByte('\n')
-		fmt.Fprintln(&b, "Covered:")
-		for _, op := range exercised {
-			fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
-		}
-	}
-	if len(missed) > 0 {
-		b.WriteByte('\n')
-		fmt.Fprintln(&b, "Not covered:")
-		for _, op := range missed {
-			fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
-		}
-	}
-	return b.String()
+	return base + "\n" + CoverageText(cov, "")
 }
 
 func sortedCovOps(ops []openapi.CoveredOperation) []openapi.CoveredOperation {
@@ -631,25 +615,13 @@ func JSONWithCoverage(result *scenario.Result, cov *openapi.ScenarioCoverageResu
 	if err := json.Unmarshal(b, &report); err != nil {
 		return b, nil // shouldn't happen; return plain report
 	}
-	jc := &JSONScenarioCoverage{
-		Total:     cov.Total,
-		Covered:   cov.Covered,
-		Percent:   cov.Percent,
-		Exercised: make([]JSONCoverageOp, 0, len(cov.Exercised)),
-		Missed:    make([]JSONCoverageOp, 0, len(cov.Missed)),
-	}
-	for _, op := range sortedCovOps(cov.Exercised) {
-		jc.Exercised = append(jc.Exercised, JSONCoverageOp{Method: op.Method, Path: op.Path})
-	}
-	for _, op := range sortedCovOps(cov.Missed) {
-		jc.Missed = append(jc.Missed, JSONCoverageOp{Method: op.Method, Path: op.Path})
-	}
-	report.Coverage = jc
+	report.Coverage = jsonCoverage(cov)
 	return json.MarshalIndent(report, "", "  ")
 }
 
 // JSON returns a machine-readable JSON report.
 func JSON(result *scenario.Result) ([]byte, error) {
+	x := redactorFor(result)
 	report := JSONReport{
 		Scenario:   result.Scenario.Title,
 		Passed:     result.Passed,
@@ -661,8 +633,8 @@ func JSON(result *scenario.Result) ([]byte, error) {
 			Name:      sr.Label,
 			Passed:    sr.Passed,
 			Skipped:   sr.Skipped,
-			Error:     sr.Error,
-			Extracted: sr.Extracted,
+			Error:     x.text(sr.Error),
+			Extracted: x.extracted(sr.Extracted),
 		}
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
@@ -675,9 +647,9 @@ func JSON(result *scenario.Result) ([]byte, error) {
 				Path:     ar.Assertion.Path,
 				Operator: string(ar.Assertion.Operator),
 				Expected: fmt.Sprintf("%v", ar.Assertion.Expected),
-				Actual:   ar.Actual,
+				Actual:   x.text(ar.Actual),
 				Passed:   ar.Passed,
-				Message:  ar.Message,
+				Message:  x.text(ar.Message),
 			})
 		}
 		report.Steps = append(report.Steps, step)

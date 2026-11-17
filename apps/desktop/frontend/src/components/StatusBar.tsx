@@ -6,6 +6,7 @@ type StatusBarProps = {
   environments: EnvInfo[]
   activeEnv: EnvInfo | null
   workspacePath: string
+  activeFilePath?: string | null
   demoRunning: boolean
   demoPort: number
   onEnvChange: (path: string) => void
@@ -13,8 +14,15 @@ type StatusBarProps = {
   onStopDemo: () => void
 }
 
+const MAX_PATH_CHARS = 100
+
+// Long paths lose their start, not their end: the file name is the part that matters.
+export function shortenPath(path: string, max = MAX_PATH_CHARS): string {
+  return path.length <= max ? path : '…' + path.slice(path.length - (max - 1))
+}
+
 export function StatusBar({
-  environments, activeEnv, workspacePath,
+  environments, activeEnv, workspacePath, activeFilePath,
   demoRunning, demoPort,
   onEnvChange, onEditEnv, onStopDemo,
 }: StatusBarProps) {
@@ -74,6 +82,16 @@ export function StatusBar({
               <X size={10} />
             </button>
           </>
+        )}
+
+        {activeFilePath && (
+          <span
+            data-testid="status-file-path"
+            className="ml-auto min-w-0 truncate font-mono text-[11px] text-[var(--color-muted-foreground)] select-text"
+            title={activeFilePath}
+          >
+            {shortenPath(activeFilePath)}
+          </span>
         )}
       </div>
 

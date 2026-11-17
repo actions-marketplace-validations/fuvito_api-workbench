@@ -1,4 +1,4 @@
-import { FolderOpen, Play, Clock, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft } from 'lucide-react'
+import { FolderOpen, Play, Clock, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type RailTab = 'explorer' | 'scenarios' | 'history' | 'coverage'
@@ -26,13 +26,14 @@ type ActivityRailProps = {
   onToggleExpanded: () => void
   onShowSettings: () => void
   onShowHelp: () => void
+  onOpenCliBuilder?: () => void
   demoRunning?: boolean
   onStopDemo?: () => void
 }
 
 export function ActivityRail({
   activeTab, sidebarOpen, expanded,
-  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, demoRunning, onStopDemo,
+  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, demoRunning, onStopDemo,
 }: ActivityRailProps) {
   return (
     <div
@@ -90,6 +91,7 @@ export function ActivityRail({
         )}
 
         {([
+          ...(onOpenCliBuilder ? [{ icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: onOpenCliBuilder }] : []),
           { icon: Settings,   label: 'Settings', title: 'Settings', onClick: onShowSettings },
           { icon: HelpCircle, label: 'Help',     title: 'Help',     onClick: onShowHelp },
         ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string; onClick: () => void }[]).map(({ icon: Icon, label, title, onClick }) => (

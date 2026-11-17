@@ -47,14 +47,111 @@ export function setupMockBridge() {
     scenarioResultCache: {} as Record<string, unknown>,
     recentWorkspaces: [] as unknown[],
     coverage: [] as Array<{ specFile: string }>,
+    pickedFile: '' as string,
+    cliCatalog: [
+      {
+        name: 'run', goal: 'Run scenarios (a file or a whole folder)', summary: 'Runs scenario files step by step: sends each request, extracts values, and checks every assertion. Give it one file, several, or a folder to run everything inside it.', when: 'To check a workflow such as login, create, fetch, delete, or a whole suite, locally or as a CI gate.',
+        inputs: [
+          { name: 'scenario-file', short: '', positional: true, required: true, kind: 'path', role: 'scenario', accepts: ['.yaml'], enum: [], default: '', label: 'Scenario or folder', help: 'A scenario file, or a folder to run every scenario inside it (and in its sub-folders). With several scenarios you get one combined report and one exit code.', example: 'scenarios/user-lifecycle.yaml', group: 'essential' },
+          { name: 'env', short: 'e', positional: false, required: false, kind: 'file', role: 'environment', accepts: ['.yaml'], enum: [], default: '', label: 'Environment', help: 'Variables used by placeholders in your requests, such as baseUrl and tokens.', example: 'environments/ci.yaml', group: 'essential' },
+          { name: 'coverage', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Coverage report', help: 'After the run, list which operations of the spec the scenario exercised.', example: '', group: 'essential' },
+          { name: 'format', short: 'f', positional: false, required: false, kind: 'enum', role: '', accepts: [], enum: ['text', 'json', 'junit', 'html'], default: 'text', label: 'Report format', help: 'How the report is written. text is for people reading a terminal or CI log; json is for scripts; junit is for CI test dashboards; html is a single page you can open in a browser or keep as a build artifact.', example: '', group: 'essential' },
+          { name: 'output', short: 'o', positional: false, required: false, kind: 'outputFile', role: '', accepts: [], enum: [], default: '', label: 'Save report to', help: 'Write the report to this file instead of the screen. Missing folders are created. Nothing is written to disk unless you set this.', example: 'reports/run.html', group: 'essential' },
+        ],
+        outputs: ['A report of every step and assertion, on the screen.', 'With a workspace: coverage recorded for the Contracts page.'],
+        exitCodes: [
+          { code: 0, meaning: 'Every step passed every assertion.', forCI: 'The pipeline step succeeds.' },
+          { code: 1, meaning: 'At least one assertion failed.', forCI: 'The pipeline step fails: the API no longer behaves as the scenario expects.' },
+          { code: 2, meaning: 'The run could not happen: a file could not be read or parsed.', forCI: 'The pipeline step fails: fix the command or the files first.' },
+        ],
+      },
+    ] as unknown[],
+    cliContext: {
+      workspace: '/workspace', runFrom: '/workspace',
+      scenarios: [{ path: '/workspace/scenarios/user-lifecycle.yaml', label: 'scenarios/user-lifecycle.yaml' }],
+      scenarioFolders: [{ path: '/workspace/scenarios', label: 'scenarios/ — 1 scenario' }],
+      environments: [{ path: '/workspace/environments/ci.yaml', label: 'environments/ci.yaml' }],
+      specs: [],
+    } as unknown,
   }
 
-  const bridge = (window as unknown as Record<string, Record<string, unknown>>)['__bridge']
+  const bridge =(window as unknown as Record<string, Record<string, unknown>>)['__bridge']
 
   ;(window as unknown as Record<string, unknown>)['go'] = {
     main: {
       App: {
         SetHasDirtyTabs: noop,
+      },
+      CliBuilderService: {
+        GetCliCatalog: () => Promise.resolve(bridge['cliCatalog']),
+        GetCliContext: () => Promise.resolve(bridge['cliContext']),
+        PickCliFile: () => Promise.resolve(bridge['pickedFile'] ?? ''),
+        PickCliFolder: () => Promise.resolve(''),
+        BuildCliCommand: (input: { command: string; values: Record<string, string>; runFrom: string }) => {
+          type Inp = { name: string; positional: boolean; required: boolean; kind: string; label: string }
+          const cmd = (bridge['cliCatalog'] as Array<{ name: string; inputs: Inp[]; exitCodes: unknown[]; outputs: string[]; summary: string; goal: string; when: string }>)
+            .find(c => c.name === input.command)
+          const rel = (v: string) => (v.startsWith(input.runFrom + '/') ? v.slice(input.runFrom.length + 1) : v)
+          const messages: Array<{ field: string; severity: string; text: string }> = []
+          const positional: string[] = []
+          const flags: string[] = []
+          for (const inp of cmd?.inputs ?? []) {
+            const v = input.values[inp.name]
+            if (!v) {
+              if (inp.required) messages.push({ field: inp.name, severity: 'error', text: `${inp.label} is required` })
+              continue
+            }
+            if (inp.positional) positional.push(rel(v))
+            else if (inp.kind === 'bool') flags.push(`--${inp.name}`)
+            else if (inp.name === 'format' && v === 'text') continue
+            else flags.push(`--${inp.name} ${rel(v)}`)
+          }
+          const fmt = input.values['format']
+          const suggestions: Array<{ field: string; value: string; why: string }> = []
+          if (fmt && fmt !== 'text' && !input.values['output']) {
+            const ext = fmt === 'junit' ? 'xml' : fmt
+            const subject = (input.values['scenario-file'] ?? '').split('/').pop()?.replace(/\.[a-z]+$/, '')
+            suggestions.push({ field: 'output', value: `reports/${input.command}${subject ? '-' + subject : ''}.${ext}`, why: 'keeps reports together, named after the command and what it checks' })
+            messages.push({ field: 'output', severity: 'warning', text: `without a file, the whole ${fmt.toUpperCase()} report is printed to the screen; choose where to save it` })
+          }
+          const target = input.values['scenario-file']
+          if (target) {
+            const isFolder = !/[.](ya?ml|json)$/.test(target)
+            messages.push({
+              field: 'scenario-file', severity: 'info',
+              text: isFolder
+                ? '3 scenarios found in ' + rel(target) + ' and its sub-folders, all valid; 1 other file skipped (not scenarios)'
+                : 'valid, 4 steps',
+            })
+          }
+          const first = 'clrsig ' + [input.command, ...positional].join(' ')
+          const lines = [first, ...flags]
+          const NL = String.fromCharCode(10)
+          const BS = String.fromCharCode(92)
+          const BT = String.fromCharCode(96)
+          const join = (cont: string) => lines.join(' ' + cont + NL + '  ')
+          const one = [first, ...flags].join(' ')
+          return Promise.resolve({
+            command: input.command, valid: !messages.some(m => m.severity === 'error'), argv: one.split(' '),
+            renderings: [
+              { shell: 'bash', multiline: join(BS), oneline: one },
+              { shell: 'powershell', multiline: join(BT), oneline: one },
+              { shell: 'cmd', multiline: join('^').split('/').join(BS), oneline: one.split('/').join(BS) },
+            ],
+            messages,
+            suggestions,
+            needs: input.values['env'] ? [{ name: 'API_BASE_URL', secret: false, from: 'baseUrl' }, { name: 'API_TOKEN', secret: true, from: 'token' }] : [],
+            explanation: {
+              goal: cmd?.goal ?? '', summary: cmd?.summary ?? '', when: cmd?.when ?? '',
+              parts: [
+                { token: 'clrsig', meaning: 'The Clear Signal command-line program.' },
+                { token: input.command, meaning: cmd?.summary ?? '' },
+                ...positional.map(p => ({ token: p, meaning: 'Scenario: The scenario file to run. It lists the steps, requests and assertions.' })),
+              ],
+              outputs: cmd?.outputs ?? [], exitCodes: cmd?.exitCodes ?? [],
+            },
+          })
+        },
       },
       RequestService: {
         Execute: () => Promise.resolve(bridge['executeResult']),

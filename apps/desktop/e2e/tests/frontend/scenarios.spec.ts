@@ -420,22 +420,24 @@ test.describe('Scenario management — run all', () => {
     await expect(page.locator('aside').getByTitle('Run all scenarios')).toBeVisible()
   })
 
-  test('clicking Run All shows pass summary when all scenarios pass', async ({ page }) => {
+  // Run All results are shown in the single "Run Results" (Runner) tab, not in the sidebar.
+  test('clicking Run All opens the Run Results tab with a pass summary', async ({ page }) => {
     await withScenarios(page, { initialScenarios: [FLOW_A, FLOW_B] })
     await gotoApp(page)
     await page.locator('aside').getByTitle('Run all scenarios').click()
-    await expect(page.locator('aside').getByText('2/2 passed')).toBeVisible()
+    await expect(page.getByRole('tab', { name: /Run Results/ })).toBeVisible()
+    await expect(page.getByText('All passed')).toBeVisible()
+    await expect(page.getByText(/2\/2 scenarios/)).toBeVisible()
   })
 
   test('run all results list shows each scenario name', async ({ page }) => {
     await withScenarios(page, { initialScenarios: [FLOW_A, FLOW_B] })
     await gotoApp(page)
     await page.locator('aside').getByTitle('Run all scenarios').click()
-    await expect(page.locator('aside').getByText('2/2 passed')).toBeVisible()
-    // Each scenario name appears in the results panel
-    const panel = page.locator('aside').getByText('2/2 passed').locator('xpath=../..')
-    await expect(panel.getByText('Flow A')).toBeVisible()
-    await expect(panel.getByText('Flow B')).toBeVisible()
+    await expect(page.getByText('All passed')).toBeVisible()
+    const table = page.getByRole('table')
+    await expect(table.getByText('Flow A')).toBeVisible()
+    await expect(table.getByText('Flow B')).toBeVisible()
   })
 
   test('clicking a result row opens the scenario tab', async ({ page }) => {
@@ -443,20 +445,19 @@ test.describe('Scenario management — run all', () => {
     await withScenarios(page, { initialScenarios: [FLOW_A, FLOW_B], detail: detailA })
     await gotoApp(page)
     await page.locator('aside').getByTitle('Run all scenarios').click()
-    await expect(page.locator('aside').getByText('2/2 passed')).toBeVisible()
-    const panel = page.locator('aside').getByText('2/2 passed').locator('xpath=../..')
-    await panel.getByRole('button', { name: 'Flow A' }).click()
+    await expect(page.getByText('All passed')).toBeVisible()
+    await page.getByRole('table').getByText('Flow A').click()
     await expect(page.getByRole('tab').filter({ hasText: 'Flow A' })).toBeVisible()
   })
 
-  test('dismiss button hides the run all results panel', async ({ page }) => {
+  test('Clear empties the Run Results tab', async ({ page }) => {
     await withScenarios(page)
     await gotoApp(page)
     await page.locator('aside').getByTitle('Run all scenarios').click()
-    await expect(page.locator('aside').getByText('1/1 passed')).toBeVisible()
-    // Dismiss button is the only button in the header row alongside the summary text
-    await page.locator('aside').getByText('1/1 passed').locator('xpath=..').getByRole('button').click()
-    await expect(page.locator('aside').getByText('1/1 passed')).not.toBeVisible()
+    await expect(page.getByText(/1\/1 scenarios/)).toBeVisible()
+    await page.getByRole('button', { name: 'Clear' }).click()
+    await expect(page.getByText(/1\/1 scenarios/)).not.toBeVisible()
+    await expect(page.getByText('No run in progress.')).toBeVisible()
   })
 })
 

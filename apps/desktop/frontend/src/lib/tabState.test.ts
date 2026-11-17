@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStateKey, createBlankTab, isTabDirty, isBlankTab } from './tabState'
+import { computeStateKey, createBlankTab, isTabDirty, isBlankTab, isPageTab } from './tabState'
 import type { TabState } from './tabState'
 
 const BLANK_KEY = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
@@ -48,6 +48,19 @@ describe('computeStateKey', () => {
     const a = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null)
     const b = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
     expect(a).toBe(b)
+  })
+})
+
+describe('isPageTab', () => {
+  it('is true for app-screen tabs and false for request and scenario tabs', () => {
+    for (const kind of ['coverage', 'runner', 'cli'] as const) expect(isPageTab(kind)).toBe(true)
+    for (const kind of ['request', 'scenario', undefined] as const) expect(isPageTab(kind)).toBe(false)
+  })
+
+  it('page tabs are never dirty or blank', () => {
+    const tab = { ...createBlankTab(), kind: 'cli' as const, url: 'x' }
+    expect(isTabDirty(tab)).toBe(false)
+    expect(isBlankTab(tab)).toBe(false)
   })
 })
 

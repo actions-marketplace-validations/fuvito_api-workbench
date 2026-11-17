@@ -17,6 +17,8 @@ import {ChevronLeft} from 'lucide-react'
 import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
 import {RunnerTab} from '@/components/RunnerTab'
+import {CliBuilderTab} from '@/components/CliBuilderTab'
+import type {CliBuilderPreset} from '@/components/CliBuilderTab'
 import {WorkspaceImportDialog} from '@/components/WorkspaceImportDialog'
 import {BundleImportDialog} from '@/components/BundleImportDialog'
 import {Sidebar} from '@/components/Sidebar'
@@ -75,7 +77,7 @@ import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
 import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
 import {serializeScenarioToYAML} from '@/components/scenario-yaml'
-import {isTabDirty} from '@/lib/tabState'
+import {isTabDirty, isPageTab} from '@/lib/tabState'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
@@ -144,6 +146,11 @@ export default function App() {
   useEffect(() => { sidebarWidthRef.current = sidebarWidth }, [sidebarWidth])
   useEffect(() => { responsePctRef.current = responsePct }, [responsePct])
 
+  function openCliBuilder(preset?: { command: string; values?: Record<string, string> }) {
+    if (preset) setCliPreset({ id: ++cliPresetSeq.current, ...preset })
+    tabs.openCliTab()
+  }
+
   function handleRailTabClick(tab: RailTab) {
     if (tab === railTab && sidebarOpen) {
       setSidebarOpen(false)
@@ -167,6 +174,8 @@ export default function App() {
   // Modal / overlay state
   const [showAbout, setShowAbout] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [cliPreset, setCliPreset] = useState<CliBuilderPreset | null>(null)
+  const cliPresetSeq = useRef(0)
   const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec' | 'example' | 'prompt'>('guide')
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
@@ -826,7 +835,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner',
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli',
     filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
@@ -1055,6 +1064,7 @@ export default function App() {
               onToggleExpanded={handleToggleRailExpanded}
               onShowSettings={() => settings.setShowSettings(true)}
               onShowHelp={() => setShowHelp(true)}
+              onOpenCliBuilder={() => openCliBuilder()}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />
@@ -1213,7 +1223,7 @@ export default function App() {
                 onRevealInExplorer={p => openInExplorer(p).catch(() => {})}
               />
 
-              {activeTab.kind !== 'coverage' && activeTab.kind !== 'runner' && (
+              {!isPageTab(activeTab.kind) && (
                 <AppToolbar
                   activeTab={activeTab}
                   activeTabId={activeTabId}
@@ -1240,6 +1250,17 @@ export default function App() {
                       onDismiss={() => setRunAllState(null)}
                       onRunAll={handleRunAll}
                     />
+                  </div>
+                ))}
+
+                {/* CLI Builder tab (single instance) */}
+                {tabList.filter(t => t.kind === 'cli').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <CliBuilderTab preset={cliPreset} />
                   </div>
                 ))}
 
@@ -1279,12 +1300,13 @@ export default function App() {
                       onRunningChange={running => updateTab(t.id, { scenarioRunning: running })}
                       onDirtyChange={dirty => updateTab(t.id, { scenarioDirty: dirty })}
                       onRunComplete={() => { setRunLogTrigger(t => t + 1); setCoverageRefreshTrigger(t => t + 1) }}
+                      onGetCliCommand={() => openCliBuilder({ command: 'run', values: { 'scenario-file': t.scenarioPath ?? '' } })}
                     />
                   </div>
                 ))}
 
                 {/* Request panel: only mount when active tab is a request */}
-                {activeTab.kind !== 'scenario' && activeTab.kind !== 'coverage' && activeTab.kind !== 'runner' && (
+                {activeTab.kind !== 'scenario' && !isPageTab(activeTab.kind) && (
                   <>
                     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                       <RequestEditor
@@ -1350,6 +1372,11 @@ export default function App() {
             environments={workspace.environments}
             activeEnv={workspace.activeEnv}
             workspacePath={workspace.workspacePath}
+            activeFilePath={
+              activeTab.kind === 'scenario' ? activeTab.scenarioPath
+                : isPageTab(activeTab.kind) ? null
+                : activeTab.filePath
+            }
             demoRunning={demo.demoRunning}
             demoPort={demo.demoPort}
             onEnvChange={workspace.handleEnvChange}
