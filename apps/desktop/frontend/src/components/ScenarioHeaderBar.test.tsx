@@ -58,6 +58,22 @@ describe('ScenarioHeaderBar', () => {
     expect(p.onShowYaml).toHaveBeenCalledTimes(1)
   })
 
+  it('offers the CLI command only when the screen can open it', () => {
+    const { unmount } = render(<ScenarioHeaderBar {...({
+      title: 't', saving: false, detailLoaded: true, environments: [], selectedEnvPath: '',
+      onEnvPathChange: vi.fn(), onTitleChange: vi.fn(), result: null, running: false,
+      onShowStats: vi.fn(), onRun: vi.fn(), saveError: null, savedFlash: false, isDirty: false,
+      onDiscard: vi.fn(), onSave: vi.fn(), onShowYaml: vi.fn(),
+    } as React.ComponentProps<typeof ScenarioHeaderBar>)} />)
+    expect(screen.queryByRole('button', { name: 'Get CLI command' })).not.toBeInTheDocument()
+    unmount()
+
+    const onGetCliCommand = vi.fn()
+    setup({ onGetCliCommand })
+    fireEvent.click(screen.getByRole('button', { name: 'Get CLI command' }))
+    expect(onGetCliCommand).toHaveBeenCalledTimes(1)
+  })
+
   it('hides the environment picker without environments', () => {
     setup()
     expect(screen.queryByTitle('Environment for this run')).not.toBeInTheDocument()

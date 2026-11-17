@@ -28,12 +28,13 @@ type Props = {
   onRunningChange: (running: boolean) => void
   onDirtyChange?: (dirty: boolean) => void
   onRunComplete?: () => void
+  onGetCliCommand?: () => void
 }
 
 export function ScenarioViewer({
   scenarioPath, scenarioName, result, running, isActive = true, saveSignal, theme = 'dark',
   environments = [], activeEnvPath = '',
-  onResultChange, onRunningChange, onDirtyChange, onRunComplete,
+  onResultChange, onRunningChange, onDirtyChange, onRunComplete, onGetCliCommand,
 }: Props) {
   const [detail, setDetail] = useState<ScenarioDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -407,6 +408,7 @@ export function ScenarioViewer({
         onDiscard={handleDiscard}
         onSave={handleSave}
         onShowYaml={() => setShowYamlDialog(true)}
+        onGetCliCommand={onGetCliCommand}
       />
 
       {running && (

@@ -64,6 +64,13 @@ import {
   ExportBundle as WailsExportBundle,
 } from '@wailsjs/go/main/BundleService'
 import {
+  GetCliCatalog as WailsGetCliCatalog,
+  GetCliContext as WailsGetCliContext,
+  BuildCliCommand as WailsBuildCliCommand,
+  PickCliFile as WailsPickCliFile,
+  PickCliFolder as WailsPickCliFolder,
+} from '@wailsjs/go/main/CliBuilderService'
+import {
   GetSettings as WailsGetSettings,
   SaveSettings as WailsSaveSettings,
   ResetSettings as WailsResetSettings,
@@ -507,6 +514,125 @@ export async function previewBundle(text: string, specFile: string, strategy: Bu
 
 export async function importBundle(text: string, specFile: string, strategy: BundleStrategy): Promise<BundleImportResult> {
   return (await WailsImportBundle(text, specFile, strategy)) as unknown as BundleImportResult
+}
+
+// ---- CLI Command Builder ----
+
+export type CliInputKind = 'file' | 'fileOrURL' | 'dir' | 'outputFile' | 'url' | 'enum' | 'int' | 'bool' | 'string'
+
+export interface CliInput {
+  name: string
+  short: string
+  positional: boolean
+  required: boolean
+  kind: CliInputKind
+  role: '' | 'scenario' | 'environment' | 'spec' | 'workspace'
+  accepts: string[]
+  enum: string[]
+  default: string
+  label: string
+  help: string
+  example: string
+  group: 'essential' | 'advanced'
+}
+
+export interface CliExitCode {
+  code: number
+  meaning: string
+  forCI: string
+}
+
+export interface CliCommand {
+  name: string
+  goal: string
+  summary: string
+  when: string
+  inputs: CliInput[]
+  outputs: string[]
+  exitCodes: CliExitCode[]
+}
+
+export interface CliFile {
+  path: string
+  label: string
+}
+
+export interface CliContext {
+  workspace: string
+  runFrom: string
+  scenarios: CliFile[]
+  environments: CliFile[]
+  specs: CliFile[]
+}
+
+export interface CliBuildInput {
+  command: string
+  values: Record<string, string>
+  runFrom: string
+}
+
+export interface CliMessage {
+  field: string
+  severity: 'error' | 'warning' | 'info'
+  text: string
+}
+
+export interface CliNeed {
+  name: string
+  secret: boolean
+  from: string
+}
+
+export interface CliSuggestion {
+  field: string
+  value: string
+  why: string
+}
+
+export type CliShell = 'bash' | 'powershell' | 'cmd'
+
+export interface CliRendering {
+  shell: CliShell
+  multiline: string
+  oneline: string
+}
+
+export interface CliBuildOutput {
+  command: string
+  valid: boolean
+  argv: string[]
+  renderings: CliRendering[]
+  messages: CliMessage[]
+  needs: CliNeed[]
+  suggestions: CliSuggestion[]
+  explanation: {
+    goal: string
+    summary: string
+    when: string
+    parts: { token: string; meaning: string }[]
+    outputs: string[]
+    exitCodes: CliExitCode[]
+  }
+}
+
+export async function getCliCatalog(): Promise<CliCommand[]> {
+  return (await WailsGetCliCatalog()) as unknown as CliCommand[]
+}
+
+export async function getCliContext(): Promise<CliContext> {
+  return (await WailsGetCliContext()) as unknown as CliContext
+}
+
+export async function buildCliCommand(input: CliBuildInput): Promise<CliBuildOutput> {
+  return (await WailsBuildCliCommand(input as never)) as unknown as CliBuildOutput
+}
+
+export async function pickCliFile(title: string): Promise<string> {
+  return WailsPickCliFile(title)
+}
+
+export async function pickCliFolder(title: string): Promise<string> {
+  return WailsPickCliFolder(title)
 }
 
 // ---- Settings ----

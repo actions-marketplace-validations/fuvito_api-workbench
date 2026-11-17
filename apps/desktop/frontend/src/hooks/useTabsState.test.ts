@@ -275,6 +275,18 @@ describe('opening things', () => {
     expect(result.current.tabs.find(t => t.id === c)).toMatchObject({ name: 'Contracts', kind: 'coverage' })
   })
 
+  it('the CLI builder tab is a singleton page tab', () => {
+    const { result } = setup()
+    let a = '', b = ''
+    act(() => { a = result.current.openCliTab() })
+    act(() => result.current.handleNewTab())
+    act(() => { b = result.current.openCliTab() })
+    expect(b).toBe(a)
+    expect(result.current.activeTabId).toBe(a)
+    expect(result.current.tabs.filter(t => t.kind === 'cli')).toHaveLength(1)
+    expect(result.current.tabs.find(t => t.id === a)).toMatchObject({ name: 'CLI Builder', kind: 'cli' })
+  })
+
   it('opening the same scenario twice switches to the existing tab', () => {
     const { result } = setup()
     let a = '', b = ''

@@ -479,12 +479,30 @@ The tab refreshes automatically whenever you switch to it and after any scenario
 
 The CLI uses the same Go execution engine as the desktop application. Build it once and use it in any terminal or CI pipeline — no behavioural differences between interactive testing and CI.
 
-### Build
+### The CLI Command Builder
 
-```bash
-cd apps/cli
-go build -o clrsig .
-```
+You do not have to assemble a command by hand. The **CLI Command Builder** is a screen in the desktop app that builds the command for you, checks it, and explains every part.
+
+**Open it** from the terminal icon (**CLI Command Builder**) near the bottom of the Activity Rail, or from the terminal button in a scenario's header bar, which opens it with that scenario already chosen.
+
+1. **Pick what you want to do** — run a scenario, check an API against its OpenAPI spec, or detect breaking changes between two specs.
+2. **Fill in the fields.** Each one says in plain words what it is and what is expected. Choose files from the **Workspace…** list (it shows the scenarios, environments and OpenAPI documents found in your workspace), browse for any other file, or type a path or web address. Less common options are under **More options**.
+3. **Read the result** on the right: the command, a list of anything to fix, and an explanation.
+4. **Copy** it into your terminal or CI pipeline. **Copy** stays disabled while there is a problem to fix.
+
+What the builder does for you:
+
+- **Relative paths, written for where you run the command.** Paths in the command are relative to the **Run from folder** (by default your repository root, found by looking for `.git`). That is why a command copied from here works the same on your machine and on a CI runner that checks out the repository. A path outside that folder is written as an absolute path, with a warning that it will not exist on another machine.
+- **The right shell.** Choose **bash**, **PowerShell** or **cmd**; the quoting and line continuation are adjusted for each. **One line** switches off the line breaks.
+- **Checks with the real parsers.** The scenario, environment and spec you pick are opened the same way the CLI opens them, so you see "valid, 4 steps", the OpenAPI title and number of operations, or the exact problem, before anything runs.
+- **Missing pieces.** It warns when a scenario uses a `{{variable}}` that the environment does not define, and when `--coverage` or `--workspace` has no spec to work with (a `specFile:` inside the scenario counts).
+- **Variables to set in CI.** If your environment file reads values such as `${API_TOKEN}`, the builder lists them under **Set these where the command runs** and marks the secret ones. Secret values are never shown or stored.
+- **Report format and file name.** Choose `text`, `json`, `junit` or `html`. For a non-text format, the builder suggests a file such as `reports/run-user-lifecycle.html`; click **Use …** to take it. It tells you when a file will be overwritten or a folder created. See [Output formats](#output-formats).
+- **An explanation of every part.** *Part by part* says what each piece of the command means, *What you get* says what is printed or written, and *Exit codes* says what each exit code means and what a pipeline does with it.
+
+The builder only builds and explains; it does not run anything. In a pipeline, give each `clrsig` command its own step with its own report file, so every result keeps its own log and exit code, and upload the reports together.
+
+### Build
 
 Or run directly without building:
 

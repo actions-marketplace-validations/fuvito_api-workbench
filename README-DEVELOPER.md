@@ -388,6 +388,20 @@ Off by default. The desktop app exposes the same switch in Settings.
 
 ---
 
+## CLI Command Builder
+
+The desktop app has a **CLI Command Builder** page (Activity Rail → terminal icon, or the terminal button on a scenario) that builds, checks and explains a `clrsig` command. Design and decisions: [`docs/enhancements/2026-11-17-cli-command-builder.md`](docs/enhancements/2026-11-17-cli-command-builder.md).
+
+- **`packages/core/clispec`** is the catalog: each command's inputs (kind, role, plain-language help, defaults, requirements), outputs and exit codes.
+- **`packages/core/clibuild`** turns the user's choices into an argument vector plus renderings for bash, PowerShell and cmd, resolves paths against the run-from folder, opens the picked files with the real parsers, and returns messages, needed environment variables, suggested report names and an explanation. It never executes anything.
+- **`apps/desktop/wails/cli_builder_service.go`** exposes both to the frontend; **`CliBuilderTab.tsx`** is the page.
+
+**When you add, rename or remove a flag** on `run`, `conform` or `diff`, update `packages/core/clispec/catalog.go`. `TestCatalogMatchesCobra` (in `apps/cli`) compares the catalog with the real cobra command tree in both directions and fails CI on any difference. To cover another command, add its constructor to `cobraFor` in `apps/cli/clispec_parity_test.go` and its entry to the catalog. `TestBuilderCommandsRun` builds commands with the builder and executes them through the real command tree, including every report format.
+
+Screenshots for the docs are generated with `pnpm test -- --grep @screenshot-cli` (in `apps/desktop/e2e`) into `docs/images/13-*` and `14-*`.
+
+---
+
 ## How Workspaces Work
 
 Clear Signal organises requests as **plain YAML files on disk** — not in a proprietary binary format, not in a database. This means your collection is fully version-controllable with git, diffable in any editor, and portable across machines.
@@ -518,6 +532,8 @@ api-workbench/
 │       ├── assertions/     # Assertion evaluation (status, header, jsonpath, schema)
 │       ├── scenario/       # Multi-step scenario runner with FailPolicy and variable extraction
 │       ├── openapi/        # OpenAPI 3.0/3.1 + Swagger 2.0 parser, generator, validator, diff
+│       ├── clispec/        # Catalog of the clrsig CLI (commands, inputs, exit codes) — drives the CLI Command Builder
+│       ├── clibuild/       # Builds, checks and explains a command line (paths, shell quoting, report names)
 │       ├── conformance/    # Conformance runner — all spec operations, negative probes, violations
 │       ├── coverage/       # Accumulated spec coverage store + quality signals
 │       ├── bundle/         # Single-file bundles: parse, validate, import, export, run

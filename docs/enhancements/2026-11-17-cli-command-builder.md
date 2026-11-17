@@ -1,6 +1,6 @@
 # CLI Command Builder
 
-- **Status:** Accepted (phase 1 in progress)
+- **Status:** Accepted — phase 1 implemented (build, explain, copy, report formats); phases 2 and 3 pending
 - **Date:** 2026-11-17
 - **Supersedes:** the backlog item "Copy CLI command button" (a subset of this)
 - **Touches:** `packages/core` (new), `apps/desktop/wails`, `apps/desktop/frontend`, `apps/cli` (tests), installer and release workflow (phase 2)
@@ -164,7 +164,7 @@ The domain/core packages never depend on Wails; the runner lives in the Wails la
 |---|---|---|
 | **1 — Build and explain** (order: catalog and builder with the default text output → page and entry points → verify end to end → **last: report formats `junit`, `html`, `json` and output-file naming**) | `clispec` catalog (+ parity test), `clibuild`, builder page, commands `run`, `conform`, `diff`; Terminal tabs (bash, PowerShell, cmd); path/name logic, validation, explanations, copy; entry points from the scenario header and the Rail | A user can produce a correct `clrsig run` command for a workspace scenario in under a minute; paths are right from the repo root; quoting golden tests pass; the parity test fails when a flag is added without a catalog entry |
 | **2 — Test it here** | process runner, binary discovery, streaming result panel, exit-code explanations, Open report, prod guard; CLI shipped with the desktop app (installer, macOS bundle, Linux) and version check | Pressing Test it runs the exact copied command; cancel and timeout work; a failing scenario is explained, not just shown; the installed app finds its CLI with no PATH setup |
-| **3 — More targets and commands** | `bundle run`, `impact`, `coverage quality`, `generate`, `request`, `validate`; Docker and GitHub Action targets; env-var checklist for CI | Docker and Action snippets run unmodified in a sample repo (checked in CI) |
+| **3 — More targets and commands** | `bundle run`, `impact`, `coverage quality`, `generate`, `request`, `validate`; Docker and GitHub Action targets; env-var checklist for CI; **multi-step pipeline snippets** (several commands as separate steps with distinct report names and an upload step using `if: always()`) | Docker and Action snippets run unmodified in a sample repo (checked in CI) |
 
 Phase 1 alone replaces the backlog "Copy CLI command" item.
 
@@ -211,4 +211,6 @@ Phase 1 alone replaces the backlog "Copy CLI command" item.
 |---|---|---|
 | 2026-11-17 | Proposal written; awaiting decisions on section 11 | assistant |
 | 2026-11-17 | All recommendations in section 11 accepted (real binary, ship CLI with the app, phase 1 then 2, Rail tab plus contextual buttons, `run`/`conform`/`diff`, no presets, name "CLI Command Builder") | project owner |
+| 2026-11-17 | Clarification: in CI each command is its own step with its own log and exit code; reports are combined only by the reporting tool (several JUnit files merge). Multi-step pipeline snippets added to phase 3 | project owner / assistant |
+| 2026-11-17 | Phase 1 implemented: catalog + builder + page + report formats, verified by unit, parity, integration, component and browser tests | assistant |
 | 2026-11-17 | Addition: the report formats (`text` first; then `junit`, `html`, `json` with `--output` naming) are added as the **last step of phase 1**, after the basic flow has been verified working | project owner |

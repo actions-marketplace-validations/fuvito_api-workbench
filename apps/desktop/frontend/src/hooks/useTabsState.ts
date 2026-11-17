@@ -425,6 +425,43 @@ export function useTabsState(deps: {
     return id
   }
 
+  function openCliTab(): string {
+    const existing = tabsStateRef.current.tabs.find(t => t.kind === 'cli')
+    if (existing) {
+      switchTo(existing.id)
+      return existing.id
+    }
+    const id = crypto.randomUUID()
+    const blankKey = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
+    const newTab: TabState = {
+      id,
+      kind: 'cli',
+      name: 'CLI Builder',
+      method: 'GET',
+      url: '',
+      queryParams: [],
+      headers: [],
+      body: { type: 'none', content: '' },
+      auth: { type: 'none' },
+      timeoutMs: 0,
+      filePath: null,
+      targetDir: null,
+      savedKey: blankKey,
+      response: null,
+      previousResponse: null,
+      responseCachedAt: null,
+      loading: false,
+      saveError: null,
+      editingName: false,
+    }
+    setTabsState(prev => {
+      const dup = prev.tabs.find(t => t.kind === 'cli')
+      if (dup) return { ...prev, activeTabId: dup.id }
+      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+    })
+    return id
+  }
+
   function openScenarioAsTab(scenarioPath: string, scenarioName: string): string {
     // If an identical scenario tab already exists, switch to it
     const existing = tabsStateRef.current.tabs.find(
@@ -496,7 +533,7 @@ export function useTabsState(deps: {
     saveTabById, saveTabByIdRef,
     handleSaveRequest, handleSaveAsRequest, handleSaveAll,
     handleSelectHistory, handleNewRequestInFolder,
-    openRunnerTab, openCoverageTab, openScenarioAsTab,
+    openRunnerTab, openCoverageTab, openCliTab, openScenarioAsTab,
     closingDirtyTabId, setClosingDirtyTabId,
     closingDirtyScenarioTabId, setClosingDirtyScenarioTabId,
     pendingBulkClose, setPendingBulkClose,

@@ -45,6 +45,7 @@ func main() {
 			app.demoService,
 			app.scenarioService,
 			app.helpService,
+			app.cliBuilder,
 		},
 	})
 	if err != nil {
