@@ -595,6 +595,7 @@ func conformCmd() *cobra.Command {
 	var requestTimeout int
 	var failFast bool
 	var showCoverage bool
+	var runNegative bool
 	var start = time.Now()
 
 	cmd := &cobra.Command{
@@ -669,6 +670,12 @@ Exit codes:
 				cov = conformance.ComputeCoverage(result)
 			}
 
+			var negResult *conformance.NegativeResult
+			if runNegative {
+				negRunner := conformance.NewNegative(exec)
+				negResult = negRunner.Run(context.Background(), spec, baseURL, env, opts)
+			}
+
 			var reportBytes []byte
 			switch strings.ToLower(format) {
 			case "json":
@@ -684,6 +691,9 @@ Exit codes:
 				}
 			default:
 				reportBytes = []byte(reporting.ConformText(result, cov))
+				if negResult != nil {
+					reportBytes = append(reportBytes, []byte(reporting.NegativeText(negResult))...)
+				}
 			}
 
 			if outputFile != "" {
@@ -704,9 +714,13 @@ Exit codes:
 			}
 
 			_, failed, _ := result.Counts()
+			negFailed := 0
+			if negResult != nil {
+				_, negFailed, _, _ = negResult.Counts()
+			}
 			tel := newTelemetryClient()
 			telResult := "pass"
-			if failed > 0 {
+			if failed > 0 || negFailed > 0 {
 				telResult = "fail"
 			}
 			passed, failedCount, _ := result.Counts()
@@ -716,7 +730,7 @@ Exit codes:
 				DurationMs:     time.Since(start).Milliseconds(),
 				AssertionCount: passed + failedCount,
 			})
-			if failed > 0 {
+			if failed > 0 || negFailed > 0 {
 				return &exitError{1}
 			}
 			return nil
@@ -732,6 +746,7 @@ Exit codes:
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
+	cmd.Flags().BoolVar(&runNegative, "negative", false, "Also run negative probes: drop required fields, wrong types, missing auth, missing params")
 	return cmd
 }
 
