@@ -264,16 +264,10 @@ func TestImportedPostmanEndToEnd(t *testing.T) {
 
 func TestHelpService(t *testing.T) {
 	h := NewHelpService()
-	guide, spec, prompt := h.GetUserGuide(), h.GetFormatSpec(), h.GetAIPrompt()
-	if len(guide) < 100 || len(spec) < 100 {
+	if guide, spec := h.GetUserGuide(), h.GetFormatSpec(); len(guide) < 100 || len(spec) < 100 {
 		t.Fatalf("embedded docs look empty: guide=%d spec=%d", len(guide), len(spec))
 	}
-	if !strings.HasSuffix(prompt, spec) || len(prompt) <= len(spec) {
-		t.Error("the AI prompt must end with the full format spec")
-	}
-	for _, want := range []string{"Step 4", "{{"} {
-		if !strings.Contains(prompt, want) {
-			t.Errorf("prompt missing %q", want)
-		}
+	if h.GetAIPromptInstructions() != aiPromptMarkdown || len(aiPromptMarkdown) < 1000 {
+		t.Error("the AI prompt instructions should be the embedded document")
 	}
 }

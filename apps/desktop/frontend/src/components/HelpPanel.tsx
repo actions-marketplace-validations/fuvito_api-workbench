@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { X, Copy, CheckCircle2 } from 'lucide-react'
-import { getUserGuide, getFormatSpec, getAIPrompt } from '@/lib/bridge'
+import { X, Copy, Download, CheckCircle2 } from 'lucide-react'
+import { getUserGuide, getFormatSpec, getExampleScenario, getAIPromptInstructions, getAIPrompt, saveContentToFile } from '@/lib/bridge'
 import { cn } from '@/lib/utils'
+import { extractScenarioYaml, extractScenarioFileName } from '@/lib/helpDocs'
 
-type Tab = 'guide' | 'spec'
+type Tab = 'guide' | 'spec' | 'example' | 'prompt'
 type Props = { onClose: () => void; initialTab?: Tab }
 
 function slugify(text: string): string {
@@ -112,11 +113,41 @@ function MarkdownBody({ content, onAnchorClick }: {
   )
 }
 
+function HeaderAction({ id, done, label, doneLabel, icon, title, onClick }: {
+  id: string
+  done: string | null
+  label: string
+  doneLabel: string
+  icon: React.ReactNode
+  title: string
+  onClick: () => void
+}) {
+  const isDone = done === id
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={cn(
+        'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors',
+        isDone
+          ? 'bg-emerald-500/15 text-emerald-400'
+          : 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20'
+      )}
+    >
+      {isDone ? <><CheckCircle2 size={12} /> {doneLabel}</> : <>{icon} {label}</>}
+    </button>
+  )
+}
+
 export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [guide, setGuide] = useState<string | null>(null)
   const [spec, setSpec] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [example, setExample] = useState<string | null>(null)
+  const [promptDoc, setPromptDoc] = useState<string | null>(null)
+  // id of the header action that just succeeded, shown briefly as "Copied!" / "Saved!"
+  const [doneAction, setDoneAction] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -128,6 +159,18 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
       getFormatSpec().then(setSpec).catch(() => setSpec('Failed to load format spec.'))
     }
   }, [tab, spec])
+
+  useEffect(() => {
+    if (tab === 'example' && example === null) {
+      getExampleScenario().then(setExample).catch(() => setExample('Failed to load the example scenario.'))
+    }
+  }, [tab, example])
+
+  useEffect(() => {
+    if (tab === 'prompt' && promptDoc === null) {
+      getAIPromptInstructions().then(setPromptDoc).catch(() => setPromptDoc('Failed to load the AI prompt.'))
+    }
+  }, [tab, promptDoc])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -150,14 +193,34 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
     }
   }
 
-  async function handleCopyAIPrompt() {
+  async function runAction(id: string, action: () => Promise<boolean>) {
     try {
-      const prompt = await getAIPrompt()
-      await navigator.clipboard.writeText(prompt)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (!(await action())) return
+      setDoneAction(id)
+      setTimeout(() => setDoneAction(d => (d === id ? null : d)), 2000)
     } catch {
-      // clipboard API may be unavailable in some environments
+      // clipboard or save dialog unavailable — nothing useful to show
+    }
+  }
+
+  const getSpecText = async () => spec ?? await getFormatSpec()
+  const getScenarioYaml = async () => (example ? extractScenarioYaml(example) : null)
+
+  function copyAction(getText: () => Promise<string | null>) {
+    return async () => {
+      const text = await getText()
+      if (!text) return false
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  }
+
+  // The native save dialog returns '' when the user cancels.
+  function downloadAction(getText: () => Promise<string | null>, fileName: string) {
+    return async () => {
+      const text = await getText()
+      if (!text) return false
+      return (await saveContentToFile(text, fileName)) !== ''
     }
   }
 
@@ -168,14 +231,14 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
       : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
   )
 
-  const content = tab === 'guide' ? guide : spec
+  const content = tab === 'guide' ? guide : tab === 'spec' ? spec : tab === 'example' ? example : promptDoc
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="flex flex-col w-full max-w-3xl max-h-[88vh] rounded-xl shadow-2xl bg-[var(--color-background)] border border-[var(--color-border)]">
+      <div className="flex flex-col w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl bg-[var(--color-background)] border border-[var(--color-border)]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-2 border-b border-[var(--color-border)] shrink-0">
@@ -186,24 +249,55 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
             <button type="button" onClick={() => setTab('spec')} className={tabCls(tab === 'spec')}>
               Format Spec
             </button>
+            <button type="button" onClick={() => setTab('example')} className={tabCls(tab === 'example')}>
+              Example Scenario
+            </button>
+            <button type="button" onClick={() => setTab('prompt')} className={tabCls(tab === 'prompt')}>
+              AI Prompt
+            </button>
           </div>
           <div className="flex items-center gap-2 pb-2">
             {tab === 'spec' && (
-              <button
-                type="button"
-                onClick={handleCopyAIPrompt}
-                title="Copy the full AI prompt (spec + instructions) to your clipboard — paste into ChatGPT, Gemini, or any AI assistant"
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors',
-                  copied
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/20'
-                )}
-              >
-                {copied
-                  ? <><CheckCircle2 size={12} /> Copied!</>
-                  : <><Copy size={12} /> Copy AI Prompt</>}
-              </button>
+              <>
+                <HeaderAction
+                  id="download-spec" done={doneAction} label="Download" doneLabel="Saved!" icon={<Download size={12} />}
+                  title="Save the format specification as a Markdown file — attach it to a chat"
+                  onClick={() => runAction('download-spec', downloadAction(getSpecText, 'clear-signal-format-spec.md'))}
+                />
+                <HeaderAction
+                  id="copy-spec" done={doneAction} label="Copy Format Spec" doneLabel="Copied!" icon={<Copy size={12} />}
+                  title="Copy the format specification to your clipboard"
+                  onClick={() => runAction('copy-spec', copyAction(getSpecText))}
+                />
+              </>
+            )}
+            {tab === 'prompt' && (
+              <>
+                <HeaderAction
+                  id="download-prompt" done={doneAction} label="Download" doneLabel="Saved!" icon={<Download size={12} />}
+                  title="Save the complete prompt (instructions + format spec + example scenario) as a Markdown file — attach it to a chat"
+                  onClick={() => runAction('download-prompt', downloadAction(getAIPrompt, 'clear-signal-ai-prompt.md'))}
+                />
+                <HeaderAction
+                  id="copy-prompt" done={doneAction} label="Copy AI Prompt" doneLabel="Copied!" icon={<Copy size={12} />}
+                  title="Copy the complete prompt (instructions + format spec + example scenario) to your clipboard"
+                  onClick={() => runAction('copy-prompt', copyAction(getAIPrompt))}
+                />
+              </>
+            )}
+            {tab === 'example' && example !== null && (
+              <>
+                <HeaderAction
+                  id="download-scenario" done={doneAction} label="Download" doneLabel="Saved!" icon={<Download size={12} />}
+                  title="Save the scenario as a YAML file you can drop into a workspace's scenarios folder"
+                  onClick={() => runAction('download-scenario', downloadAction(getScenarioYaml, extractScenarioFileName(example)))}
+                />
+                <HeaderAction
+                  id="copy-scenario" done={doneAction} label="Copy scenario" doneLabel="Copied!" icon={<Copy size={12} />}
+                  title="Copy the scenario YAML to your clipboard — save it as scenarios/user-onboarding.yaml in a workspace"
+                  onClick={() => runAction('copy-scenario', copyAction(getScenarioYaml))}
+                />
+              </>
             )}
             <button
               type="button"
@@ -215,13 +309,12 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
           </div>
         </div>
 
-        {/* Copy AI Prompt hint — shown only on spec tab */}
+        {/* Copy hint — shown only on spec tab */}
         {tab === 'spec' && (
           <div className="shrink-0 px-6 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-muted)]/50">
             <p className="text-xs text-[var(--color-muted-foreground)]">
-              <span className="font-medium text-[var(--color-foreground)]">Use with AI:</span>{' '}
-              Click <span className="font-medium">Copy AI Prompt</span> to copy the spec + a smart system prompt to your clipboard.
-              Paste into ChatGPT, Gemini, or any AI assistant — it will interview you, generate valid YAML files, and self-verify them against this spec.
+              <span className="font-medium text-[var(--color-foreground)]">Copy it anywhere:</span>{' '}
+              Click <span className="font-medium">Copy Format Spec</span> to copy this whole document to your clipboard — handy for pasting into an AI assistant, a wiki or a code review.
             </p>
           </div>
         )}

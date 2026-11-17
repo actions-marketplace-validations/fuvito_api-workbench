@@ -18,6 +18,7 @@ import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
 import {RunnerTab} from '@/components/RunnerTab'
 import {WorkspaceImportDialog} from '@/components/WorkspaceImportDialog'
+import {BundleImportDialog} from '@/components/BundleImportDialog'
 import {Sidebar} from '@/components/Sidebar'
 import {AboutDialog} from '@/components/AboutDialog'
 import {
@@ -164,7 +165,7 @@ export default function App() {
   // Modal / overlay state
   const [showAbout, setShowAbout] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec'>('guide')
+  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec' | 'example' | 'prompt'>('guide')
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
@@ -215,6 +216,7 @@ export default function App() {
 
   // Workspace export / import
   const [pendingImport, setPendingImport] = useState<ScanImportResult | null>(null)
+  const [showBundleImport, setShowBundleImport] = useState(false)
   const [showExportSecretsWarning, setShowExportSecretsWarning] = useState(false)
 
   // New scenario from response dialog
@@ -476,6 +478,10 @@ export default function App() {
   // eslint-disable-next-line react/refs
   handleSendRef.current = handleSend
 
+  const workspacePathRef = useRef(workspace.workspacePath)
+  // eslint-disable-next-line react/refs
+  workspacePathRef.current = workspace.workspacePath
+
   function handleCancel() {
     cancelRequest().catch(() => {})
   }
@@ -648,7 +654,7 @@ export default function App() {
         })
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-        if (!workspace.workspacePath) return
+        if (!workspacePathRef.current) return
         e.preventDefault()
         setShowQuickOpen(o => !o)
       }
@@ -700,6 +706,8 @@ export default function App() {
       { kind: 'separator' },
       { kind: 'action', label: 'User Guide',   onClick: () => { setHelpInitialTab('guide'); setShowHelp(true) } },
       { kind: 'action', label: 'Format Spec…', onClick: () => { setHelpInitialTab('spec');  setShowHelp(true) } },
+      { kind: 'action', label: 'Example Scenario…', onClick: () => { setHelpInitialTab('example'); setShowHelp(true) } },
+      { kind: 'action', label: 'AI Prompt…', onClick: () => { setHelpInitialTab('prompt'); setShowHelp(true) } },
       { kind: 'separator' },
       { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
     ],
@@ -747,6 +755,8 @@ export default function App() {
           items: [
             { kind: 'action', label: 'OpenAPI Spec…',       onClick: workspace.handleImportOpenAPI },
             { kind: 'action', label: 'OpenAPI from URL…',   onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) } },
+            { kind: 'separator' },
+            { kind: 'action', label: 'Bundle (environments + scenarios)…', onClick: () => setShowBundleImport(true) },
             { kind: 'separator' },
             { kind: 'action', label: 'Postman Collection…', onClick: workspace.handleImportPostman },
             { kind: 'action', label: 'Insomnia Export…',    onClick: workspace.handleImportInsomnia },
@@ -933,6 +943,13 @@ export default function App() {
               await workspace.refreshWorkspace()
             }
           }}
+        />
+      )}
+
+      {showBundleImport && (
+        <BundleImportDialog
+          onClose={() => setShowBundleImport(false)}
+          onComplete={() => { workspace.refreshWorkspace() }}
         />
       )}
 

@@ -5,6 +5,7 @@ vi.mock('@wailsjs/go/main/RequestService')
 vi.mock('@wailsjs/go/main/WorkspaceService')
 vi.mock('@wailsjs/go/main/OpenAPIService')
 vi.mock('@wailsjs/go/main/ImportService')
+vi.mock('@wailsjs/go/main/BundleService')
 vi.mock('@wailsjs/go/main/SettingsService')
 vi.mock('@wailsjs/go/main/DemoService')
 vi.mock('@wailsjs/go/main/ScenarioService')
@@ -16,6 +17,7 @@ import * as RequestService from '@wailsjs/go/main/RequestService'
 import * as WorkspaceService from '@wailsjs/go/main/WorkspaceService'
 import * as OpenAPIService from '@wailsjs/go/main/OpenAPIService'
 import * as ImportService from '@wailsjs/go/main/ImportService'
+import * as BundleService from '@wailsjs/go/main/BundleService'
 import * as SettingsService from '@wailsjs/go/main/SettingsService'
 import * as DemoService from '@wailsjs/go/main/DemoService'
 import * as ScenarioService from '@wailsjs/go/main/ScenarioService'
@@ -69,6 +71,9 @@ const passthrough: Array<[string, unknown, string, unknown[]]> = [
   ['importOpenAPISpec', OpenAPIService, 'ImportOpenAPISpec', ['http://base']],
   ['importOpenAPISpecFromPath', OpenAPIService, 'ImportOpenAPISpecFromPath', ['/spec', 'http://base']],
   ['importOpenAPISpecFromURL', OpenAPIService, 'ImportOpenAPISpecFromURL', ['http://spec', 'http://base']],
+  ['pickBundleFile', BundleService, 'PickBundleFile', []],
+  ['previewBundle', BundleService, 'PreviewBundle', ['text', '/spec.yaml', 'rename']],
+  ['importBundle', BundleService, 'ImportBundle', ['text', '', 'skip']],
   ['importPostmanCollection', ImportService, 'ImportPostmanCollection', []],
   ['importInsomniaExport', ImportService, 'ImportInsomniaExport', []],
   ['getSettings', SettingsService, 'GetSettings', []],
@@ -101,6 +106,8 @@ const passthrough: Array<[string, unknown, string, unknown[]]> = [
   ['resetAccumulatedCoverage', ScenarioService, 'ResetAccumulatedCoverage', ['spec.yaml']],
   ['getUserGuide', HelpService, 'GetUserGuide', []],
   ['getFormatSpec', HelpService, 'GetFormatSpec', []],
+  ['getExampleScenario', HelpService, 'GetExampleScenario', []],
+  ['getAIPromptInstructions', HelpService, 'GetAIPromptInstructions', []],
   ['getAIPrompt', HelpService, 'GetAIPrompt', []],
 ]
 

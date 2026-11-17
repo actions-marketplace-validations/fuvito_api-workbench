@@ -43,7 +43,7 @@ queryParams:                 # optional
     value: "20"
 
 body:                        # optional
-  type: json                 # none | json | raw | form-urlencoded
+  type: json                 # none | json | raw | form-urlencoded | multipart
   content: '{"name":"Alice","email":"alice@example.com"}'
 
 auth:                        # optional — alternative to manual auth headers
@@ -61,7 +61,7 @@ auth:                        # optional — alternative to manual auth headers
   # value: "{{apiKey}}"
   # location: header          # header | query
 
-timeoutMs: 5000              # optional — per-request timeout in ms (0 = use global default)
+timeout: 5s                  # optional — per-request timeout as a duration string (500ms, 5s, 1m30s); omit to use the global default
 ```
 
 ### Notes
@@ -69,6 +69,16 @@ timeoutMs: 5000              # optional — per-request timeout in ms (0 = use g
 - `auth` and manual `Authorization` headers are mutually exclusive — use one or the other.
 - `body.type: none` omits the body entirely; omitting the `body` block has the same effect.
 - `Content-Type` is set automatically from `body.type` when not explicitly provided.
+- `timeout` is a duration string such as `500ms`, `5s` or `1m`. Request files do **not** accept `timeoutMs`; an unknown field is silently ignored, so the timeout would not apply.
+- `body.type: multipart` sets its own `multipart/form-data` Content-Type with a generated boundary. `content` is a JSON array of fields: `n` is the field name, `t` is `text` or `file`, and `v` is the text value or, for files, an absolute path.
+
+  ```yaml
+  body:
+    type: multipart
+    content: '[{"n":"title","t":"text","v":"Report"},{"n":"file","t":"file","v":"C:/data/report.pdf"}]'
+  ```
+
+  A plain `name=value&other=value` string is also accepted for text-only forms.
 
 ---
 
@@ -82,7 +92,7 @@ title: User Lifecycle        # required — display name
 description: "Verifies CRUD operations for /users. Run after any changes to the users endpoint or auth middleware."
                              # optional — when to run it and what it proves
 
-specFile: "/absolute/path/to/openapi.yaml"  # optional — absolute path to OpenAPI spec; enables schema assertions by operationId
+specFile: "/absolute/path/to/openapi.yaml"  # optional — absolute path or http(s) URL of an OpenAPI 3.x spec; enables schema assertions by operationId
 
 steps:
   - label: Login             # required — short action phrase ("Login", "Create order", not "Step 1")
@@ -118,8 +128,14 @@ steps:
         path: "$.token"
 
     failPolicy: stop         # optional — stop (default) | continue | skip
-    timeoutMs: 0             # optional — 0 = use global default
     disabled: false          # optional — true skips this step without counting as failure
+    validateSpec: true       # optional — with specFile set, validate this step's response against the spec (default true); false opts the step out
+
+    # Accepted and saved, but NOT yet applied when a scenario runs:
+    timeoutMs: 0             # optional — per-step timeout in ms
+    retry:                   # optional — retry policy
+      maxAttempts: 3
+      delayMs: 500
 
   - label: Create user
     notes: "POST to /users. Extracts the new user's ID for use in later steps."
@@ -186,6 +202,14 @@ steps:
 | `continue` | Run the next step regardless of this step's outcome |
 | `skip` | Skip this step if the previous step failed |
 
+### Step options that are not applied yet
+
+`timeoutMs` and `retry` are part of the file format: they are parsed, preserved on save and editable in the app. The scenario runner does not use them yet, so a step runs once with the request's own `timeout` (or the global default). Do not rely on them to change run behaviour.
+
+### validateSpec
+
+When the scenario sets `specFile`, every step's response is also validated against the matching operation in that spec, and a violation fails the step. Set `validateSpec: false` on a step that intentionally returns something the spec does not describe, such as a negative test.
+
 ---
 
 ## Environment File
@@ -236,6 +260,8 @@ Every assertion evaluates one aspect of the HTTP response.
   expected: 200
 ```
 
+Every assertion may also carry an optional `name:` label. It is saved with the assertion and included in the JSON report (`--format json`); text and JUnit reports always describe the assertion from its type, path, operator and expected value.
+
 ### `type: jsonpath` — JSON response body field
 
 ```yaml
@@ -252,7 +278,7 @@ Every assertion evaluates one aspect of the HTTP response.
 ```yaml
 - type: header
   path: Content-Type        # header name (case-insensitive)
-  operator: contains        # eq | ne | contains | matches
+  operator: contains        # eq | ne | gt | lt | contains | matches (gt and lt need numeric values)
   expected: application/json
 ```
 
@@ -271,8 +297,8 @@ Requires `specFile` set at the scenario level.
 |---|---|---|
 | `eq` | status, jsonpath, header | Equal |
 | `ne` | status, jsonpath, header | Not equal |
-| `gt` | status, jsonpath | Greater than (numeric) |
-| `lt` | status, jsonpath | Less than (numeric) |
+| `gt` | status, jsonpath, header | Greater than (numeric) |
+| `lt` | status, jsonpath, header | Less than (numeric) |
 | `contains` | jsonpath, header | String contains substring |
 | `matches` | jsonpath, header | Matches regular expression |
 
@@ -308,6 +334,66 @@ Capture a value from a response to use as a variable in later steps.
 
 ---
 
+## Bundle File
+
+A **bundle** is one document that holds several environments, reusable requests and scenarios. It exists so a whole test suite can be generated, shared or pasted as a single block and imported in one step (**File → Import → Bundle (environments + scenarios)…**). Every item uses exactly the formats described above; a bundle only adds a top-level wrapper and a `file` name per item.
+
+```yaml
+schemaVersion: "1"                 # required — always "1"
+title: Pet Store test suite        # optional — shown in the import preview
+description: Smoke and lifecycle tests for the Pet Store API   # optional
+specFile: "https://petstore3.swagger.io/api/v3/openapi.json"   # optional — default OpenAPI spec (path or URL) for every scenario
+
+environments:                      # optional — one or more
+  - name: staging                  # required
+    file: staging                  # optional — saved as environments/staging.yaml (default: derived from name)
+    variables:
+      - name: baseUrl
+        value: "https://staging.example.com"
+      - name: apiKey
+        value: CHANGE_ME
+        secret: true
+
+requests:                          # optional — reusable requests
+  - file: check-health             # required — saved as requests/check-health.yaml; scenarios refer to it by this name
+    title: Check health
+    method: GET
+    url: "{{baseUrl}}/health"
+    timeout: 5s
+
+scenarios:                         # optional — one or more
+  - title: Smoke test              # required
+    file: smoke-test               # optional — saved as scenarios/smoke-test.yaml (default: derived from title)
+    description: Quick check that the API is up
+    specFile: "https://other.example.com/openapi.json"   # optional — overrides the bundle default for this scenario
+    steps:
+      - label: Health
+        requestRef: check-health   # a request from this bundle
+        assertions:
+          - type: status
+            operator: eq
+            expected: 200
+```
+
+### Rules
+
+- At least one of `environments`, `requests` or `scenarios` must be present.
+- Each item takes the same fields as the matching standalone file, except `schemaVersion` (which belongs to the bundle) and the extra `file` key.
+- **Unknown fields are errors.** A bundle is checked strictly, so a typo such as `queryParam:` or a misplaced `timeoutMs` on a request is reported at import instead of being silently ignored.
+- `file` is a name without extension; it may contain folders (`auth/login`). It must not contain `..`. Names must be unique within each kind.
+- `requestRef` in a bundle scenario names a request from the same bundle by its `file` (`check-health`, `check-health.yaml` and `requests/check-health.yaml` all match). On import it is rewritten to the saved location, for example `../requests/check-health.yaml`. A `requestRef` that is not in the bundle and looks like a path is left unchanged and must already exist in the workspace; any other unknown name is an error.
+- `specFile` resolves per scenario: the scenario's own value, otherwise the bundle's. At import time the user can override it for all scenarios, for example to point at a local file. A URL is valid; secrets and tokens must never be put in a spec URL.
+- Secret values in environments should be placeholders (`CHANGE_ME`) with `secret: true`; never include real credentials.
+
+### Import behaviour
+
+- The bundle is validated before anything is written. Any error stops the import; warnings (for example a `{{variable}}` that no environment defines, or `retry` / `timeoutMs`, which are not applied yet) do not.
+- Files that already exist can be skipped, overwritten, or kept by saving the new file as `name-2.yaml`. When a request is renamed this way, scenarios that refer to it are updated to match.
+- Files are written atomically. The result is ordinary request, scenario and environment files; the bundle itself is not stored.
+- A bundle may be YAML or JSON. Text pasted from a chat window may include a surrounding ``` code fence, which is ignored.
+
+---
+
 ## File Naming Conventions
 
 | File type | Convention | Example |
@@ -316,7 +402,7 @@ Capture a value from a response to use as a variable in later steps.
 | Scenario | `kebab-case.yaml` | `user-lifecycle.yaml`, `checkout-flow.yaml` |
 | Environment | `name.yaml` | `local.yaml`, `staging.yaml`, `production.yaml` |
 
-Place requests under `requests/`, scenarios under `scenarios/`, environments under `environments/` within your workspace.
+Place requests under `requests/`, scenarios under `scenarios/`, environments under `environments/` within your workspace. A bundle is an import format only and is not stored in the workspace.
 
 ---
 
