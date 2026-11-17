@@ -246,6 +246,8 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 	}
 	doc.Passed = failed == 0
 
+	x := newRedactor(result.Secrets, false)
+	doc.Subtitle = x.text(doc.Subtitle)
 	ops := htmlSection{Heading: "Operations"}
 	for _, op := range result.Operations {
 		row := htmlRow{Title: op.Method + " " + op.Path}
@@ -261,13 +263,13 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 			row.Meta = fmt.Sprintf("%d · %dms", op.StatusCode, op.DurationMs)
 		}
 		if op.Error != "" {
-			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + op.Error})
+			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + x.text(op.Error)})
 		}
 		for _, v := range op.RequestViolations {
-			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: "request: " + v.Error()})
+			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: "request: " + x.text(v.Error())})
 		}
 		for _, v := range op.Violations {
-			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: v.Error()})
+			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: x.text(v.Error())})
 		}
 		ops.Rows = append(ops.Rows, row)
 	}
@@ -303,7 +305,7 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 				row.Status = "SKIP"
 			case p.Error != "":
 				row.Status = "ERR"
-				row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + p.Error})
+				row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + newRedactor(neg.Secrets, false).text(p.Error)})
 			case p.Passed():
 				row.Status = "PASS"
 				row.Meta = fmt.Sprintf("%d · %dms", p.StatusCode, p.DurationMs)

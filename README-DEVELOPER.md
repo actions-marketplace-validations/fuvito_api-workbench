@@ -141,7 +141,7 @@ Open the desktop app → open a workspace → click **Import OpenAPI** in the wo
 
 ## CLI Reference
 
-The `clrsig` CLI exposes eleven commands: `run`, `conform`, `diff`, `impact`, `generate`, `request`, `validate`, `coverage`, `bundle`, `mcp` and `telemetry`. Report commands choose their output with `--format` and write to a file with `--output <file>` (parent folders are created); run `clrsig <command> --help` for the authoritative flag list.
+The `clrsig` CLI exposes twelve commands: `run`, `conform`, `diff`, `impact`, `generate`, `request`, `validate`, `import`, `coverage`, `bundle`, `mcp` and `telemetry`. Report commands choose their output with `--format` and write to a file with `--output <file>` (parent folders are created); run `clrsig <command> --help` for the authoritative flag list.
 
 | Format | Purpose | Commands |
 |---|---|---|

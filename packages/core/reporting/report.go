@@ -275,9 +275,10 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 // Pass a non-nil coverage to append a coverage summary section.
 func ConformText(result *conformance.ConformResult, coverage *conformance.CoverageReport) string {
 	var b strings.Builder
+	x := newRedactor(result.Secrets, false)
 
 	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
-	fmt.Fprintf(&b, "Base URL: %s\n\n", result.BaseURL)
+	fmt.Fprintf(&b, "Base URL: %s\n\n", x.text(result.BaseURL))
 
 	for _, op := range result.Operations {
 		if op.Skipped {
@@ -294,13 +295,13 @@ func ConformText(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		fmt.Fprintf(&b, "  %s  %-7s %s%s\n", status, op.Method, op.Path, suffix)
 		if op.Error != "" {
-			fmt.Fprintf(&b, "         error: %s\n", op.Error)
+			fmt.Fprintf(&b, "         error: %s\n", x.text(op.Error))
 		}
 		for _, v := range op.RequestViolations {
-			fmt.Fprintf(&b, "         ✗ request: %s\n", v.Error())
+			fmt.Fprintf(&b, "         ✗ request: %s\n", x.text(v.Error()))
 		}
 		for _, v := range op.Violations {
-			fmt.Fprintf(&b, "         ✗ %s\n", v.Error())
+			fmt.Fprintf(&b, "         ✗ %s\n", x.text(v.Error()))
 		}
 	}
 
@@ -382,10 +383,11 @@ type JSONCoverageOp struct {
 // Pass a non-nil coverage to include a coverage summary in the output.
 func ConformJSON(result *conformance.ConformResult, coverage *conformance.CoverageReport) ([]byte, error) {
 	_, failed, _ := result.Counts()
+	x := newRedactor(result.Secrets, false)
 	report := JSONConformReport{
 		SpecTitle:   result.SpecTitle,
 		SpecVersion: result.SpecVersion,
-		BaseURL:     result.BaseURL,
+		BaseURL:     x.text(result.BaseURL),
 		Passed:      failed == 0,
 		DurationMs:  result.Duration.Milliseconds(),
 	}
@@ -398,13 +400,13 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			DurationMs:  op.DurationMs,
 			Passed:      op.Passed(),
 			Skipped:     op.Skipped,
-			Error:       op.Error,
+			Error:       x.text(op.Error),
 		}
 		for _, v := range op.RequestViolations {
-			jo.RequestViolations = append(jo.RequestViolations, v.Error())
+			jo.RequestViolations = append(jo.RequestViolations, x.text(v.Error()))
 		}
 		for _, v := range op.Violations {
-			jo.Violations = append(jo.Violations, v.Error())
+			jo.Violations = append(jo.Violations, x.text(v.Error()))
 		}
 		report.Operations = append(report.Operations, jo)
 	}
@@ -439,6 +441,7 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 		Time:     secStr(result.Duration.Milliseconds()),
 	}
 
+	x := newRedactor(result.Secrets, false)
 	for _, op := range result.Operations {
 		tc := jUnitCase{
 			Name:      op.Method + " " + op.Path,
@@ -451,14 +454,14 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 			tc.Skipped = &skipped
 		case op.Error != "":
 			suite.Errors++
-			tc.Error = &jUnitError{Message: op.Error, Text: op.Error}
+			tc.Error = &jUnitError{Message: x.text(op.Error), Text: x.text(op.Error)}
 		case !op.Passed():
 			var msgs []string
 			for _, v := range op.RequestViolations {
-				msgs = append(msgs, "  ✗ request: "+v.Error())
+				msgs = append(msgs, "  ✗ request: "+x.text(v.Error()))
 			}
 			for _, v := range op.Violations {
-				msgs = append(msgs, "  ✗ "+v.Error())
+				msgs = append(msgs, "  ✗ "+x.text(v.Error()))
 			}
 			tc.Failure = &jUnitFailure{
 				Message: fmt.Sprintf("%d violation(s)", len(msgs)),
@@ -487,6 +490,7 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 // NegativeText returns a human-readable negative conformance report.
 func NegativeText(result *conformance.NegativeResult) string {
 	var b strings.Builder
+	x := newRedactor(result.Secrets, false)
 
 	fmt.Fprintf(&b, "\nNegative conformance probes — %s %s\n", result.SpecTitle, result.SpecVersion)
 
@@ -495,7 +499,7 @@ func NegativeText(result *conformance.NegativeResult) string {
 		case p.Skipped:
 			fmt.Fprintf(&b, "  SKIP  %s\n", p.Description)
 		case p.Error != "":
-			fmt.Fprintf(&b, "  ERR   %s\n         error: %s\n", p.Description, p.Error)
+			fmt.Fprintf(&b, "  ERR   %s\n         error: %s\n", p.Description, x.text(p.Error))
 		case p.Passed():
 			fmt.Fprintf(&b, "  PASS  %s  %d  %dms\n", p.Description, p.StatusCode, p.DurationMs)
 		default:

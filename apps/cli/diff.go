@@ -217,6 +217,11 @@ func diffText(result *openapi.DiffResult, changes []openapi.DiffChange, breaking
 // gitSpecAt returns the contents of specPath as committed at ref, found through the git
 // repository that contains the file.
 func gitSpecAt(specPath, ref string) ([]byte, string, error) {
+	// The ref becomes part of one git argument (<ref>:<path>); a ref that starts with "-" would be
+	// read by git as an option (for example --output=<file>), so it is refused.
+	if strings.HasPrefix(ref, "-") || strings.ContainsAny(ref, "\x00\n\r") {
+		return nil, "", fmt.Errorf("--against %q is not a valid git ref (it must not start with '-')", ref)
+	}
 	if strings.HasPrefix(specPath, "http://") || strings.HasPrefix(specPath, "https://") {
 		return nil, "", fmt.Errorf("--against needs a local spec file, not a URL")
 	}

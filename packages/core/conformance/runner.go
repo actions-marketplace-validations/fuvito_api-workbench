@@ -40,6 +40,11 @@ type ConformResult struct {
 	Operations  []OperationResult
 	StartedAt   time.Time
 	Duration    time.Duration
+
+	// Secrets are the resolved values of the environment variables marked secret; reports
+	// replace them wherever they would otherwise be printed (for example inside an error that
+	// quotes the request URL).
+	Secrets []string
 }
 
 // Counts returns (passed, failed, skipped) operation counts.
@@ -120,6 +125,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		SpecVersion: version,
 		BaseURL:     baseURL,
 		StartedAt:   time.Now(),
+		Secrets:     variables.SecretValues(env),
 	}
 
 	resolver := variables.NewResolver(env)

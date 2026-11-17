@@ -38,6 +38,9 @@ type NegativeResult struct {
 	Probes      []NegativeProbeResult
 	StartedAt   time.Time
 	Duration    time.Duration
+
+	// Secrets: see ConformResult.Secrets.
+	Secrets []string
 }
 
 // Counts returns (passed, failed, skipped, errored) probe counts.
@@ -77,6 +80,7 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 		SpecVersion: version,
 		BaseURL:     baseURL,
 		StartedAt:   time.Now(),
+		Secrets:     variables.SecretValues(env),
 	}
 
 	probes, err := openapi.GenerateNegativeProbes(spec, baseURL)

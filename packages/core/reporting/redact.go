@@ -67,8 +67,12 @@ type redactor struct {
 }
 
 func redactorFor(r *scenario.Result) redactor {
-	x := redactor{reveal: r.RevealExtracted}
-	for _, s := range r.Secrets {
+	return newRedactor(r.Secrets, r.RevealExtracted)
+}
+
+func newRedactor(secrets []string, reveal bool) redactor {
+	x := redactor{reveal: reveal}
+	for _, s := range secrets {
 		if len(s) >= minSecretLen {
 			x.secrets = append(x.secrets, s)
 		}
