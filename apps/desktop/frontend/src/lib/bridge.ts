@@ -61,6 +61,7 @@ import {
   PickBundleFile as WailsPickBundleFile,
   PreviewBundle as WailsPreviewBundle,
   ImportBundle as WailsImportBundle,
+  ExportBundle as WailsExportBundle,
 } from '@wailsjs/go/main/BundleService'
 import {
   GetSettings as WailsGetSettings,
@@ -478,6 +479,22 @@ export interface BundleImportResult {
   skipped: number
   written: string[]
   error?: string
+}
+
+export interface BundleExportResult {
+  path: string            // empty with no error = the user cancelled
+  environments: number
+  requests: number
+  scenarios: number
+  redactedSecrets: number
+  skipped: string[]       // files that could not be exported, with the reason
+  warnings: string[]
+  error?: string
+}
+
+// Saves the open workspace as one bundle file chosen in a save dialog. Secret values are redacted.
+export async function exportBundle(): Promise<BundleExportResult> {
+  return (await WailsExportBundle()) as unknown as BundleExportResult
 }
 
 export async function pickBundleFile(): Promise<BundleFile> {

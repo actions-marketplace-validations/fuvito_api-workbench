@@ -146,6 +146,45 @@ func bundleFileToDomain(bf *BundleFile) (*Bundle, error) {
 	return b, nil
 }
 
+// WriteBundle encodes a bundle to YAML or JSON. Items are written in the order given.
+func WriteBundle(b *Bundle, format string) ([]byte, error) {
+	bf := bundleDomainToFile(b)
+	switch strings.ToLower(format) {
+	case "yaml", "yml":
+		return yaml.Marshal(bf)
+	case "json":
+		return json.MarshalIndent(bf, "", "  ")
+	default:
+		return nil, fmt.Errorf("unknown format %q; expected yaml or json", format)
+	}
+}
+
+func bundleDomainToFile(b *Bundle) *BundleFile {
+	version := b.SchemaVersion
+	if version == "" {
+		version = "1"
+	}
+	bf := &BundleFile{SchemaVersion: version, Title: b.Title, Description: b.Description, SpecFile: b.SpecFile}
+	for _, e := range b.Environments {
+		ef := envDomainToFile(e.Environment)
+		bf.Environments = append(bf.Environments, BundleEnvironmentFile{File: e.File, Name: ef.Name, Variables: ef.Variables})
+	}
+	for _, r := range b.Requests {
+		rf := requestDomainToFile(r.Request)
+		bf.Requests = append(bf.Requests, BundleRequestFile{
+			File: r.File, Title: rf.Title, Method: rf.Method, URL: rf.URL, Headers: rf.Headers,
+			QueryParams: rf.QueryParams, Body: rf.Body, Auth: rf.Auth, Timeout: rf.Timeout,
+		})
+	}
+	for _, s := range b.Scenarios {
+		sf := scenarioDomainToFile(s.Scenario)
+		bf.Scenarios = append(bf.Scenarios, BundleScenarioFile{
+			File: s.File, Title: sf.Title, Description: sf.Description, SpecFile: sf.SpecFile, Steps: sf.Steps,
+		})
+	}
+	return bf
+}
+
 var unknownFieldRe = regexp.MustCompile(`field (\S+) not found in type \S+`)
 
 // friendlyDecodeError rewrites decoder messages so authors of bundle files (often an AI

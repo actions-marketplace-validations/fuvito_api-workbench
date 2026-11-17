@@ -50,6 +50,7 @@ import {
   duplicateScenario,
   executeRequest,
   exportWorkspace,
+  exportBundle,
   workspaceHasSecrets,
   loadScenario,
   moveRequest,
@@ -133,6 +134,7 @@ export default function App() {
   })
 
   const [appError, setAppError] = useState<string | null>(null)
+  const [appNotice, setAppNotice] = useState<string | null>(null)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
   const [responseCollapsed, setResponseCollapsed] = useState(false)
 
@@ -240,6 +242,22 @@ export default function App() {
     setShowExportSecretsWarning(false)
     const err = await exportWorkspace()
     if (err) setAppError(err)
+  }
+
+  async function handleExportBundle() {
+    try {
+      const r = await exportBundle()
+      if (r.error) { setAppError(r.error); return }
+      if (!r.path) return  // cancelled
+      const parts = [`${r.environments} environment${r.environments !== 1 ? 's' : ''}`, `${r.requests} request${r.requests !== 1 ? 's' : ''}`, `${r.scenarios} scenario${r.scenarios !== 1 ? 's' : ''}`]
+      let msg = `Exported ${parts.join(', ')} to ${r.path}.`
+      if (r.redactedSecrets > 0) msg += ` ${r.redactedSecrets} secret value${r.redactedSecrets !== 1 ? 's were' : ' was'} replaced with CHANGE_ME.`
+      if (r.skipped.length > 0) msg += ` Skipped ${r.skipped.length} file${r.skipped.length !== 1 ? 's' : ''} that could not be read: ${r.skipped.join('; ')}.`
+      if (r.warnings.length > 0) msg += ` ${r.warnings.join(' ')}`
+      setAppNotice(msg)
+    } catch (e) {
+      setAppError(String(e).replace(/^Error: /, ''))
+    }
   }
 
   async function handleImportWorkspace() {
@@ -765,17 +783,19 @@ export default function App() {
         {
           kind: 'submenu',
           label: 'Export',
-          disabled: !tabs.activeTab.response,
           items: [
             {
               kind: 'action',
               label: 'Save Response Body…',
+              disabled: !tabs.activeTab.response,
               onClick: () => {
                 const body = tabs.activeTab.response?.body ?? ''
                 const ext = body.trimStart().startsWith('{') || body.trimStart().startsWith('[') ? '.json' : '.txt'
                 saveContentToFile(body, `response${ext}`)
               },
             },
+            { kind: 'separator' },
+            { kind: 'action', label: 'Bundle (environments + requests + scenarios)…', onClick: handleExportBundle },
           ],
         },
         { kind: 'separator' },
@@ -818,6 +838,13 @@ export default function App() {
         <div className="shrink-0 px-4 py-2 bg-red-500/15 border-b border-red-500/30 flex items-center gap-2 text-sm text-red-400">
           <span className="flex-1">{appError}</span>
           <button type="button" onClick={() => setAppError(null)} className="text-red-400/60 hover:text-red-400 transition-colors text-xs">Dismiss</button>
+        </div>
+      )}
+
+      {appNotice && (
+        <div role="status" className="shrink-0 px-4 py-2 bg-emerald-500/15 border-b border-emerald-500/30 flex items-center gap-2 text-sm text-emerald-400">
+          <span className="flex-1">{appNotice}</span>
+          <button type="button" onClick={() => setAppNotice(null)} className="text-emerald-400/60 hover:text-emerald-400 transition-colors text-xs">Dismiss</button>
         </div>
       )}
 

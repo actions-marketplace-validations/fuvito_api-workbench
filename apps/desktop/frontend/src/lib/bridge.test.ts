@@ -72,6 +72,7 @@ const passthrough: Array<[string, unknown, string, unknown[]]> = [
   ['importOpenAPISpecFromPath', OpenAPIService, 'ImportOpenAPISpecFromPath', ['/spec', 'http://base']],
   ['importOpenAPISpecFromURL', OpenAPIService, 'ImportOpenAPISpecFromURL', ['http://spec', 'http://base']],
   ['pickBundleFile', BundleService, 'PickBundleFile', []],
+  ['exportBundle', BundleService, 'ExportBundle', []],
   ['previewBundle', BundleService, 'PreviewBundle', ['text', '/spec.yaml', 'rename']],
   ['importBundle', BundleService, 'ImportBundle', ['text', '', 'skip']],
   ['importPostmanCollection', ImportService, 'ImportPostmanCollection', []],

@@ -392,6 +392,15 @@ scenarios:                         # optional — one or more
 - Files are written atomically. The result is ordinary request, scenario and environment files; the bundle itself is not stored.
 - A bundle may be YAML or JSON. Text pasted from a chat window may include a surrounding ``` code fence, which is ignored.
 
+### Export behaviour
+
+**File → Export → Bundle (environments + requests + scenarios)…** saves the open workspace as one bundle in the format above:
+
+- Every environment, request and scenario file is included (YAML or JSON, any depth below `requests/` and `scenarios/`). Hidden files and folders are skipped, as are files that cannot be parsed; skipped files are listed after the export.
+- `file` is the path under its folder without the extension, for example `auth/login`. Scenario `requestRef`s that point at an exported request are rewritten to that name, so the bundle imports cleanly into another workspace.
+- If every scenario uses the same `specFile`, it is written once at the top of the bundle.
+- **Secret values are replaced with `CHANGE_ME`** so the file is safe to share or paste into a chat. The workspace itself is never changed.
+
 ---
 
 ## File Naming Conventions

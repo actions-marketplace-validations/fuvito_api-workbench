@@ -162,3 +162,71 @@ func TestFormatSpec_BundleExampleIsValid(t *testing.T) {
 		t.Errorf("the example should show one of each kind: %v", kinds)
 	}
 }
+
+func TestBundleService_ExportThenImportIntoAnotherWorkspace(t *testing.T) {
+	isolateHome(t)
+	src := newWS(t, t.TempDir())
+	writeFile(t, filepath.Join(src.workspacePath, "environments", "prod.yaml"),
+		"schemaVersion: \"1\"\nname: prod\nvariables:\n  - {name: baseUrl, value: \"https://api.example.com\"}\n  - {name: apiKey, value: sk_live_123, secret: true}\n")
+	writeFile(t, filepath.Join(src.workspacePath, "requests", "ping.yaml"), "schemaVersion: \"1\"\nmethod: GET\nurl: \"{{baseUrl}}/ping\"\n")
+	writeFile(t, filepath.Join(src.workspacePath, "scenarios", "flow.yaml"),
+		"schemaVersion: \"1\"\ntitle: Flow\nsteps:\n  - {label: Ping, requestRef: ../requests/ping.yaml, assertions: [{type: status, operator: eq, expected: 200}]}\n")
+
+	out := filepath.Join(t.TempDir(), "export.yaml")
+	res := NewBundleService(src).exportBundleTo(out)
+	if res.Error != "" || res.Path != out || res.Environments != 1 || res.Requests != 1 || res.Scenarios != 1 || res.RedactedSecrets != 1 {
+		t.Fatalf("export: %+v", res)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "sk_live_123") {
+		t.Fatalf("a secret leaked into the exported file:\n%s", data)
+	}
+	if _, err := os.Stat(out + ".tmp"); !os.IsNotExist(err) {
+		t.Error("no temp file should remain")
+	}
+
+	dst := newWS(t, t.TempDir())
+	dstSvc := NewBundleService(dst)
+	pre := dstSvc.PreviewBundle(string(data), "", "rename")
+	if pre.ParseError != "" || pre.HasErrors || len(pre.Entries) != 3 {
+		t.Fatalf("the exported file must import cleanly: %+v", pre)
+	}
+	if imp := dstSvc.ImportBundle(string(data), "", "rename"); imp.Error != "" || imp.Created != 3 {
+		t.Fatalf("import: %+v", imp)
+	}
+	scn, _ := os.ReadFile(filepath.Join(dst.workspacePath, "scenarios", "flow.yaml"))
+	if !strings.Contains(string(scn), "requestRef: ../requests/ping.yaml") {
+		t.Errorf("the imported scenario should reference the imported request:\n%s", scn)
+	}
+}
+
+func TestBundleService_ExportProblems(t *testing.T) {
+	isolateHome(t)
+	if r := NewBundleService(newWS(t, "")).exportBundleTo(filepath.Join(t.TempDir(), "x.yaml")); !strings.Contains(r.Error, "no workspace") {
+		t.Errorf("no workspace: %+v", r)
+	}
+	if r := NewBundleService(newWS(t, "")).ExportBundle(); !strings.Contains(r.Error, "no workspace") {
+		t.Errorf("no workspace (dialog entry point): %+v", r)
+	}
+
+	empty := NewBundleService(newWS(t, t.TempDir()))
+	r := empty.exportBundleTo(filepath.Join(t.TempDir(), "x.yaml"))
+	if r.Error == "" || r.Path != "" {
+		t.Errorf("an empty workspace has nothing to export: %+v", r)
+	}
+
+	ws := newWS(t, t.TempDir())
+	writeFile(t, filepath.Join(ws.workspacePath, "requests", "ok.yaml"), "method: GET\nurl: http://x\n")
+	writeFile(t, filepath.Join(ws.workspacePath, "requests", "bad.yaml"), "method: [")
+	svc := NewBundleService(ws)
+	good := svc.exportBundleTo(filepath.Join(t.TempDir(), "x.yaml"))
+	if good.Error != "" || len(good.Skipped) != 1 || !strings.Contains(good.Skipped[0], "bad.yaml") {
+		t.Errorf("unparseable files are reported, not fatal: %+v", good)
+	}
+	if r := svc.exportBundleTo(filepath.Join(t.TempDir(), "no", "such", "dir", "x.yaml")); r.Error == "" {
+		t.Errorf("an unwritable destination: %+v", r)
+	}
+}

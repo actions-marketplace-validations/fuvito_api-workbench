@@ -249,6 +249,17 @@ A **bundle** is one document that holds environments, reusable requests and seve
 
 The result is ordinary request, scenario and environment files under `requests/`, `scenarios/` and `environments/`. Nothing is written until you click Import, and a bundle with any problem is not imported at all. Select the new environment afterwards. The bundle format is described in the Format Spec under **Bundle File**.
 
+### Exporting a bundle
+
+**File → Export → Bundle (environments + requests + scenarios)…** saves everything in the open workspace as one bundle file — handy for sharing a test suite, moving it to another workspace, or giving an AI assistant your existing tests as context.
+
+- Choose where to save it. A confirmation lists how many environments, requests and scenarios were written.
+- **Secret values are replaced with `CHANGE_ME`**, so the file is safe to share. The workspace is not changed, and the message tells you how many values were replaced.
+- Files that cannot be read (for example a request with a YAML error) are skipped and listed in the message.
+- Import the file in another workspace with **File → Import → Bundle…**; scenarios keep working with the requests they refer to.
+
+Unlike **Export Workspace** (a ZIP of the raw files, secrets included), a bundle is a single readable text file.
+
 ---
 
 ## 8. Scenarios and contract testing
