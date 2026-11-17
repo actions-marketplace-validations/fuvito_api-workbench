@@ -353,8 +353,9 @@ steps:
 | `extractions` | Pull values from the response into runtime variables for subsequent steps. |
 | `assertions` | Checks that must pass for the step to succeed. |
 | `failPolicy` | What to do if an assertion fails: `stop` (default — skips remaining steps), `continue` (keeps going), `skip` (skips this step if a previous one failed). |
-| `retry.maxAttempts` | Retry the step up to N times before marking it failed. |
-| `retry.delay` | Wait duration between retries (e.g. `2s`, `500ms`). |
+| `disabled` | `true` skips the step without counting it as a failure. |
+| `validateSpec` | With `specFile` set, validate this step's response against the spec (default `true`). `false` opts the step out. |
+| `timeoutMs`, `retry.maxAttempts`, `retry.delayMs` | Accepted, saved and editable, but **not applied yet** — a step runs once, using the request's own `timeout` or the global default. Do not rely on them to change run behaviour. |
 
 ### Assertion types
 
@@ -499,12 +500,18 @@ Executes a scenario file and prints results.
 clrsig run ./scenarios/user-lifecycle.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --env ./environments/dev.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --format json
+clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --workspace .
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `--env`, `-e` | (none) | Path to an environment file (YAML or JSON). |
-| `--format`, `-f` | `text` | Output format: `text` (human-readable) or `json` (machine-readable). |
+| `--format`, `-f` | `text` | Output format: `text` (human-readable), `json` (machine-readable) or `junit`. |
+| `--output`, `-o` | (stdout) | Write the report to a file; parent directories are created. |
+| `--spec`, `-s` | (none) | OpenAPI spec file or URL. Overrides the scenario's `specFile`. |
+| `--coverage` | off | Report which spec operations the scenario exercised (needs a spec). |
+| `--workspace`, `-w` | (none) | Accumulate coverage into this workspace, so it appears on the Contracts page. |
+| `--timeout` | `0` | Global step timeout in milliseconds; overrides per-step values. `0` uses the per-step value. |
 
 ### Exit codes
 
@@ -590,7 +597,81 @@ Exit codes: `0` every scenario passed, `1` at least one failed, `2` the bundle i
 
 **`bundle validate`** prints errors and warnings with their location and exits `1` if there are errors. **`bundle import`** accepts `--on-conflict rename|skip|overwrite` (default `rename`), `--spec-file` and `--dry-run` to preview the files without writing them.
 
-`clrsig run` now also loads the request files that a scenario's `requestRef` points at — looked up next to the scenario, in the `requests/` folder beside its `scenarios/` folder, and in `<workspace>/requests` when `--workspace` is given.
+`bundle export` also accepts `--keep-secrets` to write secret values as they are instead of `CHANGE_ME` — only use it for files that will not be shared.
+
+`clrsig run` also loads the request files that a scenario's `requestRef` points at — looked up next to the scenario, in the `requests/` folder beside its `scenarios/` folder, and in `<workspace>/requests` when `--workspace` is given.
+
+### `clrsig conform`
+
+Runs **every operation declared in an OpenAPI spec** against a live server and validates each response against the spec — no scenario file needed.
+
+```bash
+clrsig conform openapi.yaml --base-url http://localhost:8080
+clrsig conform openapi.yaml --base-url http://localhost:8080 --env environments/local.yaml --coverage
+clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format junit -o conform.xml
+```
+
+| Flag | Description |
+|---|---|
+| `--base-url`, `-b` | Server to send requests to (overrides the spec's `servers[0]`). |
+| `--env`, `-e` | Environment file for variable resolution (for example an auth token). |
+| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path starts with one of these prefixes. |
+| `--negative` | Also send negative probes: dropped required fields, wrong types, missing auth, missing parameters. |
+| `--coverage` | Append a coverage summary. |
+| `--fail-fast` | Stop after the first violation or execution error. |
+| `--request-timeout` | Per-request timeout in milliseconds (default `10000`). |
+| `--format`, `-f` / `--output`, `-o` | `text`, `json` or `junit`; write the report to a file. |
+
+Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error.
+
+### `clrsig diff` and `clrsig impact`
+
+```bash
+clrsig diff openapi-v1.yaml openapi-v2.yaml --breaking-only
+clrsig impact openapi-v1.yaml openapi-v2.yaml scenarios/*.yaml
+```
+
+`diff` classifies every change between two specs as breaking (`ERR`), potentially breaking (`WARN`) or informational (`INFO`); `--format text|json|junit` and `--output` are supported. It exits `1` when breaking changes are found. `impact` goes one step further: it reports which of your **scenario steps** match a breaking change, so you know what will stop passing before the new spec ships. It exits `1` when any scenario is affected. Both exit `2` on a parse error.
+
+### `clrsig generate`, `request` and `validate`
+
+```bash
+clrsig generate openapi.yaml --output requests/ [--base-url https://api.example.com] [--dry-run]
+clrsig request requests/health-check.yaml --env environments/local.yaml [--timeout 5000]
+clrsig validate scenarios/*.yaml
+```
+
+`generate` writes one request file per spec operation (the same files the desktop **Import OpenAPI** button creates). `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything. All three accept `--format text|json`.
+
+### `clrsig coverage`
+
+Reads the same accumulated data the **Contracts** tab shows.
+
+```bash
+clrsig coverage list    --workspace .
+clrsig coverage quality openapi.yaml --workspace .
+clrsig coverage reset   openapi.yaml --workspace .
+```
+
+`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking) and exits `1` when any gap is found.
+
+### `clrsig mcp`
+
+```bash
+clrsig mcp
+```
+
+Starts a Model Context Protocol server on stdin/stdout, exposing the tools `conform`, `run_scenario`, `diff` and `coverage` so AI agents such as Claude Desktop or Cursor can run Clear Signal for you. It opens no network port.
+
+### `clrsig telemetry`
+
+```bash
+clrsig telemetry status
+clrsig telemetry enable
+clrsig telemetry disable
+```
+
+Anonymous usage counters are **off by default**. They never include request contents or personal data. The desktop app has the same switch in Settings.
 
 ---
 
@@ -598,7 +679,21 @@ Exit codes: `0` every scenario passed, `1` at least one failed, `2` the bundle i
 
 The CLI is the natural integration point for pipelines. Build it as part of your workflow, run your scenarios, and act on the exit code.
 
-### GitHub Actions example
+### The Clear Signal GitHub Action
+
+The quickest route needs no Go toolchain — use the published Action:
+
+```yaml
+- uses: fuvito/api-workbench@v1
+  with:
+    command: conform
+    spec: openapi.yaml
+    base-url: http://localhost:8080
+    format: junit
+    output: test-results/conform.xml
+```
+
+### Building the CLI yourself
 
 ```yaml
 name: API Contract Tests
@@ -670,6 +765,7 @@ Open via the gear icon at the bottom of the Activity Rail (the icon bar on the f
 | **Default timeout** | Request timeout in milliseconds (applies when the per-request timeout is 0). |
 | **Proxy URL** | HTTP/HTTPS proxy for all outbound requests (e.g. `http://proxy:8080`). Leave empty to use the system proxy. |
 | **TLS skip verify** | Disable certificate verification. Use only for local development with self-signed certificates. |
+| **Anonymous telemetry** | Opt-in usage counters (off by default). No request contents or personal data. Same switch as `clrsig telemetry enable`. |
 
 Changes preview immediately. Click **Save** to persist; **Cancel** reverts to the last saved values.
 
@@ -829,7 +925,7 @@ The Help panel (the `?` icon at the bottom of the Activity Rail, or the **Help**
 
 ### TypeScript binding errors after editing Go types
 
-The `wailsjs/` directory is generated and gitignored. If you change a Go struct that is bound to Wails, stale TypeScript types may cause compilation errors. Restart `wails dev` to regenerate the bindings.
+The `wailsjs/` directory is generated by Wails (`models.ts` and `runtime/` are gitignored; the per-service `go/main/*.js` and `*.d.ts` files are committed). If you change a Go struct that is bound to Wails, stale TypeScript types may cause compilation errors. Restart `wails dev` to regenerate the bindings.
 
 ### `wails build` fails with "no matching versions for query"
 
