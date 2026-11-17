@@ -44,9 +44,15 @@ One command. No test files to write. The spec is the source of truth.
 
 **The Contracts page** — a live scorecard for every OpenAPI spec you test: per-operation coverage and last result, plus quality signals that show what you have *not* proven yet. [See below.](#the-contracts-page)
 
+**Impact analysis** — `clrsig impact v1.yaml v2.yaml scenarios/*.yaml` tells you which of your scenarios will stop passing when a spec change ships.
+
+**Negative-path checks** — `clrsig conform --negative` also probes with missing required fields, wrong types, missing auth and missing parameters, to confirm the API rejects what the spec says it must reject.
+
+**AI-ready** — generate a whole test suite from an OpenAPI document with the built-in AI prompt and import it as a single bundle, or let an AI agent call `clrsig` directly through its MCP server (`clrsig mcp`).
+
 **Coverage reporting** — see which operations have never been exercised, which have only been tested on the happy path, which error codes have never been triggered, and which secured routes have never been called with credentials. Export as CSV, Markdown, or HTML.
 
-**CI/CD enforcement** — JUnit output, non-zero exit codes, and a GitHub Action mean the same checks that run on your laptop block the pipeline on main.
+**CI/CD enforcement** — JUnit output, non-zero exit codes, and a GitHub Action mean the same checks that run on your laptop block the pipeline on main. Add `--format html` for a self-contained report anyone can open from the build artifacts.
 
 ---
 
@@ -229,8 +235,8 @@ These three commands are run in CI on every push — they cannot silently rot.
 # 1. Point at your spec
 clrsig conform openapi.yaml --base-url http://localhost:8080
 
-# 2. Write a scenario (or generate one)
-clrsig generate openapi.yaml --output scenarios/
+# 2. Generate a request file for every operation, then build scenarios from them
+clrsig generate openapi.yaml --output requests/
 
 # 3. Run the scenario with spec validation
 clrsig run scenarios/user-lifecycle.yaml \
@@ -255,21 +261,23 @@ specFile: ./openapi.yaml
 
 steps:
   - label: Login
-    method: POST
-    url: "{{baseUrl}}/auth/login"
-    body:
-      type: json
-      content: '{"username":"admin","password":"{{password}}"}'
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"admin","password":"{{password}}"}'
     assertions:
       - { type: status, operator: eq, expected: 200 }
     extractions:
       - { name: token, source: jsonpath, path: $.token }
 
   - label: Create user
-    method: POST
-    url: "{{baseUrl}}/users"
-    headers:
-      - { name: Authorization, value: "Bearer {{token}}" }
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      headers:
+        - { name: Authorization, value: "Bearer {{token}}" }
     assertions:
       - { type: status,   operator: eq,       expected: 201 }
       - { type: jsonpath, path: $.id,          operator: ne, expected: "" }

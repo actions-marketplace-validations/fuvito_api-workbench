@@ -3,6 +3,15 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.5.0',
+    date: '2026-11-17',
+    items: [
+      'HTML reports: --format html for run, conform, diff and bundle run — one self-contained file you can open in a browser or keep as a CI artifact',
+      'Fix: --spec on run, bundle run and bundle validate now resolves from the current directory (it was resolved against the scenario folder, silently skipping schema validation and coverage)',
+      'Docs aligned with the code: all CLI commands documented, output formats table, corrected retry/timeout notes',
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-11-17',
     items: [
@@ -110,7 +119,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.4.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.5.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

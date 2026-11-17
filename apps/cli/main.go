@@ -305,13 +305,17 @@ func runCmd() *cobra.Command {
 
 			// --spec flag overrides specFile: from scenario YAML.
 			// Both file paths and http(s):// URLs are accepted.
+			// A --spec path is relative to the current directory; a specFile: inside the
+			// scenario is relative to the scenario file. effectiveSpecFile stays as written
+			// because it is also the key coverage is accumulated under.
 			effectiveSpecFile := s.SpecFile
-			specFromFlag := specFile != ""
-			if specFromFlag {
+			loadSrc := s.SpecFile
+			if specFile != "" {
 				effectiveSpecFile = specFile
+				loadSrc = cwdSpecPath(specFile)
 			}
 
-			loadedSpec := newSpecLoader(cmd).load(effectiveSpecFile, filepath.Dir(scenarioPath))
+			loadedSpec := newSpecLoader(cmd).load(loadSrc, filepath.Dir(scenarioPath))
 			runner := newScenarioRunner(loadedSpec)
 
 			// Steps that use requestRef need their request files loaded first. Look next to the
@@ -399,6 +403,15 @@ func runCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
+			case "html":
+				var htmlCov *openapi.ScenarioCoverageResult
+				if showCoverage {
+					htmlCov = cov
+				}
+				reportBytes, err = reporting.HTML(result, htmlCov)
+				if err != nil {
+					return fmt.Errorf("generating HTML report: %w", err)
+				}
 			default:
 				if cov != nil && showCoverage {
 					reportBytes = []byte(reporting.TextWithCoverage(result, cov))
@@ -440,7 +453,7 @@ func runCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file (YAML or JSON)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
 	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file or URL (overrides specFile: in scenario)")
@@ -692,6 +705,11 @@ Exit codes:
 				if err != nil {
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
+			case "html":
+				reportBytes, err = reporting.ConformHTML(result, cov, negResult)
+				if err != nil {
+					return fmt.Errorf("generating HTML report: %w", err)
+				}
 			default:
 				reportBytes = []byte(reporting.ConformText(result, cov))
 				if negResult != nil {
@@ -744,7 +762,7 @@ Exit codes:
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file for variable resolution")
 	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
@@ -896,6 +914,11 @@ Exit codes:
 				if err != nil {
 					return fmt.Errorf("generating JUnit report: %w", err)
 				}
+			case "html":
+				reportBytes, err = reporting.DiffHTML(result, changes)
+				if err != nil {
+					return fmt.Errorf("generating HTML report: %w", err)
+				}
 			case "json":
 				type jsonChange struct {
 					ID       string `json:"id"`
@@ -976,7 +999,7 @@ Exit codes:
 		},
 	}
 
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().BoolVar(&breakingOnly, "breaking-only", false, "Show only breaking changes")
 	return cmd
