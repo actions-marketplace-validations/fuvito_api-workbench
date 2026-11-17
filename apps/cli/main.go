@@ -54,6 +54,8 @@ func main() {
 	root.AddCommand(conformCmd())
 	root.AddCommand(diffCmd())
 	root.AddCommand(coverageCmd())
+	root.AddCommand(impactCmd())
+	root.AddCommand(mcpCmd())
 	root.AddCommand(telemetryCmd())
 
 	if err := root.Execute(); err != nil {
