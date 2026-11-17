@@ -207,16 +207,16 @@ function RunRow({ run, onSelectScenario }: { run: ScenarioRunEntry; onSelectScen
   const name = run.title || run.scenarioPath.split(/[\\/]/).pop()?.replace(/\.(yaml|yml|json)$/i, '') || 'scenario'
 
   async function handleToggle() {
-    if (!open && fullResult === null) {
+    const opening = !open
+    setOpen(opening)
+    if (opening && fullResult === null) {
       setFullResult('loading')
       try {
-        const r = await loadScenarioResult(run.scenarioPath)
-        setFullResult(r)
+        setFullResult(await loadScenarioResult(run.scenarioPath))
       } catch {
         setFullResult(null)
       }
     }
-    setOpen(o => !o)
   }
 
   const steps = fullResult !== null && fullResult !== 'loading' ? fullResult.steps : null

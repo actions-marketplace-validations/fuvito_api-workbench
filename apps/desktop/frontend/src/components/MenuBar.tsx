@@ -173,7 +173,7 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
                             if ((e.key === 'ArrowRight' || e.key === 'Enter') && !item.disabled && item.items.length > 0) {
                               e.preventDefault()
                               e.stopPropagation()
-                              const submenu = e.currentTarget.parentElement?.querySelector<HTMLButtonElement>('ul [role="menuitem"]:not(:disabled)')
+                              const submenu = e.currentTarget.parentElement?.querySelector<HTMLButtonElement>(':scope > ul [role="menuitem"]:not(:disabled)')
                               submenu?.focus()
                             }
                           }}

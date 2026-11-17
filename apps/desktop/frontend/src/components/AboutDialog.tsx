@@ -144,14 +144,16 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
 
           {tab === 'release-notes' && (
             <div className="px-8 py-5 flex flex-col gap-6">
-              {RELEASE_NOTES.map(rel => (
+              {RELEASE_NOTES.map((rel, idx) => (
                 <div key={rel.version}>
                   <div className="flex items-baseline gap-3 mb-3">
                     <span className="text-sm font-bold text-[var(--color-foreground)]">v{rel.version}</span>
                     <span className="text-xs text-[var(--color-muted-foreground)]">{rel.date}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold uppercase tracking-wide">
-                      Latest
-                    </span>
+                    {idx === 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold uppercase tracking-wide">
+                        Latest
+                      </span>
+                    )}
                   </div>
                   <ul className="flex flex-col gap-1.5">
                     {rel.items.map(item => (
