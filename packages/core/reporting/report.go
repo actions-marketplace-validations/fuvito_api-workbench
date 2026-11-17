@@ -186,6 +186,43 @@ func secStr(ms int64) string { return fmt.Sprintf("%.3f", float64(ms)/1000.0) }
 // Supported by Jenkins (Publish JUnit Results), GitHub Actions (dorny/test-reporter),
 // GitLab CI (junit artifact), and CircleCI (store_test_results).
 func JUnit(result *scenario.Result) ([]byte, error) {
+	suite := junitSuiteFor(result)
+	return marshalJUnit(jUnitTestSuites{
+		Name:       result.Scenario.Title,
+		Tests:      suite.Tests,
+		Failures:   suite.Failures,
+		Errors:     suite.Errors,
+		Time:       suite.Time,
+		TestSuites: []jUnitSuite{suite},
+	})
+}
+
+// JUnitMulti returns one JUnit document with a test suite per scenario, for runs that
+// execute several scenarios (for example a bundle). name labels the whole document.
+func JUnitMulti(name string, results []*scenario.Result) ([]byte, error) {
+	report := jUnitTestSuites{Name: name}
+	var totalMs int64
+	for _, r := range results {
+		suite := junitSuiteFor(r)
+		report.Tests += suite.Tests
+		report.Failures += suite.Failures
+		report.Errors += suite.Errors
+		totalMs += r.Duration.Milliseconds()
+		report.TestSuites = append(report.TestSuites, suite)
+	}
+	report.Time = secStr(totalMs)
+	return marshalJUnit(report)
+}
+
+func marshalJUnit(report jUnitTestSuites) ([]byte, error) {
+	out, err := xml.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(xml.Header), out...), nil
+}
+
+func junitSuiteFor(result *scenario.Result) jUnitSuite {
 	_, failed, _ := result.Counts()
 
 	suite := jUnitSuite{
@@ -226,21 +263,7 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 		}
 		suite.Cases = append(suite.Cases, tc)
 	}
-
-	report := jUnitTestSuites{
-		Name:       result.Scenario.Title,
-		Tests:      suite.Tests,
-		Failures:   suite.Failures,
-		Errors:     suite.Errors,
-		Time:       suite.Time,
-		TestSuites: []jUnitSuite{suite},
-	}
-
-	out, err := xml.MarshalIndent(report, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append([]byte(xml.Header), out...), nil
+	return suite
 }
 
 // ---- Conformance reporting ----

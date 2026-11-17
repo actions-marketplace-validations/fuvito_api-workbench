@@ -57,6 +57,7 @@ func main() {
 	root.AddCommand(impactCmd())
 	root.AddCommand(mcpCmd())
 	root.AddCommand(telemetryCmd())
+	root.AddCommand(bundleCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -310,33 +311,18 @@ func runCmd() *cobra.Command {
 				effectiveSpecFile = specFile
 			}
 
-			exec := executor.New(executor.Options{})
-			var loadedSpec *openapi.Spec
-			var runner *scenario.Runner
-			if effectiveSpecFile != "" {
-				src := effectiveSpecFile
-				// Resolve relative file paths against the scenario's directory.
-				if !strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://") {
-					if !filepath.IsAbs(src) {
-						src = filepath.Join(filepath.Dir(scenarioPath), src)
-					}
-				}
-				specData, specFmt, fetchErr := fetchSpec(src)
-				if fetchErr != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not load spec %q: %v\n", src, fetchErr)
-				} else {
-					loadedSpec, err = openapi.ParseBytes(specData, specFmt)
-					if err != nil {
-						fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not parse spec %q: %v\n", src, err)
-						loadedSpec = nil
-					}
-				}
-				if loadedSpec != nil {
-					runner = scenario.NewWithSpec(exec, loadedSpec)
-				}
+			loadedSpec := newSpecLoader(cmd).load(effectiveSpecFile, filepath.Dir(scenarioPath))
+			runner := newScenarioRunner(loadedSpec)
+
+			// Steps that use requestRef need their request files loaded first. Look next to the
+			// scenario, then in the requests/ folder beside its scenarios/ folder, then in the
+			// workspace's requests/ folder when --workspace is given.
+			refDirs := []string{filepath.Dir(scenarioPath), filepath.Join(filepath.Dir(scenarioPath), "..", "requests")}
+			if workspacePath != "" {
+				refDirs = append(refDirs, filepath.Join(workspacePath, "requests"))
 			}
-			if runner == nil {
-				runner = scenario.New(exec)
+			for _, ref := range scenario.ResolveRequestRefs(s, refDirs...) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: requestRef %q could not be loaded\n", ref)
 			}
 			result := runner.Run(context.Background(), s, env)
 

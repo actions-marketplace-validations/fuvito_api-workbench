@@ -391,6 +391,7 @@ scenarios:                         # optional — one or more
 - Files that already exist can be skipped, overwritten, or kept by saving the new file as `name-2.yaml`. When a request is renamed this way, scenarios that refer to it are updated to match.
 - Files are written atomically. The result is ordinary request, scenario and environment files; the bundle itself is not stored.
 - A bundle may be YAML or JSON. Text pasted from a chat window may include a surrounding ``` code fence, which is ignored.
+- The same bundle can be used from the command line: `clrsig bundle run` executes every scenario without importing, `clrsig bundle import` saves the files into a workspace, and `clrsig bundle validate` / `export` check and produce bundles.
 
 ### Export behaviour
 

@@ -557,6 +557,41 @@ Use `--format json` for machine-readable output suitable for CI tooling:
 }
 ```
 
+### `clrsig bundle`
+
+A **bundle** (see [section 7](#importing-a-bundle-environments-scenarios)) can be run, checked, imported and exported from the command line, with the same behaviour as the desktop app.
+
+```bash
+# Run every scenario in a bundle, straight from the file — no workspace needed
+clrsig bundle run bundle.yaml --env staging
+
+# Check a bundle without running or importing anything
+clrsig bundle validate bundle.yaml
+
+# Save its files into a workspace
+clrsig bundle import bundle.yaml --workspace ./my-workspace
+
+# Write a workspace as one bundle (secrets become CHANGE_ME)
+clrsig bundle export --workspace ./my-workspace -o bundle.yaml
+```
+
+**`bundle run`** validates the bundle first; any error stops the run before a single request is sent. It then runs every scenario in order, using the requests, spec and environment from the bundle.
+
+| Option | Meaning |
+|---|---|
+| `--env <name>` | Which of the bundle's environments to use. Needed only when the bundle has more than one; a single environment is used automatically. |
+| `--env-file <file>` | Use an environment file instead — handy in CI, where credentials come from the pipeline rather than the bundle. |
+| `--spec <path-or-url>` | Replace the spec of every scenario. |
+| `--scenario <title-or-file>` | Run only this scenario. Repeat the option for several. |
+| `--format text\|json\|junit` | Report format. `junit` produces one document with a test suite per scenario. |
+| `--output <file>` | Write the report to a file. |
+
+Exit codes: `0` every scenario passed, `1` at least one failed, `2` the bundle is invalid or could not be read.
+
+**`bundle validate`** prints errors and warnings with their location and exits `1` if there are errors. **`bundle import`** accepts `--on-conflict rename|skip|overwrite` (default `rename`), `--spec-file` and `--dry-run` to preview the files without writing them.
+
+`clrsig run` now also loads the request files that a scenario's `requestRef` points at — looked up next to the scenario, in the `requests/` folder beside its `scenarios/` folder, and in `<workspace>/requests` when `--workspace` is given.
+
 ---
 
 ## 11. CI/CD integration
