@@ -1045,8 +1045,6 @@ export default function App() {
                     scenarioError={scenarioRenameError}
                     runAllState={runAllState ?? undefined}
                     onRunAllScenarios={handleRunAll}
-                    onCancelRunAll={handleCancelRunAll}
-                    onDismissRunAll={() => setRunAllState(null)}
                     runLogTrigger={runLogTrigger}
                     onRunFolder={handleRunFolder}
                     onRunScenarioFolder={handleRunScenarioFolder}

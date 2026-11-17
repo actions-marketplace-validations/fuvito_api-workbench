@@ -17,8 +17,6 @@ type ScenariosPanelProps = {
   scenarioError?: string | null
   runAllState?: RunAllState
   onRunAllScenarios?: () => void
-  onCancelRunAll?: () => void
-  onDismissRunAll?: () => void
   onSelectScenario?: (path: string, name: string) => void
   onNewScenario?: (name: string, folderPath?: string) => void
   onNewScenarioFile?: (path: string, name: string) => void
@@ -40,7 +38,7 @@ type ScenariosPanelProps = {
 
 export function ScenariosPanel({
   workspacePath, scenarios, scenarioError,
-  runAllState, onRunAllScenarios, onCancelRunAll, onDismissRunAll,
+  runAllState, onRunAllScenarios,
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewFolder, onDeleteScenarioFolder, onRenameScenarioFolder, onRunFolder,
