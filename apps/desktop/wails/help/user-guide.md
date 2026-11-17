@@ -174,7 +174,9 @@ Variables marked `secret: true` in an environment file are redacted in the respo
   secret: true
 ```
 
-The application substitutes `${VAR}` references from the process environment before treating the value as a secret.
+The application substitutes `${VAR}` references from the process environment **when a run starts**, never when an environment file is read or saved, so the real value is never written back to disk. Write `$${VAR}` for the literal text `${VAR}`. If a referenced variable is not set on the machine, the text is left as written and `clrsig run`, `conform`, `request` and `bundle run` print one warning naming it (it is a warning, not an error, so an unused variable cannot fail a run).
+
+Secret values are also kept out of **reports**: wherever one would appear (an assertion's actual value, an error message), it is replaced by `***`, in every format. See [Secrets in reports](#secrets-in-reports).
 
 ---
 
@@ -402,6 +404,8 @@ Click **Run All** in the Scenarios sidebar or in the scenario header bar. All sc
 
 Click any row in the runner table to open that scenario's full result in an editor tab.
 
+When a run has finished, **Export report** saves its results as an HTML page (opened in your browser), JUnit XML, JSON, Markdown or plain text, built by the same code as the CLI's reports (so secrets are left out the same way). The export covers the scenarios listed in the table, using their latest results. To run only part of the workspace, use **Run folder** from a scenario folder's context menu; its results appear in the same tab.
+
 ---
 
 ## 9. Contracts — coverage tracking
@@ -547,6 +551,9 @@ clrsig run ./scenarios --env ./environments/ci.yaml
 | `--timeout` | `0` | Global step timeout in milliseconds; overrides per-step values. `0` uses the per-step value. |
 | `--fail-fast` | off | With several scenarios, stop after the first one that fails. |
 | `--no-recursive` | off | With a folder, only run the scenarios directly inside it, not in its sub-folders. |
+| `--var` | (none) | `name=value`, repeatable: set or override one environment variable for this run only. Put secrets in environment variables, not here (command lines are visible to other processes). |
+| `--report` | (none) | `format=file`, repeatable: also write a report in another format from the same run. See [Several reports from one run](#several-reports-from-one-run). |
+| `--show-extracted` | off | Show extracted values whose names look secret. See [Secrets in reports](#secrets-in-reports). |
 
 ### Exit codes
 
@@ -566,6 +573,8 @@ Report commands choose their format with `--format` (`-f`) and print to the scre
 | `json` | Scripts and other tools | `run`, `conform`, `diff`, `impact`, `validate`, `generate`, `request`, `coverage list`, `coverage quality`, `bundle run` |
 | `junit` | CI test dashboards and pull-request annotations (Jenkins, GitHub, GitLab, CircleCI) | `run`, `conform`, `diff`, `bundle run` |
 | `html` | A report a person can open in a browser, attach to a ticket or keep as a CI artifact | `run`, `conform`, `diff`, `bundle run` |
+| `markdown` | Pull-request comments and the GitHub job summary | `run`, `conform`, `diff`, `bundle run` |
+| `csv` | Spreadsheets (the Contracts coverage data) | `coverage list`, `coverage quality` (which also take `markdown` and `html`) |
 
 ```bash
 clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml -f junit -o reports/run.xml
@@ -573,7 +582,34 @@ clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml -f html  -o 
 clrsig run scenarios --env environments/ci.yaml -f junit -o reports/all.xml   # a whole folder, one report
 ```
 
-The HTML report is one self-contained file (no external scripts, fonts or images), follows your light or dark system theme, and prints cleanly. It shows the same results as the text report — pass/fail per step, assertions, violations, coverage — but leaves out **extracted variable values**, so a token pulled from a login response does not end up in a file you share. To produce several formats from one run, run the command once per format.
+The HTML report is one self-contained file (no external scripts, fonts or images), follows your light or dark system theme, and prints cleanly. It shows the same results as the text report — pass/fail per step, assertions, violations, coverage — but leaves out **extracted variable values**, so a token pulled from a login response does not end up in a file you share. 
+The Markdown report uses the same content, with ✅ and ❌ marks and escaped text, so it can be pasted into a pull-request comment or appended to the GitHub job summary:
+
+```bash
+clrsig run scenarios --env environments/ci.yaml -f markdown >> "$GITHUB_STEP_SUMMARY"
+```
+
+An unknown `--format` is an error and stops the command before anything runs.
+
+#### Several reports from one run
+
+`--report format=file` (repeatable) writes extra reports from the **same run**, so you do not send every request twice to get both a JUnit file and an HTML page:
+
+```bash
+clrsig run scenarios --env environments/ci.yaml \
+  -f markdown -o reports/summary.md \
+  --report junit=reports/all.xml --report html=reports/all.html
+```
+
+`--format` and `--output` still decide what goes to the screen or to one file; each `--report` adds a file (folders are created). A malformed value, an unknown format, or the same file used twice is reported before the run starts. Available on `run`, `conform`, `diff` and `bundle run`.
+
+#### Secrets in reports
+
+Reports are meant to be shared, so they never contain credentials:
+
+- the value of any environment variable marked `secret: true` is replaced by `***` wherever it would appear (an assertion's actual value, an error message), when it is at least 4 characters long;
+- an extracted value whose variable name looks secret (`token`, `password`, `apiKey`, `session`, `cookie`, `authorization`, …) is shown as `***`; other extracted values, such as an `id`, stay visible;
+- `--show-extracted` (on `run` and `bundle run`) shows the secret-looking extracted values again, for debugging on your own machine. It never reveals the values of secret environment variables.
 
 ### Text output example
 
@@ -674,7 +710,9 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--coverage` | Append a coverage summary. |
 | `--fail-fast` | Stop after the first violation or execution error. |
 | `--request-timeout` | Per-request timeout in milliseconds (default `10000`). |
-| `--format`, `-f` / `--output`, `-o` | `text`, `json`, `junit` or `html`; write the report to a file. |
+| `--format`, `-f` / `--output`, `-o` | `text`, `json`, `junit`, `html` or `markdown`; write the report to a file. |
+| `--report` | `format=file`, repeatable: also write a report in another format from the same run. |
+| `--var` | `name=value`, repeatable: set or override an environment variable for this run. |
 
 Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error.
 
@@ -682,20 +720,36 @@ Exit codes: `0` all operations conformed, `1` violations or execution failures, 
 
 ```bash
 clrsig diff openapi-v1.yaml openapi-v2.yaml --breaking-only
-clrsig impact openapi-v1.yaml openapi-v2.yaml scenarios/*.yaml
+clrsig diff openapi-v1.yaml openapi-v2.yaml --fail-on warning
+clrsig diff openapi.yaml --against origin/main
+clrsig impact openapi-v1.yaml openapi-v2.yaml scenarios
 ```
 
-`diff` classifies every change between two specs as breaking (`ERR`), potentially breaking (`WARN`) or informational (`INFO`); `--format text|json|junit|html` and `--output` are supported. It exits `1` when breaking changes are found. `impact` goes one step further: it reports which of your **scenario steps** match a breaking change, so you know what will stop passing before the new spec ships. It exits `1` when any scenario is affected. Both exit `2` on a parse error.
+`diff` classifies every change between two specs as breaking (`ERR`), potentially breaking (`WARN`) or informational (`INFO`); `--format text|json|junit|html|markdown`, `--output` and `--report` are supported.
+
+- **`--fail-on breaking|warning|info`** (default `breaking`) sets how serious a change must be to fail the command: `warning` also fails on potentially breaking changes, `info` on any change at all. The exit code, the JUnit failures and the HTML and Markdown verdict all follow it. It cannot be combined with `--breaking-only`, which hides the changes a stricter level would fail on.
+- **`--against <git-ref>`** takes **one** spec file and compares it with its committed version at that ref (for example `origin/main`), read through git. It needs the `git` executable and a repository, and explains what is wrong when git is missing, the file is not in a repository, the ref is unknown (in CI, a shallow clone may need `fetch-depth: 0`), or the file does not exist at that ref.
+
+`impact` goes one step further: it reports which of your **scenario steps** match a breaking change, so you know what will stop passing before the new spec ships. Scenario arguments can be files or folders. It exits `1` when any scenario is affected. All three commands exit `2` on a parse error.
 
 ### `clrsig generate`, `request` and `validate`
 
 ```bash
 clrsig generate openapi.yaml --output requests/ [--base-url https://api.example.com] [--dry-run]
 clrsig request requests/health-check.yaml --env environments/local.yaml [--timeout 5000]
-clrsig validate scenarios/*.yaml
+clrsig validate scenarios
 ```
 
-`generate` writes one request file per spec operation (the same files the desktop **Import OpenAPI** button creates). `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything. All three accept `--format text|json`.
+`generate` writes one request file per spec operation (the same files the desktop **Import OpenAPI** button creates). `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything; like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
+
+### `clrsig import`
+
+```bash
+clrsig import postman collection.json --output requests/
+clrsig import insomnia export.json --output requests/ --dry-run
+```
+
+Converts a Postman collection (v2.1) or an Insomnia export (v4) into request files, in the same layout the desktop app's **Import** menu uses: `<output>/<collection>/<folders>/<request>.yaml` (default output folder: `requests`). It never overwrites: a name that is taken gets `-2`, `-3` … `--dry-run` lists the files that would be written. `--format json` gives the list for scripts. Exit codes: `0` converted, `1` some requests could not be written, `2` the file is unreadable or not a supported export.
 
 ### `clrsig coverage`
 
@@ -704,10 +758,11 @@ Reads the same accumulated data the **Contracts** tab shows.
 ```bash
 clrsig coverage list    --workspace .
 clrsig coverage quality openapi.yaml --workspace .
+clrsig coverage quality openapi.yaml --workspace . -f html -o reports/contracts.html
 clrsig coverage reset   openapi.yaml --workspace .
 ```
 
-`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking) and exits `1` when any gap is found.
+`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking) and exits `1` when any gap is found. Both `list` and `quality` also write `--format csv|markdown|html` (with `--output`); these are the same reports the desktop Contracts **Export** menu produces, because both use the same code.
 
 ### `clrsig mcp`
 

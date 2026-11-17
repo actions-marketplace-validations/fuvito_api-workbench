@@ -202,7 +202,7 @@ func coverageSection(heading string, cov *openapi.ScenarioCoverageResult) htmlSe
 // HTMLMulti returns one HTML report covering several scenarios, for runs such as a bundle.
 func multiDoc(title string, results []*scenario.Result, total time.Duration, cov ...SpecCoverage) htmlDoc {
 	passedScenarios, steps, assertsPassed, assertsTotal := 0, 0, 0, 0
-	doc := htmlDoc{Title: title, Subtitle: "Bundle run"}
+	doc := htmlDoc{Title: title, Subtitle: "Several scenarios"}
 	for _, r := range results {
 		if r.Passed {
 			passedScenarios++

@@ -47,8 +47,8 @@ type AccumulatedCoverageIO struct {
 // mergeExercised are thin aliases kept here so scenario_service.go call sites
 // remain unchanged while the real logic lives in packages/core/coverage.
 
-func coverageKey(specFile string) string              { return coverage.Key(specFile) }
-func coverageDirPath(workspacePath string) string     { return coverage.DirPath(workspacePath) }
+func coverageKey(specFile string) string          { return coverage.Key(specFile) }
+func coverageDirPath(workspacePath string) string { return coverage.DirPath(workspacePath) }
 func loadStoredCoverage(wsPath, specFile string) coverage.StoredCoverage {
 	return coverage.Load(wsPath, specFile)
 }
@@ -59,15 +59,23 @@ func mergeExercised(existing, newOps []string) []string {
 	return coverage.MergeExercised(existing, newOps)
 }
 
-// buildAccumulatedCoverageIO converts a coverage.StoredCoverage + loaded spec into
-// the Wails IPC type, computing missed operations from the spec.
-func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Spec) AccumulatedCoverageIO {
+// computeCoverage combines the stored coverage with the spec's operations into the report and
+// quality signals that both the Contracts page and the exported reports show.
+func computeCoverage(stored coverage.StoredCoverage, spec *openapi.Spec) (coverage.Report, *coverage.QualityReport) {
 	all := spec.AllOperations()
 	allOps := make([]string, len(all))
 	for i, op := range all {
 		allOps[i] = op.String()
 	}
 	r := coverage.BuildReport(stored, allOps)
+	meta := openapi.ExtractSpecMeta(spec)
+	return r, coverage.ComputeQuality(r, meta.DeclaredStatusCodes, meta.SecuredOps)
+}
+
+// buildAccumulatedCoverageIO converts a coverage.StoredCoverage + loaded spec into
+// the Wails IPC type, computing missed operations from the spec.
+func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Spec) AccumulatedCoverageIO {
+	r, q := computeCoverage(stored, spec)
 
 	lastRun := ""
 	if !r.LastRunAt.IsZero() {
@@ -88,8 +96,6 @@ func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Sp
 			opResults[k] = or_
 		}
 	}
-	meta := openapi.ExtractSpecMeta(spec)
-	q := coverage.ComputeQuality(r, meta.DeclaredStatusCodes, meta.SecuredOps)
 	return AccumulatedCoverageIO{
 		SpecFile:         r.SpecFile,
 		Covered:          r.Covered,

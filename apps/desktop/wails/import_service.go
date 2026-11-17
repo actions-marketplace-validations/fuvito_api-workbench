@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/importer"
-	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -94,53 +92,16 @@ func (s *ImportService) saveImportedRequests(collectionName string, requests []i
 		return CollectionImportResult{Error: "no workspace open — open or create a workspace first"}
 	}
 
-	dirName := sanitizeDirName(collectionName)
-	if dirName == "" {
-		dirName = "imported"
-	}
-
-	result := CollectionImportResult{CollectionName: collectionName}
-
-	for _, ir := range requests {
-		destDir := filepath.Join(wsPath, "requests", dirName)
-		if ir.FolderPath != "" {
-			for _, seg := range strings.Split(ir.FolderPath, "/") {
-				destDir = filepath.Join(destDir, sanitizeDirName(seg))
-			}
-		}
-		if err := os.MkdirAll(destDir, 0755); err != nil {
-			result.Skipped++
-			continue
-		}
-
-		yamlData, err := serialization.WriteRequest(ir.Request, "yaml")
-		if err != nil {
-			result.Skipped++
-			continue
-		}
-
-		filename := sanitizeFilename(ir.Request.Title)
-		if filename == "" {
-			filename = "request"
-		}
-		savePath := filepath.Join(destDir, filename+".yaml")
-		if _, err := os.Stat(savePath); err == nil {
-			savePath = findNonConflictingPath(savePath)
-		}
-
-		if err := atomicWrite(savePath, yamlData); err != nil {
-			result.Skipped++
-			continue
-		}
-
+	saved := importer.Save(filepath.Join(wsPath, "requests"), collectionName, requests, false)
+	result := CollectionImportResult{CollectionName: collectionName, Skipped: saved.Skipped}
+	for _, sv := range saved.Saved {
 		result.Imported = append(result.Imported, ImportedRequestIO{
 			OperationID: "",
-			Summary:     ir.Request.Title,
-			Method:      string(ir.Request.Method),
-			URL:         ir.Request.URL,
-			SavedPath:   savePath,
+			Summary:     sv.Title,
+			Method:      sv.Method,
+			URL:         sv.URL,
+			SavedPath:   sv.Path,
 		})
 	}
-
 	return result
 }

@@ -1,6 +1,6 @@
 # CI and parity batch (backlog ideas 1–10, plus one prerequisite fix)
 
-- **Status:** Accepted — implementation in progress
+- **Status:** Done — items 0–10 implemented and verified; awaiting release
 - **Date:** 2026-11-17
 - **Source:** items 1–10 of [Future enhancements backlog](2026-11-17-future-enhancements.md); items 11–17 stay on the backlog for the project owner to think about
 - **Approval:** the project owner approved items 1–10 on 2026-11-17 and asked not to be asked again
@@ -51,10 +51,10 @@ Repeatable `--report <format>=<file>` on `run`, `conform`, `diff` and `bundle ru
 
 Both expand their scenario arguments with `scenario.Discover`, and gain `--no-recursive`. Same skipping rules and the same errors as `run`.
 
-## 6. Desktop: run a folder, export the run report
+## 6. Desktop: export the run report (run-a-folder already existed)
 
-- A scenario folder in the Scenarios panel gets **Run folder** (same discovery as the CLI).
-- The Run Results tab gets **Export report** (HTML, JUnit, JSON, Markdown), produced by the Go reporting package from the last run, which the scenario service keeps in memory.
+- **Correction found while building:** the Scenarios panel already has **Run folder** on every scenario folder (`handleRunFolder`), and its results already open in the Run Results tab. Only the export half was missing.
+- The Run Results tab gets **Export report** (HTML, JUnit, JSON, Markdown, text), produced by the Go reporting package (`ScenarioService.ExportRunReport`) from the latest result of each listed scenario, which the service keeps in memory. Secrets are redacted by the same code as the CLI.
 
 ## 7. `clrsig import`
 
@@ -85,3 +85,5 @@ Repeatable on `run`, `conform` and `bundle run`; overrides or adds a plain envir
 |---|---|---|
 | 2026-11-17 | Items 1–10 approved; no further questions needed | project owner |
 | 2026-11-17 | Prerequisite fix (item 0) added: `${NAME}` expansion was documented but missing | assistant |
+| 2026-11-17 | Item 6 reduced to the export: Run folder already existed in the desktop | assistant |
+| 2026-11-17 | Implemented. Notes: `--report` and `--var` are CLI-only (not in the builder, which has one value per input); `coverage list` file formats are per-spec summaries, `coverage quality` is the full per-spec report | assistant |

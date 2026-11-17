@@ -58,6 +58,7 @@ func main() {
 	root.AddCommand(mcpCmd())
 	root.AddCommand(telemetryCmd())
 	root.AddCommand(bundleCmd())
+	root.AddCommand(importCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -685,6 +686,7 @@ func coverageCmd() *cobra.Command {
 func coverageListCmd() *cobra.Command {
 	var workspacePath string
 	var format string
+	var outputFile string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -695,6 +697,13 @@ func coverageListCmd() *cobra.Command {
 				return fmt.Errorf("--workspace is required")
 			}
 			reports := coverage.ListAll(ws)
+			if f := strings.ToLower(format); isContractsFormat(f) {
+				data, err := contractsListReport(f, reports)
+				if err != nil {
+					return err
+				}
+				return writeReport(cmd, outputFile, data)
+			}
 			if len(reports) == 0 {
 				fmt.Fprintln(cmd.OutOrStdout(), "No coverage data found in workspace.")
 				return nil
@@ -749,13 +758,15 @@ func coverageListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", contractsFormatUsage)
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
 	return cmd
 }
 
 func coverageQualityCmd() *cobra.Command {
 	var workspacePath string
 	var format string
+	var outputFile string
 
 	cmd := &cobra.Command{
 		Use:   "quality <spec-file-or-url>",
@@ -800,6 +811,21 @@ Exit codes:
 
 			stored := coverage.Load(workspacePath, specArg)
 			report := coverage.BuildReport(stored, allOpStrs)
+
+			if f := strings.ToLower(format); isContractsFormat(f) {
+				q := coverage.ComputeQuality(report, meta.DeclaredStatusCodes, meta.SecuredOps)
+				data, err := contractsReport(f, specArg, report, q)
+				if err != nil {
+					return err
+				}
+				if err := writeReport(cmd, outputFile, data); err != nil {
+					return err
+				}
+				if qualityHasGaps(q) {
+					return &exitError{1}
+				}
+				return nil
+			}
 
 			if report.TotalRuns == 0 {
 				fmt.Fprintf(cmd.OutOrStdout(), "No coverage data found for %s in %s.\nRun scenarios with --workspace and --spec to accumulate coverage.\n", specArg, workspacePath)
@@ -915,7 +941,8 @@ Exit codes:
 		},
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", contractsFormatUsage)
+	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
 	return cmd
 }
 

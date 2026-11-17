@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/fuvito/api-workbench/packages/core/importer"
 	"io"
 	"net/http"
 	"os"
@@ -17,20 +18,20 @@ import (
 
 // ImportedRequestIO is the Wails-serializable summary of one imported request.
 type ImportedRequestIO struct {
-	OperationID string `json:"operationId"`
-	Summary     string `json:"summary"`
-	Method      string `json:"method"`
-	URL         string `json:"url"`
-	SavedPath   string `json:"savedPath"`
+	OperationID string   `json:"operationId"`
+	Summary     string   `json:"summary"`
+	Method      string   `json:"method"`
+	URL         string   `json:"url"`
+	SavedPath   string   `json:"savedPath"`
 	Tags        []string `json:"tags,omitempty"`
 }
 
 // ImportResult is returned from ImportOpenAPISpec.
 type ImportResult struct {
-	SpecTitle  string              `json:"specTitle"`
-	SpecVersion string             `json:"specVersion"`
-	Imported   []ImportedRequestIO `json:"imported"`
-	Error      string              `json:"error,omitempty"`
+	SpecTitle   string              `json:"specTitle"`
+	SpecVersion string              `json:"specVersion"`
+	Imported    []ImportedRequestIO `json:"imported"`
+	Error       string              `json:"error,omitempty"`
 }
 
 // OpenAPIService handles OpenAPI spec import from the desktop application.
@@ -218,26 +219,6 @@ func pathBasedFilename(method, rawPath string) string {
 	return strings.ToLower(method) + "-" + sanitizeFilename(segment)
 }
 
-func sanitizeDirName(s string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(s) {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' {
-			b.WriteRune(r)
-		} else if r == ' ' || r == '_' {
-			b.WriteRune('-')
-		}
-	}
-	return b.String()
-}
+func sanitizeDirName(s string) string { return importer.SanitizeDirName(s) }
 
-func sanitizeFilename(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
-			b.WriteRune(r)
-		} else if r == ' ' {
-			b.WriteRune('-')
-		}
-	}
-	return b.String()
-}
+func sanitizeFilename(s string) string { return importer.SanitizeFilename(s) }

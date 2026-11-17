@@ -1,6 +1,6 @@
 # Future enhancements backlog
 
-- **Status:** Ideas — none approved, none scheduled
+- **Status:** Items 1–10 approved and implemented (see [CI and parity batch](2026-11-17-ci-and-parity-batch.md)); items 11–17 remain ideas for the project owner to think about
 - **Date:** 2026-11-17
 - **Purpose:** a place to keep ideas that came out of building the CLI Command Builder, HTML reports and folder runs, so they are not lost. Nothing here is a commitment.
 
@@ -12,16 +12,16 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 
 | # | Idea | Theme | Size | Suggested |
 |---|---|---|---|---|
-| 1 | Redact secrets and extracted values in every report | Consistency | S | **First** |
-| 2 | Contracts reports from the Go core, not the frontend | Consistency | M | Soon |
-| 3 | Several report files from one run | CI | S–M | Soon |
-| 4 | `--fail-on` severity for `diff` | CI | S | Soon |
-| 5 | Folders for `validate` and `impact` | Parity | S | Soon |
-| 6 | Run a folder from the desktop, and export the run report | Parity | M | Soon |
-| 7 | `clrsig import` (Postman / Insomnia) | Parity | S–M | Next |
-| 8 | `--var name=value` overrides | CI | S | Next |
-| 9 | `markdown` report format (PR comments, job summaries) | CI | M | Next |
-| 10 | `diff` against a git ref | CI | M | Next |
+| 1 ✅ | Redact secrets and extracted values in every report | Consistency | S | **First** |
+| 2 ✅ | Contracts reports from the Go core, not the frontend | Consistency | M | Soon |
+| 3 ✅ | Several report files from one run | CI | S–M | Soon |
+| 4 ✅ | `--fail-on` severity for `diff` | CI | S | Soon |
+| 5 ✅ | Folders for `validate` and `impact` | Parity | S | Soon |
+| 6 ✅ | Run a folder from the desktop, and export the run report | Parity | M | Soon |
+| 7 ✅ | `clrsig import` (Postman / Insomnia) | Parity | S–M | Next |
+| 8 ✅ | `--var name=value` overrides | CI | S | Next |
+| 9 ✅ | `markdown` report format (PR comments, job summaries) | CI | M | Next |
+| 10 ✅ | `diff` against a git ref | CI | M | Next |
 | 11 | Baseline mode for `conform` | Adoption | M–L | Later |
 | 12 | `validate --strict` (scenario quality lint) | Quality | S–M | Later |
 | 13 | `clrsig init` (workspace and CI scaffolding) | Adoption | M | Later |
@@ -146,3 +146,5 @@ Alongside these, the CLI Command Builder's phase 2 ("Test it here") is the large
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-17 | Backlog written; nothing approved. The project owner will consider the ideas as future enhancements | assistant |
+| 2026-11-17 | Items 1–10 approved ("go with all above other than later items"); built as one batch | project owner |
+| 2026-11-17 | Items 11–17 ("Later" and "Think twice") stay on the backlog until the project owner decides | project owner |

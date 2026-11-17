@@ -34,6 +34,14 @@ export function DuplicateScenario(arg1) {
   return window['go']['main']['ScenarioService']['DuplicateScenario'](arg1);
 }
 
+export function ExportCoverageReport(arg1, arg2) {
+  return window['go']['main']['ScenarioService']['ExportCoverageReport'](arg1, arg2);
+}
+
+export function ExportRunReport(arg1, arg2) {
+  return window['go']['main']['ScenarioService']['ExportRunReport'](arg1, arg2);
+}
+
 export function GetAccumulatedCoverage(arg1) {
   return window['go']['main']['ScenarioService']['GetAccumulatedCoverage'](arg1);
 }

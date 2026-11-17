@@ -106,6 +106,8 @@ import {
   GetAccumulatedCoverage as WailsGetAccumulatedCoverage,
   ResetAccumulatedCoverage as WailsResetAccumulatedCoverage,
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
+  ExportCoverageReport as WailsExportCoverageReport,
+  ExportRunReport as WailsExportRunReport,
   GetScenarioRunHistory as WailsGetScenarioRunHistory,
   CancelScenario as WailsCancelScenario,
 } from '@wailsjs/go/main/ScenarioService'
@@ -956,6 +958,31 @@ export async function listTemplates(): Promise<TemplateInfo[]> {
 export async function createFromTemplate(templateID: string, name: string): Promise<CreateScenarioResult> {
   const result = await WailsCreateFromTemplate(templateID, name)
   return result as unknown as CreateScenarioResult
+}
+
+export type RunReportFormat = 'html' | 'junit' | 'json' | 'markdown' | 'text'
+
+export interface RunReport {
+  content: string
+  error?: string
+}
+
+// Renders the latest results of the given scenarios with the Go reporting package, the same code
+// (and the same redaction of secrets) the CLI uses.
+export async function exportRunReport(format: RunReportFormat, paths: string[]): Promise<RunReport> {
+  return (await WailsExportRunReport(format, paths)) as unknown as RunReport
+}
+
+export type CoverageReportFormat = 'csv' | 'markdown' | 'html'
+
+export interface CoverageReport {
+  content: string
+  error?: string
+}
+
+// The report is rendered by the Go core, with the same code the CLI's coverage command uses.
+export async function exportCoverageReport(specFile: string, format: CoverageReportFormat): Promise<CoverageReport> {
+  return (await WailsExportCoverageReport(specFile, format)) as unknown as CoverageReport
 }
 
 export async function getAccumulatedCoverage(specFile: string): Promise<AccumulatedCoverage | null> {
