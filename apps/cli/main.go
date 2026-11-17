@@ -347,8 +347,11 @@ func runCmd() *cobra.Command {
 				for _, sr := range result.Steps {
 					if sr.Request != nil && sr.Response != nil {
 						executed = append(executed, openapi.ExecutedRequest{
-							Method: string(sr.Request.Method),
-							URL:    sr.Request.URL,
+							Method:     string(sr.Request.Method),
+							URL:        sr.Request.URL,
+							StatusCode: sr.Response.StatusCode,
+							HadAuth:    sr.Request.Auth != nil,
+							Passed:     sr.Passed,
 						})
 					}
 				}
@@ -374,6 +377,20 @@ func runCmd() *cobra.Command {
 				}
 				stored.Exercised = coverage.MergeExercised(stored.Exercised, exercised)
 				stored.TotalOps = cov.Total
+				// Merge per-operation quality signals (status codes seen, auth presence).
+				now := time.Now()
+				if stored.OperationResults == nil {
+					stored.OperationResults = make(map[string]coverage.OperationResult)
+				}
+				for _, er := range cov.ExercisedResults {
+					prev := stored.OperationResults[er.String()]
+					stored.OperationResults[er.String()] = coverage.OperationResult{
+						LastPassed:  er.Passed,
+						LastRunAt:   now,
+						StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
+						HadAuth:     prev.HadAuth || er.HadAuth,
+					}
+				}
 				if err := coverage.Save(workspacePath, stored); err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not save coverage: %v\n", err)
 				}
@@ -985,6 +1002,7 @@ func coverageCmd() *cobra.Command {
 		Short: "View and manage accumulated spec coverage for a workspace",
 	}
 	cmd.AddCommand(coverageListCmd())
+	cmd.AddCommand(coverageQualityCmd())
 	cmd.AddCommand(coverageResetCmd())
 	return cmd
 }
@@ -1051,6 +1069,172 @@ func coverageListCmd() *cobra.Command {
 						r.SpecFile, bar, r.Covered, r.Total, pct,
 						r.TotalRuns, r.PassedRuns, r.FailedRuns, lastRun)
 				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
+	return cmd
+}
+
+func coverageQualityCmd() *cobra.Command {
+	var workspacePath string
+	var format string
+
+	cmd := &cobra.Command{
+		Use:   "quality <spec-file-or-url>",
+		Short: "Show coverage quality indicators: gaps, untested error paths, and auth coverage",
+		Long: `Analyse accumulated workspace coverage against the spec to answer
+"what have you NOT proven?" rather than just counting executed operations.
+
+Reports four quality signals:
+  NEVER EXERCISED        — operations never reached by any recorded run
+  HAPPY PATH ONLY        — exercised but only 2xx responses ever observed
+  SECURED NEVER AUTHED   — auth-required ops never tested with credentials
+  UNTESTED ERROR PATHS   — declared 4xx/5xx responses never triggered
+
+Exit codes:
+  0  no quality gaps found
+  1  one or more gaps detected
+  2  spec parse or configuration error`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if workspacePath == "" {
+				return fmt.Errorf("--workspace is required")
+			}
+
+			specArg := args[0]
+			data, specFmt, err := fetchSpec(specArg)
+			if err != nil {
+				return err
+			}
+			spec, err := openapi.ParseBytes(data, specFmt)
+			if err != nil {
+				return fmt.Errorf("parsing spec: %w", err)
+			}
+
+			title, version := spec.Info()
+			meta := openapi.ExtractSpecMeta(spec)
+
+			allOps := spec.AllOperations()
+			allOpStrs := make([]string, len(allOps))
+			for i, op := range allOps {
+				allOpStrs[i] = op.String()
+			}
+
+			stored := coverage.Load(workspacePath, specArg)
+			report := coverage.BuildReport(stored, allOpStrs)
+
+			if report.TotalRuns == 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "No coverage data found for %s in %s.\nRun scenarios with --workspace and --spec to accumulate coverage.\n", specArg, workspacePath)
+				return nil
+			}
+
+			q := coverage.ComputeQuality(report, meta.DeclaredStatusCodes, meta.SecuredOps)
+			hasGaps := len(q.NeverExercised) > 0 || len(q.HappyPathOnly) > 0 ||
+				len(q.SecuredNeverAuthed) > 0 || len(q.ErrorsNeverTriggered) > 0
+
+			switch strings.ToLower(format) {
+			case "json":
+				type jsonGap struct {
+					Operation string `json:"operation"`
+					Missing   []int  `json:"missing"`
+				}
+				type jsonOut struct {
+					SpecTitle            string    `json:"specTitle"`
+					SpecVersion          string    `json:"specVersion"`
+					Workspace            string    `json:"workspace"`
+					TotalRuns            int       `json:"totalRuns"`
+					HasGaps              bool      `json:"hasGaps"`
+					NeverExercised       []string  `json:"neverExercised"`
+					HappyPathOnly        []string  `json:"happyPathOnly"`
+					SecuredNeverAuthed   []string  `json:"securedNeverAuthed"`
+					ErrorsNeverTriggered []jsonGap `json:"errorsNeverTriggered"`
+				}
+				var gaps []jsonGap
+				for _, g := range q.ErrorsNeverTriggered {
+					gaps = append(gaps, jsonGap{Operation: g.Operation, Missing: g.Missing})
+				}
+				out := jsonOut{
+					SpecTitle:            title,
+					SpecVersion:          version,
+					Workspace:            workspacePath,
+					TotalRuns:            report.TotalRuns,
+					HasGaps:              hasGaps,
+					NeverExercised:       q.NeverExercised,
+					HappyPathOnly:        q.HappyPathOnly,
+					SecuredNeverAuthed:   q.SecuredNeverAuthed,
+					ErrorsNeverTriggered: gaps,
+				}
+				b, _ := json.MarshalIndent(out, "", "  ")
+				fmt.Fprintln(cmd.OutOrStdout(), string(b))
+
+			default:
+				fmt.Fprintf(cmd.OutOrStdout(), "Coverage quality — %s  %s\n", title, version)
+				fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s  (%d run(s)  ·  %d/%d operations exercised)\n\n",
+					workspacePath, report.TotalRuns, report.Covered, report.Total)
+
+				if !hasGaps {
+					fmt.Fprintln(cmd.OutOrStdout(), "No gaps found — all operations exercised with error paths triggered and auth tested.")
+					return nil
+				}
+
+				if len(q.NeverExercised) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "NEVER EXERCISED (%d):\n", len(q.NeverExercised))
+					for _, op := range q.NeverExercised {
+						fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", op)
+					}
+					fmt.Fprintln(cmd.OutOrStdout())
+				}
+
+				if len(q.HappyPathOnly) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "HAPPY PATH ONLY — no error responses ever triggered (%d):\n", len(q.HappyPathOnly))
+					for _, op := range q.HappyPathOnly {
+						var missing []string
+						for _, gap := range q.ErrorsNeverTriggered {
+							if gap.Operation == op {
+								for _, code := range gap.Missing {
+									missing = append(missing, fmt.Sprintf("%d", code))
+								}
+								break
+							}
+						}
+						if len(missing) > 0 {
+							fmt.Fprintf(cmd.OutOrStdout(), "  %-35s  declared errors: %s\n", op, strings.Join(missing, ", "))
+						} else {
+							fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", op)
+						}
+					}
+					fmt.Fprintln(cmd.OutOrStdout())
+				}
+
+				if len(q.SecuredNeverAuthed) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "SECURED — never tested with credentials (%d):\n", len(q.SecuredNeverAuthed))
+					for _, op := range q.SecuredNeverAuthed {
+						fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", op)
+					}
+					fmt.Fprintln(cmd.OutOrStdout())
+				}
+
+				if len(q.ErrorsNeverTriggered) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "UNTESTED ERROR PATHS (%d operations):\n", len(q.ErrorsNeverTriggered))
+					for _, gap := range q.ErrorsNeverTriggered {
+						var codes []string
+						for _, c := range gap.Missing {
+							codes = append(codes, fmt.Sprintf("%d", c))
+						}
+						fmt.Fprintf(cmd.OutOrStdout(), "  %-35s  → %s never triggered\n", gap.Operation, strings.Join(codes, ", "))
+					}
+					fmt.Fprintln(cmd.OutOrStdout())
+				}
+
+				total := len(q.NeverExercised) + len(q.HappyPathOnly) + len(q.SecuredNeverAuthed) + len(q.ErrorsNeverTriggered)
+				fmt.Fprintf(cmd.OutOrStdout(), "%d gap(s) found — add scenarios that trigger error paths and test authenticated+unauthenticated flows\n", total)
+			}
+
+			if hasGaps {
+				return &exitError{1}
 			}
 			return nil
 		},

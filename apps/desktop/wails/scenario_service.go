@@ -872,10 +872,16 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			if sr.Skipped || sr.Request == nil {
 				continue
 			}
+			statusCode := 0
+			if sr.Response != nil {
+				statusCode = sr.Response.StatusCode
+			}
 			executed = append(executed, openapi.ExecutedRequest{
-				Method: string(sr.Request.Method),
-				URL:    sr.Request.URL,
-				Passed: sr.Passed,
+				Method:     string(sr.Request.Method),
+				URL:        sr.Request.URL,
+				StatusCode: statusCode,
+				HadAuth:    sr.Request.Auth != nil,
+				Passed:     sr.Passed,
 			})
 		}
 		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {
@@ -909,9 +915,12 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 					stored.OperationResults = make(map[string]coverage.OperationResult)
 				}
 				for _, er := range cr.ExercisedResults {
+					prev := stored.OperationResults[er.String()]
 					stored.OperationResults[er.String()] = coverage.OperationResult{
-						LastPassed: er.Passed,
-						LastRunAt:  now,
+						LastPassed:  er.Passed,
+						LastRunAt:   now,
+						StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
+						HadAuth:     prev.HadAuth || er.HadAuth,
 					}
 				}
 				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
