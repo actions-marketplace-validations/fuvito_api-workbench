@@ -69,6 +69,14 @@ var catalog = []Command{
 				Group:    GroupAdvanced,
 			},
 			{
+				Name: "var", Kind: KindString, Repeatable: true,
+				Label: "Variable overrides",
+				Help: "name=value, repeatable: set or override one environment variable for this run only. " +
+					"Do not put secrets here; command lines are visible to other processes. Use environment variables for secrets.",
+				Example: "baseUrl=https://staging.example.com",
+				Group:   GroupAdvanced, Deferred: true,
+			},
+			{
 				Name: "fail-fast", Kind: KindBool, Default: "false",
 				Label: "Stop at the first failing scenario",
 				Help:  "When running several scenarios, stop after the first one that fails instead of running them all.",
@@ -141,6 +149,14 @@ var catalog = []Command{
 				Label: "Coverage summary",
 				Help:  "Append a summary of how many operations received a response.",
 				Group: GroupEssential,
+			},
+			{
+				Name: "var", Kind: KindString, Repeatable: true,
+				Label: "Variable overrides",
+				Help: "name=value, repeatable: set or override one environment variable for this run only. " +
+					"Do not put secrets here; command lines are visible to other processes. Use environment variables for secrets.",
+				Example: "token=abc",
+				Group:   GroupAdvanced, Deferred: true,
 			},
 			{
 				Name: "negative", Kind: KindBool, Default: "false",

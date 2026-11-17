@@ -134,6 +134,7 @@ func writeReport(cmd *cobra.Command, outputFile string, data []byte) error {
 
 func bundleRunCmd() *cobra.Command {
 	var envName, envFile, specFile, format, outputFile string
+	var vars []string
 	var only []string
 
 	cmd := &cobra.Command{
@@ -173,6 +174,10 @@ Exit codes:
 					return fmt.Errorf("parsing environment: %w", err)
 				}
 			} else if env, err = bundle.SelectEnvironment(b, envName); err != nil {
+				return err
+			}
+
+			if env, err = finishEnvironment(cmd, env, vars); err != nil {
 				return err
 			}
 
@@ -227,6 +232,7 @@ Exit codes:
 	}
 
 	cmd.Flags().StringVarP(&envName, "env", "e", "", "Name of the bundle's environment to use (needed when it has several)")
+	cmd.Flags().StringArrayVar(&vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().StringVar(&envFile, "env-file", "", "Use an environment file instead of the bundle's own (YAML or JSON)")
 	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file or URL; replaces the spec of every scenario")
 	cmd.Flags().StringSliceVar(&only, "scenario", nil, "Run only the scenario with this title or file name (repeatable)")

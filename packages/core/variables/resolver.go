@@ -11,7 +11,8 @@ import (
 var varPattern = regexp.MustCompile(`\{\{\s*([^}]+?)\s*\}\}`)
 
 // Resolver substitutes {{variable}} references from a merged set of values.
-// Environment variables are loaded first; runtime variables (from scenario
+// Environment values may refer to process environment variables as ${NAME}; they are expanded
+// here, when a run starts. Environment variables are loaded first; runtime variables (from scenario
 // extractions) can be added with Set and take precedence.
 type Resolver struct {
 	vars map[string]string
@@ -21,7 +22,7 @@ func NewResolver(env *domain.Environment) *Resolver {
 	r := &Resolver{vars: make(map[string]string)}
 	if env != nil {
 		for _, v := range env.Variables {
-			r.vars[v.Name] = v.Value
+			r.vars[v.Name] = ExpandEnv(v.Value)
 		}
 	}
 	return r

@@ -25,8 +25,11 @@ func cobraFor(t *testing.T, name string) *cobra.Command {
 	return nil
 }
 
-func wantFlagType(k clispec.Kind) string {
-	switch k {
+func wantFlagType(in clispec.Input) string {
+	if in.Repeatable {
+		return "stringArray"
+	}
+	switch in.Kind {
 	case clispec.KindBool:
 		return "bool"
 	case clispec.KindInt:
@@ -63,11 +66,15 @@ func TestCatalogMatchesCobra(t *testing.T) {
 				if f.Shorthand != in.Short {
 					t.Errorf("--%s: shorthand is %q in cobra, %q in catalog", in.Name, f.Shorthand, in.Short)
 				}
-				if f.DefValue != in.Default {
-					t.Errorf("--%s: default is %q in cobra, %q in catalog", in.Name, f.DefValue, in.Default)
+				wantDefault := in.Default
+				if in.Repeatable {
+					wantDefault = "[]"
 				}
-				if got := f.Value.Type(); got != wantFlagType(in.Kind) {
-					t.Errorf("--%s: cobra type is %q, catalog kind %q expects %q", in.Name, got, in.Kind, wantFlagType(in.Kind))
+				if f.DefValue != wantDefault {
+					t.Errorf("--%s: default is %q in cobra, %q in catalog", in.Name, f.DefValue, wantDefault)
+				}
+				if got := f.Value.Type(); got != wantFlagType(in) {
+					t.Errorf("--%s: cobra type is %q, catalog kind %q expects %q", in.Name, got, in.Kind, wantFlagType(in))
 				}
 				if in.Kind == clispec.KindEnum {
 					for _, v := range in.Enum {

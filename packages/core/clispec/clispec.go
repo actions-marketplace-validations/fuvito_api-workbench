@@ -61,6 +61,9 @@ type Input struct {
 
 	Positional bool
 	Required   bool
+	// Repeatable inputs may be given several times (--var a=1 --var b=2). The builder does not
+	// offer them yet, so they are also Deferred.
+	Repeatable bool
 
 	Kind    Kind
 	Role    Role

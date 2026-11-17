@@ -29,6 +29,7 @@ type runOptions struct {
 	workspacePath string
 	failFast      bool
 	noRecursive   bool
+	vars          []string
 }
 
 // scenarioRun is one executed scenario.
@@ -72,6 +73,7 @@ Exit codes:
 	cmd.Flags().StringVarP(&o.specFile, "spec", "s", "", "OpenAPI spec file or URL (overrides specFile: in scenario)")
 	cmd.Flags().BoolVar(&o.showCoverage, "coverage", false, "Report which spec operations were exercised (requires --spec or specFile: in scenario)")
 	cmd.Flags().StringVarP(&o.workspacePath, "workspace", "w", "", "Workspace directory to accumulate coverage into")
+	cmd.Flags().StringArrayVar(&o.vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().BoolVar(&o.failFast, "fail-fast", false, "Stop after the first scenario that fails")
 	cmd.Flags().BoolVar(&o.noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
 
@@ -123,6 +125,9 @@ func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 
 	env, err := loadRunEnvironment(o.envFile)
 	if err != nil {
+		return err
+	}
+	if env, err = finishEnvironment(cmd, env, o.vars); err != nil {
 		return err
 	}
 

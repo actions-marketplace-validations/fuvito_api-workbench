@@ -103,6 +103,9 @@ func requestCmd() *cobra.Command {
 				}
 			}
 
+			if env, err = finishEnvironment(cmd, env, nil); err != nil {
+				return err
+			}
 			resolver := variables.NewResolver(env)
 			resolved := resolver.InterpolateRequest(req)
 
@@ -405,6 +408,7 @@ func conformCmd() *cobra.Command {
 	var outputFile string
 	var requestTimeout int
 	var failFast bool
+	var vars []string
 	var showCoverage bool
 	var runNegative bool
 	var start = time.Now()
@@ -444,6 +448,10 @@ Exit codes:
 				if err != nil {
 					return fmt.Errorf("parsing environment: %w", err)
 				}
+			}
+
+			if env, err = finishEnvironment(cmd, env, vars); err != nil {
+				return err
 			}
 
 			opts := conformance.Options{
@@ -555,6 +563,7 @@ Exit codes:
 
 	cmd.Flags().StringVarP(&baseURL, "base-url", "b", "", "Base URL to send requests to (overrides spec servers[0])")
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "Path to environment file for variable resolution")
+	cmd.Flags().StringArrayVar(&vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
