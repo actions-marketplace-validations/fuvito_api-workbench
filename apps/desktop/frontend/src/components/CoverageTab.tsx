@@ -473,7 +473,7 @@ function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedC
     await saveContentToFile(md, name)
   }
 
-  async function handlePDF() {
+  async function handleHTML() {
     setOpen(false)
     const html = generateHTMLReport(specFile, entry)
     const err = await openInSystemViewer(html, 'html')
@@ -485,14 +485,14 @@ function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedC
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        title="Export report"
-        className="flex items-center gap-0.5 p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
       >
-        <Download size={13} />
+        <Download size={12} />
+        Export
         <ChevronDownSm size={9} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1 text-xs">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[148px] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1 text-xs">
           <button type="button" onClick={handleCSV}
             className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-muted)] text-[var(--color-foreground)] transition-colors">
             Export CSV
@@ -501,9 +501,9 @@ function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedC
             className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-muted)] text-[var(--color-foreground)] transition-colors">
             Export Markdown
           </button>
-          <button type="button" onClick={handlePDF}
+          <button type="button" onClick={handleHTML}
             className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-muted)] text-[var(--color-foreground)] transition-colors">
-            Export PDF…
+            Export HTML
           </button>
         </div>
       )}
@@ -589,23 +589,24 @@ export function CoverageTab({ workspacePath, specFile, refreshTrigger }: Props) 
         <BarChart2 size={15} className="text-emerald-400 shrink-0" />
         {specFile ? (
           <>
-            <span className="text-sm font-semibold text-[var(--color-foreground)] truncate flex-1" title={specFile}>
-              {specLabel(specFile)}
-            </span>
-            {specFile !== specLabel(specFile) && (
-              <span className="text-xs text-[var(--color-muted-foreground)] truncate max-w-xs hidden sm:block" title={specFile}>
-                {specFile}
-              </span>
-            )}
-            <div className="ml-auto flex items-center gap-1">
+            <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+              <span className="text-sm font-semibold text-[var(--color-foreground)] shrink-0">{specLabel(specFile)}</span>
+              {specFile !== specLabel(specFile) && (
+                <span className="text-xs text-[var(--color-muted-foreground)] truncate" title={specFile}>
+                  ({specFile})
+                </span>
+              )}
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
               {specEntry && <ExportMenu specFile={specFile} entry={specEntry} />}
               <button
                 type="button"
                 onClick={refresh}
                 title="Refresh"
-                className="p-1.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-[var(--color-border)] text-xs font-medium text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors"
               >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                Refresh
               </button>
             </div>
           </>
