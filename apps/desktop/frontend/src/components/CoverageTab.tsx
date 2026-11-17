@@ -3,6 +3,7 @@ import { RotateCcw, RefreshCw, BarChart2, AlertCircle, ChevronDown, ChevronRight
 import { cn } from '@/lib/utils'
 import type { AccumulatedCoverage } from '@/lib/bridge'
 import { getAccumulatedCoverage, resetAccumulatedCoverage } from '@/lib/bridge'
+import { QualityPanel } from './QualityPanel'
 
 type Props = {
   workspacePath: string
@@ -233,6 +234,8 @@ function SpecDetailPanel({
           </div>
         )}
       </div>
+
+      {entry.quality && <QualityPanel quality={entry.quality} />}
     </div>
   )
 }

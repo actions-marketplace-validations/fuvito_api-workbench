@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioCoverage, AccumulatedCoverage } from '@/lib/bridge'
+import { QualityPanel } from './QualityPanel'
 
 type Props = {
   coverage?: ScenarioCoverage
@@ -57,6 +58,9 @@ export function CoverageBanner({ coverage, accumulated, onReset }: Props) {
         <p className="text-[10px] text-[var(--color-muted-foreground)]">
           Not yet covered: {primary.missed.join(' · ')}
         </p>
+      )}
+      {accumulated?.quality && (
+        <QualityPanel quality={accumulated.quality} compact />
       )}
     </div>
   )

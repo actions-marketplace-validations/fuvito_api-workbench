@@ -610,6 +610,18 @@ export interface ScenarioCoverage {
   missed: string[]
 }
 
+export interface QualityGap {
+  operation: string
+  missing: number[]
+}
+
+export interface QualityReport {
+  neverExercised: string[]
+  happyPathOnly: string[]
+  securedNeverAuthed: string[]
+  errorsNeverTriggered: QualityGap[]
+}
+
 export interface AccumulatedCoverage {
   specFile: string
   covered: number
@@ -622,6 +634,7 @@ export interface AccumulatedCoverage {
   exercised: string[]
   missed: string[]
   operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string }>
+  quality?: QualityReport
 }
 
 export interface ScenarioResult {
