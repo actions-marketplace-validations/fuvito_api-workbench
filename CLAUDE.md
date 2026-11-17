@@ -161,6 +161,8 @@ Before implementing a **major or breaking request**, check it and tell the user 
 
 Say what the concern is in a few lines, give a recommendation (proceed, shrink it, or skip), and wait for the answer. Do not refuse or quietly change the request; once the user has decided, follow their decision. Small, clearly consistent requests need no review — just do them.
 
+For a **major enhancement** (new UI area, new command family, format change, several packages), write a design proposal first in `docs/enhancements/` — named `YYYY-MM-DD-short-name.md`, following `docs/enhancements/README.md` — and get it agreed before building. The first one is `2026-11-17-cli-command-builder.md`.
+
 ---
 
 ## 7. Security Requirements
