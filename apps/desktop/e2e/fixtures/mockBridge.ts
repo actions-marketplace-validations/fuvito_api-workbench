@@ -46,6 +46,7 @@ export function setupMockBridge() {
     scenarioRaw: '' as unknown,
     scenarioResultCache: {} as Record<string, unknown>,
     recentWorkspaces: [] as unknown[],
+    coverage: [] as Array<{ specFile: string }>,
   }
 
   const bridge = (window as unknown as Record<string, Record<string, unknown>>)['__bridge']
@@ -129,6 +130,13 @@ export function setupMockBridge() {
         },
         LoadScenario: () => Promise.resolve(bridge['scenarioDetail'] ?? { path: '', title: '', description: '', error: '', steps: [] }),
         RunScenario: (_path: string, _envPath: string) => Promise.resolve(bridge['scenarioResult'] ?? { title: '', error: '', passed: true, durationMs: 0, steps: [] }),
+        ListAccumulatedCoverage: () => Promise.resolve(bridge['coverage']),
+        GetAccumulatedCoverage: (specFile: string) =>
+          Promise.resolve((bridge['coverage'] as Array<{ specFile: string }>).find(c => c.specFile === specFile) ?? null),
+        ResetAccumulatedCoverage: (specFile: string) => {
+          bridge['coverage'] = (bridge['coverage'] as Array<{ specFile: string }>).filter(c => c.specFile !== specFile)
+          return Promise.resolve()
+        },
         LoadScenarioRaw: () => Promise.resolve(bridge['scenarioRaw'] ?? ''),
         SaveScenarioRaw: (_path: string, content: string) => { bridge['scenarioRaw'] = content; return Promise.resolve('') },
         SaveScenarioResult: (path: string, result: unknown) => {
