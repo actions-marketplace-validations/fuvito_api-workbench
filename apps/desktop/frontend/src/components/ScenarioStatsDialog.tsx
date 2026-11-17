@@ -1,7 +1,7 @@
 import { CheckCircle2, XCircle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioResult } from '@/lib/bridge'
-import { statusColor } from './ScenarioStepResult'
+import { statusColor } from '@/lib/httpUtils'
 
 type Props = {
   result: ScenarioResult

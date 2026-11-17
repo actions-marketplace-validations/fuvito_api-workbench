@@ -398,7 +398,7 @@ func (s *ScenarioService) CreateScenario(name, folderPath string) CreateScenario
 	// Avoid overwriting an existing file by appending a suffix.
 	if _, err := os.Stat(filePath); err == nil {
 		for i := 2; ; i++ {
-			candidate := filepath.Join(scenDir, fmt.Sprintf("%s-%d.yaml", slug, i))
+			candidate := filepath.Join(targetDir, fmt.Sprintf("%s-%d.yaml", slug, i))
 			if _, err := os.Stat(candidate); err != nil {
 				filePath = candidate
 				break
@@ -406,6 +406,8 @@ func (s *ScenarioService) CreateScenario(name, folderPath string) CreateScenario
 		}
 	}
 
+	// A JSON string is valid YAML, so titles containing ':' or '#' stay parseable.
+	quotedName, _ := json.Marshal(name)
 	starter := fmt.Sprintf(`schemaVersion: "1"
 title: %s
 description: ""
@@ -418,7 +420,7 @@ steps:
       - type: status
         operator: eq
         expected: 200
-`, name)
+`, quotedName)
 
 	if err := atomicWrite(filePath, []byte(starter)); err != nil {
 		return CreateScenarioResultIO{Error: err.Error()}
@@ -872,10 +874,16 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			if sr.Skipped || sr.Request == nil {
 				continue
 			}
+			statusCode := 0
+			if sr.Response != nil {
+				statusCode = sr.Response.StatusCode
+			}
 			executed = append(executed, openapi.ExecutedRequest{
-				Method: string(sr.Request.Method),
-				URL:    sr.Request.URL,
-				Passed: sr.Passed,
+				Method:     string(sr.Request.Method),
+				URL:        sr.Request.URL,
+				StatusCode: statusCode,
+				HadAuth:    sr.Request.Auth != nil,
+				Passed:     sr.Passed,
 			})
 		}
 		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {
@@ -909,9 +917,12 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 					stored.OperationResults = make(map[string]coverage.OperationResult)
 				}
 				for _, er := range cr.ExercisedResults {
+					prev := stored.OperationResults[er.String()]
 					stored.OperationResults[er.String()] = coverage.OperationResult{
-						LastPassed: er.Passed,
-						LastRunAt:  now,
+						LastPassed:  er.Passed,
+						LastRunAt:   now,
+						StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
+						HadAuth:     prev.HadAuth || er.HadAuth,
 					}
 				}
 				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {

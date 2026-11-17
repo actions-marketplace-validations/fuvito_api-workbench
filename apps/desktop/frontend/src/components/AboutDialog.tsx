@@ -3,6 +3,20 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.4.0',
+    date: '2026-11-17',
+    items: [
+      'Bundle import/export — a whole workspace (environments, requests, scenarios) as a single YAML/JSON file',
+      'clrsig bundle run|validate|import|export — run scenarios straight from a bundle file',
+      'Help panel: Example Scenario and AI Prompt tabs with Copy and Download',
+      'clrsig impact command and MCP server over stdio',
+      'clrsig conform --negative — negative-path conformance checks',
+      'Coverage quality indicators in CLI and desktop UI; Contracts tab export to CSV, Markdown and PDF',
+      'Fix: blank page when a scenario run exercised no spec operations',
+      'Broad Go and frontend test coverage; several bugs found and fixed along the way',
+    ],
+  },
+  {
     version: '0.3.0',
     date: '2026-11-13',
     items: [
@@ -96,7 +110,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.3.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.4.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
@@ -144,14 +158,16 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
 
           {tab === 'release-notes' && (
             <div className="px-8 py-5 flex flex-col gap-6">
-              {RELEASE_NOTES.map(rel => (
+              {RELEASE_NOTES.map((rel, idx) => (
                 <div key={rel.version}>
                   <div className="flex items-baseline gap-3 mb-3">
                     <span className="text-sm font-bold text-[var(--color-foreground)]">v{rel.version}</span>
                     <span className="text-xs text-[var(--color-muted-foreground)]">{rel.date}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold uppercase tracking-wide">
-                      Latest
-                    </span>
+                    {idx === 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold uppercase tracking-wide">
+                        Latest
+                      </span>
+                    )}
                   </div>
                   <ul className="flex flex-col gap-1.5">
                     {rel.items.map(item => (

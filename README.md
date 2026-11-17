@@ -42,9 +42,66 @@ One command. No test files to write. The spec is the source of truth.
 
 **Breaking change detection** — `clrsig diff v1.yaml v2.yaml` tells you exactly which changes will break clients before you ship.
 
-**Coverage reporting** — see which operations in your spec have never been exercised, which have only been tested on the happy path, and what you have not yet proven.
+**The Contracts page** — a live scorecard for every OpenAPI spec you test: per-operation coverage and last result, plus quality signals that show what you have *not* proven yet. [See below.](#the-contracts-page)
+
+**Coverage reporting** — see which operations have never been exercised, which have only been tested on the happy path, which error codes have never been triggered, and which secured routes have never been called with credentials. Export as CSV, Markdown, or HTML.
 
 **CI/CD enforcement** — JUnit output, non-zero exit codes, and a GitHub Action mean the same checks that run on your laptop block the pipeline on main.
+
+---
+
+## The Contracts page
+
+Passing tests tell you what works. The **Contracts** page tells you what you have never checked.
+
+Every time a scenario runs against an OpenAPI spec, Clear Signal maps each request to the spec operation it exercised and records whether it passed. Those results accumulate across runs, so the page becomes a running picture of how well your tests cover the contract you declared.
+
+![Contracts page — coverage per operation, with last result and last run time](docs/images/10-contracts-overview.png)
+
+**One card per spec.** The sidebar lists every spec you have tested with its coverage percentage, operations covered, and passed/failed run counts. Green at 80% and above, amber at 40% and above, red below.
+
+**Every operation, at a glance.** The main view lists each operation in the spec as *Covered* or *Not covered*, with the result of the most recent run that hit it. A failing operation (`PUT /users/{id}` above) stands out immediately, and so does one nobody has tested.
+
+### Quality signals: what have you *not* proven?
+
+A 100% coverage number can still hide a lot. Below the operation table, four collapsible signals point at the gaps that coverage alone misses:
+
+| Signal | What it tells you |
+|---|---|
+| **Happy-path only** | Only 2xx responses have ever been observed. Nobody has tested what happens when it goes wrong. |
+| **Error responses never triggered** | The spec declares `400`, `404`, `409`… for this operation, but no run has ever produced them. Each missing code is listed. |
+| **Secured — never tested with auth** | The spec says the operation needs credentials, yet every call so far was made without any. |
+| **Never exercised** | No recorded run has reached this operation at all. |
+
+![Quality signals — happy-path only, untriggered error codes, and untested auth](docs/images/11-contracts-quality-signals.png)
+
+Each row names the operation and, for error gaps, the exact status codes to go and trigger. It works as a to-do list for your next scenario.
+
+### Share it
+
+**Export** produces a CSV, a Markdown report (paste it into a pull request or wiki), or a print-ready HTML report. Reports include the coverage summary, the operation table, and every quality gap.
+
+![Export menu — CSV, Markdown, HTML](docs/images/12-contracts-export-menu.png)
+
+### Turn it on
+
+Point a scenario at its spec and run it. Coverage accumulates automatically:
+
+```yaml
+schemaVersion: "1"
+title: User lifecycle
+specFile: ./openapi.yaml
+```
+
+The page refreshes after every run. The CLI reads the same data from the workspace:
+
+```bash
+clrsig run scenarios/user-lifecycle.yaml --spec openapi.yaml --workspace . --coverage
+clrsig coverage list    --workspace .
+clrsig coverage quality openapi.yaml --workspace .
+```
+
+Contracts data lives in your workspace, never in the cloud. **Reset data** clears a spec's history whenever you want a fresh baseline.
 
 ---
 
@@ -234,6 +291,12 @@ API traffic stays on your machine. Project files are YAML you own and can commit
 | Request editor | Scenario results |
 |---|---|
 | ![Request editor](docs/images/04-response-viewer.png) | ![Scenario results](docs/images/07-scenario-result.png) |
+
+| Contracts overview | Contracts quality signals |
+|---|---|
+| ![Contracts overview](docs/images/10-contracts-overview.png) | ![Contracts quality signals](docs/images/11-contracts-quality-signals.png) |
+
+Light-theme versions of every Contracts image are in [`docs/images`](docs/images) (`*-light.png`).
 
 ---
 

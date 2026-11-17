@@ -8,6 +8,11 @@ import type { HttpMethod } from '@/lib/httpUtils'
 import type { HistoryEntry } from '@/lib/bridge'
 import type { BodyState } from '@/types'
 
+// Stored URLs can contain a literal '%' that decodeURIComponent rejects.
+function safeDecode(s: string): string {
+  try { return decodeURIComponent(s) } catch { return s }
+}
+
 export type TabsStateTuple = { tabs: TabState[]; activeTabId: string }
 
 export function useTabsState(deps: {
@@ -291,8 +296,8 @@ export function useTabsState(deps: {
     const queryParams = qIdx >= 0
       ? entry.url.slice(qIdx + 1).split('&').filter(Boolean).map(pair => {
           const eqIdx = pair.indexOf('=')
-          const name = decodeURIComponent(eqIdx >= 0 ? pair.slice(0, eqIdx) : pair)
-          const value = eqIdx >= 0 ? decodeURIComponent(pair.slice(eqIdx + 1)) : ''
+          const name = safeDecode(eqIdx >= 0 ? pair.slice(0, eqIdx) : pair)
+          const value = eqIdx >= 0 ? safeDecode(pair.slice(eqIdx + 1)) : ''
           return { id: crypto.randomUUID(), name, value, enabled: true }
         })
       : []

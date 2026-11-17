@@ -186,6 +186,43 @@ func secStr(ms int64) string { return fmt.Sprintf("%.3f", float64(ms)/1000.0) }
 // Supported by Jenkins (Publish JUnit Results), GitHub Actions (dorny/test-reporter),
 // GitLab CI (junit artifact), and CircleCI (store_test_results).
 func JUnit(result *scenario.Result) ([]byte, error) {
+	suite := junitSuiteFor(result)
+	return marshalJUnit(jUnitTestSuites{
+		Name:       result.Scenario.Title,
+		Tests:      suite.Tests,
+		Failures:   suite.Failures,
+		Errors:     suite.Errors,
+		Time:       suite.Time,
+		TestSuites: []jUnitSuite{suite},
+	})
+}
+
+// JUnitMulti returns one JUnit document with a test suite per scenario, for runs that
+// execute several scenarios (for example a bundle). name labels the whole document.
+func JUnitMulti(name string, results []*scenario.Result) ([]byte, error) {
+	report := jUnitTestSuites{Name: name}
+	var totalMs int64
+	for _, r := range results {
+		suite := junitSuiteFor(r)
+		report.Tests += suite.Tests
+		report.Failures += suite.Failures
+		report.Errors += suite.Errors
+		totalMs += r.Duration.Milliseconds()
+		report.TestSuites = append(report.TestSuites, suite)
+	}
+	report.Time = secStr(totalMs)
+	return marshalJUnit(report)
+}
+
+func marshalJUnit(report jUnitTestSuites) ([]byte, error) {
+	out, err := xml.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(xml.Header), out...), nil
+}
+
+func junitSuiteFor(result *scenario.Result) jUnitSuite {
 	_, failed, _ := result.Counts()
 
 	suite := jUnitSuite{
@@ -226,21 +263,7 @@ func JUnit(result *scenario.Result) ([]byte, error) {
 		}
 		suite.Cases = append(suite.Cases, tc)
 	}
-
-	report := jUnitTestSuites{
-		Name:       result.Scenario.Title,
-		Tests:      suite.Tests,
-		Failures:   suite.Failures,
-		Errors:     suite.Errors,
-		Time:       suite.Time,
-		TestSuites: []jUnitSuite{suite},
-	}
-
-	out, err := xml.MarshalIndent(report, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append([]byte(xml.Header), out...), nil
+	return suite
 }
 
 // ---- Conformance reporting ----
@@ -456,6 +479,42 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 		return nil, err
 	}
 	return append([]byte(xml.Header), out...), nil
+}
+
+// NegativeText returns a human-readable negative conformance report.
+func NegativeText(result *conformance.NegativeResult) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "\nNegative conformance probes — %s %s\n", result.SpecTitle, result.SpecVersion)
+
+	for _, p := range result.Probes {
+		switch {
+		case p.Skipped:
+			fmt.Fprintf(&b, "  SKIP  %s\n", p.Description)
+		case p.Error != "":
+			fmt.Fprintf(&b, "  ERR   %s\n         error: %s\n", p.Description, p.Error)
+		case p.Passed():
+			fmt.Fprintf(&b, "  PASS  %s  %d  %dms\n", p.Description, p.StatusCode, p.DurationMs)
+		default:
+			fmt.Fprintf(&b, "  FAIL  %s\n         server accepted invalid request with %d\n", p.Description, p.StatusCode)
+		}
+	}
+
+	fmt.Fprintln(&b)
+	passed, failed, skipped, errored := result.Counts()
+	total := passed + failed + errored
+
+	verdict := "PASSED"
+	if failed > 0 {
+		verdict = "FAILED"
+	}
+	fmt.Fprintf(&b, "%s  %d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms\n",
+		verdict, total, passed, failed, skipped, errored, result.Duration.Milliseconds())
+	if failed > 0 {
+		fmt.Fprintf(&b, "       %d operation(s) accepted requests they should have rejected — fix server validation\n", failed)
+	}
+
+	return b.String()
 }
 
 // DiffJUnit returns a JUnit XML report for a spec diff result.

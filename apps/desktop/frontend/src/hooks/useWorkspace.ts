@@ -29,8 +29,9 @@ export function useWorkspace(deps: {
   tabsStateRef: React.RefObject<TabsStateTuple>
   openFileAsTab: (r: RequestFileIO, path: string) => string
   loadCacheIntoTab: (tabId: string, path: string) => Promise<void>
+  onWorkspaceOpened?: () => void
 }) {
-  const { setTabsState, tabsStateRef, openFileAsTab, loadCacheIntoTab } = deps
+  const { setTabsState, tabsStateRef, openFileAsTab, loadCacheIntoTab, onWorkspaceOpened } = deps
 
   const [workspacePath, setWorkspacePath] = useState('')
   const [fileTree, setFileTree] = useState<FileNode[]>([])
@@ -114,6 +115,7 @@ export function useWorkspace(deps: {
         setWorkspacePath(path)
         const tree = await refreshWorkspace()
         await Promise.all([openFirstFileInTree(tree), refreshHistory()])
+        onWorkspaceOpened?.()
       }
     } catch (err) {
       console.error('open workspace:', err)
@@ -127,6 +129,7 @@ export function useWorkspace(deps: {
         setWorkspacePath(path)
         const tree = await refreshWorkspace()
         await Promise.all([openFirstFileInTree(tree), refreshHistory()])
+        onWorkspaceOpened?.()
       }
     } catch (err) {
       console.error('new workspace:', err)
@@ -140,6 +143,7 @@ export function useWorkspace(deps: {
         setWorkspacePath(opened)
         const tree = await refreshWorkspace()
         await Promise.all([openFirstFileInTree(tree), refreshHistory()])
+        onWorkspaceOpened?.()
       }
     } catch (err) {
       console.error('open workspace by path:', err)
@@ -328,7 +332,7 @@ export function useWorkspace(deps: {
         ...prev,
         tabs: prev.tabs.map(t => {
           if (t.filePath !== path) return t
-          const savedKey = computeStateKey(t.method, t.url, t.queryParams, t.headers, t.body, t.auth, newName)
+          const savedKey = computeStateKey(t.method, t.url, t.queryParams, t.headers, t.body, t.auth, newName, t.timeoutMs)
           return { ...t, name: newName, filePath: newPath, savedKey }
         }),
       }))

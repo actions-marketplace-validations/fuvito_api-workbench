@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioCoverage, AccumulatedCoverage } from '@/lib/bridge'
+import { QualityPanel } from './QualityPanel'
 
 type Props = {
   coverage?: ScenarioCoverage
@@ -12,6 +13,8 @@ export function CoverageBanner({ coverage, accumulated, onReset }: Props) {
   const primary = accumulated ?? coverage
   if (!primary) return null
 
+  const exercised = coverage?.exercised ?? []
+  const missed = primary.missed ?? []
   const pct = Math.round(primary.percent)
   const color = pct >= 100 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400'
   const barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'
@@ -48,15 +51,18 @@ export function CoverageBanner({ coverage, accumulated, onReset }: Props) {
         />
       </div>
       {/* This run row — only shown when we have both, to highlight what this run contributed */}
-      {accumulated && coverage && coverage.exercised.length > 0 && (
+      {accumulated && exercised.length > 0 && (
         <p className="text-[10px] text-[var(--color-muted-foreground)] truncate">
-          This run: {coverage.exercised.join(' · ')}
+          This run: {exercised.join(' · ')}
         </p>
       )}
-      {primary.missed.length > 0 && (
+      {missed.length > 0 && (
         <p className="text-[10px] text-[var(--color-muted-foreground)]">
-          Not yet covered: {primary.missed.join(' · ')}
+          Not yet covered: {missed.join(' · ')}
         </p>
+      )}
+      {accumulated?.quality && (
+        <QualityPanel quality={accumulated.quality} compact />
       )}
     </div>
   )

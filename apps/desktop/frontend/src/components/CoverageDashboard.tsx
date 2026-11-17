@@ -52,7 +52,9 @@ export function CoverageDashboard({ workspacePath }: Props) {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect
     if (workspacePath) refresh()
+    // eslint-disable-next-line react/set-state-in-effect
     else setEntries([])
   }, [workspacePath, refresh])
 

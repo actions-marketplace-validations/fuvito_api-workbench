@@ -4,7 +4,7 @@ import type { AppSettings } from '@/lib/bridge'
 
 export function useSettings() {
   const [settings, setSettings] = useState<AppSettings>({
-    theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false,
+    theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false, telemetryEnabled: false,
   })
   const [showSettings, setShowSettings] = useState(false)
 

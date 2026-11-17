@@ -13,6 +13,20 @@ type OperationResultIO struct {
 	LastRunAt  string `json:"lastRunAt,omitempty"`
 }
 
+// QualityGapIO is the Wails IPC representation of untested error responses for one operation.
+type QualityGapIO struct {
+	Operation string `json:"operation"`
+	Missing   []int  `json:"missing"`
+}
+
+// QualityIO is the Wails IPC representation of a coverage quality report.
+type QualityIO struct {
+	NeverExercised       []string       `json:"neverExercised"`
+	HappyPathOnly        []string       `json:"happyPathOnly"`
+	SecuredNeverAuthed   []string       `json:"securedNeverAuthed"`
+	ErrorsNeverTriggered []QualityGapIO `json:"errorsNeverTriggered"`
+}
+
 // AccumulatedCoverageIO is the Wails IPC representation of accumulated spec coverage.
 type AccumulatedCoverageIO struct {
 	SpecFile         string                       `json:"specFile"`
@@ -26,6 +40,7 @@ type AccumulatedCoverageIO struct {
 	Exercised        []string                     `json:"exercised"`
 	Missed           []string                     `json:"missed"`
 	OperationResults map[string]OperationResultIO `json:"operationResults,omitempty"`
+	Quality          *QualityIO                   `json:"quality,omitempty"`
 }
 
 // coverageKey / coverageDirPath / loadStoredCoverage / saveStoredCoverage /
@@ -73,6 +88,8 @@ func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Sp
 			opResults[k] = or_
 		}
 	}
+	meta := openapi.ExtractSpecMeta(spec)
+	q := coverage.ComputeQuality(r, meta.DeclaredStatusCodes, meta.SecuredOps)
 	return AccumulatedCoverageIO{
 		SpecFile:         r.SpecFile,
 		Covered:          r.Covered,
@@ -85,7 +102,38 @@ func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Sp
 		Exercised:        r.Exercised,
 		Missed:           missed,
 		OperationResults: opResults,
+		Quality:          buildQualityIO(q),
 	}
+}
+
+func buildQualityIO(q *coverage.QualityReport) *QualityIO {
+	if q == nil {
+		return nil
+	}
+	io := &QualityIO{
+		NeverExercised:       orEmpty(q.NeverExercised),
+		HappyPathOnly:        orEmpty(q.HappyPathOnly),
+		SecuredNeverAuthed:   orEmpty(q.SecuredNeverAuthed),
+		ErrorsNeverTriggered: []QualityGapIO{},
+	}
+	for _, gap := range q.ErrorsNeverTriggered {
+		missing := gap.Missing
+		if missing == nil {
+			missing = []int{}
+		}
+		io.ErrorsNeverTriggered = append(io.ErrorsNeverTriggered, QualityGapIO{
+			Operation: gap.Operation,
+			Missing:   missing,
+		})
+	}
+	return io
+}
+
+func orEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // reportToIO converts a coverage.Report (from ListAll, which has no Missed) to the IPC type.

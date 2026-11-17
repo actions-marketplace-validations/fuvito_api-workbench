@@ -18,6 +18,7 @@ import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
 import {RunnerTab} from '@/components/RunnerTab'
 import {WorkspaceImportDialog} from '@/components/WorkspaceImportDialog'
+import {BundleImportDialog} from '@/components/BundleImportDialog'
 import {Sidebar} from '@/components/Sidebar'
 import {AboutDialog} from '@/components/AboutDialog'
 import {
@@ -49,6 +50,7 @@ import {
   duplicateScenario,
   executeRequest,
   exportWorkspace,
+  exportBundle,
   workspaceHasSecrets,
   loadScenario,
   moveRequest,
@@ -80,11 +82,20 @@ export default function App() {
   const refreshWorkspaceRef = useRef<() => Promise<void>>(async () => {})
 
   const tabs = useTabsState({ refreshWorkspaceRef })
+
+  function switchToExplorer() {
+    setRailTab('explorer')
+    localStorage.setItem('ui.railTab', 'explorer')
+    setSidebarOpen(true)
+    localStorage.setItem('ui.sidebarOpen', 'true')
+  }
+
   const workspace = useWorkspace({
     setTabsState: tabs.setTabsState,
     tabsStateRef: tabs.tabsStateRef,
     openFileAsTab: tabs.openFileAsTab,
     loadCacheIntoTab: tabs.loadCacheIntoTab,
+    onWorkspaceOpened: switchToExplorer,
   })
   const settings = useSettings()
   const demo = useDemo({
@@ -92,6 +103,7 @@ export default function App() {
     refreshHistory: workspace.refreshHistory,
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
+    onWorkspaceOpened: switchToExplorer,
   })
 
   // Wire cross-dependency after both hooks are initialized
@@ -122,6 +134,7 @@ export default function App() {
   })
 
   const [appError, setAppError] = useState<string | null>(null)
+  const [appNotice, setAppNotice] = useState<string | null>(null)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
   const [responseCollapsed, setResponseCollapsed] = useState(false)
 
@@ -154,7 +167,7 @@ export default function App() {
   // Modal / overlay state
   const [showAbout, setShowAbout] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec'>('guide')
+  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec' | 'example' | 'prompt'>('guide')
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
@@ -205,6 +218,7 @@ export default function App() {
 
   // Workspace export / import
   const [pendingImport, setPendingImport] = useState<ScanImportResult | null>(null)
+  const [showBundleImport, setShowBundleImport] = useState(false)
   const [showExportSecretsWarning, setShowExportSecretsWarning] = useState(false)
 
   // New scenario from response dialog
@@ -228,6 +242,22 @@ export default function App() {
     setShowExportSecretsWarning(false)
     const err = await exportWorkspace()
     if (err) setAppError(err)
+  }
+
+  async function handleExportBundle() {
+    try {
+      const r = await exportBundle()
+      if (r.error) { setAppError(r.error); return }
+      if (!r.path) return  // cancelled
+      const parts = [`${r.environments} environment${r.environments !== 1 ? 's' : ''}`, `${r.requests} request${r.requests !== 1 ? 's' : ''}`, `${r.scenarios} scenario${r.scenarios !== 1 ? 's' : ''}`]
+      let msg = `Exported ${parts.join(', ')} to ${r.path}.`
+      if (r.redactedSecrets > 0) msg += ` ${r.redactedSecrets} secret value${r.redactedSecrets !== 1 ? 's were' : ' was'} replaced with CHANGE_ME.`
+      if (r.skipped.length > 0) msg += ` Skipped ${r.skipped.length} file${r.skipped.length !== 1 ? 's' : ''} that could not be read: ${r.skipped.join('; ')}.`
+      if (r.warnings.length > 0) msg += ` ${r.warnings.join(' ')}`
+      setAppNotice(msg)
+    } catch (e) {
+      setAppError(String(e).replace(/^Error: /, ''))
+    }
   }
 
   async function handleImportWorkspace() {
@@ -346,12 +376,7 @@ export default function App() {
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
     setRunLogTrigger(t => t + 1)
-
     setCoverageRefreshTrigger(t => t + 1)
-    setRailTab('scenarios')
-    setSidebarOpen(true)
-    localStorage.setItem('ui.railTab', 'scenarios')
-    localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
   async function handleRunAll() {
@@ -385,12 +410,7 @@ export default function App() {
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
     setRunLogTrigger(t => t + 1)
-
     setCoverageRefreshTrigger(t => t + 1)
-    setRailTab('scenarios')
-    setSidebarOpen(true)
-    localStorage.setItem('ui.railTab', 'scenarios')
-    localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
   // Init
@@ -475,6 +495,10 @@ export default function App() {
 
   // eslint-disable-next-line react/refs
   handleSendRef.current = handleSend
+
+  const workspacePathRef = useRef(workspace.workspacePath)
+  // eslint-disable-next-line react/refs
+  workspacePathRef.current = workspace.workspacePath
 
   function handleCancel() {
     cancelRequest().catch(() => {})
@@ -648,7 +672,7 @@ export default function App() {
         })
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-        if (!workspace.workspacePath) return
+        if (!workspacePathRef.current) return
         e.preventDefault()
         setShowQuickOpen(o => !o)
       }
@@ -700,6 +724,8 @@ export default function App() {
       { kind: 'separator' },
       { kind: 'action', label: 'User Guide',   onClick: () => { setHelpInitialTab('guide'); setShowHelp(true) } },
       { kind: 'action', label: 'Format Spec…', onClick: () => { setHelpInitialTab('spec');  setShowHelp(true) } },
+      { kind: 'action', label: 'Example Scenario…', onClick: () => { setHelpInitialTab('example'); setShowHelp(true) } },
+      { kind: 'action', label: 'AI Prompt…', onClick: () => { setHelpInitialTab('prompt'); setShowHelp(true) } },
       { kind: 'separator' },
       { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
     ],
@@ -748,6 +774,8 @@ export default function App() {
             { kind: 'action', label: 'OpenAPI Spec…',       onClick: workspace.handleImportOpenAPI },
             { kind: 'action', label: 'OpenAPI from URL…',   onClick: () => { workspace.setImportFromURLInput(''); workspace.setImportFromURLError(''); workspace.setImportFromURLDialog(true) } },
             { kind: 'separator' },
+            { kind: 'action', label: 'Bundle (environments + scenarios)…', onClick: () => setShowBundleImport(true) },
+            { kind: 'separator' },
             { kind: 'action', label: 'Postman Collection…', onClick: workspace.handleImportPostman },
             { kind: 'action', label: 'Insomnia Export…',    onClick: workspace.handleImportInsomnia },
           ],
@@ -755,17 +783,19 @@ export default function App() {
         {
           kind: 'submenu',
           label: 'Export',
-          disabled: !tabs.activeTab.response,
           items: [
             {
               kind: 'action',
               label: 'Save Response Body…',
+              disabled: !tabs.activeTab.response,
               onClick: () => {
                 const body = tabs.activeTab.response?.body ?? ''
                 const ext = body.trimStart().startsWith('{') || body.trimStart().startsWith('[') ? '.json' : '.txt'
                 saveContentToFile(body, `response${ext}`)
               },
             },
+            { kind: 'separator' },
+            { kind: 'action', label: 'Bundle (environments + requests + scenarios)…', onClick: handleExportBundle },
           ],
         },
         { kind: 'separator' },
@@ -808,6 +838,13 @@ export default function App() {
         <div className="shrink-0 px-4 py-2 bg-red-500/15 border-b border-red-500/30 flex items-center gap-2 text-sm text-red-400">
           <span className="flex-1">{appError}</span>
           <button type="button" onClick={() => setAppError(null)} className="text-red-400/60 hover:text-red-400 transition-colors text-xs">Dismiss</button>
+        </div>
+      )}
+
+      {appNotice && (
+        <div role="status" className="shrink-0 px-4 py-2 bg-emerald-500/15 border-b border-emerald-500/30 flex items-center gap-2 text-sm text-emerald-400">
+          <span className="flex-1">{appNotice}</span>
+          <button type="button" onClick={() => setAppNotice(null)} className="text-emerald-400/60 hover:text-emerald-400 transition-colors text-xs">Dismiss</button>
         </div>
       )}
 
@@ -936,6 +973,13 @@ export default function App() {
         />
       )}
 
+      {showBundleImport && (
+        <BundleImportDialog
+          onClose={() => setShowBundleImport(false)}
+          onComplete={() => { workspace.refreshWorkspace() }}
+        />
+      )}
+
       {pendingImport && (
         <WorkspaceImportDialog
           scan={pendingImport}
@@ -1055,8 +1099,6 @@ export default function App() {
                     scenarioError={scenarioRenameError}
                     runAllState={runAllState ?? undefined}
                     onRunAllScenarios={handleRunAll}
-                    onCancelRunAll={handleCancelRunAll}
-                    onDismissRunAll={() => setRunAllState(null)}
                     runLogTrigger={runLogTrigger}
                     onRunFolder={handleRunFolder}
                     onRunScenarioFolder={handleRunScenarioFolder}
