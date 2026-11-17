@@ -346,12 +346,7 @@ export default function App() {
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
     setRunLogTrigger(t => t + 1)
-
     setCoverageRefreshTrigger(t => t + 1)
-    setRailTab('scenarios')
-    setSidebarOpen(true)
-    localStorage.setItem('ui.railTab', 'scenarios')
-    localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
   async function handleRunAll() {
@@ -385,12 +380,7 @@ export default function App() {
     }
     setRunAllState(prev => prev ? { ...prev, running: false } : prev)
     setRunLogTrigger(t => t + 1)
-
     setCoverageRefreshTrigger(t => t + 1)
-    setRailTab('scenarios')
-    setSidebarOpen(true)
-    localStorage.setItem('ui.railTab', 'scenarios')
-    localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
   // Init

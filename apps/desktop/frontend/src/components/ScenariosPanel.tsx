@@ -6,7 +6,6 @@ import { listTemplates, createFromTemplate } from '@/lib/bridge'
 import type { RunAllState } from '@/types'
 import type { FileClipboard } from '@/types'
 import { WorkspaceScenarioSection } from './WorkspaceScenarioSection'
-import { RunAllResults } from './WorkspaceRunResults'
 import { ContextMenu } from './ContextMenu'
 import { ScenarioTemplateGallery } from './ScenarioTemplateGallery'
 import { ScenarioRunLog } from './ScenarioRunLog'
@@ -160,14 +159,6 @@ export function ScenariosPanel({
             setFolderCtxMenu({ x: e.clientX, y: e.clientY, folderPath, name })
           }
         />
-        {runAllState && (
-          <RunAllResults
-            state={runAllState}
-            onSelectScenario={onSelectScenario}
-            onCancel={onCancelRunAll}
-            onDismiss={onDismissRunAll}
-          />
-        )}
       </div>
       </>
       )}
