@@ -524,7 +524,6 @@ function exportCSV(specFile: string, entry: AccumulatedCoverage) {
   const q = entry.quality
   const happySet  = new Set(q?.happyPathOnly        ?? [])
   const authSet   = new Set(q?.securedNeverAuthed   ?? [])
-  const neverSet  = new Set(q?.neverExercised       ?? [])
   const errorMap  = new Map((q?.errorsNeverTriggered ?? []).map(g => [g.operation, g.missing]))
 
   function qualityFlags(op: string, covered: boolean): [string, string] {
