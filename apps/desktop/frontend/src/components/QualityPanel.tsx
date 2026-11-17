@@ -63,14 +63,13 @@ type SectionProps = {
   count: number
   accentText: string
   accentBg: string
-  accentBorder: string
   icon: React.ReactNode
   defaultOpen?: boolean
   children: React.ReactNode
 }
 
 function QualitySection({
-  title, hint, count, accentText, accentBg, accentBorder,
+  title, hint, count, accentText, accentBg,
   icon, defaultOpen = false, children,
 }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
@@ -154,7 +153,6 @@ export function QualityPanel({ quality, compact = false }: Props) {
             count={happyPathOnly.length}
             accentText="text-amber-400"
             accentBg="bg-amber-500/5"
-            accentBorder="border-amber-500/20"
             icon={<AlertTriangle size={10} />}
             defaultOpen
           >
@@ -175,7 +173,6 @@ export function QualityPanel({ quality, compact = false }: Props) {
             count={errorsNeverTriggered.length}
             accentText="text-orange-400"
             accentBg="bg-orange-500/5"
-            accentBorder="border-orange-500/20"
             icon={<XCircle size={10} />}
             defaultOpen
           >
@@ -190,7 +187,6 @@ export function QualityPanel({ quality, compact = false }: Props) {
             count={securedNeverAuthed.length}
             accentText="text-blue-400"
             accentBg="bg-blue-500/5"
-            accentBorder="border-blue-500/20"
             icon={<Lock size={10} />}
             defaultOpen
           >
@@ -211,7 +207,6 @@ export function QualityPanel({ quality, compact = false }: Props) {
             count={neverExercised.length}
             accentText="text-red-400"
             accentBg="bg-red-500/5"
-            accentBorder="border-red-500/20"
             icon={<ShieldOff size={10} />}
           >
             <ul className="py-1">
