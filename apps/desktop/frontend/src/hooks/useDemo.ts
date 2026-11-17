@@ -11,8 +11,9 @@ export function useDemo(deps: {
   refreshHistory: () => Promise<void>
   setTabsState: React.Dispatch<React.SetStateAction<TabsStateTuple>>
   openFirstFileInTree: (tree: FileNode[]) => Promise<void>
+  onWorkspaceOpened?: () => void
 }) {
-  const { refreshWorkspace, refreshHistory, setTabsState, openFirstFileInTree } = deps
+  const { refreshWorkspace, refreshHistory, setTabsState, openFirstFileInTree, onWorkspaceOpened } = deps
 
   const [demoRunning, setDemoRunning] = useState(false)
   const [demoPort, setDemoPort] = useState(0)
@@ -33,6 +34,7 @@ export function useDemo(deps: {
       setDemoWorkspacePath(result.workspacePath ?? '')
       const tree = await refreshWorkspace()
       await Promise.all([openFirstFileInTree(tree), refreshHistory()])
+      onWorkspaceOpened?.()
     } catch (err) {
       console.error('demo start error:', err)
     } finally {

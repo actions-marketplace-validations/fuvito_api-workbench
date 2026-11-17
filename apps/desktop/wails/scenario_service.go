@@ -398,7 +398,7 @@ func (s *ScenarioService) CreateScenario(name, folderPath string) CreateScenario
 	// Avoid overwriting an existing file by appending a suffix.
 	if _, err := os.Stat(filePath); err == nil {
 		for i := 2; ; i++ {
-			candidate := filepath.Join(scenDir, fmt.Sprintf("%s-%d.yaml", slug, i))
+			candidate := filepath.Join(targetDir, fmt.Sprintf("%s-%d.yaml", slug, i))
 			if _, err := os.Stat(candidate); err != nil {
 				filePath = candidate
 				break
@@ -406,6 +406,8 @@ func (s *ScenarioService) CreateScenario(name, folderPath string) CreateScenario
 		}
 	}
 
+	// A JSON string is valid YAML, so titles containing ':' or '#' stay parseable.
+	quotedName, _ := json.Marshal(name)
 	starter := fmt.Sprintf(`schemaVersion: "1"
 title: %s
 description: ""
@@ -418,7 +420,7 @@ steps:
       - type: status
         operator: eq
         expected: 200
-`, name)
+`, quotedName)
 
 	if err := atomicWrite(filePath, []byte(starter)); err != nil {
 		return CreateScenarioResultIO{Error: err.Error()}

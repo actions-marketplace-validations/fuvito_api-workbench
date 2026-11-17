@@ -142,6 +142,12 @@ func (d *DemoService) StopDemo() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// Without this guard, a stop while nothing is running would overwrite the
+	// open workspace with the empty "previous workspace" values.
+	if d.server == nil && d.tempDir == "" {
+		return
+	}
+
 	if d.server != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
