@@ -1372,6 +1372,11 @@ export default function App() {
             environments={workspace.environments}
             activeEnv={workspace.activeEnv}
             workspacePath={workspace.workspacePath}
+            activeFilePath={
+              activeTab.kind === 'scenario' ? activeTab.scenarioPath
+                : isPageTab(activeTab.kind) ? null
+                : activeTab.filePath
+            }
             demoRunning={demo.demoRunning}
             demoPort={demo.demoPort}
             onEnvChange={workspace.handleEnvChange}

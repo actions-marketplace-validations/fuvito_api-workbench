@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { StatusBar } from './StatusBar'
+import { StatusBar, shortenPath } from './StatusBar'
 
 const envs = [{ name: 'local', path: '/e/local.yaml' }, { name: 'prod', path: '/e/prod.yaml' }]
 
@@ -25,6 +25,37 @@ describe('StatusBar', () => {
     renderBar({ workspacePath: 'C:\\Users\\me\\proj\\' })
     const name = screen.getByText('proj')
     expect(name).toHaveAttribute('title', 'C:\\Users\\me\\proj\\')
+  })
+
+  it('shows the full path of the file in focus, with the same path as a tooltip', () => {
+    const path = String.raw`C:\Users\me\proj\scenarios\login.yaml`
+    renderBar({ activeFilePath: path })
+    const el = screen.getByTestId('status-file-path')
+    expect(el).toHaveTextContent(path)
+    expect(el).toHaveAttribute('title', path)
+  })
+
+  it('shows no file path when nothing is open or the file is unsaved', () => {
+    renderBar({ activeFilePath: null })
+    expect(screen.queryByTestId('status-file-path')).not.toBeInTheDocument()
+    renderBar({ activeFilePath: '' })
+    expect(screen.queryByTestId('status-file-path')).not.toBeInTheDocument()
+  })
+
+  it('shortens a very long path from the left and keeps the file name', () => {
+    const long = '/very/' + 'deep/'.repeat(40) + 'requests/get-user.yaml'
+    renderBar({ activeFilePath: long })
+    const el = screen.getByTestId('status-file-path')
+    expect(el.textContent!.startsWith('…')).toBe(true)
+    expect(el.textContent!.endsWith('requests/get-user.yaml')).toBe(true)
+    expect(el.textContent!.length).toBe(100)
+    expect(el).toHaveAttribute('title', long)
+  })
+
+  it('shortenPath leaves short paths alone', () => {
+    expect(shortenPath('/a/b.yaml')).toBe('/a/b.yaml')
+    expect(shortenPath('x'.repeat(100))).toBe('x'.repeat(100))
+    expect(shortenPath('x'.repeat(101))).toBe('…' + 'x'.repeat(99))
   })
 
   it('lists environments with the active one selected, and reports changes', () => {
