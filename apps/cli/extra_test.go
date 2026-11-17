@@ -763,3 +763,44 @@ func TestRunCmd_JUnitOutputFile(t *testing.T) {
 		t.Errorf("want JUnit XML in file, got:\n%s", data)
 	}
 }
+
+// ---- html format ----
+
+func TestRunCmd_HTMLOutput(t *testing.T) {
+	srv := pingServer(t)
+	sc := writeTempFile(t, "scenario.yaml", scenarioYAML(srv.URL))
+	outFile := filepath.Join(t.TempDir(), "reports", "run.html")
+	if _, err := exec(t, "run", "--format", "html", "--output", outFile, sc); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("report not written: %v", err)
+	}
+	if !strings.HasPrefix(string(data), "<!DOCTYPE html>") || !strings.Contains(string(data), "PASSED") {
+		t.Errorf("want a passing HTML report, got:\n%s", data)
+	}
+}
+
+func TestConformCmd_HTMLOutput(t *testing.T) {
+	srv := pingServer(t)
+	spec := writeTempFile(t, "api.yaml", minimalSpec)
+	out, err := exec(t, "conform", "--base-url", srv.URL, "--format", "html", "--coverage", spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
+	}
+	if !strings.HasPrefix(out, "<!DOCTYPE html>") || !strings.Contains(out, "Coverage") {
+		t.Errorf("want HTML conformance report with coverage, got:\n%s", out)
+	}
+}
+
+func TestDiffCmd_HTMLOutput(t *testing.T) {
+	spec := writeTempFile(t, "api.yaml", minimalSpec)
+	out, err := exec(t, "diff", "--format", "html", spec, spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
+	}
+	if !strings.HasPrefix(out, "<!DOCTYPE html>") || !strings.Contains(out, "No changes.") {
+		t.Errorf("want HTML diff report, got:\n%s", out)
+	}
+}

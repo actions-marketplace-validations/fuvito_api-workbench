@@ -141,7 +141,16 @@ Open the desktop app → open a workspace → click **Import OpenAPI** in the wo
 
 ## CLI Reference
 
-The `clrsig` CLI exposes eleven commands: `run`, `conform`, `diff`, `impact`, `generate`, `request`, `validate`, `coverage`, `bundle`, `mcp` and `telemetry`. Most report commands accept `--format json` for machine-readable output and `--output <file>` to write results to disk; run `clrsig <command> --help` for the authoritative flag list.
+The `clrsig` CLI exposes eleven commands: `run`, `conform`, `diff`, `impact`, `generate`, `request`, `validate`, `coverage`, `bundle`, `mcp` and `telemetry`. Report commands choose their output with `--format` and write to a file with `--output <file>` (parent folders are created); run `clrsig <command> --help` for the authoritative flag list.
+
+| Format | Purpose | Commands |
+|---|---|---|
+| `text` (default) | Terminal / CI log; plain ASCII | all report commands |
+| `json` | Machine-readable | `run`, `conform`, `diff`, `impact`, `validate`, `generate`, `request`, `coverage list\|quality`, `bundle run` |
+| `junit` | CI test dashboards, PR annotation | `run`, `conform`, `diff`, `bundle run` |
+| `html` | Human-readable, self-contained single file (inline CSS, light/dark, print-friendly) | `run`, `conform`, `diff`, `bundle run` |
+
+Formats are opt-in; no command writes a file unless `--output` is given. The exit code is independent of the format. Renderers live in `packages/core/reporting` (`html.go` builds one document model and renders it with `html/template`, so all untrusted text is escaped; extracted variable values are never included).
 
 ### `run` — execute a scenario
 
@@ -149,10 +158,10 @@ The `clrsig` CLI exposes eleven commands: `run`, `conform`, `diff`, `impact`, `g
 clrsig run <scenario-file> [flags]
 
   -e, --env <file>       Environment file (YAML or JSON)
-  -s, --spec <file>      OpenAPI spec to validate responses against
+  -s, --spec <file>      OpenAPI spec to validate responses against (relative to the current directory)
       --coverage         Report which spec operations the scenario exercised
   -w, --workspace <dir>  Accumulate coverage into this workspace (shown on the Contracts page)
-  -f, --format           Output format: text (default), json, junit
+  -f, --format           Output format: text (default), json, junit, html
   -o, --output <file>    Write report to file
       --timeout <ms>     Global step timeout (overrides per-step setting)
 ```
@@ -212,7 +221,7 @@ clrsig conform <spec-file-or-url> [flags]
                              missing auth, missing params
       --fail-fast            Stop after first violation
       --request-timeout <ms> Per-request timeout (default 10 000)
-  -f, --format               text (default), json, junit
+  -f, --format               text (default), json, junit, html
   -o, --output <file>        Write report to file
 ```
 
@@ -238,7 +247,7 @@ clrsig conform https://petstore.swagger.io/v2/swagger.json \
 clrsig diff <base-spec> <revision-spec> [flags]
 
       --breaking-only    Only report breaking changes
-  -f, --format           text (default), json, junit
+  -f, --format           text (default), json, junit, html
   -o, --output <file>    Write report to file
 ```
 
@@ -348,7 +357,7 @@ clrsig coverage reset   <spec-file-or-url> --workspace <dir>
 
 ```bash
 clrsig bundle run      <bundle-file> [--env <name> | --env-file <file>] [--spec <path-or-url>]
-                       [--scenario <title-or-file>]... [-f text|json|junit] [-o <file>]
+                       [--scenario <title-or-file>]... [-f text|json|junit|html] [-o <file>]
 clrsig bundle validate <bundle-file> [--spec <path-or-url>]
 clrsig bundle import   <bundle-file> --workspace <dir> [--on-conflict rename|skip|overwrite]
                        [--spec-file <path-or-url>] [--dry-run]

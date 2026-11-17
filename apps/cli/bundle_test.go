@@ -114,6 +114,14 @@ func TestBundleRun_JSONAndJUnitReports(t *testing.T) {
 		t.Errorf("json: %+v", js)
 	}
 
+	out, err = execBundle(t, "bundle", "run", path, "-f", "html")
+	if exitCode(err) != 1 {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out, "<!DOCTYPE html>") || !strings.Contains(out, "CLI suite") || !strings.Contains(out, "FAILED") {
+		t.Errorf("html: %s", out)
+	}
+
 	out, err = execBundle(t, "bundle", "run", path, "-f", "junit")
 	if exitCode(err) != 1 {
 		t.Fatal(err)

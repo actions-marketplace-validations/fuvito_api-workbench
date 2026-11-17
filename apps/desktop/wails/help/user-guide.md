@@ -506,9 +506,9 @@ clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --work
 | Flag | Default | Description |
 |---|---|---|
 | `--env`, `-e` | (none) | Path to an environment file (YAML or JSON). |
-| `--format`, `-f` | `text` | Output format: `text` (human-readable), `json` (machine-readable) or `junit`. |
+| `--format`, `-f` | `text` | Output format: `text`, `json`, `junit` or `html` — see [Output formats](#output-formats). |
 | `--output`, `-o` | (stdout) | Write the report to a file; parent directories are created. |
-| `--spec`, `-s` | (none) | OpenAPI spec file or URL. Overrides the scenario's `specFile`. |
+| `--spec`, `-s` | (none) | OpenAPI spec file or URL. Overrides the scenario's `specFile`. A relative path is relative to your current directory (a `specFile:` inside the scenario is relative to the scenario file). |
 | `--coverage` | off | Report which spec operations the scenario exercised (needs a spec). |
 | `--workspace`, `-w` | (none) | Accumulate coverage into this workspace, so it appears on the Contracts page. |
 | `--timeout` | `0` | Global step timeout in milliseconds; overrides per-step values. `0` uses the per-step value. |
@@ -520,6 +520,24 @@ clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --work
 | `0` | All steps passed all assertions. |
 | `1` | One or more assertions failed. |
 | `2` | A network, parse, or configuration error occurred. |
+
+### Output formats
+
+Report commands choose their format with `--format` (`-f`) and print to the screen unless you give `--output` (`-o`) a file, in which case the folders are created for you. Nothing is written to disk by default, and the exit code never depends on the format.
+
+| Format | Best for | Commands |
+|---|---|---|
+| `text` (default) | Reading in a terminal or CI log | all report commands |
+| `json` | Scripts and other tools | `run`, `conform`, `diff`, `impact`, `validate`, `generate`, `request`, `coverage list`, `coverage quality`, `bundle run` |
+| `junit` | CI test dashboards and pull-request annotations (Jenkins, GitHub, GitLab, CircleCI) | `run`, `conform`, `diff`, `bundle run` |
+| `html` | A report a person can open in a browser, attach to a ticket or keep as a CI artifact | `run`, `conform`, `diff`, `bundle run` |
+
+```bash
+clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml -f junit -o reports/run.xml
+clrsig run scenarios/user-lifecycle.yaml --env environments/ci.yaml -f html  -o reports/run.html
+```
+
+The HTML report is one self-contained file (no external scripts, fonts or images), follows your light or dark system theme, and prints cleanly. It shows the same results as the text report — pass/fail per step, assertions, violations, coverage — but leaves out **extracted variable values**, so a token pulled from a login response does not end up in a file you share. To produce several formats from one run, run the command once per format.
 
 ### Text output example
 
@@ -590,7 +608,7 @@ clrsig bundle export --workspace ./my-workspace -o bundle.yaml
 | `--env-file <file>` | Use an environment file instead — handy in CI, where credentials come from the pipeline rather than the bundle. |
 | `--spec <path-or-url>` | Replace the spec of every scenario. |
 | `--scenario <title-or-file>` | Run only this scenario. Repeat the option for several. |
-| `--format text\|json\|junit` | Report format. `junit` produces one document with a test suite per scenario. |
+| `--format text\|json\|junit\|html` | Report format. `junit` produces one document with a test suite per scenario; `html` one page covering every scenario. |
 | `--output <file>` | Write the report to a file. |
 
 Exit codes: `0` every scenario passed, `1` at least one failed, `2` the bundle is invalid or could not be read.
@@ -620,7 +638,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--coverage` | Append a coverage summary. |
 | `--fail-fast` | Stop after the first violation or execution error. |
 | `--request-timeout` | Per-request timeout in milliseconds (default `10000`). |
-| `--format`, `-f` / `--output`, `-o` | `text`, `json` or `junit`; write the report to a file. |
+| `--format`, `-f` / `--output`, `-o` | `text`, `json`, `junit` or `html`; write the report to a file. |
 
 Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error.
 
@@ -631,7 +649,7 @@ clrsig diff openapi-v1.yaml openapi-v2.yaml --breaking-only
 clrsig impact openapi-v1.yaml openapi-v2.yaml scenarios/*.yaml
 ```
 
-`diff` classifies every change between two specs as breaking (`ERR`), potentially breaking (`WARN`) or informational (`INFO`); `--format text|json|junit` and `--output` are supported. It exits `1` when breaking changes are found. `impact` goes one step further: it reports which of your **scenario steps** match a breaking change, so you know what will stop passing before the new spec ships. It exits `1` when any scenario is affected. Both exit `2` on a parse error.
+`diff` classifies every change between two specs as breaking (`ERR`), potentially breaking (`WARN`) or informational (`INFO`); `--format text|json|junit|html` and `--output` are supported. It exits `1` when breaking changes are found. `impact` goes one step further: it reports which of your **scenario steps** match a breaking change, so you know what will stop passing before the new spec ships. It exits `1` when any scenario is affected. Both exit `2` on a parse error.
 
 ### `clrsig generate`, `request` and `validate`
 

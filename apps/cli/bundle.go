@@ -55,6 +55,19 @@ func (l *specLoader) load(src, baseDir string) *openapi.Spec {
 	return spec
 }
 
+// cwdSpecPath makes a spec path given on the command line relative to the current
+// directory, like every other CLI path. URLs and absolute paths are returned unchanged.
+// (A specFile written inside a scenario or bundle is relative to that file instead.)
+func cwdSpecPath(src string) string {
+	if src == "" || strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") || filepath.IsAbs(src) {
+		return src
+	}
+	if abs, err := filepath.Abs(src); err == nil {
+		return abs
+	}
+	return src
+}
+
 // newScenarioRunner builds a runner that validates responses against spec when one is given.
 func newScenarioRunner(spec *openapi.Spec) *scenario.Runner {
 	exec := executor.New(executor.Options{})
@@ -145,7 +158,7 @@ Exit codes:
 			if err != nil {
 				return err
 			}
-			opts := bundle.Options{SpecFile: specFile}
+			opts := bundle.Options{SpecFile: cwdSpecPath(specFile)}
 			if n := printIssues(cmd, bundle.Validate(b, opts)); n > 0 {
 				return fmt.Errorf("the bundle has %d error(s) and was not run", n)
 			}
@@ -217,7 +230,7 @@ Exit codes:
 	cmd.Flags().StringVar(&envFile, "env-file", "", "Use an environment file instead of the bundle's own (YAML or JSON)")
 	cmd.Flags().StringVarP(&specFile, "spec", "s", "", "OpenAPI spec file or URL; replaces the spec of every scenario")
 	cmd.Flags().StringSliceVar(&only, "scenario", nil, "Run only the scenario with this title or file name (repeatable)")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, or junit")
+	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text, json, junit, or html")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
 	return cmd
 }
@@ -231,6 +244,13 @@ func bundleReport(format, title string, results []*scenario.Result, total time.D
 		out, err := reporting.JUnitMulti(title, results)
 		if err != nil {
 			return nil, fmt.Errorf("generating JUnit report: %w", err)
+		}
+		return out, nil
+
+	case "html":
+		out, err := reporting.HTMLMulti(title, results, total)
+		if err != nil {
+			return nil, fmt.Errorf("generating HTML report: %w", err)
 		}
 		return out, nil
 
@@ -303,7 +323,7 @@ func bundleValidateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			issues := bundle.Validate(b, bundle.Options{SpecFile: specFile})
+			issues := bundle.Validate(b, bundle.Options{SpecFile: cwdSpecPath(specFile)})
 			errs := printIssues(cmd, issues)
 			warns := len(issues) - errs
 			if errs > 0 {

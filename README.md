@@ -52,7 +52,7 @@ One command. No test files to write. The spec is the source of truth.
 
 **Coverage reporting** — see which operations have never been exercised, which have only been tested on the happy path, which error codes have never been triggered, and which secured routes have never been called with credentials. Export as CSV, Markdown, or HTML.
 
-**CI/CD enforcement** — JUnit output, non-zero exit codes, and a GitHub Action mean the same checks that run on your laptop block the pipeline on main.
+**CI/CD enforcement** — JUnit output, non-zero exit codes, and a GitHub Action mean the same checks that run on your laptop block the pipeline on main. Add `--format html` for a self-contained report anyone can open from the build artifacts.
 
 ---
 
