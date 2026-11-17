@@ -34,7 +34,7 @@ function envToYAML(name: string, variables: EnvVar[]): string {
 
 function yamlScalar(s: string): string {
   if (s === '') return "''"
-  if (/[:#\[\]{},|>&*!%@`'"]/.test(s) || /^\s|\s$/.test(s) || s.includes('\n')) {
+  if (/[:#[\]{},|>&*!%@`'"]/.test(s) || /^\s|\s$/.test(s) || s.includes('\n')) {
     return "'" + s.replace(/'/g, "''") + "'"
   }
   return s

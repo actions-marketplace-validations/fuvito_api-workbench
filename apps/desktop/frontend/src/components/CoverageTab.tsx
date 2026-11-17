@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import type { AccumulatedCoverage } from '@/lib/bridge'
 import { getAccumulatedCoverage, resetAccumulatedCoverage, saveContentToFile, openInSystemViewer } from '@/lib/bridge'
 import { QualityPanel } from './QualityPanel'
+import { parseOp, specLabel, buildCsvRows, generateMarkdownReport } from '@/lib/coverage-report'
 
 type Props = {
   workspacePath: string
@@ -23,15 +24,6 @@ const METHOD_BG: Record<string, string> = {
   OPTIONS: 'bg-pink-400/10',
 }
 
-function parseOp(op: string): { method: string; path: string } {
-  const idx = op.indexOf(' ')
-  if (idx === -1) return { method: op, path: '' }
-  return { method: op.slice(0, idx), path: op.slice(idx + 1) }
-}
-
-function specLabel(specFile: string): string {
-  return specFile.replace(/\\/g, '/').split('/').pop() ?? specFile
-}
 
 function ProgressBar({ pct }: { pct: number }) {
   const color = pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'
@@ -243,88 +235,7 @@ function SpecDetailPanel({
 // ── Report generators ─────────────────────────────────────────────────────────
 
 function generateMarkdown(specFile: string, entry: AccumulatedCoverage): string {
-  const label = specLabel(specFile)
-  const pct = Math.round(entry.percent)
-  const now = new Date().toLocaleString()
-  const lines: string[] = []
-
-  lines.push(`# Contracts Report — ${label}`)
-  lines.push(``)
-  lines.push(`Generated: ${now}`)
-  lines.push(``)
-  lines.push(`## Summary`)
-  lines.push(``)
-  lines.push(`**${entry.covered} / ${entry.total} operations covered (${pct}%)**`)
-  lines.push(``)
-  lines.push(`| Metric | Value |`)
-  lines.push(`|--------|-------|`)
-  lines.push(`| Total runs | ${entry.totalRuns} |`)
-  lines.push(`| Passed runs | ${entry.passedRuns} |`)
-  lines.push(`| Failed runs | ${entry.failedRuns} |`)
-  if (entry.lastRunAt) lines.push(`| Last run | ${new Date(entry.lastRunAt).toLocaleString()} |`)
-  lines.push(``)
-  lines.push(`## Operations`)
-  lines.push(``)
-  lines.push(`| Method | Path | Coverage | Last Result | Last Run |`)
-  lines.push(`|--------|------|----------|-------------|---------|`)
-
-  const allOps = [...(entry.exercised ?? []), ...(entry.missed ?? [])].sort((a, b) => {
-    const pa = parseOp(a), pb = parseOp(b)
-    return pa.path !== pb.path ? pa.path.localeCompare(pb.path) : pa.method.localeCompare(pb.method)
-  })
-  for (const op of allOps) {
-    const { method, path } = parseOp(op)
-    const covered = (entry.exercised ?? []).includes(op)
-    const r = entry.operationResults?.[op]
-    const result = r ? (r.lastPassed ? 'Pass' : 'Fail') : '—'
-    const runAt = r?.lastRunAt ? relTime(r.lastRunAt) : '—'
-    lines.push(`| \`${method}\` | \`${path}\` | ${covered ? '✅ Covered' : '—'} | ${result} | ${runAt} |`)
-  }
-
-  const q = entry.quality
-  if (q) {
-    const hasGaps = q.happyPathOnly.length + q.securedNeverAuthed.length + q.errorsNeverTriggered.length > 0
-    if (hasGaps) {
-      lines.push(``)
-      lines.push(`## Quality Gaps`)
-
-      if (q.happyPathOnly.length > 0) {
-        lines.push(``)
-        lines.push(`### Happy-path only (${q.happyPathOnly.length})`)
-        lines.push(``)
-        lines.push(`Only 2xx responses observed — declared error paths untested.`)
-        lines.push(``)
-        for (const op of q.happyPathOnly) lines.push(`- \`${op}\``)
-      }
-
-      if (q.errorsNeverTriggered.length > 0) {
-        lines.push(``)
-        lines.push(`### Error responses never triggered (${q.errorsNeverTriggered.length})`)
-        lines.push(``)
-        lines.push(`| Operation | Missing status codes |`)
-        lines.push(`|-----------|---------------------|`)
-        for (const gap of q.errorsNeverTriggered) {
-          lines.push(`| \`${gap.operation}\` | ${gap.missing.join(', ')} |`)
-        }
-      }
-
-      if (q.securedNeverAuthed.length > 0) {
-        lines.push(``)
-        lines.push(`### Secured — never tested with auth (${q.securedNeverAuthed.length})`)
-        lines.push(``)
-        lines.push(`Operations that require authentication but were always called without credentials.`)
-        lines.push(``)
-        for (const op of q.securedNeverAuthed) lines.push(`- \`${op}\``)
-      }
-    } else {
-      lines.push(``)
-      lines.push(`## Quality Gaps`)
-      lines.push(``)
-      lines.push(`_All quality signals clear._`)
-    }
-  }
-
-  return lines.join('\n')
+  return generateMarkdownReport(specFile, entry)
 }
 
 const METHOD_HEX: Record<string, string> = {
@@ -513,42 +424,8 @@ function ExportMenu({ specFile, entry }: { specFile: string; entry: AccumulatedC
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function csvCell(v: string): string {
-  if (v.includes(',') || v.includes('"') || v.includes('\n')) {
-    return '"' + v.replace(/"/g, '""') + '"'
-  }
-  return v
-}
-
 function exportCSV(specFile: string, entry: AccumulatedCoverage) {
-  const q = entry.quality
-  const happySet  = new Set(q?.happyPathOnly        ?? [])
-  const authSet   = new Set(q?.securedNeverAuthed   ?? [])
-  const errorMap  = new Map((q?.errorsNeverTriggered ?? []).map(g => [g.operation, g.missing]))
-
-  function qualityFlags(op: string, covered: boolean): [string, string] {
-    if (!covered) return ['Never exercised', '']
-    const flags: string[] = []
-    if (happySet.has(op))  flags.push('Happy-path only')
-    if (authSet.has(op))   flags.push('No auth tested')
-    if (errorMap.has(op))  flags.push('Errors never triggered')
-    return [flags.join('; '), (errorMap.get(op) ?? []).join(' ')]
-  }
-
-  const rows = ['Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes']
-  const allOps = [...(entry.exercised ?? []), ...(entry.missed ?? [])].sort((a, b) => {
-    const pa = parseOp(a), pb = parseOp(b)
-    return pa.path !== pb.path ? pa.path.localeCompare(pb.path) : pa.method.localeCompare(pb.method)
-  })
-  for (const op of allOps) {
-    const { method, path } = parseOp(op)
-    const covered = (entry.exercised ?? []).includes(op)
-    const r = entry.operationResults?.[op]
-    const result = covered ? (r ? (r.lastPassed ? 'Pass' : 'Fail') : '') : ''
-    const runAt  = r?.lastRunAt ? new Date(r.lastRunAt).toISOString() : ''
-    const [quality, missing] = qualityFlags(op, covered)
-    rows.push([method, path, covered ? 'Covered' : 'Not Covered', result, runAt, quality, missing].map(csvCell).join(','))
-  }
+  const rows = buildCsvRows(entry)
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -579,8 +456,10 @@ export function CoverageTab({ workspacePath, specFile, refreshTrigger }: Props) 
     }
   }, [workspacePath, specFile])
 
+  // eslint-disable-next-line react/set-state-in-effect
   useEffect(() => { refresh() }, [refresh])
 
+  // eslint-disable-next-line react/set-state-in-effect
   useEffect(() => { if (refreshTrigger) refresh() }, [refreshTrigger, refresh])
 
   async function handleReset() {

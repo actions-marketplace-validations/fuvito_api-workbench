@@ -300,6 +300,7 @@ export function ScenarioRunLog({ workspacePath, refreshTrigger, onSelectScenario
     }
   }, [workspacePath])
 
+  // eslint-disable-next-line react/set-state-in-effect
   useEffect(() => { refresh() }, [refresh, refreshTrigger])
 
   if (!workspacePath) {

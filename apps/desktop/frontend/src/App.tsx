@@ -80,11 +80,20 @@ export default function App() {
   const refreshWorkspaceRef = useRef<() => Promise<void>>(async () => {})
 
   const tabs = useTabsState({ refreshWorkspaceRef })
+
+  function switchToExplorer() {
+    setRailTab('explorer')
+    localStorage.setItem('ui.railTab', 'explorer')
+    setSidebarOpen(true)
+    localStorage.setItem('ui.sidebarOpen', 'true')
+  }
+
   const workspace = useWorkspace({
     setTabsState: tabs.setTabsState,
     tabsStateRef: tabs.tabsStateRef,
     openFileAsTab: tabs.openFileAsTab,
     loadCacheIntoTab: tabs.loadCacheIntoTab,
+    onWorkspaceOpened: switchToExplorer,
   })
   const settings = useSettings()
   const demo = useDemo({
@@ -92,6 +101,7 @@ export default function App() {
     refreshHistory: workspace.refreshHistory,
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
+    onWorkspaceOpened: switchToExplorer,
   })
 
   // Wire cross-dependency after both hooks are initialized

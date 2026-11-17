@@ -42,7 +42,7 @@ One command. No test files to write. The spec is the source of truth.
 
 **Breaking change detection** — `clrsig diff v1.yaml v2.yaml` tells you exactly which changes will break clients before you ship.
 
-**Coverage reporting** — see which operations in your spec have never been exercised, which have only been tested on the happy path, and what you have not yet proven.
+**Coverage reporting** — see which operations have never been exercised, which have only been tested on the happy path, which error codes have never been triggered, and which secured routes have never been called with credentials. Export as CSV, Markdown, or HTML.
 
 **CI/CD enforcement** — JUnit output, non-zero exit codes, and a GitHub Action mean the same checks that run on your laptop block the pipeline on main.
 

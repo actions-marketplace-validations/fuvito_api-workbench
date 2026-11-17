@@ -380,7 +380,7 @@ Click any row in the runner table to open that scenario's full result in an edit
 
 ## 9. Contracts — coverage tracking
 
-The **Contracts** tab tracks which operations in an OpenAPI specification have been exercised by your scenarios, and what the last test result was for each one.
+The **Contracts** tab tracks which operations in an OpenAPI specification have been exercised by your scenarios, what the last test result was for each one, and surfaces quality signals that highlight what you have *not yet proven*.
 
 ### Enabling coverage tracking
 
@@ -422,10 +422,26 @@ The detail view shows a table with one row per operation:
 
 Operations are grouped into **Covered** and **Not covered** collapsible sections, sorted by path then method.
 
+### Quality signals
+
+Below the operations table, Clear Signal shows four collapsible quality-signal sections that highlight gaps in what you have proven:
+
+| Signal | Meaning |
+|---|---|
+| **Happy-path only** | Only 2xx responses have been observed — no error paths have been tested |
+| **Error responses never triggered** | The spec declares non-2xx status codes for this operation, but none have ever been returned |
+| **Secured — never tested with auth** | The operation requires authentication (per the spec's security schemes) but has always been called without credentials |
+| **Never exercised** | These operations have not been reached by any recorded run |
+
+A compact summary of the same gaps also appears inline in the scenario result view after any run that has a `specFile`.
+
 ### Reset and export
 
 - **Reset data** — clears all accumulated coverage for the selected spec.
-- **Export CSV** — downloads a CSV with all operations, their coverage status, last result, and last run time.
+- **Export** (dropdown button) — three formats:
+  - **Export CSV** — comma-separated file with one row per operation: method, path, coverage, last result, last run time, quality flags, and missing status codes.
+  - **Export Markdown** — Markdown report suitable for pasting into a wiki, PR description, or README. Includes the coverage summary, operations table, and all quality gap sections.
+  - **Export HTML** — full HTML report opened in your default browser, ready for print-to-PDF. Includes the same content as the Markdown report with styling.
 
 ### Auto-refresh
 

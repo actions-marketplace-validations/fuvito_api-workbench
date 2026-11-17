@@ -159,6 +159,7 @@ export function ScenarioViewer({
   }, [isActive])
 
   const handleSaveRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false))
+  // eslint-disable-next-line react/immutability
   useEffect(() => { handleSaveRef.current = handleSave })
 
   useEffect(() => {
