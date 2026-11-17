@@ -2,12 +2,15 @@ package clispec
 
 var specExts = []string{".yaml", ".yml", ".json"}
 
-var reportFormats = []string{"text", "json", "junit", "html"}
+var reportFormats = []string{"text", "json", "junit", "html", "markdown"}
 
 const (
 	formatHelp = "How the report is written. text is for people reading a terminal or a CI log; " +
 		"json is for scripts; junit is for CI test dashboards and pull-request annotations; " +
-		"html is a single page you can open in a browser or keep as a build artifact."
+		"html is a single page you can open in a browser or keep as a build artifact; " +
+		"markdown is for pull-request comments and the GitHub job summary."
+	reportHelp = "name=file, repeatable: also write a report in another format from the same run, " +
+		"for example junit=reports/run.xml, so you do not have to run twice."
 	outputHelp = "Write the report to this file instead of the screen. Missing folders are created. " +
 		"Nothing is written to disk unless you set this."
 	envHelp = "Variables used by {{placeholders}} in your requests, such as baseUrl and tokens. " +
@@ -69,6 +72,13 @@ var catalog = []Command{
 				Group:    GroupAdvanced,
 			},
 			{
+				Name: "show-extracted", Kind: KindBool, Default: "false",
+				Label: "Show secret-looking extracted values",
+				Help: "Reports hide extracted values whose names look secret (token, password, key, session …) and any " +
+					"secret environment value. Turn this on only to debug locally; the values then appear in the report.",
+				Group: GroupAdvanced,
+			},
+			{
 				Name: "var", Kind: KindString, Repeatable: true,
 				Label: "Variable overrides",
 				Help: "name=value, repeatable: set or override one environment variable for this run only. " +
@@ -103,6 +113,11 @@ var catalog = []Command{
 				Name: "output", Short: "o", Kind: KindOutputFile,
 				Label: "Save report to", Help: outputHelp, Example: "reports/run.html",
 				Group: GroupEssential,
+			},
+			{
+				Name: "report", Kind: KindString, Repeatable: true,
+				Label: "Also save as", Help: reportHelp, Example: "junit=reports/run.xml",
+				Group: GroupAdvanced, Deferred: true,
 			},
 		},
 		Outputs: []string{
@@ -201,6 +216,11 @@ var catalog = []Command{
 				Label: "Save report to", Help: outputHelp, Example: "reports/conform.html",
 				Group: GroupEssential,
 			},
+			{
+				Name: "report", Kind: KindString, Repeatable: true,
+				Label: "Also save as", Help: reportHelp, Example: "junit=reports/conform.xml",
+				Group: GroupAdvanced, Deferred: true,
+			},
 		},
 		Outputs: []string{
 			"A pass/fail line per operation with the violations found, on the screen (or in the file you choose).",
@@ -242,6 +262,22 @@ var catalog = []Command{
 				Group: GroupEssential,
 			},
 			{
+				Name: "fail-on", Kind: KindEnum, Enum: []string{"breaking", "warning", "info"}, Default: "breaking",
+				Label: "Fail when a change is at least",
+				Help: "How serious a change must be before the command fails. breaking (the default) fails only on " +
+					"breaking changes; warning also fails on potentially breaking ones; info fails on any change. " +
+					"It cannot be combined with Only breaking changes.",
+				Group: GroupEssential,
+			},
+			{
+				Name: "against", Kind: KindString,
+				Label: "Compare against a git ref",
+				Help: "Give one spec file and compare it with its version at this git ref (for example origin/main), " +
+					"read through git. Needs git and a repository.",
+				Example: "origin/main",
+				Group:   GroupAdvanced, Deferred: true,
+			},
+			{
 				Name: "format", Short: "f", Kind: KindEnum, Enum: reportFormats, Default: "text",
 				Label: "Report format", Help: formatHelp, Group: GroupEssential,
 			},
@@ -250,13 +286,18 @@ var catalog = []Command{
 				Label: "Save report to", Help: outputHelp, Example: "reports/diff.html",
 				Group: GroupEssential,
 			},
+			{
+				Name: "report", Kind: KindString, Repeatable: true,
+				Label: "Also save as", Help: reportHelp, Example: "junit=reports/diff.xml",
+				Group: GroupAdvanced, Deferred: true,
+			},
 		},
 		Outputs: []string{
 			"A list of changes, each marked ERR (breaking), WARN or INFO, on the screen (or in the file you choose).",
 		},
 		ExitCodes: []ExitCode{
-			{0, "No breaking changes.", "The pipeline step succeeds: safe to ship."},
-			{1, "One or more breaking changes.", "The pipeline step fails: review before shipping."},
+			{0, "No change at or above the --fail-on level (breaking by default).", "The pipeline step succeeds: safe to ship."},
+			{1, "One or more changes at or above the --fail-on level (breaking by default).", "The pipeline step fails: review before shipping."},
 			{2, "A spec could not be read or parsed, or a configuration error.", "The pipeline step fails: fix the command or the specs first."},
 		},
 	},

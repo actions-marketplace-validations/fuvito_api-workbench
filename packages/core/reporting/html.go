@@ -120,6 +120,7 @@ func scenarioSummary(result *scenario.Result) string {
 }
 
 func scenarioSection(result *scenario.Result) htmlSection {
+	x := redactorFor(result)
 	sec := htmlSection{Heading: result.Scenario.Title, Note: result.Scenario.Description}
 	for _, sr := range result.Steps {
 		row := htmlRow{Title: sr.Label}
@@ -135,14 +136,14 @@ func scenarioSection(result *scenario.Result) htmlSection {
 			row.Meta = fmt.Sprintf("%d · %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
 		}
 		if sr.Error != "" {
-			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + sr.Error})
+			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + x.text(sr.Error)})
 		}
 		for _, ar := range sr.Assertions {
 			label := assertionLabel(ar.Assertion)
 			if ar.Passed {
 				row.Lines = append(row.Lines, htmlLine{Mark: "✓", Text: label, OK: true})
 			} else {
-				row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: label + ": " + ar.Message})
+				row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: label + ": " + x.text(ar.Message)})
 			}
 		}
 		for _, name := range sortedKeys(sr.Extracted) {
@@ -173,7 +174,7 @@ func opLines(ops []openapi.CoveredOperation) []string {
 // HTML returns a self-contained, human-readable HTML report for a scenario run.
 // Pass a non-nil cov to append a spec coverage section. Extracted variable values
 // are deliberately left out so the file is safe to share as a CI artifact.
-func HTML(result *scenario.Result, cov *openapi.ScenarioCoverageResult) ([]byte, error) {
+func scenarioDoc(result *scenario.Result, cov *openapi.ScenarioCoverageResult) htmlDoc {
 	doc := htmlDoc{
 		Title:    result.Scenario.Title,
 		Subtitle: "Scenario run",
@@ -184,7 +185,7 @@ func HTML(result *scenario.Result, cov *openapi.ScenarioCoverageResult) ([]byte,
 	if cov != nil {
 		doc.Sections = append(doc.Sections, coverageSection("Spec coverage", cov))
 	}
-	return renderHTML(doc)
+	return doc
 }
 
 func coverageSection(heading string, cov *openapi.ScenarioCoverageResult) htmlSection {
@@ -199,7 +200,7 @@ func coverageSection(heading string, cov *openapi.ScenarioCoverageResult) htmlSe
 }
 
 // HTMLMulti returns one HTML report covering several scenarios, for runs such as a bundle.
-func HTMLMulti(title string, results []*scenario.Result, total time.Duration, cov ...SpecCoverage) ([]byte, error) {
+func multiDoc(title string, results []*scenario.Result, total time.Duration, cov ...SpecCoverage) htmlDoc {
 	passedScenarios, steps, assertsPassed, assertsTotal := 0, 0, 0, 0
 	doc := htmlDoc{Title: title, Subtitle: "Bundle run"}
 	for _, r := range results {
@@ -230,12 +231,12 @@ func HTMLMulti(title string, results []*scenario.Result, total time.Duration, co
 	doc.Passed = passedScenarios == len(results)
 	doc.Summary = fmt.Sprintf("%d/%d scenarios passed  (%d steps, %d/%d assertions passed)  %dms",
 		passedScenarios, len(results), steps, assertsPassed, assertsTotal, total.Milliseconds())
-	return renderHTML(doc)
+	return doc
 }
 
 // ConformHTML returns a self-contained HTML report for a conformance run. Pass non-nil
 // coverage and/or neg to append the coverage summary and the negative-probe results.
-func ConformHTML(result *conformance.ConformResult, cov *conformance.CoverageReport, neg *conformance.NegativeResult) ([]byte, error) {
+func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageReport, neg *conformance.NegativeResult) htmlDoc {
 	passed, failed, skipped := result.Counts()
 	doc := htmlDoc{
 		Title:    fmt.Sprintf("%s %s", result.SpecTitle, result.SpecVersion),
@@ -317,17 +318,40 @@ func ConformHTML(result *conformance.ConformResult, cov *conformance.CoverageRep
 			doc.Passed = false
 		}
 	}
-	return renderHTML(doc)
+	return doc
 }
 
-// DiffHTML returns a self-contained HTML report for a spec diff. changes is the list to
-// show (the caller may have filtered it, for example to breaking changes only).
-func DiffHTML(result *openapi.DiffResult, changes []openapi.DiffChange) ([]byte, error) {
+// HTML returns a self-contained, human-readable HTML report for a scenario run.
+// Pass a non-nil cov to append a spec coverage section. Extracted variable values are
+// deliberately left out so the file is safe to share as a CI artifact.
+func HTML(result *scenario.Result, cov *openapi.ScenarioCoverageResult) ([]byte, error) {
+	return renderHTML(scenarioDoc(result, cov))
+}
+
+// HTMLMulti returns one HTML report covering several scenarios, for runs such as a bundle or
+// a folder.
+func HTMLMulti(title string, results []*scenario.Result, total time.Duration, cov ...SpecCoverage) ([]byte, error) {
+	return renderHTML(multiDoc(title, results, total, cov...))
+}
+
+// ConformHTML returns a self-contained HTML report for a conformance run. Pass non-nil
+// coverage and/or neg to append the coverage summary and the negative-probe results.
+func ConformHTML(result *conformance.ConformResult, cov *conformance.CoverageReport, neg *conformance.NegativeResult) ([]byte, error) {
+	return renderHTML(conformDoc(result, cov, neg))
+}
+
+// diffDoc builds the document for a spec diff. changes is the list to show (the caller may have
+// filtered it); the verdict follows the on threshold.
+func diffDoc(result *openapi.DiffResult, changes []openapi.DiffChange, on openapi.FailOn) htmlDoc {
 	breaking := 0
+	failing := 0
 	sec := htmlSection{Heading: "Changes"}
 	for _, c := range changes {
 		if c.Breaking {
 			breaking++
+		}
+		if c.Fails(on) {
+			failing++
 		}
 		row := htmlRow{Status: c.Level, Title: c.Text}
 		if c.Method != "" && c.Path != "" {
@@ -338,16 +362,28 @@ func DiffHTML(result *openapi.DiffResult, changes []openapi.DiffChange) ([]byte,
 	doc := htmlDoc{
 		Title:    "API Spec Diff",
 		Subtitle: "Breaking and non-breaking changes between two OpenAPI specs",
-		Passed:   !result.HasBreaking,
+		Passed:   !result.Fails(on),
 		Sections: []htmlSection{sec},
 	}
 	switch {
 	case len(changes) == 0:
 		doc.Summary = "No changes."
+	case on != openapi.FailOnBreaking && on != "":
+		doc.Summary = fmt.Sprintf("%d change(s)  ·  %d breaking  ·  %d at or above %q", len(changes), breaking, failing, string(on))
 	case result.HasBreaking:
 		doc.Summary = fmt.Sprintf("%d change(s)  ·  %d breaking", len(changes), breaking)
 	default:
 		doc.Summary = fmt.Sprintf("%d change(s)  ·  no breaking changes", len(changes))
 	}
-	return renderHTML(doc)
+	return doc
+}
+
+// DiffHTML returns a self-contained HTML report for a spec diff, failing on breaking changes.
+func DiffHTML(result *openapi.DiffResult, changes []openapi.DiffChange) ([]byte, error) {
+	return renderHTML(diffDoc(result, changes, openapi.FailOnBreaking))
+}
+
+// DiffHTMLOn is DiffHTML with a chosen --fail-on threshold.
+func DiffHTMLOn(result *openapi.DiffResult, changes []openapi.DiffChange, on openapi.FailOn) ([]byte, error) {
+	return renderHTML(diffDoc(result, changes, on))
 }

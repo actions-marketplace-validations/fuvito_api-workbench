@@ -178,13 +178,13 @@ func TestText_Extracted(t *testing.T) {
 	r := &scenario.Result{
 		Scenario: makeScenario("extract"),
 		Steps: []scenario.StepResult{
-			{Label: "s", Passed: true, Extracted: map[string]string{"token": "abc123"}},
+			{Label: "s", Passed: true, Extracted: map[string]string{"userId": "abc123"}},
 		},
 		Passed:   true,
 		Duration: 1 * time.Millisecond,
 	}
 	out := reporting.Text(r)
-	if !strings.Contains(out, `token`) || !strings.Contains(out, `abc123`) {
+	if !strings.Contains(out, `userId`) || !strings.Contains(out, `abc123`) {
 		t.Error("missing extracted variable")
 	}
 }

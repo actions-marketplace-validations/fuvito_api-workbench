@@ -30,6 +30,8 @@ type runOptions struct {
 	failFast      bool
 	noRecursive   bool
 	vars          []string
+	reports       []string
+	showExtracted bool
 }
 
 // scenarioRun is one executed scenario.
@@ -67,13 +69,15 @@ Exit codes:
 	}
 
 	cmd.Flags().StringVarP(&o.envFile, "env", "e", "", "Path to environment file (YAML or JSON)")
-	cmd.Flags().StringVarP(&o.format, "format", "f", "text", "Output format: text, json, junit, or html")
+	cmd.Flags().StringVarP(&o.format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&o.outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&o.timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
 	cmd.Flags().StringVarP(&o.specFile, "spec", "s", "", "OpenAPI spec file or URL (overrides specFile: in scenario)")
 	cmd.Flags().BoolVar(&o.showCoverage, "coverage", false, "Report which spec operations were exercised (requires --spec or specFile: in scenario)")
 	cmd.Flags().StringVarP(&o.workspacePath, "workspace", "w", "", "Workspace directory to accumulate coverage into")
+	cmd.Flags().StringArrayVar(&o.reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/run.xml (repeatable)")
 	cmd.Flags().StringArrayVar(&o.vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
+	cmd.Flags().BoolVar(&o.showExtracted, "show-extracted", false, "Show extracted values whose names look secret (tokens, passwords, keys); secret environment values are always hidden")
 	cmd.Flags().BoolVar(&o.failFast, "fail-fast", false, "Stop after the first scenario that fails")
 	cmd.Flags().BoolVar(&o.noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
 
@@ -87,6 +91,11 @@ func isDir(path string) bool {
 
 func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 	start := time.Now()
+
+	plan, err := planReports(o.format, o.reports, o.outputFile)
+	if err != nil {
+		return err
+	}
 
 	// One file keeps the exact behaviour and output it always had.
 	singleFile := len(args) == 1 && !isDir(args[0])
@@ -144,16 +153,14 @@ func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 		}
 	}
 
-	var report []byte
-	if singleFile {
-		report, err = singleReport(runs[0], o)
-	} else {
-		report, err = combinedReport(runTitle(args), runs, o, time.Since(start))
-	}
+	total := time.Since(start)
+	err = plan.emit(cmd, o.outputFile, func(format string) ([]byte, error) {
+		if singleFile {
+			return singleReport(runs[0], o, format)
+		}
+		return combinedReport(runTitle(args), runs, o, total, format)
+	})
 	if err != nil {
-		return err
-	}
-	if err := writeReport(cmd, o.outputFile, report); err != nil {
 		return err
 	}
 
@@ -241,6 +248,7 @@ func executeScenario(cmd *cobra.Command, scenarioPath string, s *domain.Scenario
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: requestRef %q could not be loaded\n", ref)
 	}
 	result := runner.Run(context.Background(), s, env)
+	result.RevealExtracted = o.showExtracted
 
 	var cov *openapi.ScenarioCoverageResult
 	if loadedSpec != nil && (o.showCoverage || o.workspacePath != "") {
@@ -301,8 +309,14 @@ func accumulateCoverage(cmd *cobra.Command, workspacePath, specRef string, resul
 	}
 }
 
-func singleReport(r *scenarioRun, o runOptions) ([]byte, error) {
-	switch strings.ToLower(o.format) {
+func singleReport(r *scenarioRun, o runOptions, format string) ([]byte, error) {
+	switch format {
+	case "markdown":
+		var mdCov *openapi.ScenarioCoverageResult
+		if o.showCoverage {
+			mdCov = r.cov
+		}
+		return reporting.Markdown(r.result, mdCov), nil
 	case "json":
 		var b []byte
 		var err error
@@ -338,7 +352,7 @@ func singleReport(r *scenarioRun, o runOptions) ([]byte, error) {
 	return []byte(reporting.Text(r.result)), nil
 }
 
-func combinedReport(title string, runs []*scenarioRun, o runOptions, total time.Duration) ([]byte, error) {
+func combinedReport(title string, runs []*scenarioRun, o runOptions, total time.Duration, format string) ([]byte, error) {
 	results := make([]*scenario.Result, len(runs))
 	for i, r := range runs {
 		results[i] = r.result
@@ -348,7 +362,9 @@ func combinedReport(title string, runs []*scenarioRun, o runOptions, total time.
 		cov = groupCoverage(runs)
 	}
 
-	switch strings.ToLower(o.format) {
+	switch format {
+	case "markdown":
+		return reporting.MarkdownMulti(title, results, total, cov...), nil
 	case "json":
 		b, err := reporting.JSONMulti(title, results, cov, total)
 		if err != nil {
@@ -412,3 +428,29 @@ func listNames(paths []string, max int) string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// expandScenarioArgs turns file and folder arguments into scenario files, the same way clrsig run
+// does. When no argument is a folder the arguments are returned unchanged, so a missing file is
+// still reported by the command that reads it.
+func expandScenarioArgs(cmd *cobra.Command, args []string, noRecursive bool) ([]string, error) {
+	anyDir := false
+	for _, a := range args {
+		if isDir(a) {
+			anyDir = true
+			break
+		}
+	}
+	if !anyDir {
+		return args, nil
+	}
+	found, err := scenario.Discover(args, !noRecursive)
+	if err != nil {
+		return nil, err
+	}
+	if n := len(found.Skipped); n > 0 {
+		fmt.Fprintf(cmd.ErrOrStderr(), "note: skipped %d file%s that %s not scenarios: %s\n",
+			n, plural(n), map[bool]string{true: "is", false: "are"}[n == 1], listNames(found.Skipped, 5))
+	}
+	return found.Files, nil
+}
+

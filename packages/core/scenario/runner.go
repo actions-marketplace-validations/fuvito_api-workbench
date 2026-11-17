@@ -35,6 +35,14 @@ type Result struct {
 	Passed     bool
 	StartedAt  time.Time
 	Duration   time.Duration
+
+	// Secrets are the resolved values of the environment variables marked secret. Reports
+	// replace them wherever they would otherwise be printed.
+	Secrets []string
+	// RevealExtracted lets reports print extracted values whose names look secret. It is a
+	// report-time choice made by the caller (clrsig run --show-extracted); it never reveals
+	// the values in Secrets.
+	RevealExtracted bool
 }
 
 // Runner executes scenarios against the HTTP executor.
@@ -66,6 +74,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 		Scenario:  s,
 		StartedAt: time.Now(),
 		Passed:    true,
+		Secrets:   variables.SecretValues(env),
 	}
 
 	resolver := variables.NewResolver(env)

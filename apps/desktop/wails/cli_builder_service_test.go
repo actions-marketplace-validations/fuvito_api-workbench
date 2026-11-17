@@ -79,7 +79,7 @@ func TestCliBuilder_Catalog(t *testing.T) {
 			have[in.Name] = in
 		}
 		format, hasFormat := have["format"]
-		if !hasFormat || strings.Join(format.Enum, ",") != "text,json,junit,html" || format.Default != "text" {
+		if !hasFormat || strings.Join(format.Enum, ",") != "text,json,junit,html,markdown" || format.Default != "text" {
 			t.Errorf("%s: format input = %+v", c.Name, format)
 		}
 		if out, ok := have["output"]; !ok || out.Kind != "outputFile" {
