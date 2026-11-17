@@ -261,15 +261,19 @@ func nopCloser(data []byte) *nopCloserReader {
 
 // ExecutedRequest is a (method, full URL) pair from an executed scenario step.
 type ExecutedRequest struct {
-	Method string
-	URL    string
-	Passed bool // whether this step's assertions all passed
+	Method     string
+	URL        string
+	StatusCode int  // HTTP status code returned by the server
+	HadAuth    bool // whether the request carried any auth credentials
+	Passed     bool // whether this step's assertions all passed
 }
 
 // ExercisedResult pairs a matched spec operation with the last-run pass/fail outcome.
 type ExercisedResult struct {
 	CoveredOperation
-	Passed bool
+	Passed      bool
+	StatusCodes []int // all unique status codes observed across matching executions
+	HadAuth     bool  // whether at least one execution carried auth credentials
 }
 
 // CoveredOperation identifies a spec operation (method + path pattern) exercised or missed.
@@ -337,6 +341,8 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 
 	exercised := make(map[opKey]struct{})
 	exercisedPassed := make(map[opKey]bool)
+	exercisedCodes := make(map[opKey]map[int]struct{})
+	exercisedHadAuth := make(map[opKey]bool)
 	for _, ex := range executed {
 		matchURL := ex.URL
 		if specBase != "" {
@@ -355,6 +361,15 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 		k := opKey{strings.ToUpper(ex.Method), route.Path}
 		exercised[k] = struct{}{}
 		exercisedPassed[k] = ex.Passed // last execution wins
+		if ex.StatusCode > 0 {
+			if exercisedCodes[k] == nil {
+				exercisedCodes[k] = make(map[int]struct{})
+			}
+			exercisedCodes[k][ex.StatusCode] = struct{}{}
+		}
+		if ex.HadAuth {
+			exercisedHadAuth[k] = true
+		}
 	}
 
 	cr := &ScenarioCoverageResult{Total: len(all)}
@@ -363,9 +378,16 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 			cr.Covered++
 			op := CoveredOperation{Method: k.method, Path: k.path}
 			cr.Exercised = append(cr.Exercised, op)
+			var codes []int
+			for code := range exercisedCodes[k] {
+				codes = append(codes, code)
+			}
+			sort.Ints(codes)
 			cr.ExercisedResults = append(cr.ExercisedResults, ExercisedResult{
 				CoveredOperation: op,
 				Passed:           exercisedPassed[k],
+				StatusCodes:      codes,
+				HadAuth:          exercisedHadAuth[k],
 			})
 		}
 	}

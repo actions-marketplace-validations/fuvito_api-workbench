@@ -6,6 +6,14 @@ export function GetAIPrompt() {
   return window['go']['main']['HelpService']['GetAIPrompt']();
 }
 
+export function GetAIPromptInstructions() {
+  return window['go']['main']['HelpService']['GetAIPromptInstructions']();
+}
+
+export function GetExampleScenario() {
+  return window['go']['main']['HelpService']['GetExampleScenario']();
+}
+
 export function GetFormatSpec() {
   return window['go']['main']['HelpService']['GetFormatSpec']();
 }

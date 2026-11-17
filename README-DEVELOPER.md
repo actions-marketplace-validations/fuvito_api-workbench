@@ -4,7 +4,7 @@
 
 Clear Signal is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
 
-> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working. Recent additions: Ctrl+P quick open, env-var autocomplete, collapsible response panel, and tab overflow indicators.
+> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working. Recent additions: Contracts coverage quality signals (happy-path only, error gap, auth gap, never exercised), Markdown/HTML report export, singleton Runner tab, and Explorer rail auto-focus on workspace open.
 
 ---
 

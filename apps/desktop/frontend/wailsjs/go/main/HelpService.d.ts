@@ -3,6 +3,10 @@
 
 export function GetAIPrompt():Promise<string>;
 
+export function GetAIPromptInstructions():Promise<string>;
+
+export function GetExampleScenario():Promise<string>;
+
 export function GetFormatSpec():Promise<string>;
 
 export function GetUserGuide():Promise<string>;

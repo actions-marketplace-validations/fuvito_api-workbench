@@ -58,6 +58,12 @@ import {
   ImportInsomniaExport as WailsImportInsomniaExport,
 } from '@wailsjs/go/main/ImportService'
 import {
+  PickBundleFile as WailsPickBundleFile,
+  PreviewBundle as WailsPreviewBundle,
+  ImportBundle as WailsImportBundle,
+  ExportBundle as WailsExportBundle,
+} from '@wailsjs/go/main/BundleService'
+import {
   GetSettings as WailsGetSettings,
   SaveSettings as WailsSaveSettings,
   ResetSettings as WailsResetSettings,
@@ -99,7 +105,9 @@ import {
 import {
   GetUserGuide as WailsGetUserGuide,
   GetFormatSpec as WailsGetFormatSpec,
+  GetExampleScenario as WailsGetExampleScenario,
   GetAIPrompt as WailsGetAIPrompt,
+  GetAIPromptInstructions as WailsGetAIPromptInstructions,
 } from '@wailsjs/go/main/HelpService'
 
 // ---- Shared I/O types ----
@@ -431,6 +439,76 @@ export async function importInsomniaExport(): Promise<CollectionImportResult> {
   return result as unknown as CollectionImportResult
 }
 
+// ---- Bundle import (environments + requests + scenarios in one document) ----
+
+export type BundleStrategy = 'skip' | 'overwrite' | 'rename'
+
+export interface BundleFile {
+  path: string   // empty = the user cancelled
+  text: string
+  error?: string
+}
+
+export interface BundleIssue {
+  severity: 'error' | 'warning'
+  where: string
+  message: string
+}
+
+export interface BundleEntry {
+  kind: 'environment' | 'request' | 'scenario'
+  name: string
+  path: string           // where it will be written, relative to the workspace
+  requestedPath: string  // where the bundle asked for it
+  action: 'create' | 'overwrite' | 'rename' | 'skip'
+}
+
+export interface BundlePreview {
+  title: string
+  specFile: string       // the bundle's own default spec
+  issues: BundleIssue[]
+  entries: BundleEntry[]
+  hasErrors: boolean
+  parseError?: string
+}
+
+export interface BundleImportResult {
+  created: number
+  overwritten: number
+  renamed: number
+  skipped: number
+  written: string[]
+  error?: string
+}
+
+export interface BundleExportResult {
+  path: string            // empty with no error = the user cancelled
+  environments: number
+  requests: number
+  scenarios: number
+  redactedSecrets: number
+  skipped: string[]       // files that could not be exported, with the reason
+  warnings: string[]
+  error?: string
+}
+
+// Saves the open workspace as one bundle file chosen in a save dialog. Secret values are redacted.
+export async function exportBundle(): Promise<BundleExportResult> {
+  return (await WailsExportBundle()) as unknown as BundleExportResult
+}
+
+export async function pickBundleFile(): Promise<BundleFile> {
+  return (await WailsPickBundleFile()) as unknown as BundleFile
+}
+
+export async function previewBundle(text: string, specFile: string, strategy: BundleStrategy): Promise<BundlePreview> {
+  return (await WailsPreviewBundle(text, specFile, strategy)) as unknown as BundlePreview
+}
+
+export async function importBundle(text: string, specFile: string, strategy: BundleStrategy): Promise<BundleImportResult> {
+  return (await WailsImportBundle(text, specFile, strategy)) as unknown as BundleImportResult
+}
+
 // ---- Settings ----
 
 export async function getSettings(): Promise<AppSettings> {
@@ -610,6 +688,18 @@ export interface ScenarioCoverage {
   missed: string[]
 }
 
+export interface QualityGap {
+  operation: string
+  missing: number[]
+}
+
+export interface QualityReport {
+  neverExercised: string[]
+  happyPathOnly: string[]
+  securedNeverAuthed: string[]
+  errorsNeverTriggered: QualityGap[]
+}
+
 export interface AccumulatedCoverage {
   specFile: string
   covered: number
@@ -622,6 +712,7 @@ export interface AccumulatedCoverage {
   exercised: string[]
   missed: string[]
   operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string }>
+  quality?: QualityReport
 }
 
 export interface ScenarioResult {
@@ -844,6 +935,16 @@ export async function getFormatSpec(): Promise<string> {
   return (await WailsGetFormatSpec()) as unknown as string
 }
 
+export async function getExampleScenario(): Promise<string> {
+  return (await WailsGetExampleScenario()) as unknown as string
+}
+
+// The AI prompt document as shown in the Help panel (instructions only).
+export async function getAIPromptInstructions(): Promise<string> {
+  return (await WailsGetAIPromptInstructions()) as unknown as string
+}
+
+// The complete prompt to paste into an AI assistant: instructions + format spec + example.
 export async function getAIPrompt(): Promise<string> {
   return (await WailsGetAIPrompt()) as unknown as string
 }

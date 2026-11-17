@@ -226,3 +226,111 @@ func TestDefaultPath(t *testing.T) {
 		t.Errorf("directory not created: %v", err)
 	}
 }
+
+func TestScenarioRuns_RecordAndRecent(t *testing.T) {
+	store, err := history.Open(filepath.Join(t.TempDir(), "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	for _, title := range []string{"first", "second"} {
+		err := store.RecordScenarioRun(history.ScenarioRunRecord{
+			WorkspacePath: "/ws/a", ScenarioPath: title + ".yaml", Title: title,
+			Passed: title == "first", DurationMs: 42,
+			StepTotal: 2, StepPassed: 1, StepFailed: 1,
+			Steps: []history.ScenarioStepSummary{{Label: "login", Passed: true, StatusCode: 200}, {Label: "x", Error: "boom"}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.RecordScenarioRun(history.ScenarioRunRecord{WorkspacePath: "/ws/b", Title: "other"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.RecentScenarioRuns("/ws/a", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Title != "second" || got[1].Title != "first" {
+		t.Fatalf("unexpected order/content: %+v", got)
+	}
+	if !got[1].Passed || got[0].Passed {
+		t.Error("passed flag not round-tripped")
+	}
+	if len(got[0].Steps) != 2 || got[0].Steps[1].Error != "boom" || got[0].DurationMs != 42 || got[0].StepFailed != 1 {
+		t.Errorf("details lost: %+v", got[0])
+	}
+	if got[0].ExecutedAt.IsZero() {
+		t.Error("ExecutedAt should be parsed")
+	}
+
+	limited, err := store.RecentScenarioRuns("/ws/a", 1)
+	if err != nil || len(limited) != 1 {
+		t.Fatalf("limit: %v %d", err, len(limited))
+	}
+	none, err := store.RecentScenarioRuns("/ws/missing", 5)
+	if err != nil || len(none) != 0 {
+		t.Fatalf("expected empty, got %v %v", none, err)
+	}
+}
+
+func TestClear(t *testing.T) {
+	store, err := history.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	for _, ws := range []string{"/a", "/a", "/b"} {
+		if _, err := store.Record(ws, "GET", "http://x", 200, "OK", 1, 1, nil, "none", "", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Clear("/a"); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := store.Recent("/a", 10); len(a) != 0 {
+		t.Errorf("/a should be cleared, got %d", len(a))
+	}
+	if b, _ := store.Recent("/b", 10); len(b) != 1 {
+		t.Errorf("/b should be untouched, got %d", len(b))
+	}
+	if err := store.Clear(""); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := store.Recent("/b", 10); len(b) != 0 {
+		t.Errorf("all entries should be cleared, got %d", len(b))
+	}
+}
+
+func TestOpen_ReopenIsIdempotentAndFailsOnBadPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "r.db")
+	for i := 0; i < 2; i++ {
+		s, err := history.Open(path)
+		if err != nil {
+			t.Fatalf("open #%d: %v", i, err)
+		}
+		s.Close()
+	}
+	if s, err := history.Open(filepath.Join(t.TempDir(), "missing", "dir", "x.db")); err == nil {
+		s.Close()
+		t.Error("expected error for unreachable path")
+	}
+}
+
+func TestDefaultPath_UsesHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	p, err := history.DefaultPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(p) != "history.db" || filepath.Dir(p) != filepath.Join(home, ".clrsig") {
+		t.Errorf("unexpected path %q", p)
+	}
+	if _, err := os.Stat(filepath.Dir(p)); err != nil {
+		t.Errorf("directory should exist: %v", err)
+	}
+}

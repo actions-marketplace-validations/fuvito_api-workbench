@@ -40,6 +40,7 @@ func main() {
 			app.workspaceService,
 			app.openapiService,
 			app.importService,
+			app.bundleService,
 			app.settingsService,
 			app.demoService,
 			app.scenarioService,

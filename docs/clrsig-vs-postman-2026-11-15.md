@@ -865,14 +865,16 @@ consolidates.
 
 - [ ] **Ship negative-path conformance.** Extend `conformance.Runner` to generate contract-violating requests per operation (drop required fields, wrong types, missing credentials) and assert the server returns a declared error status with a conformant error body.
   *Value:* This is the single most defensible answer to "why not just use Postman." No mainstream tool does this well. It makes `clrsig conform` block-worthy.
-- [ ] **Build the `clrsig impact` command.** Join `clrsig diff` output (breaking changes with method + path) against scenario `specFile:` declarations to produce "these scenarios will break when you ship spec v2." Requires no new core machinery.
+- [x] **Build the `clrsig impact` command.** Join `clrsig diff` output (breaking changes with method + path) against scenario `specFile:` declarations to produce "these scenarios will break when you ship spec v2." Requires no new core machinery.
   *Value:* Turns a diff report into an actionable risk assessment. This is high enterprise value.
+  *Done 2026-11-16: `apps/cli/impact.go` — diffs two specs, filters breaking changes with method+path, matches against scenario step URLs (handles `{{variable}}/path`, `http://…` and bare paths). Text and JSON output. Exit 0 = clean, 1 = affected scenarios found.*
 - [ ] **Build the failure-mode catalog as a content product.** Commission and validate 50+ failure modes — not just the YAML schema but worked examples, real-world incident references, and executable scenarios. Assign an owner who is responsible for accuracy and growth, not just the data format.
   *Value:* The catalog is the most defensible long-term moat — harder to clone than a feature. It fails if thin. It succeeds if deep and maintained.
 - [ ] **Extend coverage reporting to quality indicators.** Compute "operations never exercised," "operations tested only on happy path," "secured operations never tested authenticated," "declared error responses never asserted." Present "what you have not proven," not just "what you ran."
   *Value:* This is what makes the coverage report worth reading in a team meeting. Percentage alone is not actionable.
-- [ ] **Ship an MCP server over stdio.** Expose `run_scenario`, `conform`, `diff`, and `coverage` as MCP tools. No HTTP listener needed — a thin stdio wrapper over `packages/core`. Makes Clear Signal the most agent-friendly tool in the category.
+- [x] **Ship an MCP server over stdio.** Expose `run_scenario`, `conform`, `diff`, and `coverage` as MCP tools. No HTTP listener needed — a thin stdio wrapper over `packages/core`. Makes Clear Signal the most agent-friendly tool in the category.
   *Value:* Coding agents invoking `clrsig` without human intervention is a low-effort P1/P2 item with high strategic value as AI-assisted development grows.
+  *Done 2026-11-16: `apps/cli/mcp.go` — NDJSON JSON-RPC 2.0 over stdio (protocol `2024-11-05`). Tools: `conform`, `run_scenario`, `diff`, `coverage`. 4 MB scanner buffer; notifications (nil ID) silently dropped.*
 - [ ] **Publish a VS Code extension** with one-click `clrsig run` for the open scenario file and inline annotation of conformance violations.
   *Value:* Removes the install barrier for the largest slice of the developer audience and embeds the tool in the daily workflow rather than a separate app.
   *Devin: agree on the channel, flag the cost — this is a second maintained frontend with its own release cadence. Validate demand via Discussions first, and consider JetBrains Marketplace as an equal or better first target: the spec-authoring backend audience skews IntelliJ/GoLand.*

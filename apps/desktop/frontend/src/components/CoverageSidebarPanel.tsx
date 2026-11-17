@@ -32,6 +32,7 @@ export function CoverageSidebarPanel({ workspacePath, selectedSpecFile, onSelect
     }
   }, [workspacePath, selectedSpecFile, onSelectSpec])
 
+  // eslint-disable-next-line react/set-state-in-effect
   useEffect(() => { refresh() }, [refresh])
 
   if (!workspacePath) {

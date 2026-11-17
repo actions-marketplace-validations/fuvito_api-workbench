@@ -341,3 +341,15 @@ Do not implement or stub any of these without explicit user direction.
 - **Wails service**: `StepDetailIO` and `StepResultIO` updated (`label`/`notes` JSON tags); new scenario starter YAML uses `label:`.
 - **Frontend**: `StepDetail.label`/`notes`, `StepResult.label`; `ScenarioStepList` shows `notes` as a secondary italic line under the label; step editor uses "Step label" / "Notes (optional)" placeholders; `scenario-yaml.ts` serializes `label:`/`notes:`.
 - **Templates + examples**: all 11 scenario template files and `examples/scenarios/user-lifecycle.yaml` migrated to `label:`/`notes:` with example notes added.
+
+### 2026-11-16 — Bundle import (single-file AI output)
+
+- **Format:** a *bundle* is one YAML/JSON document with `environments`, `requests` and `scenarios`, each item using the existing file format plus a `file` name; optional top-level `specFile` default. Decoded strictly (unknown fields are errors). Documented in `format-spec.md` ("Bundle File").
+- **Core:** `serialization.ParseBundle` (strict decode) and the new `packages/core/bundle` package (`ParseText` tolerates ``` fences/BOM, `Validate` with located errors and warnings, `Prepare` resolves skip/overwrite/rename conflicts and rewrites `requestRef`s, `Plan.Write` writes atomically).
+- **Desktop:** `BundleService` (`PickBundleFile`, `PreviewBundle`, `ImportBundle`) and `BundleImportDialog` under File → Import → Bundle.
+- **Export:** File → Export → Bundle writes the whole workspace as one bundle (`bundle.Export`, `serialization.WriteBundle`): requestRefs become bundle names, a spec shared by all scenarios is hoisted, secret values are redacted to `CHANGE_ME`. Round-trip tested (export → import into a fresh workspace).
+- **CLI:** `clrsig bundle run|validate|import|export`. `run` executes every scenario straight from the file (`bundle.Materialize` inlines bundle requests; `--env`, `--env-file`, `--spec`, `--scenario`, text/json/junit output; exit 0/1/2), `import`/`export` mirror the desktop dialogs. Shared helpers: `scenario.ResolveRequestRefs` (also fixes `clrsig run` ignoring `requestRef`), `reporting.JUnitMulti`, CLI `specLoader`.
+- **Backlog:** a "copy CLI command" button in the desktop dialogs; honour step `retry`/`timeoutMs` in the runner; `bundle run --workspace` coverage accumulation.
+- **Help:** the Help panel (wider) has four tabs — User Guide, Format Spec, Example Scenario, AI Prompt — each with Copy and Download (native save dialog) buttons. The Example Scenario is a runnable sample verified against the demo server by a Go test.
+- **AI prompt:** `help/ai-prompt.md` holds the instructions (phased workflow, bundle-writing rules, self-check, sample bundle). `HelpService.GetAIPrompt()` assembles instructions + format spec + example scenario at copy time; the old hard-coded Go prompt is removed. A Go test imports and runs the prompt's sample bundle against the demo server.
+- **Docs:** format spec corrected to match the code (request `timeout` not `timeoutMs`, `multipart`, `validateSpec`, `retry`/step `timeoutMs` noted as not applied, assertion `name`); user guide sections 7 and 14 updated.

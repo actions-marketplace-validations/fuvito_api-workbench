@@ -235,6 +235,31 @@ Path parameters become `{{paramName}}` placeholders. POST/PUT/PATCH operations g
 
 After import, the workspace panel refreshes and you can open any generated request by clicking it in the tree.
 
+### Importing a bundle (environments + scenarios)
+
+A **bundle** is one document that holds environments, reusable requests and several scenarios — typically the reply from an AI assistant (see [section 14](#14-creating-files-with-ai-assistance)). To import one:
+
+1. Open or create a workspace.
+2. Choose **File → Import → Bundle (environments + scenarios)…**.
+3. Paste the bundle into the box, or click **Open file…**. A surrounding code fence copied from a chat is fine.
+4. Review the preview. It lists every file that will be created, plus any **problems** (these block the import) and **warnings** (these do not). Problems say exactly where they are, for example `scenarios[0] "Flow" › step 2 "Login"`.
+5. Optionally enter a **Spec file** (a path or URL). It replaces the spec in every imported scenario — use it to point the schema checks at a local copy of the OpenAPI document.
+6. If some files already exist, choose **Rename** (keep both, saved as `name-2.yaml`), **Skip** or **Overwrite**.
+7. Click **Import**.
+
+The result is ordinary request, scenario and environment files under `requests/`, `scenarios/` and `environments/`. Nothing is written until you click Import, and a bundle with any problem is not imported at all. Select the new environment afterwards. The bundle format is described in the Format Spec under **Bundle File**.
+
+### Exporting a bundle
+
+**File → Export → Bundle (environments + requests + scenarios)…** saves everything in the open workspace as one bundle file — handy for sharing a test suite, moving it to another workspace, or giving an AI assistant your existing tests as context.
+
+- Choose where to save it. A confirmation lists how many environments, requests and scenarios were written.
+- **Secret values are replaced with `CHANGE_ME`**, so the file is safe to share. The workspace is not changed, and the message tells you how many values were replaced.
+- Files that cannot be read (for example a request with a YAML error) are skipped and listed in the message.
+- Import the file in another workspace with **File → Import → Bundle…**; scenarios keep working with the requests they refer to.
+
+Unlike **Export Workspace** (a ZIP of the raw files, secrets included), a bundle is a single readable text file.
+
 ---
 
 ## 8. Scenarios and contract testing
@@ -380,7 +405,7 @@ Click any row in the runner table to open that scenario's full result in an edit
 
 ## 9. Contracts — coverage tracking
 
-The **Contracts** tab tracks which operations in an OpenAPI specification have been exercised by your scenarios, and what the last test result was for each one.
+The **Contracts** tab tracks which operations in an OpenAPI specification have been exercised by your scenarios, what the last test result was for each one, and surfaces quality signals that highlight what you have *not yet proven*.
 
 ### Enabling coverage tracking
 
@@ -422,10 +447,26 @@ The detail view shows a table with one row per operation:
 
 Operations are grouped into **Covered** and **Not covered** collapsible sections, sorted by path then method.
 
+### Quality signals
+
+Below the operations table, Clear Signal shows four collapsible quality-signal sections that highlight gaps in what you have proven:
+
+| Signal | Meaning |
+|---|---|
+| **Happy-path only** | Only 2xx responses have been observed — no error paths have been tested |
+| **Error responses never triggered** | The spec declares non-2xx status codes for this operation, but none have ever been returned |
+| **Secured — never tested with auth** | The operation requires authentication (per the spec's security schemes) but has always been called without credentials |
+| **Never exercised** | These operations have not been reached by any recorded run |
+
+A compact summary of the same gaps also appears inline in the scenario result view after any run that has a `specFile`.
+
 ### Reset and export
 
 - **Reset data** — clears all accumulated coverage for the selected spec.
-- **Export CSV** — downloads a CSV with all operations, their coverage status, last result, and last run time.
+- **Export** (dropdown button) — three formats:
+  - **Export CSV** — comma-separated file with one row per operation: method, path, coverage, last result, last run time, quality flags, and missing status codes.
+  - **Export Markdown** — Markdown report suitable for pasting into a wiki, PR description, or README. Includes the coverage summary, operations table, and all quality gap sections.
+  - **Export HTML** — full HTML report opened in your default browser, ready for print-to-PDF. Includes the same content as the Markdown report with styling.
 
 ### Auto-refresh
 
@@ -515,6 +556,41 @@ Use `--format json` for machine-readable output suitable for CI tooling:
   ]
 }
 ```
+
+### `clrsig bundle`
+
+A **bundle** (see [section 7](#importing-a-bundle-environments-scenarios)) can be run, checked, imported and exported from the command line, with the same behaviour as the desktop app.
+
+```bash
+# Run every scenario in a bundle, straight from the file — no workspace needed
+clrsig bundle run bundle.yaml --env staging
+
+# Check a bundle without running or importing anything
+clrsig bundle validate bundle.yaml
+
+# Save its files into a workspace
+clrsig bundle import bundle.yaml --workspace ./my-workspace
+
+# Write a workspace as one bundle (secrets become CHANGE_ME)
+clrsig bundle export --workspace ./my-workspace -o bundle.yaml
+```
+
+**`bundle run`** validates the bundle first; any error stops the run before a single request is sent. It then runs every scenario in order, using the requests, spec and environment from the bundle.
+
+| Option | Meaning |
+|---|---|
+| `--env <name>` | Which of the bundle's environments to use. Needed only when the bundle has more than one; a single environment is used automatically. |
+| `--env-file <file>` | Use an environment file instead — handy in CI, where credentials come from the pipeline rather than the bundle. |
+| `--spec <path-or-url>` | Replace the spec of every scenario. |
+| `--scenario <title-or-file>` | Run only this scenario. Repeat the option for several. |
+| `--format text\|json\|junit` | Report format. `junit` produces one document with a test suite per scenario. |
+| `--output <file>` | Write the report to a file. |
+
+Exit codes: `0` every scenario passed, `1` at least one failed, `2` the bundle is invalid or could not be read.
+
+**`bundle validate`** prints errors and warnings with their location and exits `1` if there are errors. **`bundle import`** accepts `--on-conflict rename|skip|overwrite` (default `rename`), `--spec-file` and `--dry-run` to preview the files without writing them.
+
+`clrsig run` now also loads the request files that a scenario's `requestRef` points at — looked up next to the scenario, in the `requests/` folder beside its `scenarios/` folder, and in `<workspace>/requests` when `--workspace` is given.
 
 ---
 
@@ -626,7 +702,7 @@ auth:
   type: bearer
   token: "{{apiToken}}"
 
-timeoutMs: 10000   # 0 = use global default
+timeout: 10s   # omit to use the global default
 ```
 
 ### Environment file
@@ -684,34 +760,41 @@ See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
 
 ## 14. Creating files with AI assistance
 
-The **Format Spec** tab in the Help panel (accessible via the `?` icon at the bottom of the Activity Rail) contains the full YAML format specification for requests, scenarios, and environments. The **Copy AI Prompt** button combines that spec with a structured system prompt you can paste directly into ChatGPT, Gemini, or any other AI assistant.
+The Help panel (the `?` icon at the bottom of the Activity Rail, or the **Help** menu) has four tabs:
 
-### What the AI prompt does
+| Tab | What it is |
+|---|---|
+| **User Guide** | This guide. |
+| **Format Spec** | The complete file format specification, including the bundle format. **Copy Format Spec** and **Download** put it on your clipboard or save it as a Markdown file. |
+| **Example Scenario** | A complete, runnable scenario that uses every feature of the format, with its environment and a reusable request. It runs against the built-in Demo Server. **Copy scenario** and **Download** give you just the scenario YAML. |
+| **AI Prompt** | Instructions for an AI assistant that turns an OpenAPI or Swagger document into a ready-to-import bundle. **Copy AI Prompt** and **Download** give you the complete prompt (instructions + format spec + example scenario). |
 
-When you paste the prompt into an AI assistant, it follows a four-step workflow:
+### Generating tests from an OpenAPI document
 
-1. **Discovery survey** — the assistant asks a short set of questions: what you want to build, whether you have an existing OpenAPI spec or curl commands to share, what the base URL and authentication method are, and whether you need multiple environments (dev/staging/prod).
+1. Open the **AI Prompt** tab.
+2. Click **Copy AI Prompt** and paste it into a new conversation in ChatGPT, Claude, Gemini or any other assistant. Or click **Download** and attach the saved Markdown file to the chat instead.
+3. Give the assistant your API: paste the OpenAPI/Swagger document, or give it a URL to the document. (If the assistant cannot open web pages it will ask you to paste the document.)
+4. Answer its few questions — which environments you want, how authentication works, whether tests may create and delete data, and what to focus on. It then proposes a list of scenarios; reply `go` to generate them.
+5. The assistant replies with **one code block**: a bundle containing an environment, optional reusable requests and several scenarios, followed by notes on what to fill in.
+6. Copy the code block and import it with **File → Import → Bundle (environments + scenarios)…** ([section 7](#importing-a-bundle-environments-scenarios)).
+7. Select the new environment and fill in its placeholder values (base URL, credentials, and so on), then run the scenarios.
 
-2. **Generate** — based on your answers, the assistant creates one or more YAML files following the Clear Signal format exactly. It automatically extracts the base URL into an environment file, marks secrets as `secret: true`, and structures scenario steps with proper `label` and `notes` fields.
+### What the assistant is told to do
 
-3. **Self-verify** — before delivering, the assistant checks every generated file against the spec: required fields, valid enum values, no invented field names, and that every `{{variable}}` reference is either defined in the environment file or extracted by an earlier scenario step. It fixes any violations it finds.
-
-4. **Deliver** — the assistant presents each file with its suggested filename, a list of variables you need to fill in before running, and any assumptions it made (e.g. base URL inferred from the OpenAPI spec).
-
-### Workflow
-
-1. Click the `?` icon at the bottom of the Activity Rail to open the Help panel.
-2. Switch to the **Format Spec** tab.
-3. Click **Copy AI Prompt** — the spec plus the system prompt is now on your clipboard.
-4. Open ChatGPT, Gemini, or any AI assistant and paste into a new conversation.
-5. The assistant will begin the discovery survey. Answer its questions and it will generate valid Clear Signal YAML files.
-6. Copy each generated file and save it to your workspace under `requests/`, `scenarios/`, or `environments/`.
+- Read the spec and summarise it, then ask at most five questions with sensible defaults.
+- Write scenarios only from what the document defines — it must not invent endpoints, fields or operation IDs.
+- Derive assertions from the spec: declared status codes, required response fields, and `schema` checks by `operationId`.
+- Chain steps with extracted values (for example a login token or a created ID), and clean up any data a scenario creates.
+- Keep real secrets out of the file: credentials are placeholders marked `secret: true`.
+- Check its own output against a checklist before sending it.
 
 ### Tips
 
-- If you have an OpenAPI spec, paste its contents when the assistant asks for source material — it will generate one scenario per workflow rather than per endpoint.
-- If the assistant invents a field name that does not appear in the Format Spec, ask it to re-verify against the spec. The self-verification step catches most of these, but re-running the check is always safe.
-- For multi-environment setups, tell the assistant which environments you need (e.g. dev, staging, production). It will generate one environment file per target with identical variable names so the same scenario runs against all of them.
+- If the OpenAPI document is OpenAPI 3.x and you gave a URL, the bundle binds scenarios to it, and every response is also validated against the spec. If you pasted the document instead, save it to a file and enter its path in the **Spec file** box of the import dialog.
+- Swagger 2.0 documents work for generating requests and assertions, but cannot be bound for schema validation.
+- Import problems are reported with their location. Paste them back to the assistant and ask it to fix exactly those.
+- Run the generated scenarios against a test environment first; they create and delete data.
+- For several environments (dev, staging, production), tell the assistant up front. It generates one environment per target with identical variable names so the same scenarios run against each.
 
 ---
 

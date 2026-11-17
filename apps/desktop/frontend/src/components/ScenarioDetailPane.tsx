@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Play, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { statusColor } from './ScenarioStepResult'
+import { statusColor } from '@/lib/httpUtils'
 import { StepEditorCard } from './ScenarioStepEditor'
 import type { ScenarioDetail, ScenarioResult, StepDetail } from '@/lib/bridge'
 

@@ -12,10 +12,29 @@ import (
 	"time"
 )
 
-// OperationResult records the last-run outcome for a single spec operation.
+// OperationResult records the accumulated run outcomes for a single spec operation.
 type OperationResult struct {
-	LastPassed bool      `json:"lastPassed"`
-	LastRunAt  time.Time `json:"lastRunAt"`
+	LastPassed  bool      `json:"lastPassed"`
+	LastRunAt   time.Time `json:"lastRunAt"`
+	StatusCodes []int     `json:"statusCodes,omitempty"` // all unique status codes observed across runs
+	HadAuth     bool      `json:"hadAuth,omitempty"`     // ever exercised with auth credentials
+}
+
+// MergeStatusCodes merges two sorted, deduplicated status-code slices.
+func MergeStatusCodes(a, b []int) []int {
+	seen := make(map[int]struct{}, len(a)+len(b))
+	for _, c := range a {
+		seen[c] = struct{}{}
+	}
+	for _, c := range b {
+		seen[c] = struct{}{}
+	}
+	out := make([]int, 0, len(seen))
+	for c := range seen {
+		out = append(out, c)
+	}
+	sort.Ints(out)
+	return out
 }
 
 // StoredCoverage is the on-disk format for a single spec's accumulated data.
