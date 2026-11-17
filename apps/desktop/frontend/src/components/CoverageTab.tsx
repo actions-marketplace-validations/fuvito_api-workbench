@@ -521,17 +521,34 @@ function csvCell(v: string): string {
 }
 
 function exportCSV(specFile: string, entry: AccumulatedCoverage) {
-  const rows = ['Method,Path,Coverage,Last Result,Last Run']
-  for (const op of [...(entry.exercised ?? [])].sort()) {
-    const { method, path } = parseOp(op)
-    const r = entry.operationResults?.[op]
-    const result = r ? (r.lastPassed ? 'Pass' : 'Fail') : ''
-    const runAt = r?.lastRunAt ? new Date(r.lastRunAt).toISOString() : ''
-    rows.push([method, path, 'Covered', result, runAt].map(csvCell).join(','))
+  const q = entry.quality
+  const happySet  = new Set(q?.happyPathOnly        ?? [])
+  const authSet   = new Set(q?.securedNeverAuthed   ?? [])
+  const neverSet  = new Set(q?.neverExercised       ?? [])
+  const errorMap  = new Map((q?.errorsNeverTriggered ?? []).map(g => [g.operation, g.missing]))
+
+  function qualityFlags(op: string, covered: boolean): [string, string] {
+    if (!covered) return ['Never exercised', '']
+    const flags: string[] = []
+    if (happySet.has(op))  flags.push('Happy-path only')
+    if (authSet.has(op))   flags.push('No auth tested')
+    if (errorMap.has(op))  flags.push('Errors never triggered')
+    return [flags.join('; '), (errorMap.get(op) ?? []).join(' ')]
   }
-  for (const op of [...(entry.missed ?? [])].sort()) {
+
+  const rows = ['Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes']
+  const allOps = [...(entry.exercised ?? []), ...(entry.missed ?? [])].sort((a, b) => {
+    const pa = parseOp(a), pb = parseOp(b)
+    return pa.path !== pb.path ? pa.path.localeCompare(pb.path) : pa.method.localeCompare(pb.method)
+  })
+  for (const op of allOps) {
     const { method, path } = parseOp(op)
-    rows.push([method, path, 'Not Covered', '', ''].map(csvCell).join(','))
+    const covered = (entry.exercised ?? []).includes(op)
+    const r = entry.operationResults?.[op]
+    const result = covered ? (r ? (r.lastPassed ? 'Pass' : 'Fail') : '') : ''
+    const runAt  = r?.lastRunAt ? new Date(r.lastRunAt).toISOString() : ''
+    const [quality, missing] = qualityFlags(op, covered)
+    rows.push([method, path, covered ? 'Covered' : 'Not Covered', result, runAt, quality, missing].map(csvCell).join(','))
   }
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
