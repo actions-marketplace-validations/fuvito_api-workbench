@@ -117,8 +117,19 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 
 ### 15. Parallel scenario execution — M
 
-- **Idea.** `--parallel N` for folder runs, opt-in.
-- **Requirement review.** Scenarios often create and delete data and may depend on each other's side effects. It must be opt-in, with the reports and exit codes unchanged, and documented as unsafe for scenarios that share state.
+- **Idea.** `--parallel N` for folder runs (`run`, `bundle run`), opt-in. A worker count, not an on/off flag: "all at once" would send hundreds of simultaneous flows at the API.
+- **Design discussed 2026-11-17 (not decided).**
+  - `0` and `1` both mean sequential, which stays the default; a hard cap of 16 (an error above it) and never more workers than scenarios.
+  - The combined report stays in path order and the exit code is unchanged, so the same files give the same report at any worker count.
+  - The desktop Run All stays sequential at first (its progress display assumes one scenario at a time).
+- **Concerns and how to handle them.**
+  1. *Shared data between scenarios* (two scenarios creating the same user, one deleting what another reads) is the main risk: opt-in, documented as unsafe for scenarios that share state; a later "run alone / run together" marker would change the scenario format, so it is out of the first version.
+  2. *Server load* (429s, timeouts, inflated per-scenario timings): opt-in default and the cap.
+  3. *Coverage recording with `--workspace`* is a read-modify-write on a shared file: record after all scenarios finish, in path order (also deterministic).
+  4. *Shared CLI state:* lock the spec cache and collect per-scenario warnings to print in order. Each scenario already has its own HTTP client, cookie jar and resolver; secrets are read-only.
+  5. *`--fail-fast`* can only mean "stop starting new scenarios"; scenarios already running finish, so which ones ran varies between runs. Document it.
+  6. *Proof:* run the tests under the race detector and assert an identical report for 1, 4 and 16 workers.
+- **Requirement review.** Scenarios often create and delete data and may depend on each other's side effects. It must be opt-in, with the reports and exit codes unchanged, and documented as unsafe for scenarios that share state. Needs evidence of demand before it is built.
 
 ## Think twice before building
 
