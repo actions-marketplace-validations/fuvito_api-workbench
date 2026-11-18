@@ -117,3 +117,17 @@ func TestFakeData(t *testing.T) {
 }
 
 func regexpMatch(re, s string) bool { return regexp.MustCompile(re).MatchString(s) }
+
+func TestEveryFunctionIsDocumentedWithAWorkingExample(t *testing.T) {
+	if len(functionDocs) != len(functions) {
+		t.Errorf("%d documented, %d functions", len(functionDocs), len(functions))
+	}
+	for _, f := range Functions() {
+		if f.Description == "" || f.Example == "" {
+			t.Errorf("%s is missing documentation", f.Name)
+		}
+		if errs := Check("{{" + f.Example + "}}"); len(errs) != 0 {
+			t.Errorf("the example for %s does not work: %v", f.Name, errs)
+		}
+	}
+}

@@ -1,6 +1,6 @@
 # Dynamic values and scenario variables
 
-- **Status:** Approved — phases 1 and 2 built (2026-11-17); phase 3 (desktop) pending
+- **Status:** Approved — all three phases built (2026-11-17)
 - **Date:** 2026-11-17
 - **Touches:** `packages/core/variables`, `packages/core/scenario`, `packages/core/domain`, `serialization` (scenario and bundle formats), `importer`, `clispec`, desktop editors, `format-spec.md`, the AI prompt
 

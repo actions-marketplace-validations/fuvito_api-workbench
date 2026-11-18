@@ -2,6 +2,7 @@
 // Uses plain interfaces for ergonomic object creation at call sites.
 // The generated wailsjs classes use 'namespace' (not erasable syntax in TS7),
 // so all Wails imports are isolated here.
+import type { DynamicFunction } from '@/lib/dynamicFunctions'
 import { SetHasDirtyTabs as WailsSetHasDirtyTabs, Exit as WailsExit } from '@wailsjs/go/main/App'
 import {
   Execute as WailsExecute,
@@ -108,6 +109,7 @@ import {
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
   ExportCoverageReport as WailsExportCoverageReport,
   ExportRunReport as WailsExportRunReport,
+  ListDynamicFunctions as WailsListDynamicFunctions,
   GetScenarioRunHistory as WailsGetScenarioRunHistory,
   CancelScenario as WailsCancelScenario,
 } from '@wailsjs/go/main/ScenarioService'
@@ -860,6 +862,12 @@ export interface ScenarioResult {
   specError?: string
   coverage?: ScenarioCoverage
   accumulatedCoverage?: AccumulatedCoverage
+  seed?: number
+  variables?: ScenarioVariable[]
+}
+
+export async function listDynamicFunctions(): Promise<DynamicFunction[]> {
+  return ((await WailsListDynamicFunctions()) ?? []) as unknown as DynamicFunction[]
 }
 
 export async function listScenarios(): Promise<ScenarioInfo[]> {

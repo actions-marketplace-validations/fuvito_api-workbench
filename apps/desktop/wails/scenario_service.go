@@ -128,6 +128,10 @@ type ScenarioResultIO struct {
 	SpecError           string                 `json:"specError,omitempty"`
 	Coverage            *CoverageIO            `json:"coverage,omitempty"`
 	AccumulatedCoverage *AccumulatedCoverageIO `json:"accumulatedCoverage,omitempty"`
+	// Seed is set when the run used random values; run the CLI with --seed to replay them.
+	Seed *int64 `json:"seed,omitempty"`
+	// Variables are the scenario variables as generated for this run (secret values are masked).
+	Variables []VariableIO `json:"variables,omitempty"`
 }
 
 type StepRunEntryIO struct {
@@ -849,6 +853,18 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
 		SpecError:  specLoadErr,
+		Error:      result.SetupError,
+	}
+	if result.UsedRandomness {
+		seed := result.Seed
+		out.Seed = &seed
+	}
+	for _, v := range result.Variables {
+		val := v.Value
+		if v.Secret {
+			val = "***"
+		}
+		out.Variables = append(out.Variables, VariableIO{Name: v.Name, Value: val, Secret: v.Secret})
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{
@@ -1385,4 +1401,23 @@ func (s *ScenarioService) CreateFromTemplate(templateID, name string) CreateScen
 		return CreateScenarioResultIO{Error: err.Error()}
 	}
 	return CreateScenarioResultIO{Path: filePath}
+}
+
+// DynamicFunctionIO describes one {{$function}} for the editors' autocomplete.
+type DynamicFunctionIO struct {
+	Name        string `json:"name"`
+	Usage       string `json:"usage"`
+	Description string `json:"description"`
+	Example     string `json:"example"`
+}
+
+// ListDynamicFunctions returns the built-in dynamic-value functions, straight from the core so the
+// editors never drift from what a run accepts.
+func (s *ScenarioService) ListDynamicFunctions() []DynamicFunctionIO {
+	infos := variables.Functions()
+	out := make([]DynamicFunctionIO, len(infos))
+	for i, f := range infos {
+		out[i] = DynamicFunctionIO{Name: f.Name, Usage: f.Usage, Description: f.Description, Example: f.Example}
+	}
+	return out
 }

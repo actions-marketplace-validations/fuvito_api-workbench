@@ -1147,4 +1147,29 @@ test.describe('Scenario visual editor — assertions', () => {
     // Step 0 (Create user) is selected; its schema assertion value is in the schema input
     await expect(page.getByLabel('Schema value').first()).toHaveValue('createUser')
   })
+  test('scenario variables are listed and offer dynamic functions', async ({ page }) => {
+    const detail = { ...SCENARIO_DETAIL, variables: [{ name: 'email', value: 'user-{{$randomString 6}}@example.com' }] }
+    await withScenarios(page, { detail })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await expect(page.getByLabel('Variable 1 name')).toHaveValue('email')
+
+    await page.getByRole('button', { name: 'Add variable' }).click()
+    await page.getByLabel('Variable 2 name').fill('count')
+    const value = page.getByPlaceholder(/value, e\.g\./).nth(1)
+    await value.fill('{{$ran')
+    await expect(page.getByRole('button', { name: /\$randomInt/ })).toContainText('Random whole number')
+    await page.getByRole('button', { name: /\$randomInt/ }).click()
+    await expect(value).toHaveValue('{{$randomInt 1 100}}')
+  })
+
+  test('run result shows the seed and generated variables', async ({ page }) => {
+    const result = { ...SCENARIO_RESULT, seed: 4242, variables: [{ name: 'email', value: 'u-abc@example.com' }] }
+    await withScenarios(page, { detail: SCENARIO_DETAIL, result })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await page.getByRole('button', { name: /^Run$/ }).click()
+    await expect(page.getByText('clrsig run --seed 4242')).toBeVisible()
+    await expect(page.getByText('u-abc@example.com')).toBeVisible()
+  })
 })

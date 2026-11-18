@@ -72,7 +72,9 @@ import {
   selectEnvironment,
   stopDemo,
   openInExplorer,
+  listDynamicFunctions,
 } from '@/lib/bridge'
+import {setDynamicFunctions} from '@/lib/dynamicFunctions'
 import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
 import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
@@ -427,6 +429,7 @@ export default function App() {
     workspace.refreshWorkspace()
     workspace.refreshHistory()
     settings.loadSettings()
+    Promise.resolve(listDynamicFunctions()).then(list => setDynamicFunctions(list ?? [])).catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resize

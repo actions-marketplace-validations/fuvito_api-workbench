@@ -423,3 +423,13 @@ Do not implement or stub any of these without explicit user direction.
 
 - **`$calc <expression>`:** own evaluator in `variables/calc.go` (numbers, bare variable names, `+ - * / %`, parentheses, `round floor ceil abs min max`); integers stay integers, floats trimmed, errors for division by zero, unknown or non-numeric variables; `validate` checks syntax without values. No dependency, cannot call anything else.
 - **Fake data:** `$randomEmail`, `$randomFirstName`, `$randomLastName`, `$randomFullName`, `$randomPhone`, `$randomWord` from a small embedded set, following the seed. Postman names are mapped by the importer.
+
+### 2026-11-17 — Dynamic values, phase 3 (desktop) and AI prompt
+
+- **Function catalog from the core:** `variables.Functions()` (name, usage, description, example; a test checks every function is documented and its example validates) served by `ScenarioService.ListDynamicFunctions`; the frontend loads it once at startup (`lib/dynamicFunctions.ts`).
+- **Autocomplete:** the existing `{{` suggestions (URL field, key/value editors, variable values) now also list `$` functions with their description and insert a working example.
+- **Variables section** in the scenario editor (name, value with autocomplete, secret lock, add/remove); saved through the existing YAML serializer.
+- **Run result:** `ScenarioResultIO` carries `seed` (only when random values were used), generated `variables` (secret values masked) and the setup error; the scenario view shows them with the `clrsig run --seed N` replay command.
+- **AI prompt** now teaches scenario variables, dynamic functions and interpolated assertions (guard test updated).
+- Playwright: 2 new tests; the 5 `smoke` tests still need a live `wails dev` server.
+

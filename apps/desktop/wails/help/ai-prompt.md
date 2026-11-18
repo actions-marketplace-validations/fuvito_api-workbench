@@ -119,14 +119,15 @@ Create a reusable request only when two or more scenarios use exactly the same c
 - `method` and `url` come from the document. Write URLs as `"{{baseUrl}}/path"` with path parameters filled by variables, for example `"{{baseUrl}}/pets/{{petId}}"`.
 - Authentication: use an `auth:` block that matches the document's security scheme — `bearer`, `basic` or `apikey` (with `location: header` or `query`). When a login endpoint returns a token, extract it and use `{{token}}`. For OAuth flows that need a browser, do not invent a flow: add an environment variable for a token the user pastes in.
 - Bodies: use `type: json` with `content` as a YAML single-quoted JSON string. Build the data from the schema, using `example` values and `enum` values where they exist. Include every required field and nothing the schema does not define.
-- Test data collides on a second run because there are no random functions. Use clearly artificial values (`"Test Pet 1"`), always clean up, and say so in your assumptions.
+- Make test data unique per run with dynamic values so a second run does not collide: put them in the scenario's `variables` (for example `name: petName`, `value: "Test Pet {{$randomInt 1000 9999}}"`) and use `{{petName}}` in the request and the assertions. Always clean up what the scenario creates.
 - File uploads need an absolute local path. Avoid real uploads; use an upload only as a negative test (see below).
 - Never use `retry` or `timeoutMs`; they are accepted by the format but have no effect. Use `timeout: 5s` on a request only when an endpoint is known to be slow.
 
 ## Variables — the most common source of errors
 
-- Only `{{name}}` references. Every variable you use must be defined in an environment **or** extracted by an **earlier** step of the same scenario.
-- **Variables are not expanded inside assertions.** `expected` is always a literal. To check that a response echoes data, write the literal you sent, for example `expected: "Test Pet 1"`.
+- `{{name}}` references. Every variable you use must be defined in an environment, in the scenario's `variables`, **or** extracted by an **earlier** step of the same scenario.
+- Scenario `variables` are generated once per run, in order, and can use functions and earlier variables. Dynamic functions are written `{{$name args}}`: `$guid`, `$randomString <n>`, `$randomInt <min> <max>`, `$randomBool`, `$randomChoice a b c`, `$date +7d`, `$timestamp`, `$calc a * b`, `$randomEmail`, and the others in the Format Specification. Never invent a function that is not listed there.
+- **Variables and functions are expanded inside assertions** (`expected`, `path`, `name`), so to check that a response echoes data write `expected: "{{petName}}"`. An inline `{{$guid}}` differs every time it appears, so use a scenario variable when a value is needed in more than one place.
 - Variables are not allowed in `specFile`.
 - Extract IDs with `jsonpath` using the response schema's path (`$.id`, `$.data.id`). Extract headers or the status only when later steps need them.
 
@@ -157,7 +158,7 @@ Generate them only for behaviour the document declares or the user asked for:
 ## Do not
 
 - Invent endpoints, fields, operation IDs, status codes or credentials.
-- Use loops, conditions, functions, random values or expressions — the format has none.
+- Use loops, conditions or scripting. The only dynamic values are the `{{$function}}` calls in the Format Specification.
 - Call destructive endpoints (delete, reset, purge) on anything the scenario did not create.
 - Output more than one code block for the bundle, or wrap the bundle in extra prose inside the block.
 - Use features marked "not applied yet" in the Format Specification.
@@ -170,7 +171,7 @@ Go through every point. Fix problems before sending.
 
 1. The output is exactly one ```yaml block containing a bundle, with `schemaVersion: "1"` first.
 2. Every field exists in the Format Specification; no unknown fields (check requests for `timeoutMs`, steps for `retry`).
-3. Every `{{variable}}` is defined in an environment or extracted by an earlier step; none appears in an assertion's `expected` or in `specFile`.
+3. Every `{{variable}}` is defined in an environment, in the scenario's `variables` or extracted by an earlier step; none appears in `specFile`; every `{{$function}}` is listed in the Format Specification with valid arguments.
 4. Every step has a unique `label` within its scenario, and either `request` or `requestRef` (never both).
 5. Every `requestRef` names a request in the same bundle by its `file`.
 6. `file` names are unique within each kind and kebab-case; no `..` in any `file`.

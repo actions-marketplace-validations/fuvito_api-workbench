@@ -228,6 +228,10 @@ export function setupMockBridge() {
         LoadScenario: () => Promise.resolve(bridge['scenarioDetail'] ?? { path: '', title: '', description: '', error: '', steps: [] }),
         RunScenario: (_path: string, _envPath: string) => Promise.resolve(bridge['scenarioResult'] ?? { title: '', error: '', passed: true, durationMs: 0, steps: [] }),
         ListAccumulatedCoverage: () => Promise.resolve(bridge['coverage']),
+        ListDynamicFunctions: () => Promise.resolve([
+          { name: 'guid', usage: '$guid', description: 'Random UUID (version 4)', example: '$guid' },
+          { name: 'randomInt', usage: '$randomInt [<min> <max>]', description: 'Random whole number (default 0 to 1000)', example: '$randomInt 1 100' },
+        ]),
         GetAccumulatedCoverage: (specFile: string) =>
           Promise.resolve((bridge['coverage'] as Array<{ specFile: string }>).find(c => c.specFile === specFile) ?? null),
         ResetAccumulatedCoverage: (specFile: string) => {

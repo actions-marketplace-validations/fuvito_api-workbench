@@ -4,10 +4,12 @@ import {
   loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario,
 } from '@/lib/bridge'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
-import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage } from '@/lib/bridge'
+import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage, ScenarioVariable } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
 import { ScenarioHeaderBar } from './ScenarioHeaderBar'
 import { ScenarioMetaSection } from './ScenarioMetaSection'
+import { ScenarioVariablesSection } from './ScenarioVariablesSection'
+import { ScenarioRunInfo } from './ScenarioRunInfo'
 import { StepListPanel } from './ScenarioStepListPanel'
 import { StepDetailPane } from './ScenarioDetailPane'
 import { ScenarioYamlDialog } from './ScenarioYamlDialog'
@@ -221,7 +223,7 @@ export function ScenarioViewer({
     setAccumulatedCoverage(null)
   }
 
-  function updateMeta(patch: { title?: string; description?: string; specFile?: string }) {
+  function updateMeta(patch: { title?: string; description?: string; specFile?: string; variables?: ScenarioVariable[] }) {
     if (!visualDetail) return
     setVisualDetail({ ...visualDetail, ...patch })
     setVisualDirty(true)
@@ -446,6 +448,15 @@ export function ScenarioViewer({
           onChange={updateMeta}
         />
       )}
+
+      {visualDetail && (
+        <ScenarioVariablesSection
+          variables={visualDetail.variables ?? []}
+          onChange={variables => updateMeta({ variables })}
+        />
+      )}
+
+      {result && !running && <ScenarioRunInfo result={result} />}
 
       <div ref={containerRef} className="flex-1 flex overflow-hidden">
         <StepListPanel
