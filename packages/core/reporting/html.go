@@ -141,6 +141,9 @@ func scenarioSection(result *scenario.Result) htmlSection {
 		if sr.Response != nil {
 			row.Meta = fmt.Sprintf("%d · %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
 		}
+		if sr.Attempts > 1 {
+			row.Meta += fmt.Sprintf(" · %d attempts", sr.Attempts)
+		}
 		if sr.Error != "" {
 			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + x.text(sr.Error)})
 		}

@@ -42,6 +42,7 @@ export function serializeScenarioToYAML(d: ScenarioDetail): string {
         lines.push('    request:')
         if (step.method) lines.push(`      method: ${step.method}`)
         if (step.url) lines.push(`      url: ${yamlScalar(step.url)}`)
+        if (step.noFollowRedirects) lines.push('      followRedirects: false')
         if (step.headers?.length) {
           lines.push('      headers:')
           for (const h of step.headers) {

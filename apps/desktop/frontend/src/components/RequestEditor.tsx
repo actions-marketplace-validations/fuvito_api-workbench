@@ -155,6 +155,8 @@ export type RequestEditorProps = {
   onBodyChange: (b: BodyState) => void
   onAuthChange: (a: AuthState) => void
   onTimeoutChange: (ms: number) => void
+  noFollowRedirects?: boolean
+  onNoFollowRedirectsChange?: (v: boolean) => void
   onPickFile?: () => Promise<string>
   onSend: () => void
   onCancel?: () => void
@@ -166,7 +168,7 @@ export function RequestEditor({
   queryParams, headers, body, auth, timeoutMs, envVarMap,
   onMethodChange, onUrlChange, onUrlPaste,
   onQueryParamsChange, onHeadersChange, onBodyChange, onAuthChange,
-  onTimeoutChange, onPickFile, onSend, onCancel, onCreateVariable,
+  onTimeoutChange, noFollowRedirects = false, onNoFollowRedirectsChange, onPickFile, onSend, onCancel, onCreateVariable,
 }: RequestEditorProps) {
   const [activeTab, setActiveTab] = useState<RequestEditorTab>('Params')
 
@@ -235,6 +237,21 @@ export function RequestEditor({
           />
           <span className="text-[10px] text-[var(--color-muted-foreground)]">ms</span>
         </div>
+
+        {onNoFollowRedirectsChange && (
+          <label
+            className="flex items-center gap-1 shrink-0 text-[10px] text-[var(--color-muted-foreground)] cursor-pointer"
+            title="Return a 3xx response as it is instead of following the redirect (so a redirect declared in the spec can be checked)"
+          >
+            <input
+              type="checkbox"
+              checked={noFollowRedirects}
+              onChange={e => onNoFollowRedirectsChange(e.target.checked)}
+              className="accent-[var(--color-accent)]"
+            />
+            No redirects
+          </label>
+        )}
 
         {loading ? (
           <button

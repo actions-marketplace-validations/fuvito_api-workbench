@@ -88,14 +88,14 @@ func TestBundleService_SpecFileOverrideAndWarnings(t *testing.T) {
 	isolateHome(t)
 	ws := newWS(t, t.TempDir())
 	svc := NewBundleService(ws)
-	doc := "schemaVersion: \"1\"\nspecFile: https://guess.example.com/openapi.json\nscenarios:\n  - title: S\n    steps:\n      - {label: a, request: {method: GET, url: \"http://x\"}, timeoutMs: 100}\n"
+	doc := "schemaVersion: \"1\"\nspecFile: https://guess.example.com/openapi.json\nscenarios:\n  - title: S\n    steps:\n      - {label: a, request: {method: GET, url: \"http://x\"}}\n"
 
 	pre := svc.PreviewBundle(doc, "C:/specs/api.yaml", "rename")
 	if pre.HasErrors || pre.SpecFile != "https://guess.example.com/openapi.json" {
 		t.Fatalf("%+v", pre)
 	}
-	if len(pre.Issues) != 1 || pre.Issues[0].Severity != "warning" {
-		t.Errorf("expected the not-applied warning: %+v", pre.Issues)
+	if len(pre.Issues) != 0 {
+		t.Errorf("a valid bundle has no findings: %+v", pre.Issues)
 	}
 	if r := svc.ImportBundle(doc, "C:/specs/api.yaml", "rename"); r.Error != "" {
 		t.Fatal(r.Error)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/variables"
@@ -26,6 +27,12 @@ func (iss Issue) String() string {
 	}
 	return fmt.Sprintf("[step %d]: %s", iss.Step, iss.Message)
 }
+
+// Limits that keep a retry policy from hiding a broken API behind minutes of waiting.
+const (
+	MaxRetryAttempts = 10
+	MaxRetryDelay    = time.Minute
+)
 
 // Validate checks a parsed Scenario for structural problems without executing it.
 // scenarioDir is the directory containing the scenario file; pass "" to skip
@@ -78,6 +85,18 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 			step.FailPolicy != domain.FailPolicyContinue &&
 			step.FailPolicy != domain.FailPolicySkip {
 			add(num, name, fmt.Sprintf("unknown failPolicy %q (want: stop, continue, skip)", step.FailPolicy))
+		}
+
+		if step.TimeoutMs < 0 {
+			add(num, name, "timeoutMs cannot be negative")
+		}
+		if step.Retry != nil {
+			if step.Retry.MaxAttempts > MaxRetryAttempts {
+				add(num, name, fmt.Sprintf("retry maxAttempts is %d; the most allowed is %d", step.Retry.MaxAttempts, MaxRetryAttempts))
+			}
+			if step.Retry.Delay > MaxRetryDelay {
+				add(num, name, fmt.Sprintf("retry delayMs is %d; the most allowed is %d", step.Retry.Delay.Milliseconds(), MaxRetryDelay.Milliseconds()))
+			}
 		}
 
 		validTypes := map[domain.AssertionType]bool{

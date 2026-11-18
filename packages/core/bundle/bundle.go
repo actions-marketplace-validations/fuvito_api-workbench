@@ -281,9 +281,6 @@ func Validate(b *serialization.Bundle, opts Options) []Issue {
 				}
 			}
 
-			if step.Retry != nil || step.TimeoutMs > 0 {
-				warnf(sw, "retry and timeoutMs are accepted but not applied when a scenario runs yet")
-			}
 			for _, a := range step.Assertions {
 				if a.Type == domain.AssertionSchema && spec == "" && looksLikeOperationID(a.Schema) {
 					warnf(sw, "schema assertion %q needs a spec: set specFile on the bundle or scenario", a.Schema)

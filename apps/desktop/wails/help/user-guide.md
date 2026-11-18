@@ -379,7 +379,9 @@ steps:
 | `failPolicy` | What to do if an assertion fails: `stop` (default — skips remaining steps), `continue` (keeps going), `skip` (skips this step if a previous one failed). |
 | `disabled` | `true` skips the step without counting it as a failure. |
 | `validateSpec` | With `specFile` set, validate this step's response against the spec (default `true`). `false` opts the step out. |
-| `timeoutMs`, `retry.maxAttempts`, `retry.delayMs` | Accepted, saved and editable, but **not applied yet** — a step runs once, using the request's own `timeout` or the global default. Do not rely on them to change run behaviour. |
+| `timeoutMs` | Timeout for this step in milliseconds; overrides the request's own `timeout` and the global default. |
+| `retry.maxAttempts`, `retry.delayMs` | Re-send the step after a network error or a `5xx` response, up to `maxAttempts` attempts in total (1–10) with `delayMs` between them (at most 60000). A failed assertion or a `4xx` is never retried. Reports show the attempt count. |
+| request `followRedirects: false` | Return a `3xx` response as it is instead of following it, so a redirect declared in the spec can be checked. In the app: **No redirects** next to the timeout, or **Don't follow redirects** in a step's advanced options. |
 
 ### Assertion types
 

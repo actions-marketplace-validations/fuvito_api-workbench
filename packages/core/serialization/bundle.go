@@ -50,6 +50,8 @@ type BundleRequestFile struct {
 	Body        *BodyFile `yaml:"body,omitempty" json:"body,omitempty"`
 	Auth        *AuthFile `yaml:"auth,omitempty" json:"auth,omitempty"`
 	Timeout     string    `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+
+	FollowRedirects *bool `yaml:"followRedirects,omitempty" json:"followRedirects,omitempty"`
 }
 
 // BundleScenarioFile is a scenario inside a bundle.
@@ -129,6 +131,7 @@ func bundleFileToDomain(bf *BundleFile) (*Bundle, error) {
 		rf := RequestFile{
 			SchemaVersion: "1", Title: r.Title, Method: r.Method, URL: r.URL, Headers: r.Headers,
 			QueryParams: r.QueryParams, Body: r.Body, Auth: r.Auth, Timeout: r.Timeout,
+			FollowRedirects: r.FollowRedirects,
 		}
 		req, err := requestFileToDomain(&rf)
 		if err != nil {
@@ -175,6 +178,7 @@ func bundleDomainToFile(b *Bundle) *BundleFile {
 		bf.Requests = append(bf.Requests, BundleRequestFile{
 			File: r.File, Title: rf.Title, Method: rf.Method, URL: rf.URL, Headers: rf.Headers,
 			QueryParams: rf.QueryParams, Body: rf.Body, Auth: rf.Auth, Timeout: rf.Timeout,
+			FollowRedirects: rf.FollowRedirects,
 		})
 	}
 	for _, s := range b.Scenarios {

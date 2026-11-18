@@ -158,11 +158,13 @@ export function useTabsState(deps: {
   function openFileAsTab(r: RequestFileIO, path: string): string {
     const state = requestFileIOToState(r)
     const timeoutMs = r.timeoutMs ?? 0
-    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.title || null, timeoutMs)
+    const noFollowRedirects = r.noFollowRedirects ?? false
+    const savedKey = computeStateKey(state.method, state.url, state.queryParams, state.headers, state.body, state.auth, r.title || null, timeoutMs, noFollowRedirects)
     const newTab: TabState = {
       id: crypto.randomUUID(),
       ...state,
       timeoutMs,
+      noFollowRedirects,
       name: r.title || null,
       filePath: path,
       targetDir: null,
@@ -221,6 +223,7 @@ export function useTabsState(deps: {
       body: tab.body.type === 'none' ? undefined : { type: tab.body.type, content: tab.body.content },
       auth: authStateToPayload(tab.auth) ?? undefined,
       timeoutMs: tab.timeoutMs || undefined,
+      noFollowRedirects: tab.noFollowRedirects || undefined,
       filePath: overrideFilePath ?? tab.filePath ?? '',
       targetDir: tab.targetDir ?? '',
     }
@@ -239,7 +242,7 @@ export function useTabsState(deps: {
       const req = tabToRequestFileIO(tab)
       const savedPath = await saveRequest(req)
       if (savedPath) {
-        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name, tab.timeoutMs)
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name, tab.timeoutMs, tab.noFollowRedirects)
         updateTab(tabId, { name, filePath: savedPath, savedKey })
         await refreshWorkspaceRef.current?.()
         return true
@@ -269,7 +272,7 @@ export function useTabsState(deps: {
       const req = tabToRequestFileIO(tab, '')
       const savedPath = await saveRequest(req)
       if (savedPath) {
-        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name, tab.timeoutMs)
+        const savedKey = computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, name, tab.timeoutMs, tab.noFollowRedirects)
         updateTab(currentActiveId, { name, filePath: savedPath, savedKey })
         await refreshWorkspaceRef.current?.()
         return true

@@ -55,6 +55,9 @@ func textScenario(result *scenario.Result, showSeed bool) string {
 			suffix = fmt.Sprintf("  %d  %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
 		}
 
+		if sr.Attempts > 1 {
+			suffix += fmt.Sprintf("  (%d attempts)", sr.Attempts)
+		}
 		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Label, suffix)
 
 		if sr.Error != "" {
@@ -150,6 +153,7 @@ type JSONStep struct {
 	Error      string            `json:"error,omitempty"`
 	StatusCode int               `json:"statusCode,omitempty"`
 	DurationMs int64             `json:"durationMs,omitempty"`
+	Attempts   int               `json:"attempts,omitempty"` // only when the step was re-sent
 	Extracted  map[string]string `json:"extracted,omitempty"`
 	Assertions []JSONAssertion   `json:"assertions,omitempty"`
 }
@@ -695,6 +699,9 @@ func JSON(result *scenario.Result) ([]byte, error) {
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
 			step.DurationMs = sr.Response.Duration.Milliseconds()
+		}
+		if sr.Attempts > 1 {
+			step.Attempts = sr.Attempts
 		}
 		for _, ar := range sr.Assertions {
 			step.Assertions = append(step.Assertions, JSONAssertion{

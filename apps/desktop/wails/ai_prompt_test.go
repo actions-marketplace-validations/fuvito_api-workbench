@@ -119,7 +119,7 @@ func TestAIPrompt_SampleBundleImportsAndRuns(t *testing.T) {
 func TestAIPrompt_KeepsTheCriticalRules(t *testing.T) {
 	for _, rule := range []string{
 		"at most **five** numbered questions",
-		"Never use `retry` or `timeoutMs`",
+		"never after a failed assertion",
 		"`timeout: 5s`",
 		"Variables and functions are expanded inside assertions",
 		"Never invent a function that is not listed",

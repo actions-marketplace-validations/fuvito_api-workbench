@@ -443,6 +443,18 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
               />
               <span className="text-[var(--color-muted-foreground)] text-xs">ms</span>
             </div>
+            <label
+              className="flex items-center gap-1 text-[var(--color-muted-foreground)] text-xs cursor-pointer"
+              title="Return a 3xx response as it is instead of following the redirect"
+            >
+              <input
+                type="checkbox"
+                checked={step.noFollowRedirects ?? false}
+                onChange={e => onChange({ noFollowRedirects: e.target.checked })}
+                className="accent-[var(--color-accent)]"
+              />
+              Don&apos;t follow redirects
+            </label>
             <div className="flex items-center gap-1">
               <span className="text-[var(--color-muted-foreground)] text-xs shrink-0">Retry:</span>
               <input

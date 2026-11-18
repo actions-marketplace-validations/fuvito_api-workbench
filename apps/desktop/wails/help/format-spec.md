@@ -94,6 +94,7 @@ auth:                        # optional — alternative to manual auth headers
   # location: header          # header | query
 
 timeout: 5s                  # optional — per-request timeout as a duration string (500ms, 5s, 1m30s); omit to use the global default
+followRedirects: false       # optional — false returns a 3xx response as it is instead of following it (default true)
 ```
 
 ### Notes
@@ -102,6 +103,7 @@ timeout: 5s                  # optional — per-request timeout as a duration st
 - `body.type: none` omits the body entirely; omitting the `body` block has the same effect.
 - `Content-Type` is set automatically from `body.type` when not explicitly provided.
 - `timeout` is a duration string such as `500ms`, `5s` or `1m`. Request files do **not** accept `timeoutMs`; an unknown field is silently ignored, so the timeout would not apply.
+- `followRedirects: false` makes the client return the `301`/`302`/`307`/`308` response itself (with its `Location` header) instead of following it, so a redirect that the OpenAPI spec declares can be asserted and validated. Leave it out for the normal behaviour. It is also accepted on a scenario step's `request` and on a bundle request.
 - `body.type: multipart` sets its own `multipart/form-data` Content-Type with a generated boundary. `content` is a JSON array of fields: `n` is the field name, `t` is `text` or `file`, and `v` is the text value or, for files, an absolute path.
 
   ```yaml
@@ -170,11 +172,10 @@ steps:
     disabled: false          # optional — true skips this step without counting as failure
     validateSpec: true       # optional — with specFile set, validate this step's response against the spec (default true); false opts the step out
 
-    # Accepted and saved, but NOT yet applied when a scenario runs:
-    timeoutMs: 0             # optional — per-step timeout in ms
-    retry:                   # optional — retry policy
-      maxAttempts: 3
-      delayMs: 500
+    timeoutMs: 0             # optional — per-step timeout in ms; overrides the request's own timeout
+    retry:                   # optional — re-send the step after a network error or a 5xx response
+      maxAttempts: 3         # total attempts, 1–10 (1 = no retry)
+      delayMs: 500           # wait between attempts, at most 60000
 
   - label: Create user
     notes: "POST to /users. Extracts the new user's ID for use in later steps."
@@ -241,9 +242,12 @@ steps:
 | `continue` | Run the next step regardless of this step's outcome |
 | `skip` | Skip this step if the previous step failed |
 
-### Step options that are not applied yet
+### Step timeout and retry
 
-`timeoutMs` and `retry` are part of the file format: they are parsed, preserved on save and editable in the app. The scenario runner does not use them yet, so a step runs once with the request's own `timeout` (or the global default). Do not rely on them to change run behaviour.
+- `timeoutMs` overrides the request's `timeout` (and the global default) for that step. `0` or omitted means no override.
+- `retry` re-sends the step when the attempt fails at the network level (connection refused, timeout) or the server answers `5xx`. `maxAttempts` is the **total** number of attempts (so `3` means one try and up to two retries); `delayMs` is the wait between them.
+- A failed assertion, a `4xx` response or a spec violation never triggers a retry: those are real results and retrying would hide them. Assertions, extractions and spec validation run on the last attempt only.
+- Reports show the attempt count when a step was re-sent (`(3 attempts)`; `attempts` in JSON). A step counts once in totals and coverage however many attempts it took.
 
 ### validateSpec
 
@@ -426,7 +430,7 @@ scenarios:                         # optional — one or more
 
 ### Import behaviour
 
-- The bundle is validated before anything is written. Any error stops the import; warnings (for example a `{{variable}}` that no environment defines, or `retry` / `timeoutMs`, which are not applied yet) do not.
+- The bundle is validated before anything is written. Any error stops the import; warnings (for example a `{{variable}}` that no environment defines) do not. A `retry.maxAttempts` above 10 or a negative `timeoutMs` is an error.
 - Files that already exist can be skipped, overwritten, or kept by saving the new file as `name-2.yaml`. When a request is renamed this way, scenarios that refer to it are updated to match.
 - Files are written atomically. The result is ordinary request, scenario and environment files; the bundle itself is not stored.
 - A bundle may be YAML or JSON. Text pasted from a chat window may include a surrounding ``` code fence, which is ignored.

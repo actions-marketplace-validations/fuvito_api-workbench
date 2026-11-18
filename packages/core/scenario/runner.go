@@ -26,6 +26,9 @@ type StepResult struct {
 	Passed     bool
 	Skipped    bool
 	Error      string
+	// Attempts is how many times the request was sent: 1 normally, more when the step's retry
+	// policy re-sent it after a transport error or a 5xx response.
+	Attempts int
 }
 
 // Result holds the full outcome of running a scenario.
@@ -173,6 +176,30 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 	return result
 }
 
+// send executes the request, re-sending it up to retry.MaxAttempts times in total when the
+// attempt fails at the transport level or the server answers 5xx. A failed assertion never
+// triggers a retry: it would hide a real contract violation. Only the last attempt is evaluated.
+func (r *Runner) send(ctx context.Context, req *domain.Request, retry *domain.RetryPolicy) (*domain.Response, int, error) {
+	max := 1
+	if retry != nil && retry.MaxAttempts > 1 {
+		max = retry.MaxAttempts
+	}
+	for attempt := 1; ; attempt++ {
+		resp, err := r.exec.Execute(ctx, req)
+		retryable := err != nil || resp.StatusCode >= 500
+		if !retryable || attempt >= max || ctx.Err() != nil {
+			return resp, attempt, err
+		}
+		if retry.Delay > 0 {
+			select {
+			case <-time.After(retry.Delay):
+			case <-ctx.Done():
+				return resp, attempt, err
+			}
+		}
+	}
+}
+
 func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolver *variables.Resolver, prevFailed bool) StepResult {
 	sr := StepResult{Label: step.Label}
 
@@ -209,7 +236,11 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 		return sr
 	}
 
-	resp, err := r.exec.Execute(ctx, resolved)
+	if step.TimeoutMs > 0 {
+		resolved.Timeout = time.Duration(step.TimeoutMs) * time.Millisecond
+	}
+	resp, attempts, err := r.send(ctx, resolved, step.Retry)
+	sr.Attempts = attempts
 	if err != nil {
 		sr.Error = err.Error()
 		return sr

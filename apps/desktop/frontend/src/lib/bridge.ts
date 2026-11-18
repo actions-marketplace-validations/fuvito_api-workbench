@@ -141,6 +141,7 @@ export interface RequestPayload {
   body?: { type: string; content: string }
   auth?: AuthPayload
   timeoutMs: number
+  noFollowRedirects?: boolean
 }
 
 export interface TimingData {
@@ -209,6 +210,7 @@ export interface RequestFileIO {
   body?: { type: string; content: string }
   auth?: AuthPayload
   timeoutMs?: number
+  noFollowRedirects?: boolean
   filePath?: string
   targetDir?: string
 }
@@ -781,6 +783,7 @@ export interface StepDetail {
   timeoutMs?: number
   retryMaxAttempts?: number
   retryDelayMs?: number
+  noFollowRedirects?: boolean
 }
 
 export interface ScenarioDetail {
@@ -816,6 +819,7 @@ export interface StepResult {
   assertions: AssertionResult[]
   responseBody?: string
   responseHeaders?: Array<{ name: string; value: string }>
+  attempts?: number
 }
 
 export interface ScenarioCoverage {

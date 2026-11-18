@@ -491,6 +491,7 @@ export default function App() {
         body: activeTab.body.type === 'none' ? undefined : { type: activeTab.body.type, content: activeTab.body.content },
         auth: authStateToPayload(activeTab.auth),
         timeoutMs: activeTab.timeoutMs,
+        noFollowRedirects: activeTab.noFollowRedirects || undefined,
       })
       updateTab(tabId, { response: result })
       const filePath = tabsStateRef.current.tabs.find(t => t.id === tabId)?.filePath
@@ -1330,6 +1331,8 @@ export default function App() {
                         onPickFile={pickFile}
                         timeoutMs={activeTab.timeoutMs}
                         onTimeoutChange={ms => updateTab(activeTabId, { timeoutMs: ms })}
+                        noFollowRedirects={activeTab.noFollowRedirects ?? false}
+                        onNoFollowRedirectsChange={v => updateTab(activeTabId, { noFollowRedirects: v })}
                         envVarMap={workspace.envVarMap}
                         onSend={handleSend}
                         onCancel={handleCancel}

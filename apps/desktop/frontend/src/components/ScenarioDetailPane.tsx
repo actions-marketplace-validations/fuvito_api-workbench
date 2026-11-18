@@ -63,6 +63,9 @@ function StepResultStrip({ result, onRunFrom, running }: {
           {result.durationMs > 0 && (
             <span className="text-[var(--color-muted-foreground)]">{result.durationMs} ms</span>
           )}
+          {(result.attempts ?? 0) > 1 && (
+            <span className="text-amber-400">{result.attempts} attempts</span>
+          )}
         </button>
         <button
           type="button"

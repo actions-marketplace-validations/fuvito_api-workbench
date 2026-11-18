@@ -6,6 +6,8 @@
 
 **How an idea graduates:** when you want one built, it gets its own dated proposal in this folder (see [README](README.md)), including the requirement review, and is agreed before any code is written. Sizes: **S** ≈ a day or less, **M** ≈ a few days, **L** ≈ a week or more. "Evidence" says where the idea came from, so you can judge how real the need is.
 
+A comparison with Postman produced a few more candidates (making step `retry` / `timeoutMs` real, redirect control, OAuth2 documentation, mTLS) in the [Postman gap review](2026-11-17-postman-gap-review.md).
+
 Ideas already written up elsewhere are only linked here: the remaining phases of the [CLI Command Builder](2026-11-17-cli-command-builder.md) ("Test it here", shipping the CLI with the desktop app, more commands, Docker and GitHub Action targets, multi-step pipeline snippets), and the older items in the project backlog (screenshots in the user guide, Wails v3, Analytics tab, mock server, step `retry` / `timeoutMs` in the runner, `bundle run --workspace`).
 
 ## Summary

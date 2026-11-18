@@ -248,3 +248,19 @@ describe('tabs', () => {
     expect(h.onAuthChange).toHaveBeenCalledWith({ type: 'bearer', token: '' })
   })
 })
+
+describe('No redirects option', () => {
+  it('is hidden unless the parent handles it', () => {
+    setup()
+    expect(screen.queryByLabelText('No redirects')).not.toBeInTheDocument()
+  })
+
+  it('reflects and reports the choice', () => {
+    const onNoFollowRedirectsChange = vi.fn()
+    setup({ noFollowRedirects: true, onNoFollowRedirectsChange })
+    const box = screen.getByLabelText('No redirects') as HTMLInputElement
+    expect(box.checked).toBe(true)
+    fireEvent.click(box)
+    expect(onNoFollowRedirectsChange).toHaveBeenCalledWith(false)
+  })
+})

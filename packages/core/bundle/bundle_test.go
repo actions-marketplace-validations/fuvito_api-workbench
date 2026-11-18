@@ -197,7 +197,7 @@ scenarios:
 	}
 	w := warningsOf(issues)
 	for _, want := range []string{
-		"{{ghost}} is not defined", "retry and timeoutMs are accepted but not applied",
+		"{{ghost}} is not defined",
 		`schema assertion "getThing" needs a spec`, "{{evenLater}} is not defined",
 		`requestRef "../requests/other.yaml" is not part of this bundle`,
 	} {

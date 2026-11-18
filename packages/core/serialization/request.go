@@ -24,6 +24,8 @@ type RequestFile struct {
 	Body          *BodyFile `yaml:"body,omitempty" json:"body,omitempty"`
 	Auth          *AuthFile `yaml:"auth,omitempty" json:"auth,omitempty"`
 	Timeout       string    `yaml:"timeout,omitempty" json:"timeout,omitempty"` // e.g. "30s"
+	// FollowRedirects defaults to true; false returns a 3xx response instead of following it.
+	FollowRedirects *bool `yaml:"followRedirects,omitempty" json:"followRedirects,omitempty"`
 }
 
 type KVPair struct {
@@ -118,6 +120,9 @@ func requestFileToDomain(rf *RequestFile) (*domain.Request, error) {
 		}
 		req.Timeout = d
 	}
+	if rf.FollowRedirects != nil && !*rf.FollowRedirects {
+		req.NoFollowRedirects = true
+	}
 
 	return req, nil
 }
@@ -156,6 +161,10 @@ func requestDomainToFile(req *domain.Request) *RequestFile {
 	}
 	if req.Timeout > 0 {
 		rf.Timeout = req.Timeout.String()
+	}
+	if req.NoFollowRedirects {
+		no := false
+		rf.FollowRedirects = &no
 	}
 	return rf
 }

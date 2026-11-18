@@ -73,6 +73,8 @@ type StepDetailIO struct {
 	TimeoutMs        int                  `json:"timeoutMs,omitempty"`
 	RetryMaxAttempts int                  `json:"retryMaxAttempts,omitempty"`
 	RetryDelayMs     int                  `json:"retryDelayMs,omitempty"`
+	// NoFollowRedirects is the step request's followRedirects: false.
+	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
 }
 
 // VariableIO is a scenario variable; the editor keeps them so saving does not drop them.
@@ -109,6 +111,8 @@ type StepResultIO struct {
 	Assertions      []AssertionResultIO `json:"assertions"`
 	ResponseBody    string              `json:"responseBody,omitempty"`
 	ResponseHeaders []HeaderIO          `json:"responseHeaders,omitempty"`
+	// Attempts is set only when the step was re-sent by its retry policy.
+	Attempts int `json:"attempts,omitempty"`
 }
 
 type CoverageIO struct {
@@ -310,6 +314,7 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		if step.Request != nil {
 			sd.Method = string(step.Request.Method)
 			sd.URL = step.Request.URL
+			sd.NoFollowRedirects = step.Request.NoFollowRedirects
 			for _, h := range step.Request.Headers {
 				sd.Headers = append(sd.Headers, KVPairIO{Name: h.Name, Value: h.Value})
 			}
@@ -874,6 +879,9 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			Error:      sr.Error,
 			Extracted:  sr.Extracted,
 			Assertions: []AssertionResultIO{},
+		}
+		if sr.Attempts > 1 {
+			step.Attempts = sr.Attempts
 		}
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode

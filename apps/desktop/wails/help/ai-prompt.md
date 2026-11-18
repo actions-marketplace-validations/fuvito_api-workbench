@@ -121,7 +121,7 @@ Create a reusable request only when two or more scenarios use exactly the same c
 - Bodies: use `type: json` with `content` as a YAML single-quoted JSON string. Build the data from the schema, using `example` values and `enum` values where they exist. Include every required field and nothing the schema does not define.
 - Make test data unique per run with dynamic values so a second run does not collide: put them in the scenario's `variables` (for example `name: petName`, `value: "Test Pet {{$randomInt 1000 9999}}"`) and use `{{petName}}` in the request and the assertions. Always clean up what the scenario creates.
 - File uploads need an absolute local path. Avoid real uploads; use an upload only as a negative test (see below).
-- Never use `retry` or `timeoutMs`; they are accepted by the format but have no effect. Use `timeout: 5s` on a request only when an endpoint is known to be slow.
+- Use `retry` (for example `maxAttempts: 3`, `delayMs: 500`) only on a step that follows an eventually-consistent or known-flaky operation; it re-sends the step after a network error or a 5xx response, never after a failed assertion. Use `timeoutMs` or a request `timeout: 5s` only when an endpoint is known to be slow. When the document declares a 301/302/307 response for an operation, set `followRedirects: false` on that step's request so the redirect itself is tested.
 
 ## Variables — the most common source of errors
 
@@ -161,7 +161,6 @@ Generate them only for behaviour the document declares or the user asked for:
 - Use loops, conditions or scripting. The only dynamic values are the `{{$function}}` calls in the Format Specification.
 - Call destructive endpoints (delete, reset, purge) on anything the scenario did not create.
 - Output more than one code block for the bundle, or wrap the bundle in extra prose inside the block.
-- Use features marked "not applied yet" in the Format Specification.
 
 ---
 
@@ -170,7 +169,7 @@ Generate them only for behaviour the document declares or the user asked for:
 Go through every point. Fix problems before sending.
 
 1. The output is exactly one ```yaml block containing a bundle, with `schemaVersion: "1"` first.
-2. Every field exists in the Format Specification; no unknown fields (check requests for `timeoutMs`, steps for `retry`).
+2. Every field exists in the Format Specification; no unknown fields (`timeoutMs` and `retry` belong on a step, never inside a request; requests use `timeout`).
 3. Every `{{variable}}` is defined in an environment, in the scenario's `variables` or extracted by an earlier step; none appears in `specFile`; every `{{$function}}` is listed in the Format Specification with valid arguments.
 4. Every step has a unique `label` within its scenario, and either `request` or `requestRef` (never both).
 5. Every `requestRef` names a request in the same bundle by its `file`.

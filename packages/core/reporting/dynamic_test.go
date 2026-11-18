@@ -159,3 +159,25 @@ func TestCombinedReportsShowOneSeed(t *testing.T) {
 		t.Error("a run without random values has no seed")
 	}
 }
+
+func TestRetriedStepShowsItsAttempts(t *testing.T) {
+	r := passedResult("Flaky")
+	r.Steps[0].Attempts = 3
+	if !strings.Contains(reporting.Text(r), "(3 attempts)") {
+		t.Errorf("text:\n%s", reporting.Text(r))
+	}
+	b, _ := reporting.JSON(r)
+	if !strings.Contains(string(b), `"attempts": 3`) {
+		t.Errorf("json:\n%s", b)
+	}
+	h, _ := reporting.HTML(r, nil)
+	if !strings.Contains(string(h), "3 attempts") || !strings.Contains(string(reporting.Markdown(r, nil)), "3 attempts") {
+		t.Error("html and markdown show the attempts")
+	}
+	once := passedResult("Once")
+	once.Steps[0].Attempts = 1
+	b, _ = reporting.JSON(once)
+	if strings.Contains(string(b), "attempts") || strings.Contains(reporting.Text(once), "attempts") {
+		t.Error("a step sent once shows no attempt count")
+	}
+}

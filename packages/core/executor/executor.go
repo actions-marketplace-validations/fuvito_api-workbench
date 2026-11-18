@@ -10,9 +10,9 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"net/http/cookiejar"
 	"net/http/httptrace"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -31,7 +31,7 @@ const (
 // It is the only place in the codebase that performs HTTP I/O.
 // Neither the desktop frontend nor the CLI may duplicate this logic.
 type Executor struct {
-	client      *http.Client
+	client         *http.Client
 	defaultTimeout time.Duration
 	maxBodySize    int64
 }
@@ -104,7 +104,14 @@ func (e *Executor) Execute(ctx context.Context, req *domain.Request) (*domain.Re
 	httpReq = httpReq.WithContext(tracedCtx)
 
 	start := time.Now()
-	httpResp, err := e.client.Do(httpReq)
+	client := e.client
+	if req.NoFollowRedirects {
+		// a copy shares the transport and cookie jar; only the redirect policy differs
+		c := *e.client
+		c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		client = &c
+	}
+	httpResp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
@@ -123,15 +130,15 @@ func (e *Executor) Execute(ctx context.Context, req *domain.Request) (*domain.Re
 
 // timingCollector records httptrace timestamps and converts them to domain.Timing.
 type timingCollector struct {
-	mu              sync.Mutex
-	dnsStart        time.Time
-	dnsDone         time.Time
-	connectStart    time.Time
-	connectDone     time.Time
-	tlsStart        time.Time
-	tlsDone         time.Time
-	wroteRequest    time.Time
-	firstByte       time.Time
+	mu           sync.Mutex
+	dnsStart     time.Time
+	dnsDone      time.Time
+	connectStart time.Time
+	connectDone  time.Time
+	tlsStart     time.Time
+	tlsDone      time.Time
+	wroteRequest time.Time
+	firstByte    time.Time
 }
 
 func (tc *timingCollector) trace() *httptrace.ClientTrace {

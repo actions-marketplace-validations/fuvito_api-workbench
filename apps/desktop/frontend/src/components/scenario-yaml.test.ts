@@ -333,3 +333,11 @@ describe('serializeScenarioToYAML — variables', () => {
     expect(serializeScenarioToYAML(minimal())).not.toContain('variables:')
   })
 })
+
+describe('serializeScenarioToYAML — redirects', () => {
+  it('writes followRedirects: false only when the step opts out', () => {
+    const step = { label: 'a', method: 'GET', url: 'http://x/old', assertions: [], extractions: [] }
+    expect(serializeScenarioToYAML(minimal({ steps: [{ ...step, noFollowRedirects: true }] }))).toContain('      followRedirects: false')
+    expect(serializeScenarioToYAML(minimal({ steps: [step] }))).not.toContain('followRedirects')
+  })
+})
