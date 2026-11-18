@@ -124,4 +124,4 @@ Collaboration and cloud workspaces, mock servers, monitors, documentation publis
 |---|---|---|
 | 2026-11-17 | Gap review written from a comparison with Postman; nothing approved | assistant |
 | 2026-11-17 | "Complete them": items A–E approved and built, using the recommendations for the open decisions | project owner |
-| 2026-11-17 | Open: should a response status code the spec does not declare be a violation? (found while testing B; today it is ignored) | assistant |
+| 2026-11-17 | Undeclared response status codes stay ignored by the validator ("nothing to validate"); behaviour unchanged. Found while testing B | project owner |
