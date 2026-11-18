@@ -17,6 +17,7 @@ type ScenarioFile struct {
 	Title         string     `yaml:"title,omitempty" json:"title,omitempty"`
 	Description   string     `yaml:"description,omitempty" json:"description,omitempty"`
 	SpecFile      string     `yaml:"specFile,omitempty" json:"specFile,omitempty"`
+	Variables     []EnvVar   `yaml:"variables,omitempty" json:"variables,omitempty"`
 	Steps         []StepFile `yaml:"steps" json:"steps"`
 }
 
@@ -97,6 +98,7 @@ func scenarioFileToDomain(sf *ScenarioFile) (*domain.Scenario, error) {
 		Title:         sf.Title,
 		Description:   sf.Description,
 		SpecFile:      sf.SpecFile,
+		Variables:     envVarsToDomain(sf.Variables),
 	}
 	for _, step := range sf.Steps {
 		ds, err := stepFileToDomain(&step)
@@ -157,11 +159,28 @@ func scenarioDomainToFile(s *domain.Scenario) *ScenarioFile {
 		Title:         s.Title,
 		Description:   s.Description,
 		SpecFile:      s.SpecFile,
+		Variables:     envVarsToFile(s.Variables),
 	}
 	for _, step := range s.Steps {
 		sf.Steps = append(sf.Steps, stepDomainToFile(&step))
 	}
 	return sf
+}
+
+func envVarsToDomain(vars []EnvVar) []domain.EnvironmentVariable {
+	var out []domain.EnvironmentVariable
+	for _, v := range vars {
+		out = append(out, domain.EnvironmentVariable{Name: v.Name, Value: v.Value, Secret: v.Secret})
+	}
+	return out
+}
+
+func envVarsToFile(vars []domain.EnvironmentVariable) []EnvVar {
+	var out []EnvVar
+	for _, v := range vars {
+		out = append(out, EnvVar{Name: v.Name, Value: v.Value, Secret: v.Secret})
+	}
+	return out
 }
 
 func stepDomainToFile(step *domain.ScenarioStep) StepFile {

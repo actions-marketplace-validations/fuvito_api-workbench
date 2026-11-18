@@ -104,13 +104,27 @@ func plural(n int) string {
 	return "s"
 }
 
+// runSeed returns the seed of a run and whether any scenario drew random values from it.
+func runSeed(results []*scenario.Result) (int64, bool) {
+	for _, r := range results {
+		if r.UsedRandomness {
+			return r.Seed, true
+		}
+	}
+	return 0, false
+}
+
 // TextMulti renders several scenario results as one plain-text report with an overall
 // summary, followed by the coverage of each spec when given.
 func TextMulti(title string, results []*scenario.Result, cov []SpecCoverage, total time.Duration) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Run: %s  (%d scenario%s)\n\n", title, len(results), plural(len(results)))
+	header := fmt.Sprintf("Run: %s  (%d scenario%s)", title, len(results), plural(len(results)))
+	if seed, used := runSeed(results); used {
+		header += fmt.Sprintf("  seed %d", seed)
+	}
+	b.WriteString(header + "\n\n")
 	for _, r := range results {
-		b.WriteString(Text(r))
+		b.WriteString(textScenario(r, false))
 		b.WriteString("\n")
 	}
 	passed, steps, ap, at := multiTotals(results)
@@ -141,12 +155,16 @@ type JSONSpecCoverage struct {
 func JSONMulti(title string, results []*scenario.Result, cov []SpecCoverage, total time.Duration) ([]byte, error) {
 	type out struct {
 		Run        string             `json:"run"`
+		Seed       *int64             `json:"seed,omitempty"`
 		Passed     bool               `json:"passed"`
 		DurationMs int64              `json:"durationMs"`
 		Scenarios  []json.RawMessage  `json:"scenarios"`
 		Coverage   []JSONSpecCoverage `json:"coverage,omitempty"`
 	}
 	doc := out{Run: title, Passed: true, DurationMs: total.Milliseconds(), Scenarios: []json.RawMessage{}}
+	if seed, used := runSeed(results); used {
+		doc.Seed = &seed
+	}
 	for _, r := range results {
 		raw, err := JSON(r)
 		if err != nil {

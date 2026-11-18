@@ -122,6 +122,12 @@ func scenarioSummary(result *scenario.Result) string {
 func scenarioSection(result *scenario.Result) htmlSection {
 	x := redactorFor(result)
 	sec := htmlSection{Heading: result.Scenario.Title, Note: result.Scenario.Description}
+	for _, v := range result.Variables {
+		sec.Rows = append(sec.Rows, htmlRow{Status: "INFO", Title: "variable " + v.Name, Meta: x.variable(v)})
+	}
+	if result.SetupError != "" {
+		sec.Rows = append(sec.Rows, htmlRow{Status: "ERR", Title: "scenario could not start", Lines: []htmlLine{{Mark: "!", Text: x.text(result.SetupError)}}})
+	}
 	for _, sr := range result.Steps {
 		row := htmlRow{Title: sr.Label}
 		switch {
@@ -134,6 +140,9 @@ func scenarioSection(result *scenario.Result) htmlSection {
 		}
 		if sr.Response != nil {
 			row.Meta = fmt.Sprintf("%d · %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
+		}
+		if sr.Attempts > 1 {
+			row.Meta += fmt.Sprintf(" · %d attempts", sr.Attempts)
 		}
 		if sr.Error != "" {
 			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + x.text(sr.Error)})
@@ -174,12 +183,19 @@ func opLines(ops []openapi.CoveredOperation) []string {
 // HTML returns a self-contained, human-readable HTML report for a scenario run.
 // Pass a non-nil cov to append a spec coverage section. Extracted variable values
 // are deliberately left out so the file is safe to share as a CI artifact.
+func withSeed(summary string, seed int64, used bool) string {
+	if !used {
+		return summary
+	}
+	return fmt.Sprintf("%s  ·  seed %d", summary, seed)
+}
+
 func scenarioDoc(result *scenario.Result, cov *openapi.ScenarioCoverageResult) htmlDoc {
 	doc := htmlDoc{
 		Title:    result.Scenario.Title,
 		Subtitle: "Scenario run",
 		Passed:   result.Passed,
-		Summary:  scenarioSummary(result),
+		Summary:  withSeed(scenarioSummary(result), result.Seed, result.UsedRandomness),
 		Sections: []htmlSection{scenarioSection(result)},
 	}
 	if cov != nil {
@@ -229,8 +245,9 @@ func multiDoc(title string, results []*scenario.Result, total time.Duration, cov
 		doc.Sections = append(doc.Sections, coverageSection(heading, c.Result))
 	}
 	doc.Passed = passedScenarios == len(results)
-	doc.Summary = fmt.Sprintf("%d/%d scenarios passed  (%d steps, %d/%d assertions passed)  %dms",
-		passedScenarios, len(results), steps, assertsPassed, assertsTotal, total.Milliseconds())
+	seed, used := runSeed(results)
+	doc.Summary = withSeed(fmt.Sprintf("%d/%d scenarios passed  (%d steps, %d/%d assertions passed)  %dms",
+		passedScenarios, len(results), steps, assertsPassed, assertsTotal, total.Milliseconds()), seed, used)
 	return doc
 }
 
@@ -246,6 +263,8 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 	}
 	doc.Passed = failed == 0
 
+	x := newRedactor(result.Secrets, false)
+	doc.Subtitle = x.text(doc.Subtitle)
 	ops := htmlSection{Heading: "Operations"}
 	for _, op := range result.Operations {
 		row := htmlRow{Title: op.Method + " " + op.Path}
@@ -261,13 +280,13 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 			row.Meta = fmt.Sprintf("%d · %dms", op.StatusCode, op.DurationMs)
 		}
 		if op.Error != "" {
-			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + op.Error})
+			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + x.text(op.Error)})
 		}
 		for _, v := range op.RequestViolations {
-			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: "request: " + v.Error()})
+			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: "request: " + x.text(v.Error())})
 		}
 		for _, v := range op.Violations {
-			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: v.Error()})
+			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: x.text(v.Error())})
 		}
 		ops.Rows = append(ops.Rows, row)
 	}
@@ -303,7 +322,7 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 				row.Status = "SKIP"
 			case p.Error != "":
 				row.Status = "ERR"
-				row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + p.Error})
+				row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + newRedactor(neg.Secrets, false).text(p.Error)})
 			case p.Passed():
 				row.Status = "PASS"
 				row.Meta = fmt.Sprintf("%d · %dms", p.StatusCode, p.DurationMs)

@@ -16,16 +16,63 @@ var varPattern = regexp.MustCompile(`\{\{\s*([^}]+?)\s*\}\}`)
 // extractions) can be added with Set and take precedence.
 type Resolver struct {
 	vars map[string]string
+	eng  *Engine
+	errs []error
 }
 
+// NewResolver builds a resolver whose dynamic values ({{$guid}}, {{$randomInt 1 9}}, …) use a
+// fresh random seed.
 func NewResolver(env *domain.Environment) *Resolver {
-	r := &Resolver{vars: make(map[string]string)}
+	return NewResolverWith(env, nil)
+}
+
+// NewResolverWith is NewResolver with a chosen engine (and so a chosen seed). A nil engine means
+// a fresh random one. Environment values are evaluated here, once, in order: a value may use
+// functions and the environment variables defined before it.
+func NewResolverWith(env *domain.Environment, eng *Engine) *Resolver {
+	if eng == nil {
+		eng = NewEngine(RandomSeed())
+	}
+	r := &Resolver{vars: make(map[string]string), eng: eng}
 	if env != nil {
 		for _, v := range env.Variables {
-			r.vars[v.Name] = ExpandEnv(v.Value)
+			r.vars[v.Name] = r.evaluate(ExpandEnv(v.Value))
 		}
 	}
 	return r
+}
+
+// Get returns the current value of a variable.
+func (r *Resolver) Get(name string) (string, bool) {
+	v, ok := r.vars[name]
+	return v, ok
+}
+
+// Engine returns the engine behind the resolver's dynamic values.
+func (r *Resolver) Engine() *Engine { return r.eng }
+
+// Define evaluates scenario variables in order and makes them available as {{name}}. Each value is
+// generated once, here, and stays the same for the rest of the run. A value may use functions,
+// environment variables and the scenario variables defined before it.
+func (r *Resolver) Define(vars []domain.EnvironmentVariable) {
+	for _, v := range vars {
+		r.vars[v.Name] = r.evaluate(ExpandEnv(v.Value))
+	}
+}
+
+// TakeErrors returns the dynamic-value errors collected since the last call (an unknown
+// function, a bad argument, …) and clears them. A value that failed is left as written.
+func (r *Resolver) TakeErrors() []error {
+	errs := r.errs
+	r.errs = nil
+	return errs
+}
+
+func (r *Resolver) evaluate(s string) string {
+	if !strings.Contains(s, "{{") {
+		return s
+	}
+	return r.Interpolate(s)
 }
 
 // Set adds or overrides a runtime variable (e.g. extracted from a scenario step).
@@ -38,6 +85,14 @@ func (r *Resolver) Set(name, value string) {
 func (r *Resolver) Interpolate(s string) string {
 	return varPattern.ReplaceAllStringFunc(s, func(match string) string {
 		name := strings.TrimSpace(match[2 : len(match)-2])
+		if strings.HasPrefix(name, "$") {
+			out, err := r.eng.CallWith(name, r.Get)
+			if err != nil {
+				r.errs = append(r.errs, err)
+				return match
+			}
+			return out
+		}
 		if val, ok := r.vars[name]; ok {
 			return val
 		}

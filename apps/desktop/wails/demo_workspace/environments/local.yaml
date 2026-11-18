@@ -13,3 +13,5 @@ variables:
     value: "demo"
   - name: userId
     value: "1"
+  - name: runId
+    value: "demo-{{$randomString 6}}"

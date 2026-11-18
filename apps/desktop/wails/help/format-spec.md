@@ -15,7 +15,39 @@ headers:
     value: "Bearer {{token}}"
 ```
 
-Variables are resolved from the active environment first, then from values extracted by prior scenario steps. Unresolved references are left as-is.
+Variables are resolved in this order: values extracted by prior scenario steps, then the scenario's own `variables`, then the active environment. Unresolved references are left as-is.
+
+### Dynamic values
+
+`{{$name arg arg key=value}}` generates a value each time it is evaluated. Arguments are separated by spaces; use quotes for text with spaces (`format="MMM d, yyyy"`).
+
+| Function | Result |
+|---|---|
+| `$guid`, `$uuid` | random UUID v4 |
+| `$randomString [length]` | letters and digits (default 8) |
+| `$randomAlpha [length]` / `$randomHex [length]` | letters only / hex digits |
+| `$randomChoice a b c` | one of the given values |
+| `$randomInt [min] [max]` | whole number (default 0–1000) |
+| `$randomFloat [min] [max] [decimals=2]` | decimal number (default 0–1) |
+| `$randomBool` | `true` or `false` |
+| `$timestamp` / `$timestampMs` | Unix time in seconds / milliseconds |
+| `$isoTimestamp` | current time, ISO 8601 (UTC) |
+| `$date`, `$datetime`, `$time` | current date / date and time / time of day |
+| `$calc <expression>` | arithmetic, see below |
+| `$randomEmail`, `$randomFirstName`, `$randomLastName`, `$randomFullName`, `$randomPhone`, `$randomWord` | small built-in fake-data set (emails use `example.com`, phones a fictional `555-01xx` line) |
+
+`$date`, `$datetime`, `$time` and `$isoTimestamp` accept an offset (`+7d`, `-2h`; units `s m h d w M y`), `format=` (`yyyy-MM-dd`, `HH:mm`, or `iso`, `rfc1123`, `unix`, `unixms`) and `tz=` (an IANA name such as `Europe/Berlin`; default UTC). Example: `{{$date +7d format="yyyy-MM-dd"}}`.
+
+`$calc` evaluates numbers, variable names, `+ - * / %`, parentheses and `round(x, n)`, `floor`, `ceil`, `abs`, `min`, `max`; for example `{{$calc price * quantity}}` or `{{$calc round(total / 3, 2)}}`. Variable names are written bare (not in braces); their values must be numbers. Integers stay integers (`10 / 5` is `2`), decimals are trimmed (`0.1 * 3` is `0.3`). Division by zero or a non-numeric variable is an error. Nothing else can be called.
+
+Dynamic values also work in environment variable values and in assertion `expected`, `path` and `name`. An unknown function or bad argument is an error (`clrsig validate` finds it; `clrsig run` refuses to send anything).
+
+**When a value is generated**
+
+- A scenario `variables` entry is generated **once per scenario run**; `{{email}}` is identical in every step and assertion of that run.
+- An inline call (`{{$guid}}` in a URL) is generated **every time it appears**, so two inline calls differ.
+- An environment variable that uses a function is generated **once per command** and shared by all scenarios run by that command (the desktop app generates it per scenario run).
+- Random values come from a seed. The report prints it (`seed: N`) when random values were used; `clrsig run --seed N` (or `CLRSIG_SEED=N`) replays the same values. Date and time functions read the clock and are not affected by the seed.
 
 ---
 
@@ -62,6 +94,7 @@ auth:                        # optional — alternative to manual auth headers
   # location: header          # header | query
 
 timeout: 5s                  # optional — per-request timeout as a duration string (500ms, 5s, 1m30s); omit to use the global default
+followRedirects: false       # optional — false returns a 3xx response as it is instead of following it (default true)
 ```
 
 ### Notes
@@ -70,6 +103,7 @@ timeout: 5s                  # optional — per-request timeout as a duration st
 - `body.type: none` omits the body entirely; omitting the `body` block has the same effect.
 - `Content-Type` is set automatically from `body.type` when not explicitly provided.
 - `timeout` is a duration string such as `500ms`, `5s` or `1m`. Request files do **not** accept `timeoutMs`; an unknown field is silently ignored, so the timeout would not apply.
+- `followRedirects: false` makes the client return the `301`/`302`/`307`/`308` response itself (with its `Location` header) instead of following it, so a redirect that the OpenAPI spec declares can be asserted and validated. Leave it out for the normal behaviour. It is also accepted on a scenario step's `request` and on a bundle request.
 - `body.type: multipart` sets its own `multipart/form-data` Content-Type with a generated boundary. `content` is a JSON array of fields: `n` is the field name, `t` is `text` or `file`, and `v` is the text value or, for files, an absolute path.
 
   ```yaml
@@ -93,6 +127,13 @@ description: "Verifies CRUD operations for /users. Run after any changes to the 
                              # optional — when to run it and what it proves
 
 specFile: "/absolute/path/to/openapi.yaml"  # optional — absolute path or http(s) URL of an OpenAPI 3.x spec; enables schema assertions by operationId
+
+variables:                   # optional — scenario variables, generated once per run, in order
+  - name: email              # no spaces, braces or $
+    value: "user-{{$randomString 10}}@example.com"   # may use functions, environment variables and earlier variables
+  - name: apiToken
+    value: "{{token}}"
+    secret: true             # optional — masked as *** in reports
 
 steps:
   - label: Login             # required — short action phrase ("Login", "Create order", not "Step 1")
@@ -131,11 +172,10 @@ steps:
     disabled: false          # optional — true skips this step without counting as failure
     validateSpec: true       # optional — with specFile set, validate this step's response against the spec (default true); false opts the step out
 
-    # Accepted and saved, but NOT yet applied when a scenario runs:
-    timeoutMs: 0             # optional — per-step timeout in ms
-    retry:                   # optional — retry policy
-      maxAttempts: 3
-      delayMs: 500
+    timeoutMs: 0             # optional — per-step timeout in ms; overrides the request's own timeout
+    retry:                   # optional — re-send the step after a network error or a 5xx response
+      maxAttempts: 3         # total attempts, 1–10 (1 = no retry)
+      delayMs: 500           # wait between attempts, at most 60000
 
   - label: Create user
     notes: "POST to /users. Extracts the new user's ID for use in later steps."
@@ -202,9 +242,12 @@ steps:
 | `continue` | Run the next step regardless of this step's outcome |
 | `skip` | Skip this step if the previous step failed |
 
-### Step options that are not applied yet
+### Step timeout and retry
 
-`timeoutMs` and `retry` are part of the file format: they are parsed, preserved on save and editable in the app. The scenario runner does not use them yet, so a step runs once with the request's own `timeout` (or the global default). Do not rely on them to change run behaviour.
+- `timeoutMs` overrides the request's `timeout` (and the global default) for that step. `0` or omitted means no override.
+- `retry` re-sends the step when the attempt fails at the network level (connection refused, timeout) or the server answers `5xx`. `maxAttempts` is the **total** number of attempts (so `3` means one try and up to two retries); `delayMs` is the wait between them.
+- A failed assertion, a `4xx` response or a spec violation never triggers a retry: those are real results and retrying would hide them. Assertions, extractions and spec validation run on the last attempt only.
+- Reports show the attempt count when a step was re-sent (`(3 attempts)`; `attempts` in JSON). A step counts once in totals and coverage however many attempts it took.
 
 ### validateSpec
 
@@ -387,7 +430,7 @@ scenarios:                         # optional — one or more
 
 ### Import behaviour
 
-- The bundle is validated before anything is written. Any error stops the import; warnings (for example a `{{variable}}` that no environment defines, or `retry` / `timeoutMs`, which are not applied yet) do not.
+- The bundle is validated before anything is written. Any error stops the import; warnings (for example a `{{variable}}` that no environment defines) do not. A `retry.maxAttempts` above 10 or a negative `timeoutMs` is an error.
 - Files that already exist can be skipped, overwritten, or kept by saving the new file as `name-2.yaml`. When a request is renamed this way, scenarios that refer to it are updated to match.
 - Files are written atomically. The result is ordinary request, scenario and environment files; the bundle itself is not stored.
 - A bundle may be YAML or JSON. Text pasted from a chat window may include a surrounding ``` code fence, which is ignored.
@@ -401,6 +444,22 @@ scenarios:                         # optional — one or more
 - `file` is the path under its folder without the extension, for example `auth/login`. Scenario `requestRef`s that point at an exported request are rewritten to that name, so the bundle imports cleanly into another workspace.
 - If every scenario uses the same `specFile`, it is written once at the top of the bundle.
 - **Secret values are replaced with `CHANGE_ME`** so the file is safe to share or paste into a chat. The workspace itself is never changed.
+
+---
+
+## Conform Baseline File
+
+Written by `clrsig conform --write-baseline <file>` and read by `--baseline <file>`. It lists the violations a team has accepted for now. YAML or JSON by file extension (`.json` is JSON). Unknown fields are errors.
+
+```yaml
+schemaVersion: "1"           # required — always "1" (quoted string); a newer version is refused
+violations:                  # sorted, no duplicates, no timestamps (so the file only changes when violations do)
+  - operation: "GET /users/{id}"   # required — method and path template from the spec
+    kind: response                 # required — request | response | error | probe
+    detail: "/id: property is missing"   # optional — field and rule; empty for an error; "<probe kind>: <description>" for a probe
+```
+
+A violation is identified by `operation` + `kind` + `detail`. Secret values are replaced with `***`.
 
 ---
 

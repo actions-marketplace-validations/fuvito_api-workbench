@@ -67,8 +67,12 @@ type redactor struct {
 }
 
 func redactorFor(r *scenario.Result) redactor {
-	x := redactor{reveal: r.RevealExtracted}
-	for _, s := range r.Secrets {
+	return newRedactor(r.Secrets, r.RevealExtracted)
+}
+
+func newRedactor(secrets []string, reveal bool) redactor {
+	x := redactor{reveal: reveal}
+	for _, s := range secrets {
 		if len(s) >= minSecretLen {
 			x.secrets = append(x.secrets, s)
 		}
@@ -86,6 +90,15 @@ func (x redactor) text(s string) string {
 		}
 	}
 	return s
+}
+
+// variable returns a scenario variable's value as it may appear in a report: a variable marked
+// secret is never shown.
+func (x redactor) variable(v scenario.ResolvedVariable) string {
+	if v.Secret {
+		return Redacted
+	}
+	return x.text(v.Value)
 }
 
 // extracted returns the extracted variables as they may appear in a report.

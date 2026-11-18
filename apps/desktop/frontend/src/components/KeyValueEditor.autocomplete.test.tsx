@@ -121,3 +121,19 @@ describe('KeyValueEditor — variable autocomplete', () => {
     expect(screen.queryByRole('button', { name: 'baseUrl' })).not.toBeInTheDocument()
   })
 })
+
+describe('KeyValueEditor — dynamic function autocomplete', () => {
+  afterEach(async () => (await import('@/lib/dynamicFunctions')).setDynamicFunctions([]))
+
+  it('lists functions with their description and inserts a working example', async () => {
+    const { setDynamicFunctions } = await import('@/lib/dynamicFunctions')
+    setDynamicFunctions([{ name: 'randomInt', usage: '$randomInt [min max]', description: 'Random whole number', example: '$randomInt 1 100' }])
+    const seen: KVPair[][] = []
+    render(<Harness envVarNames={names} onChange={p => seen.push(p)} />)
+    type('{{$ran')
+    const option = screen.getByRole('button', { name: /\$randomInt/ })
+    expect(option).toHaveTextContent('Random whole number')
+    fireEvent.mouseDown(option)
+    expect(seen[seen.length - 1][0].value).toBe('{{$randomInt 1 100}}')
+  })
+})

@@ -406,3 +406,47 @@ Do not implement or stub any of these without explicit user direction.
 - **Desktop:** the Contracts export builds nothing in the frontend any more (`ScenarioService.ExportCoverageReport` renders with the same Go code as the CLI); Run Results tab gets **Export report** (`ExportRunReport`: html, junit, json, markdown, text). "Run folder" already existed.
 - **Catalog:** `fail-on` is offered in the builder; `report`, `var` and `against` are in the catalog as deferred (repeatable or single-positional modes the builder cannot express yet).
 
+
+### 2026-11-17 — Dynamic values and scenario variables, phase 1 (design: `docs/enhancements/2026-11-17-dynamic-values.md`)
+
+- **Syntax:** `{{$function arg key=value}}` next to `{{variable}}`. Functions: `$guid`/`$uuid`, `$randomString/Alpha/Hex/Choice`, `$randomInt/Float/Bool`, `$timestamp/$timestampMs/$isoTimestamp`, `$date/$datetime/$time` (offsets, `format=`, `tz=`). Evaluated by the Go core (`packages/core/variables`: `Engine`, `Check`, `ResolveEnvironment`).
+- **Scenario `variables:`** (additive optional field, `schemaVersion` stays "1"; older clrsig rejects bundles containing it): generated once per scenario run, in order, may use functions, environment values and earlier variables; `secret: true` masks in reports.
+- **Scopes:** extracted > scenario variables > environment. Environment values with functions are generated once per command (CLI) and shared by all scenarios; inline calls are generated at every occurrence.
+- **Assertions:** `expected` (strings), `path` and `name` are now interpolated (previously never were).
+- **Seed:** `clrsig run|bundle run --seed N` or `CLRSIG_SEED`; each scenario gets its own stream derived from the seed and its path, so values do not depend on run order. Reports show the seed (text, json, junit property, html, markdown) only when random values were used, plus generated scenario variables.
+- **Validation:** unknown function, bad arguments/offsets/time zones, duplicate, self-referencing or out-of-order variables are errors in `clrsig validate`, bundle import and before `clrsig run` sends anything; a scenario that fails to start reports a setup error.
+- **Importer:** Postman `$randomUUID`, `$randomBoolean`, `$randomAlphaNumeric` etc. are mapped; unsupported names are left as written and reported as warnings (stderr).
+- **Desktop:** scenario `variables` survive visual-editor saves; editing UI, autocomplete and showing the seed in run results are phase 3. The desktop generates environment functions per scenario run.
+- **Docs:** format spec, user guide. **Not yet:** `--seed` for `conform`, builder UI for `seed` beyond the catalog entry.
+
+### 2026-11-17 — Dynamic values, phase 2
+
+- **`$calc <expression>`:** own evaluator in `variables/calc.go` (numbers, bare variable names, `+ - * / %`, parentheses, `round floor ceil abs min max`); integers stay integers, floats trimmed, errors for division by zero, unknown or non-numeric variables; `validate` checks syntax without values. No dependency, cannot call anything else.
+- **Fake data:** `$randomEmail`, `$randomFirstName`, `$randomLastName`, `$randomFullName`, `$randomPhone`, `$randomWord` from a small embedded set, following the seed. Postman names are mapped by the importer.
+
+### 2026-11-17 — Dynamic values, phase 3 (desktop) and AI prompt
+
+- **Function catalog from the core:** `variables.Functions()` (name, usage, description, example; a test checks every function is documented and its example validates) served by `ScenarioService.ListDynamicFunctions`; the frontend loads it once at startup (`lib/dynamicFunctions.ts`).
+- **Autocomplete:** the existing `{{` suggestions (URL field, key/value editors, variable values) now also list `$` functions with their description and insert a working example.
+- **Variables section** in the scenario editor (name, value with autocomplete, secret lock, add/remove); saved through the existing YAML serializer.
+- **Run result:** `ScenarioResultIO` carries `seed` (only when random values were used), generated `variables` (secret values masked) and the setup error; the scenario view shows them with the `clrsig run --seed N` replay command.
+- **AI prompt** now teaches scenario variables, dynamic functions and interpolated assertions (guard test updated).
+- Playwright: 2 new tests; the 5 `smoke` tests still need a live `wails dev` server.
+
+
+### 2026-11-17 — Postman gap review items A–E (design: `docs/enhancements/2026-11-17-postman-gap-review.md`)
+
+- **B — redirect control:** request `followRedirects: false` returns a 3xx as it is (default unchanged); request files, scenario step requests, bundles, desktop request editor ("No redirects") and step editor. Finding (not changed): the response validator treats an undeclared status code as "nothing to validate".
+- **A — `retry` and `timeoutMs` are real:** the runner applies step `timeoutMs` (overrides the request timeout) and `retry` (total attempts; re-sent after a network error or 5xx only, never after a failed assertion; max 10 attempts, delay up to 60 s, validated). `StepResult.Attempts` is shown in text, JSON, HTML, Markdown and the desktop; the "not applied" warnings and docs are gone.
+- **D — OAuth2:** the client-credentials scenario pattern is documented (user guide, AI prompt) and covered by an end-to-end CLI test; no dedicated auth type.
+- **E — client certificates (mTLS):** `executor.TLSFiles` (cert, key, extra CA; paths only, `${NAME}` expanded at run time); Settings panel fields; `--client-cert`, `--client-key`, `--ca-cert` (and `CLRSIG_CLIENT_CERT`, `CLRSIG_CLIENT_KEY`, `CLRSIG_CA_CERT`) on every CLI command that sends requests, validated before anything is sent. Encrypted private keys are not supported.
+- **C — conform baseline (backlog 11):** `conform --write-baseline <file>` records violations, `--baseline <file>` fails only on new ones and reports fixed ones. New versioned file format (`schemaVersion: "1"`, documented in `format-spec.md`); violation identity = operation + kind + detail; no timestamps (stable diffs); secrets redacted; summary on stderr so machine formats stay pure.
+
+### 2026-11-17 — Demo workspace: dynamic values
+
+- `demo_workspace/scenarios/4-dynamic-values/` (unique-users, function-playground, calculations, dates-and-offsets), `requests/8-dynamic-values/echo-dynamic.yaml`, and a `runId` environment function in `environments/local.yaml`. A Go test runs every scenario five times (each run generates different values) and sends the request twice to check the values differ.
+
+### 2026-11-17 — Scenario steps show the request and the response
+
+- `StepResultIO` carries the request as sent (`requestMethod`, `requestUrl` with query parameters, `requestHeaders`, `requestBody`), built by `exchangeRequest` with credentials masked (sensitive header/parameter names, the auth block, and every secret value). New `StepExchange` component: blue Request and green Response sections (collapsible; response headers closed by default), shown for the selected step in the scenario editor and for each step in the run log.
+

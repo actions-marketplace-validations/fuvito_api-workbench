@@ -343,7 +343,59 @@ steps:
 |---|---|
 | `title` | Display name shown in the UI and reports. |
 | `description` | Optional prose describing the overall scenario purpose. |
+| `variables` | Optional list of scenario variables (`name`, `value`, optional `secret`). Each is generated once per run and can use dynamic values such as `{{$randomString 10}}`. See "Dynamic values" below. |
 | `specFile` | Path to an OpenAPI spec (relative to the workspace). When set, Clear Signal maps each executed request to the spec's operations and accumulates coverage data visible in the **Contracts** tab. |
+
+### Dynamic values and scenario variables
+
+Tests do not have to use fixed data. `{{$guid}}`, `{{$randomString 10}}`, `{{$randomInt 1 100}}`, `{{$randomBool}}` and date functions such as `{{$date +7d}}` generate a fresh value when the request is sent. They work in URLs, headers, bodies, environment values and assertion values.
+
+To use one generated value in several places, put it in the scenario's `variables`:
+
+```yaml
+variables:
+  - name: email
+    value: "user-{{$randomString 10}}@example.com"
+steps:
+  - label: Create user
+    request: {method: POST, url: "{{baseUrl}}/users", body: {type: json, content: '{"email": "{{email}}"}'}}
+  - label: Fetch user
+    request: {method: GET, url: "{{baseUrl}}/users?email={{email}}"}
+    assertions:
+      - {type: jsonpath, path: "$[0].email", operator: eq, expected: "{{email}}"}
+```
+
+`{{email}}` is the same in both steps; two inline `{{$guid}}` calls are different. A function used in an environment variable is generated once per `clrsig` command. Random values come from a seed that the report shows; `clrsig run --seed 12345` (or `CLRSIG_SEED`) replays a run exactly. `{{$calc price * quantity}}` does arithmetic, and `{{$randomEmail}}`, `{{$randomFullName}}` and similar give realistic fake data. In the desktop app, the **Variables** section under a scenario's description edits these (the lock marks a value as secret, so reports mask it). Typing `{{` in a URL, header, body or variable value lists your variables and every dynamic function with a one-line description; picking a function inserts a working example to adjust. After a run, the scenario shows the generated values and, when random values were used, the seed that replays them with `clrsig run --seed`; a scenario that cannot start (for example an unknown function) shows the reason instead of running. To experiment, start the Demo Server: its workspace has a `4-dynamic-values` scenario folder (unique users, a playground that echoes every function, calculations, dates and offsets) and a `8-dynamic-values` request, all safe to edit and run repeatedly. The complete function list is in the Format Spec tab.
+
+### Authenticating with OAuth2 (client credentials)
+
+There is no separate OAuth2 auth type: for service-to-service APIs a scenario does the same thing in two steps. The first step asks the token endpoint for a token and extracts it; later steps use it as a bearer token.
+
+```yaml
+steps:
+  - label: Get token
+    request:
+      method: POST
+      url: "{{authUrl}}/oauth/token"
+      body:
+        type: form-urlencoded
+        content: "grant_type=client_credentials&client_id={{clientId}}&client_secret={{clientSecret}}"
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+    extractions:
+      - {name: accessToken, source: jsonpath, path: $.access_token}
+  - label: Call the API
+    request:
+      method: GET
+      url: "{{baseUrl}}/me"
+      auth:
+        type: bearer
+        token: "{{accessToken}}"
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+```
+
+Keep the client secret out of the file: in the environment, give `clientSecret` the value `${CLIENT_SECRET}` with `secret: true`, and set `CLIENT_SECRET` in your CI secrets. Reports mask secret environment values, and an extracted value whose name looks secret (`accessToken`) is masked too. The token is fetched once per scenario run; put the token step first in each scenario that needs it. Values that contain `&`, `=` or other special characters must be URL-encoded in a form body. Flows that need a browser (authorization code, PKCE) are not supported: paste a token into an environment variable instead.
 
 ### Step fields
 
@@ -357,7 +409,9 @@ steps:
 | `failPolicy` | What to do if an assertion fails: `stop` (default — skips remaining steps), `continue` (keeps going), `skip` (skips this step if a previous one failed). |
 | `disabled` | `true` skips the step without counting it as a failure. |
 | `validateSpec` | With `specFile` set, validate this step's response against the spec (default `true`). `false` opts the step out. |
-| `timeoutMs`, `retry.maxAttempts`, `retry.delayMs` | Accepted, saved and editable, but **not applied yet** — a step runs once, using the request's own `timeout` or the global default. Do not rely on them to change run behaviour. |
+| `timeoutMs` | Timeout for this step in milliseconds; overrides the request's own `timeout` and the global default. |
+| `retry.maxAttempts`, `retry.delayMs` | Re-send the step after a network error or a `5xx` response, up to `maxAttempts` attempts in total (1–10) with `delayMs` between them (at most 60000). A failed assertion or a `4xx` is never retried. Reports show the attempt count. |
+| request `followRedirects: false` | Return a `3xx` response as it is instead of following it, so a redirect declared in the spec can be checked. In the app: **No redirects** next to the timeout, or **Don't follow redirects** in a step's advanced options. |
 
 ### Assertion types
 
@@ -390,6 +444,8 @@ steps:
 ### Running a scenario
 
 Open a scenario tab and click **Run** in the scenario header bar. While the scenario is running the button changes to **Stop** (amber square icon) — click it at any time to cancel the in-flight run. Steps that have already completed are preserved in the results view; the remaining steps are marked cancelled.
+
+After a run, select a step to see exactly what happened: a blue **Request** section shows the request as it was sent (the URL with its query parameters, the headers and the body, with variables and dynamic values filled in) and a green **Response** section shows the status, time, headers and body that came back. Credentials are masked in the request: `Authorization`, cookies, API keys, tokens and any value of a secret variable appear as `***`. The same two sections appear for each step in the run log.
 
 ### Running all scenarios (Run All)
 
@@ -523,6 +579,7 @@ Runs scenario files and prints the results. Give it one file, several, or a fold
 clrsig run ./scenarios/user-lifecycle.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --env ./environments/dev.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --format json
+clrsig run ./scenarios/user-lifecycle.yaml --seed 12345   # replay the same random values
 clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --workspace .
 
 # every scenario in a folder and its sub-folders
@@ -554,6 +611,16 @@ clrsig run ./scenarios --env ./environments/ci.yaml
 | `--var` | (none) | `name=value`, repeatable: set or override one environment variable for this run only. Put secrets in environment variables, not here (command lines are visible to other processes). |
 | `--report` | (none) | `format=file`, repeatable: also write a report in another format from the same run. See [Several reports from one run](#several-reports-from-one-run). |
 | `--show-extracted` | off | Show extracted values whose names look secret. See [Secrets in reports](#secrets-in-reports). |
+
+### Client certificates (mutual TLS)
+
+For APIs that require a client certificate, every command that sends requests (`run`, `request`, `conform`, `bundle run`, `mcp`) accepts:
+
+```bash
+clrsig run ./scenarios --client-cert client.pem --client-key client.key --ca-cert private-ca.pem
+```
+
+or the environment variables `CLRSIG_CLIENT_CERT`, `CLRSIG_CLIENT_KEY` and `CLRSIG_CA_CERT` (a flag wins). Give paths, not contents: in CI, write the certificate from your secret store to a temporary file first. A wrong or half-configured path stops the command before any request is sent (exit 2). The key must be unencrypted PEM.
 
 ### Exit codes
 
@@ -713,8 +780,21 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--format`, `-f` / `--output`, `-o` | `text`, `json`, `junit`, `html` or `markdown`; write the report to a file. |
 | `--report` | `format=file`, repeatable: also write a report in another format from the same run. |
 | `--var` | `name=value`, repeatable: set or override an environment variable for this run. |
+| `--write-baseline` | Record today's violations in a file (YAML, or JSON for a `.json` name) and exit `0`. |
+| `--baseline` | Accept the violations recorded in that file: only **new** ones fail the run, and fixed ones are reported. |
 
 Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error.
+
+#### Adopting `conform` on an API that already has violations
+
+Pointing `conform` at a long-lived API often reports many violations at once. Record them, commit the file, and let CI fail only on **new** ones:
+
+```bash
+clrsig conform openapi.yaml -b http://localhost:8080 --write-baseline conform-baseline.yaml   # once
+clrsig conform openapi.yaml -b http://localhost:8080 --baseline conform-baseline.yaml         # in CI
+```
+
+The baseline summary (`Baseline: 12 known, 1 new, 3 fixed`, with each new and fixed violation) is printed to stderr, so `--format json` on stdout stays machine-readable. When violations are fixed, run `--write-baseline` again to remove them, so quality can only improve; a regression of a fixed one then fails. A violation is identified by its operation (`GET /users/{id}`), its kind (`request`, `response`, `error`, `probe`) and the field and rule that broke, not by ids or timestamps, so the file does not change between runs. The JUnit/HTML/JSON reports still list every violation; only the exit code follows the baseline. Secrets never appear in the file.
 
 ### `clrsig diff` and `clrsig impact`
 
@@ -874,6 +954,8 @@ Open via the gear icon at the bottom of the Activity Rail (the icon bar on the f
 | **Default timeout** | Request timeout in milliseconds (applies when the per-request timeout is 0). |
 | **Proxy URL** | HTTP/HTTPS proxy for all outbound requests (e.g. `http://proxy:8080`). Leave empty to use the system proxy. |
 | **TLS skip verify** | Disable certificate verification. Use only for local development with self-signed certificates. |
+| **Client certificate file**, **Client key file** | Mutual TLS: the PEM certificate and private key sent to servers that require a client certificate. Only the file *paths* are stored (a `${NAME}` reference is expanded when a request is sent); the key must not be password-protected. Both are needed together. |
+| **CA certificate file** | A PEM file of extra certificate authorities to trust (added to the system ones), for servers signed by a private CA. |
 | **Anonymous telemetry** | Opt-in usage counters (off by default). No request contents or personal data. Same switch as `clrsig telemetry enable`. |
 
 Changes preview immediately. Click **Save** to persist; **Cancel** reverts to the last saved values.

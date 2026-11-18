@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { inputCls as baseInputCls } from '@/lib/styles'
 import type { KVPair } from '@/types'
+import { suggest } from '@/lib/dynamicFunctions'
 
 type Props = {
   pairs: KVPair[]
@@ -22,16 +23,15 @@ type VarValueInputProps = {
   envVarNames?: string[]
 }
 
-function VarValueInput({ value, onChange, placeholder, envVarNames }: VarValueInputProps) {
+export function VarValueInput({ value, onChange, placeholder, envVarNames }: VarValueInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [acPartial, setAcPartial] = useState<string | null>(null)
   const [acIndex, setAcIndex] = useState(0)
 
-  const acMatches = useMemo(() => {
-    if (acPartial === null || !envVarNames?.length) return []
-    const q = acPartial.toLowerCase()
-    return envVarNames.filter(n => n.toLowerCase().includes(q))
-  }, [acPartial, envVarNames])
+  const acMatches = useMemo(
+    () => (acPartial === null ? [] : suggest(acPartial, envVarNames)),
+    [acPartial, envVarNames],
+  )
 
   function checkAc(el: HTMLInputElement, v: string) {
     const pos = el.selectionStart ?? v.length
@@ -63,7 +63,7 @@ function VarValueInput({ value, onChange, placeholder, envVarNames }: VarValueIn
       if (e.key === 'ArrowDown') { e.preventDefault(); setAcIndex(i => Math.min(i + 1, acMatches.length - 1)); return }
       if (e.key === 'ArrowUp') { e.preventDefault(); setAcIndex(i => Math.max(i - 1, 0)); return }
       if (e.key === 'Tab' || e.key === 'Enter') {
-        if (acMatches[acIndex]) { e.preventDefault(); insertVar(acMatches[acIndex]); return }
+        if (acMatches[acIndex]) { e.preventDefault(); insertVar(acMatches[acIndex].insert); return }
       }
       if (e.key === 'Escape') { e.preventDefault(); setAcPartial(null); return }
     }
@@ -84,17 +84,18 @@ function VarValueInput({ value, onChange, placeholder, envVarNames }: VarValueIn
       />
       {acPartial !== null && acMatches.length > 0 && (
         <ul className="absolute top-full left-0 right-0 z-50 bg-[var(--color-card)] border border-[var(--color-border)] rounded shadow-lg mt-0.5 max-h-40 overflow-auto py-0.5">
-          {acMatches.map((name, i) => (
-            <li key={name}>
+          {acMatches.map((item, i) => (
+            <li key={item.label}>
               <button
                 type="button"
-                onMouseDown={e => { e.preventDefault(); insertVar(name) }}
+                onMouseDown={e => { e.preventDefault(); insertVar(item.insert) }}
                 className={cn(
                   'w-full text-left px-3 py-1 text-xs font-mono transition-colors',
                   i === acIndex ? 'bg-[var(--color-accent)]/15 text-[var(--color-foreground)]' : 'text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]'
                 )}
               >
-                {name}
+                {item.label}
+                {item.hint && <span className="ml-2 font-sans text-[10px] opacity-70">{item.hint}</span>}
               </button>
             </li>
           ))}

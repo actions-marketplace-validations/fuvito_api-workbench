@@ -72,6 +72,14 @@ var catalog = []Command{
 				Group:    GroupAdvanced,
 			},
 			{
+				Name: "seed", Kind: KindInt, Default: "0",
+				Label: "Seed for random values",
+				Help: "Random and dynamic values ({{$randomInt 1 9}}, {{$guid}}, …) are generated from a seed. Leave this at 0 for a " +
+					"fresh random seed each run (it is printed in the report); give a number to replay a run exactly.",
+				Example: "12345",
+				Group:   GroupAdvanced,
+			},
+			{
 				Name: "show-extracted", Kind: KindBool, Default: "false",
 				Label: "Show secret-looking extracted values",
 				Help: "Reports hide extracted values whose names look secret (token, password, key, session …) and any " +
@@ -185,6 +193,20 @@ var catalog = []Command{
 				Label: "Stop at the first failure",
 				Help:  "Stop after the first violation or execution error instead of checking every operation.",
 				Group: GroupAdvanced,
+			},
+			{
+				Name: "baseline", Kind: KindString,
+				Label:   "Accept recorded violations",
+				Help:    "Violations already listed in this baseline file are accepted; only new ones fail the run, and fixed ones are reported.",
+				Example: "conform-baseline.yaml",
+				Group:   GroupAdvanced, Deferred: true,
+			},
+			{
+				Name: "write-baseline", Kind: KindString,
+				Label:   "Record violations as a baseline",
+				Help:    "Write today's violations to this file and exit 0, so a long-lived API can adopt the check and improve gradually.",
+				Example: "conform-baseline.yaml",
+				Group:   GroupAdvanced, Deferred: true,
 			},
 			{
 				Name: "tags", Kind: KindString,

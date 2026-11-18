@@ -20,6 +20,14 @@ export function serializeScenarioToYAML(d: ScenarioDetail): string {
   const lines: string[] = ['schemaVersion: "1"', `title: ${yamlScalar(d.title)}`]
   if (d.description) lines.push(`description: ${yamlScalar(d.description)}`)
   if (d.specFile) lines.push(`specFile: ${yamlScalar(d.specFile)}`)
+  if (d.variables?.length) {
+    lines.push('variables:')
+    for (const v of d.variables) {
+      lines.push(`  - name: ${yamlScalar(v.name)}`)
+      lines.push(`    value: ${yamlScalar(v.value)}`)
+      if (v.secret) lines.push('    secret: true')
+    }
+  }
   if (!d.steps.length) {
     lines.push('steps: []')
   } else {
@@ -34,6 +42,7 @@ export function serializeScenarioToYAML(d: ScenarioDetail): string {
         lines.push('    request:')
         if (step.method) lines.push(`      method: ${step.method}`)
         if (step.url) lines.push(`      url: ${yamlScalar(step.url)}`)
+        if (step.noFollowRedirects) lines.push('      followRedirects: false')
         if (step.headers?.length) {
           lines.push('      headers:')
           for (const h of step.headers) {

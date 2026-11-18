@@ -332,7 +332,7 @@ export function useWorkspace(deps: {
         ...prev,
         tabs: prev.tabs.map(t => {
           if (t.filePath !== path) return t
-          const savedKey = computeStateKey(t.method, t.url, t.queryParams, t.headers, t.body, t.auth, newName, t.timeoutMs)
+          const savedKey = computeStateKey(t.method, t.url, t.queryParams, t.headers, t.body, t.auth, newName, t.timeoutMs, t.noFollowRedirects)
           return { ...t, name: newName, filePath: newPath, savedKey }
         }),
       }))

@@ -253,6 +253,9 @@ func Validate(b *serialization.Bundle, opts Options) []Issue {
 
 		spec := effectiveSpec(b, sc, opts)
 		extracted := map[string]bool{}
+		for _, v := range sc.Variables {
+			extracted[v.Name] = true // scenario variables are defined from the start
+		}
 		for si, step := range sc.Steps {
 			sw := stepWhere(where, si+1, step.Label)
 
@@ -278,9 +281,6 @@ func Validate(b *serialization.Bundle, opts Options) []Issue {
 				}
 			}
 
-			if step.Retry != nil || step.TimeoutMs > 0 {
-				warnf(sw, "retry and timeoutMs are accepted but not applied when a scenario runs yet")
-			}
 			for _, a := range step.Assertions {
 				if a.Type == domain.AssertionSchema && spec == "" && looksLikeOperationID(a.Schema) {
 					warnf(sw, "schema assertion %q needs a spec: set specFile on the bundle or scenario", a.Schema)
@@ -371,6 +371,9 @@ func variablesIn(r *domain.Request) []string {
 	var out []string
 	for _, t := range texts {
 		for _, m := range varRe.FindAllStringSubmatch(t, -1) {
+			if strings.HasPrefix(m[1], "$") {
+				continue // a {{$function}} call, not a variable
+			}
 			if !seen[m[1]] {
 				seen[m[1]] = true
 				out = append(out, m[1])

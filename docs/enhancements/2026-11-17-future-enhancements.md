@@ -1,10 +1,12 @@
 # Future enhancements backlog
 
-- **Status:** Items 1–10 approved and implemented (see [CI and parity batch](2026-11-17-ci-and-parity-batch.md)); items 11–17 remain ideas for the project owner to think about
+- **Status:** Items 1–10 approved and implemented (see [CI and parity batch](2026-11-17-ci-and-parity-batch.md)); item 11 implemented with the [Postman gap review](2026-11-17-postman-gap-review.md) (C); items 12–17 remain ideas for the project owner to think about
 - **Date:** 2026-11-17
 - **Purpose:** a place to keep ideas that came out of building the CLI Command Builder, HTML reports and folder runs, so they are not lost. Nothing here is a commitment.
 
 **How an idea graduates:** when you want one built, it gets its own dated proposal in this folder (see [README](README.md)), including the requirement review, and is agreed before any code is written. Sizes: **S** ≈ a day or less, **M** ≈ a few days, **L** ≈ a week or more. "Evidence" says where the idea came from, so you can judge how real the need is.
+
+A comparison with Postman produced a few more candidates (making step `retry` / `timeoutMs` real, redirect control, OAuth2 documentation, mTLS) in the [Postman gap review](2026-11-17-postman-gap-review.md).
 
 Ideas already written up elsewhere are only linked here: the remaining phases of the [CLI Command Builder](2026-11-17-cli-command-builder.md) ("Test it here", shipping the CLI with the desktop app, more commands, Docker and GitHub Action targets, multi-step pipeline snippets), and the older items in the project backlog (screenshots in the user guide, Wails v3, Analytics tab, mock server, step `retry` / `timeoutMs` in the runner, `bundle run --workspace`).
 
@@ -22,7 +24,7 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 | 8 ✅ | `--var name=value` overrides | CI | S | Next |
 | 9 ✅ | `markdown` report format (PR comments, job summaries) | CI | M | Next |
 | 10 ✅ | `diff` against a git ref | CI | M | Next |
-| 11 | Baseline mode for `conform` | Adoption | M–L | Later |
+| 11 ✅ | Baseline mode for `conform` | Adoption | M–L | Later |
 | 12 | `validate --strict` (scenario quality lint) | Quality | S–M | Later |
 | 13 | `clrsig init` (workspace and CI scaffolding) | Adoption | M | Later |
 | 14 | Select scenarios by tag or name | Scale | M | Later |
@@ -93,7 +95,9 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 
 ## Adoption and quality
 
-### 11. Baseline mode for `conform` — M–L
+### 11. Baseline mode for `conform` — M–L ✅ done
+
+> **Implemented** (Postman gap review, item C): `conform --write-baseline <file>` and `--baseline <file>`; file format in `format-spec.md` ("Conform Baseline File").
 
 - **Problem.** Pointing `conform` at a long-lived API often reports hundreds of violations at once, so the check is switched off instead of fixed gradually.
 - **Idea.** `--write-baseline file` records today's violations; `--baseline file` fails only on violations that are not in it, and reports fixed ones, so quality can only ratchet up.
@@ -117,8 +121,19 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 
 ### 15. Parallel scenario execution — M
 
-- **Idea.** `--parallel N` for folder runs, opt-in.
-- **Requirement review.** Scenarios often create and delete data and may depend on each other's side effects. It must be opt-in, with the reports and exit codes unchanged, and documented as unsafe for scenarios that share state.
+- **Idea.** `--parallel N` for folder runs (`run`, `bundle run`), opt-in. A worker count, not an on/off flag: "all at once" would send hundreds of simultaneous flows at the API.
+- **Design discussed 2026-11-17 (not decided).**
+  - `0` and `1` both mean sequential, which stays the default; a hard cap of 16 (an error above it) and never more workers than scenarios.
+  - The combined report stays in path order and the exit code is unchanged, so the same files give the same report at any worker count.
+  - The desktop Run All stays sequential at first (its progress display assumes one scenario at a time).
+- **Concerns and how to handle them.**
+  1. *Shared data between scenarios* (two scenarios creating the same user, one deleting what another reads) is the main risk: opt-in, documented as unsafe for scenarios that share state; a later "run alone / run together" marker would change the scenario format, so it is out of the first version.
+  2. *Server load* (429s, timeouts, inflated per-scenario timings): opt-in default and the cap.
+  3. *Coverage recording with `--workspace`* is a read-modify-write on a shared file: record after all scenarios finish, in path order (also deterministic).
+  4. *Shared CLI state:* lock the spec cache and collect per-scenario warnings to print in order. Each scenario already has its own HTTP client, cookie jar and resolver; secrets are read-only.
+  5. *`--fail-fast`* can only mean "stop starting new scenarios"; scenarios already running finish, so which ones ran varies between runs. Document it.
+  6. *Proof:* run the tests under the race detector and assert an identical report for 1, 4 and 16 workers.
+- **Requirement review.** Scenarios often create and delete data and may depend on each other's side effects. It must be opt-in, with the reports and exit codes unchanged, and documented as unsafe for scenarios that share state. Needs evidence of demand before it is built.
 
 ## Think twice before building
 
@@ -148,3 +163,4 @@ Alongside these, the CLI Command Builder's phase 2 ("Test it here") is the large
 | 2026-11-17 | Backlog written; nothing approved. The project owner will consider the ideas as future enhancements | assistant |
 | 2026-11-17 | Items 1–10 approved ("go with all above other than later items"); built as one batch | project owner |
 | 2026-11-17 | Items 11–17 ("Later" and "Think twice") stay on the backlog until the project owner decides | project owner |
+| 2026-11-17 | Item 11 built as part of "complete" the Postman gap review (its item C); items 12–17 stay on the backlog | project owner |

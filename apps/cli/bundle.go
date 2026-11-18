@@ -11,7 +11,6 @@ import (
 
 	"github.com/fuvito/api-workbench/packages/core/bundle"
 	"github.com/fuvito/api-workbench/packages/core/domain"
-	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
@@ -70,7 +69,7 @@ func cwdSpecPath(src string) string {
 
 // newScenarioRunner builds a runner that validates responses against spec when one is given.
 func newScenarioRunner(spec *openapi.Spec) *scenario.Runner {
-	exec := executor.New(executor.Options{})
+	exec := newExecutor()
 	if spec != nil {
 		return scenario.NewWithSpec(exec, spec)
 	}
@@ -137,6 +136,7 @@ func bundleRunCmd() *cobra.Command {
 	var vars []string
 	var reports []string
 	var showExtracted bool
+	var seed int64
 	var only []string
 
 	cmd := &cobra.Command{
@@ -187,6 +187,10 @@ Exit codes:
 			if env, err = finishEnvironment(cmd, env, vars); err != nil {
 				return err
 			}
+			engine, env, err := prepareDynamic(cmd, env, seed)
+			if err != nil {
+				return err
+			}
 
 			runs, unmatched := bundle.FilterRunnables(bundle.Materialize(b, opts), only)
 			if len(unmatched) > 0 {
@@ -203,7 +207,11 @@ Exit codes:
 				for _, ref := range scenario.ResolveRequestRefs(r.Scenario, baseDir) {
 					fmt.Fprintf(cmd.ErrOrStderr(), "warning: scenario %q: requestRef %q could not be loaded\n", r.Scenario.Title, ref)
 				}
-				runner := newScenarioRunner(loader.load(r.Scenario.SpecFile, baseDir))
+				key := r.File
+				if key == "" {
+					key = r.Scenario.Title
+				}
+				runner := newScenarioRunner(loader.load(r.Scenario.SpecFile, baseDir)).WithEngine(engine, key)
 				res := runner.Run(context.Background(), r.Scenario, env)
 				res.RevealExtracted = showExtracted
 				results = append(results, res)
@@ -242,6 +250,7 @@ Exit codes:
 
 	cmd.Flags().StringVarP(&envName, "env", "e", "", "Name of the bundle's environment to use (needed when it has several)")
 	cmd.Flags().StringArrayVar(&reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/bundle.xml (repeatable)")
+	cmd.Flags().Int64Var(&seed, "seed", 0, "Seed for random and dynamic values; default: random, printed in the report (or set CLRSIG_SEED)")
 	cmd.Flags().BoolVar(&showExtracted, "show-extracted", false, "Show extracted values whose names look secret (tokens, passwords, keys); secret environment values are always hidden")
 	cmd.Flags().StringArrayVar(&vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().StringVar(&envFile, "env-file", "", "Use an environment file instead of the bundle's own (YAML or JSON)")

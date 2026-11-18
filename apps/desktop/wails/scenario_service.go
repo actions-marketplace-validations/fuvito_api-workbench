@@ -73,6 +73,15 @@ type StepDetailIO struct {
 	TimeoutMs        int                  `json:"timeoutMs,omitempty"`
 	RetryMaxAttempts int                  `json:"retryMaxAttempts,omitempty"`
 	RetryDelayMs     int                  `json:"retryDelayMs,omitempty"`
+	// NoFollowRedirects is the step request's followRedirects: false.
+	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
+}
+
+// VariableIO is a scenario variable; the editor keeps them so saving does not drop them.
+type VariableIO struct {
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Secret bool   `json:"secret,omitempty"`
 }
 
 type ScenarioDetailIO struct {
@@ -80,6 +89,7 @@ type ScenarioDetailIO struct {
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
 	SpecFile    string         `json:"specFile,omitempty"`
+	Variables   []VariableIO   `json:"variables,omitempty"`
 	Steps       []StepDetailIO `json:"steps"`
 	Error       string         `json:"error,omitempty"`
 }
@@ -101,6 +111,14 @@ type StepResultIO struct {
 	Assertions      []AssertionResultIO `json:"assertions"`
 	ResponseBody    string              `json:"responseBody,omitempty"`
 	ResponseHeaders []HeaderIO          `json:"responseHeaders,omitempty"`
+	// Attempts is set only when the step was re-sent by its retry policy.
+	Attempts int `json:"attempts,omitempty"`
+	// The request as it was sent, after variables and dynamic values were filled in. Credentials
+	// are masked (see exchangeRequest).
+	RequestMethod  string     `json:"requestMethod,omitempty"`
+	RequestURL     string     `json:"requestUrl,omitempty"`
+	RequestHeaders []HeaderIO `json:"requestHeaders,omitempty"`
+	RequestBody    string     `json:"requestBody,omitempty"`
 }
 
 type CoverageIO struct {
@@ -120,6 +138,10 @@ type ScenarioResultIO struct {
 	SpecError           string                 `json:"specError,omitempty"`
 	Coverage            *CoverageIO            `json:"coverage,omitempty"`
 	AccumulatedCoverage *AccumulatedCoverageIO `json:"accumulatedCoverage,omitempty"`
+	// Seed is set when the run used random values; run the CLI with --seed to replay them.
+	Seed *int64 `json:"seed,omitempty"`
+	// Variables are the scenario variables as generated for this run (secret values are masked).
+	Variables []VariableIO `json:"variables,omitempty"`
 }
 
 type StepRunEntryIO struct {
@@ -275,6 +297,9 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		Description: sc.Description,
 		SpecFile:    sc.SpecFile,
 	}
+	for _, v := range sc.Variables {
+		detail.Variables = append(detail.Variables, VariableIO{Name: v.Name, Value: v.Value, Secret: v.Secret})
+	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{
 			Label:       step.Label,
@@ -295,6 +320,7 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		if step.Request != nil {
 			sd.Method = string(step.Request.Method)
 			sd.URL = step.Request.URL
+			sd.NoFollowRedirects = step.Request.NoFollowRedirects
 			for _, h := range step.Request.Headers {
 				sd.Headers = append(sd.Headers, KVPairIO{Name: h.Name, Value: h.Value})
 			}
@@ -838,6 +864,18 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
 		SpecError:  specLoadErr,
+		Error:      result.SetupError,
+	}
+	if result.UsedRandomness {
+		seed := result.Seed
+		out.Seed = &seed
+	}
+	for _, v := range result.Variables {
+		val := v.Value
+		if v.Secret {
+			val = "***"
+		}
+		out.Variables = append(out.Variables, VariableIO{Name: v.Name, Value: val, Secret: v.Secret})
 	}
 	for _, sr := range result.Steps {
 		step := StepResultIO{
@@ -847,6 +885,12 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			Error:      sr.Error,
 			Extracted:  sr.Extracted,
 			Assertions: []AssertionResultIO{},
+		}
+		if sr.Attempts > 1 {
+			step.Attempts = sr.Attempts
+		}
+		if sr.Request != nil {
+			step.RequestMethod, step.RequestURL, step.RequestHeaders, step.RequestBody = exchangeRequest(sr.Request, result.Secrets)
 		}
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
@@ -1374,4 +1418,23 @@ func (s *ScenarioService) CreateFromTemplate(templateID, name string) CreateScen
 		return CreateScenarioResultIO{Error: err.Error()}
 	}
 	return CreateScenarioResultIO{Path: filePath}
+}
+
+// DynamicFunctionIO describes one {{$function}} for the editors' autocomplete.
+type DynamicFunctionIO struct {
+	Name        string `json:"name"`
+	Usage       string `json:"usage"`
+	Description string `json:"description"`
+	Example     string `json:"example"`
+}
+
+// ListDynamicFunctions returns the built-in dynamic-value functions, straight from the core so the
+// editors never drift from what a run accepts.
+func (s *ScenarioService) ListDynamicFunctions() []DynamicFunctionIO {
+	infos := variables.Functions()
+	out := make([]DynamicFunctionIO, len(infos))
+	for i, f := range infos {
+		out[i] = DynamicFunctionIO{Name: f.Name, Usage: f.Usage, Description: f.Description, Example: f.Example}
+	}
+	return out
 }

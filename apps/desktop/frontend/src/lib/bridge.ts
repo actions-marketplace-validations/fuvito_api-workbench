@@ -2,6 +2,7 @@
 // Uses plain interfaces for ergonomic object creation at call sites.
 // The generated wailsjs classes use 'namespace' (not erasable syntax in TS7),
 // so all Wails imports are isolated here.
+import type { DynamicFunction } from '@/lib/dynamicFunctions'
 import { SetHasDirtyTabs as WailsSetHasDirtyTabs, Exit as WailsExit } from '@wailsjs/go/main/App'
 import {
   Execute as WailsExecute,
@@ -108,6 +109,7 @@ import {
   ListAccumulatedCoverage as WailsListAccumulatedCoverage,
   ExportCoverageReport as WailsExportCoverageReport,
   ExportRunReport as WailsExportRunReport,
+  ListDynamicFunctions as WailsListDynamicFunctions,
   GetScenarioRunHistory as WailsGetScenarioRunHistory,
   CancelScenario as WailsCancelScenario,
 } from '@wailsjs/go/main/ScenarioService'
@@ -139,6 +141,7 @@ export interface RequestPayload {
   body?: { type: string; content: string }
   auth?: AuthPayload
   timeoutMs: number
+  noFollowRedirects?: boolean
 }
 
 export interface TimingData {
@@ -167,6 +170,10 @@ export interface AppSettings {
   proxyUrl: string
   tlsSkipVerify: boolean
   telemetryEnabled: boolean
+  // mutual TLS: file paths only (may contain ${NAME}); never the certificate contents
+  clientCertFile?: string
+  clientKeyFile?: string
+  caFile?: string
 }
 
 export interface HistoryEntry {
@@ -207,6 +214,7 @@ export interface RequestFileIO {
   body?: { type: string; content: string }
   auth?: AuthPayload
   timeoutMs?: number
+  noFollowRedirects?: boolean
   filePath?: string
   targetDir?: string
 }
@@ -779,6 +787,7 @@ export interface StepDetail {
   timeoutMs?: number
   retryMaxAttempts?: number
   retryDelayMs?: number
+  noFollowRedirects?: boolean
 }
 
 export interface ScenarioDetail {
@@ -786,8 +795,15 @@ export interface ScenarioDetail {
   title: string
   description: string
   specFile?: string
+  variables?: ScenarioVariable[]
   steps: StepDetail[]
   error?: string
+}
+
+export interface ScenarioVariable {
+  name: string
+  value: string
+  secret?: boolean
 }
 
 export interface AssertionResult {
@@ -807,6 +823,12 @@ export interface StepResult {
   assertions: AssertionResult[]
   responseBody?: string
   responseHeaders?: Array<{ name: string; value: string }>
+  attempts?: number
+  // the request as it was sent (variables and dynamic values filled in, credentials masked)
+  requestMethod?: string
+  requestUrl?: string
+  requestHeaders?: Array<{ name: string; value: string }>
+  requestBody?: string
 }
 
 export interface ScenarioCoverage {
@@ -853,6 +875,12 @@ export interface ScenarioResult {
   specError?: string
   coverage?: ScenarioCoverage
   accumulatedCoverage?: AccumulatedCoverage
+  seed?: number
+  variables?: ScenarioVariable[]
+}
+
+export async function listDynamicFunctions(): Promise<DynamicFunction[]> {
+  return ((await WailsListDynamicFunctions()) ?? []) as unknown as DynamicFunction[]
 }
 
 export async function listScenarios(): Promise<ScenarioInfo[]> {

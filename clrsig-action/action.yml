@@ -38,7 +38,7 @@ inputs:
     description: 'Base URL to send requests to, overrides spec servers[] (conform)'
     required: false
   format:
-    description: 'Output format: text | json | junit | html'
+    description: 'Output format: text | json | junit | html | markdown'
     required: false
     default: 'text'
   output:

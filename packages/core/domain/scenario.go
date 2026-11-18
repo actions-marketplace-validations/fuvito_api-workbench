@@ -38,5 +38,9 @@ type Scenario struct {
 	Title         string
 	Description   string
 	SpecFile      string // optional path to OpenAPI spec; enables automatic response schema validation
-	Steps         []ScenarioStep
+	// Variables are scenario-scoped values, evaluated once, in order, when the scenario starts. A
+	// value may use {{$functions}}, environment variables and earlier scenario variables, and then
+	// stays the same for the whole run of the scenario.
+	Variables []EnvironmentVariable
+	Steps     []ScenarioStep
 }

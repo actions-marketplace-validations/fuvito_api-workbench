@@ -94,19 +94,21 @@ type EnvironmentIO struct {
 }
 
 type RequestFileIO struct {
-	SchemaVersion string          `json:"schemaVersion"`
-	Title         string          `json:"title"`
-	Method        string          `json:"method"`
-	URL           string          `json:"url"`
-	Headers       []HeaderIO      `json:"headers,omitempty"`
-	QueryParams   []QueryParamIO  `json:"queryParams,omitempty"`
-	Body          *BodyIO         `json:"body,omitempty"`
-	Auth          *AuthIO         `json:"auth,omitempty"`
-	TimeoutMs     int64           `json:"timeoutMs,omitempty"`
+	SchemaVersion string         `json:"schemaVersion"`
+	Title         string         `json:"title"`
+	Method        string         `json:"method"`
+	URL           string         `json:"url"`
+	Headers       []HeaderIO     `json:"headers,omitempty"`
+	QueryParams   []QueryParamIO `json:"queryParams,omitempty"`
+	Body          *BodyIO        `json:"body,omitempty"`
+	Auth          *AuthIO        `json:"auth,omitempty"`
+	TimeoutMs     int64          `json:"timeoutMs,omitempty"`
+	// NoFollowRedirects is the file's followRedirects: false.
+	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
 	// FilePath is the on-disk path of the loaded file; not persisted to YAML.
-	FilePath      string          `json:"filePath,omitempty"`
+	FilePath string `json:"filePath,omitempty"`
 	// TargetDir overrides the save directory for new (unsaved) requests.
-	TargetDir     string          `json:"targetDir,omitempty"`
+	TargetDir string `json:"targetDir,omitempty"`
 }
 
 // ---- WorkspaceService ----
@@ -707,7 +709,7 @@ func (w *WorkspaceService) OpenRequest() (*RequestFileIO, error) {
 		defaultDir, _ = os.UserHomeDir()
 	}
 	path, err := runtime.OpenFileDialog(w.ctx, runtime.OpenDialogOptions{
-		Title:           "Open Request",
+		Title:            "Open Request",
 		DefaultDirectory: defaultDir,
 		Filters: []runtime.FileFilter{
 			{DisplayName: "Request files (*.yaml, *.yml, *.json)", Pattern: "*.yaml;*.yml;*.json"},
@@ -880,14 +882,15 @@ func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
 	if req.Timeout > 0 {
 		out.TimeoutMs = req.Timeout.Milliseconds()
 	}
+	out.NoFollowRedirects = req.NoFollowRedirects
 	return out
 }
 
 func requestFileIOToDomain(r RequestFileIO) *domain.Request {
 	req := &domain.Request{
-		Title:       r.Title,
-		Method:      domain.HTTPMethod(r.Method),
-		URL:         r.URL,
+		Title:  r.Title,
+		Method: domain.HTTPMethod(r.Method),
+		URL:    r.URL,
 	}
 	for _, h := range r.Headers {
 		req.Headers = append(req.Headers, domain.Header{Name: h.Name, Value: h.Value})
@@ -904,6 +907,7 @@ func requestFileIOToDomain(r RequestFileIO) *domain.Request {
 	if r.TimeoutMs > 0 {
 		req.Timeout = time.Duration(r.TimeoutMs) * time.Millisecond
 	}
+	req.NoFollowRedirects = r.NoFollowRedirects
 	return req
 }
 

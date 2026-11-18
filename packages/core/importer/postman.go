@@ -70,10 +70,10 @@ type postmanKV struct {
 }
 
 type postmanBody struct {
-	Mode       string            `json:"mode"`
-	Raw        string            `json:"raw"`
-	Options    *postmanBodyOpts  `json:"options"`
-	URLEncoded []postmanKV       `json:"urlencoded"`
+	Mode       string           `json:"mode"`
+	Raw        string           `json:"raw"`
+	Options    *postmanBodyOpts `json:"options"`
+	URLEncoded []postmanKV      `json:"urlencoded"`
 }
 
 type postmanBodyOpts struct {
@@ -100,6 +100,7 @@ type postmanVariable struct {
 type ImportedRequest struct {
 	FolderPath string // slash-separated relative path; empty = workspace root
 	Request    *domain.Request
+	Warnings   []string // things that could not be converted exactly
 }
 
 // ParsePostmanCollection parses a Postman Collection v2.1 JSON file.
@@ -127,7 +128,7 @@ func flattenPostmanItems(items []postmanItem, folderPath string) []ImportedReque
 			result = append(result, flattenPostmanItems(item.Item, sub)...)
 		} else if item.Request != nil {
 			req := convertPostmanRequest(item)
-			result = append(result, ImportedRequest{FolderPath: folderPath, Request: req})
+			result = append(result, ImportedRequest{FolderPath: folderPath, Request: req, Warnings: mapDynamic(req)})
 		}
 	}
 	return result

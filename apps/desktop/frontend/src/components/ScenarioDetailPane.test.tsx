@@ -63,8 +63,8 @@ describe('StepDetailPane', () => {
   it('shows a passed result with status, duration and passing assertions, collapsed by default', () => {
     setup({ result: resultOf(res({ assertions: [{ type: 'status', passed: true, message: 'status eq 200' }] })) })
     expect(screen.getByText('PASSED')).toBeInTheDocument()
-    expect(screen.getByText('200')).toBeInTheDocument()
-    expect(screen.getByText('12 ms')).toBeInTheDocument()
+    expect(screen.getAllByText('200').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('12 ms').length).toBeGreaterThan(0)
     expect(screen.queryByText('status eq 200')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('PASSED'))
     expect(screen.getByText('status eq 200')).toBeInTheDocument()

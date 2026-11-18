@@ -62,7 +62,10 @@ type Request struct {
 	Body          *RequestBody
 	Auth          *Auth
 	Timeout       time.Duration // zero means use executor default
-	Assertions    []Assertion
+	// NoFollowRedirects returns a 3xx response as it is instead of following it, so a redirect the
+	// spec declares can be validated. The zero value keeps the default: follow redirects.
+	NoFollowRedirects bool
+	Assertions        []Assertion
 }
 
 func (r *Request) Validate() error {

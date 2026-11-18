@@ -214,30 +214,46 @@ describe('ScenarioRunLog', () => {
         }),
       ]))
       await expand()
-      fireEvent.click(await screen.findByRole('button', { name: /Response body/ }))
-      expect(screen.getByText(/"a": 1/)).toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: /Response body/ }))
-      expect(screen.queryByText(/"a": 1/)).not.toBeInTheDocument()
+      // the response section is open, so the body is visible straight away
+      expect(await screen.findByText(/"a": 1/)).toBeInTheDocument()
+      expect(screen.queryByText('Content-Type:')).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: /Headers \(1\)/ }))
       expect(screen.getByText('Content-Type:')).toBeInTheDocument()
-      expect(screen.getByText('application/json')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: /Headers \(1\)/ }))
       expect(screen.queryByText('Content-Type:')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /^Response/ }))
+      expect(screen.queryByText(/"a": 1/)).not.toBeInTheDocument()
+    })
+
+    it('shows the request as sent above the response', async () => {
+      b.loadScenarioResult.mockResolvedValue(result([
+        step({
+          requestMethod: 'POST', requestUrl: 'http://x/users?v=1',
+          requestHeaders: [{ name: 'X-Req', value: 'abc' }], requestBody: '{"id":"u1"}',
+          responseBody: '{"ok":true}',
+        }),
+      ]))
+      await expand()
+      expect(await screen.findByText('http://x/users?v=1')).toBeInTheDocument()
+      expect(screen.getByText('X-Req:')).toBeInTheDocument()
+      expect(screen.getByText(/"id": "u1"/)).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Request' })).toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Response' })).toBeInTheDocument()
     })
 
     it('shows non-JSON bodies verbatim', async () => {
       b.loadScenarioResult.mockResolvedValue(result([step({ responseBody: 'plain text body' })]))
       await expand()
-      fireEvent.click(await screen.findByRole('button', { name: /Response body/ }))
-      expect(screen.getByText('plain text body')).toBeInTheDocument()
+      expect(await screen.findByText('plain text body')).toBeInTheDocument()
     })
 
     it('shows no body/headers toggles when the step has neither', async () => {
       b.loadScenarioResult.mockResolvedValue(result([step()]))
       await expand()
       await screen.findByText('Login')
-      expect(screen.queryByRole('button', { name: /Response body/ })).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Copy response body')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /Headers/ })).not.toBeInTheDocument()
     })
   })

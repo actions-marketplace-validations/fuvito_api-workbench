@@ -13,6 +13,7 @@ export type TabState = {
   body: BodyState
   auth: AuthState
   timeoutMs: number
+  noFollowRedirects?: boolean // true returns a 3xx response instead of following it
   name: string | null
   filePath: string | null
   targetDir: string | null
@@ -43,12 +44,15 @@ export function computeStateKey(
   auth: AuthState,
   name: string | null,
   timeoutMs = 0,
+  noFollowRedirects = false,
 ): string {
   return JSON.stringify({
     method,
     url: url.trim(),
     name,
     timeoutMs,
+    // only written when set, so keys of ordinary requests stay as they were
+    ...(noFollowRedirects ? { noFollowRedirects } : {}),
     params: queryParams
       .filter(p => p.name.trim())
       .map(p => ({ name: p.name.trim(), value: p.value, enabled: p.enabled })),
@@ -92,7 +96,7 @@ export function isPageTab(kind: TabState['kind']): boolean {
 export function isTabDirty(tab: TabState): boolean {
   if (tab.kind === 'scenario') return tab.scenarioDirty === true
   if (isPageTab(tab.kind)) return false
-  return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs) !== tab.savedKey
+  return computeStateKey(tab.method, tab.url, tab.queryParams, tab.headers, tab.body, tab.auth, tab.name, tab.timeoutMs, tab.noFollowRedirects) !== tab.savedKey
 }
 
 export function isBlankTab(tab: TabState): boolean {

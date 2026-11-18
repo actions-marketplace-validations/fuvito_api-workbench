@@ -28,6 +28,8 @@ export function GetScenarioRunHistory(arg1:number):Promise<Array<main.ScenarioRu
 
 export function ListAccumulatedCoverage():Promise<Array<main.AccumulatedCoverageIO>>;
 
+export function ListDynamicFunctions():Promise<Array<main.DynamicFunctionIO>>;
+
 export function ListScenarios():Promise<Array<main.ScenarioInfoIO>>;
 
 export function ListTemplates():Promise<Array<main.TemplateInfoIO>>;

@@ -49,6 +49,8 @@ type RequestInput struct {
 	Body        *BodyIO        `json:"body"`
 	Auth        *AuthIO        `json:"auth"`
 	TimeoutMs   int64          `json:"timeoutMs"` // 0 means use executor default
+	// NoFollowRedirects returns a 3xx response instead of following it.
+	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
 }
 
 type TimingIO struct {
@@ -129,6 +131,7 @@ func buildExecutorOpts(ss *SettingsService, withCookies bool) *executor.Executor
 		TLSSkipVerify: cfg.TLSSkipVerify,
 		ProxyURL:      cfg.ProxyURL,
 		WithCookies:   withCookies,
+		TLS:           executor.TLSFiles{ClientCertFile: cfg.ClientCertFile, ClientKeyFile: cfg.ClientKeyFile, CAFile: cfg.CAFile},
 	}
 	if cfg.DefaultTimeoutMs > 0 {
 		opts.DefaultTimeout = time.Duration(cfg.DefaultTimeoutMs) * time.Millisecond
@@ -353,6 +356,7 @@ func inputToDomain(in RequestInput) (*domain.Request, error) {
 	if in.TimeoutMs > 0 {
 		req.Timeout = time.Duration(in.TimeoutMs) * time.Millisecond
 	}
+	req.NoFollowRedirects = in.NoFollowRedirects
 
 	if err := req.Validate(); err != nil {
 		return nil, err

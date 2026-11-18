@@ -82,3 +82,21 @@ func SecretValues(env *domain.Environment) []string {
 	}
 	return out
 }
+
+// ResolveEnvironment returns a copy of env with every value evaluated once: ${NAME} references
+// expanded and {{$functions}} generated, in order, using eng. Resolving the environment once per
+// command, then giving that copy to every scenario, is what makes a generated environment value
+// (for example a runId) the same in all of them. The original env is not modified.
+func ResolveEnvironment(env *domain.Environment, eng *Engine) (*domain.Environment, []error) {
+	if env == nil {
+		return nil, nil
+	}
+	r := NewResolverWith(env, eng)
+	out := *env
+	out.Variables = make([]domain.EnvironmentVariable, len(env.Variables))
+	for i, v := range env.Variables {
+		val, _ := r.Get(v.Name)
+		out.Variables[i] = domain.EnvironmentVariable{Name: v.Name, Value: val, Secret: v.Secret}
+	}
+	return &out, r.TakeErrors()
+}

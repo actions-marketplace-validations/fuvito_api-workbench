@@ -451,8 +451,8 @@ These are valid in a scenario file and editable in the app, but a step currently
   request:
     method: GET
     url: "{{baseUrl}}/health"
-  timeoutMs: 5000        # per-step timeout — not applied yet
-  retry:                 # retry policy — not applied yet
+  timeoutMs: 5000        # per-step timeout; overrides the request's own timeout
+  retry:                 # re-send after a network error or a 5xx response
     maxAttempts: 3
     delayMs: 500
 ```

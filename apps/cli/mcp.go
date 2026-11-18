@@ -11,7 +11,6 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
-	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
@@ -248,7 +247,7 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 
-	exec := executor.New(executor.Options{})
+	exec := newExecutor()
 	runner := conformance.New(exec)
 	result := runner.Run(context.Background(), spec, args.BaseURL, env, conformance.Options{})
 	return reporting.ConformText(result, nil), nil
@@ -281,7 +280,7 @@ func mcpRunScenario(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 
-	exec := executor.New(executor.Options{})
+	exec := newExecutor()
 	var runner *scenario.Runner
 	if args.SpecFile != "" {
 		specData, specFmt, fetchErr := fetchSpec(args.SpecFile)

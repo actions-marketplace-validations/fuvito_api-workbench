@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
@@ -15,13 +16,26 @@ import (
 
 // Text returns a human-readable scenario result suitable for terminal output.
 // Uses plain ASCII (no ANSI codes) so it is safe in CI logs.
-func Text(result *scenario.Result) string {
+func Text(result *scenario.Result) string { return textScenario(result, true) }
+
+// textScenario is Text; showSeed is false when several scenarios share one run seed that the
+// combined report prints once.
+func textScenario(result *scenario.Result, showSeed bool) string {
 	var b strings.Builder
 	x := redactorFor(result)
 
 	fmt.Fprintf(&b, "Scenario: %s\n", result.Scenario.Title)
 	if result.Scenario.Description != "" {
 		fmt.Fprintf(&b, "          %s\n", result.Scenario.Description)
+	}
+	if showSeed && result.UsedRandomness {
+		fmt.Fprintf(&b, "          seed: %d\n", result.Seed)
+	}
+	for _, v := range result.Variables {
+		fmt.Fprintf(&b, "          var %s = %s\n", v.Name, x.variable(v))
+	}
+	if result.SetupError != "" {
+		fmt.Fprintf(&b, "          error: %s\n", x.text(result.SetupError))
 	}
 	fmt.Fprintln(&b)
 
@@ -41,6 +55,9 @@ func Text(result *scenario.Result) string {
 			suffix = fmt.Sprintf("  %d  %dms", sr.Response.StatusCode, sr.Response.Duration.Milliseconds())
 		}
 
+		if sr.Attempts > 1 {
+			suffix += fmt.Sprintf("  (%d attempts)", sr.Attempts)
+		}
 		fmt.Fprintf(&b, "  %s  %s%s\n", status, sr.Label, suffix)
 
 		if sr.Error != "" {
@@ -107,6 +124,9 @@ type JSONReport struct {
 	Scenario   string                `json:"scenario"`
 	Passed     bool                  `json:"passed"`
 	DurationMs int64                 `json:"durationMs"`
+	Seed       *int64                `json:"seed,omitempty"`
+	Error      string                `json:"error,omitempty"`
+	Variables  []JSONVariable        `json:"variables,omitempty"`
 	Steps      []JSONStep            `json:"steps"`
 	Coverage   *JSONScenarioCoverage `json:"coverage,omitempty"`
 }
@@ -120,6 +140,12 @@ type JSONScenarioCoverage struct {
 	Missed    []JSONCoverageOp `json:"missed"`
 }
 
+// JSONVariable is a scenario variable and the value it was given for the run.
+type JSONVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type JSONStep struct {
 	Name       string            `json:"name"`
 	Passed     bool              `json:"passed"`
@@ -127,6 +153,7 @@ type JSONStep struct {
 	Error      string            `json:"error,omitempty"`
 	StatusCode int               `json:"statusCode,omitempty"`
 	DurationMs int64             `json:"durationMs,omitempty"`
+	Attempts   int               `json:"attempts,omitempty"` // only when the step was re-sent
 	Extracted  map[string]string `json:"extracted,omitempty"`
 	Assertions []JSONAssertion   `json:"assertions,omitempty"`
 }
@@ -145,31 +172,41 @@ type JSONAssertion struct {
 // ---- JUnit XML ----
 
 type jUnitTestSuites struct {
-	XMLName    xml.Name       `xml:"testsuites"`
-	Name       string         `xml:"name,attr"`
-	Tests      int            `xml:"tests,attr"`
-	Failures   int            `xml:"failures,attr"`
-	Errors     int            `xml:"errors,attr"`
-	Time       string         `xml:"time,attr"`
-	TestSuites []jUnitSuite   `xml:"testsuite"`
+	XMLName    xml.Name     `xml:"testsuites"`
+	Name       string       `xml:"name,attr"`
+	Tests      int          `xml:"tests,attr"`
+	Failures   int          `xml:"failures,attr"`
+	Errors     int          `xml:"errors,attr"`
+	Time       string       `xml:"time,attr"`
+	TestSuites []jUnitSuite `xml:"testsuite"`
+}
+
+type jUnitProperty struct {
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
+}
+
+type jUnitProperties struct {
+	Property []jUnitProperty `xml:"property"`
 }
 
 type jUnitSuite struct {
-	Name     string        `xml:"name,attr"`
-	Tests    int           `xml:"tests,attr"`
-	Failures int           `xml:"failures,attr"`
-	Errors   int           `xml:"errors,attr"`
-	Time     string        `xml:"time,attr"`
-	Cases    []jUnitCase   `xml:"testcase"`
+	Name       string           `xml:"name,attr"`
+	Tests      int              `xml:"tests,attr"`
+	Failures   int              `xml:"failures,attr"`
+	Errors     int              `xml:"errors,attr"`
+	Time       string           `xml:"time,attr"`
+	Properties *jUnitProperties `xml:"properties,omitempty"`
+	Cases      []jUnitCase      `xml:"testcase"`
 }
 
 type jUnitCase struct {
-	Name      string         `xml:"name,attr"`
-	ClassName string         `xml:"classname,attr"`
-	Time      string         `xml:"time,attr"`
-	Skipped   *struct{}      `xml:"skipped"`
-	Failure   *jUnitFailure  `xml:"failure"`
-	Error     *jUnitError    `xml:"error"`
+	Name      string        `xml:"name,attr"`
+	ClassName string        `xml:"classname,attr"`
+	Time      string        `xml:"time,attr"`
+	Skipped   *struct{}     `xml:"skipped"`
+	Failure   *jUnitFailure `xml:"failure"`
+	Error     *jUnitError   `xml:"error"`
 }
 
 type jUnitFailure struct {
@@ -235,6 +272,17 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 		Time:     secStr(result.Duration.Milliseconds()),
 	}
 
+	if result.UsedRandomness {
+		suite.Properties = &jUnitProperties{Property: []jUnitProperty{{Name: "seed", Value: strconv.FormatInt(result.Seed, 10)}}}
+	}
+	if result.SetupError != "" {
+		suite.Tests++
+		suite.Errors++
+		suite.Cases = append(suite.Cases, jUnitCase{
+			Name: "scenario variables", ClassName: result.Scenario.Title, Time: "0.000",
+			Error: &jUnitError{Message: x.text(result.SetupError), Text: x.text(result.SetupError)},
+		})
+	}
 	for _, sr := range result.Steps {
 		stepMs := int64(0)
 		if sr.Response != nil {
@@ -275,9 +323,10 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 // Pass a non-nil coverage to append a coverage summary section.
 func ConformText(result *conformance.ConformResult, coverage *conformance.CoverageReport) string {
 	var b strings.Builder
+	x := newRedactor(result.Secrets, false)
 
 	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
-	fmt.Fprintf(&b, "Base URL: %s\n\n", result.BaseURL)
+	fmt.Fprintf(&b, "Base URL: %s\n\n", x.text(result.BaseURL))
 
 	for _, op := range result.Operations {
 		if op.Skipped {
@@ -294,13 +343,13 @@ func ConformText(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		fmt.Fprintf(&b, "  %s  %-7s %s%s\n", status, op.Method, op.Path, suffix)
 		if op.Error != "" {
-			fmt.Fprintf(&b, "         error: %s\n", op.Error)
+			fmt.Fprintf(&b, "         error: %s\n", x.text(op.Error))
 		}
 		for _, v := range op.RequestViolations {
-			fmt.Fprintf(&b, "         ✗ request: %s\n", v.Error())
+			fmt.Fprintf(&b, "         ✗ request: %s\n", x.text(v.Error()))
 		}
 		for _, v := range op.Violations {
-			fmt.Fprintf(&b, "         ✗ %s\n", v.Error())
+			fmt.Fprintf(&b, "         ✗ %s\n", x.text(v.Error()))
 		}
 	}
 
@@ -339,13 +388,13 @@ func ConformText(result *conformance.ConformResult, coverage *conformance.Covera
 
 // JSONConformReport is the machine-readable structure for a conformance run.
 type JSONConformReport struct {
-	SpecTitle   string           `json:"specTitle"`
-	SpecVersion string           `json:"specVersion"`
-	BaseURL     string           `json:"baseURL"`
-	Passed      bool             `json:"passed"`
-	DurationMs  int64            `json:"durationMs"`
-	Operations  []JSONConformOp  `json:"operations"`
-	Coverage    *JSONCoverage    `json:"coverage,omitempty"`
+	SpecTitle   string          `json:"specTitle"`
+	SpecVersion string          `json:"specVersion"`
+	BaseURL     string          `json:"baseURL"`
+	Passed      bool            `json:"passed"`
+	DurationMs  int64           `json:"durationMs"`
+	Operations  []JSONConformOp `json:"operations"`
+	Coverage    *JSONCoverage   `json:"coverage,omitempty"`
 }
 
 type JSONConformOp struct {
@@ -382,10 +431,11 @@ type JSONCoverageOp struct {
 // Pass a non-nil coverage to include a coverage summary in the output.
 func ConformJSON(result *conformance.ConformResult, coverage *conformance.CoverageReport) ([]byte, error) {
 	_, failed, _ := result.Counts()
+	x := newRedactor(result.Secrets, false)
 	report := JSONConformReport{
 		SpecTitle:   result.SpecTitle,
 		SpecVersion: result.SpecVersion,
-		BaseURL:     result.BaseURL,
+		BaseURL:     x.text(result.BaseURL),
 		Passed:      failed == 0,
 		DurationMs:  result.Duration.Milliseconds(),
 	}
@@ -398,13 +448,13 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			DurationMs:  op.DurationMs,
 			Passed:      op.Passed(),
 			Skipped:     op.Skipped,
-			Error:       op.Error,
+			Error:       x.text(op.Error),
 		}
 		for _, v := range op.RequestViolations {
-			jo.RequestViolations = append(jo.RequestViolations, v.Error())
+			jo.RequestViolations = append(jo.RequestViolations, x.text(v.Error()))
 		}
 		for _, v := range op.Violations {
-			jo.Violations = append(jo.Violations, v.Error())
+			jo.Violations = append(jo.Violations, x.text(v.Error()))
 		}
 		report.Operations = append(report.Operations, jo)
 	}
@@ -439,6 +489,7 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 		Time:     secStr(result.Duration.Milliseconds()),
 	}
 
+	x := newRedactor(result.Secrets, false)
 	for _, op := range result.Operations {
 		tc := jUnitCase{
 			Name:      op.Method + " " + op.Path,
@@ -451,14 +502,14 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 			tc.Skipped = &skipped
 		case op.Error != "":
 			suite.Errors++
-			tc.Error = &jUnitError{Message: op.Error, Text: op.Error}
+			tc.Error = &jUnitError{Message: x.text(op.Error), Text: x.text(op.Error)}
 		case !op.Passed():
 			var msgs []string
 			for _, v := range op.RequestViolations {
-				msgs = append(msgs, "  ✗ request: "+v.Error())
+				msgs = append(msgs, "  ✗ request: "+x.text(v.Error()))
 			}
 			for _, v := range op.Violations {
-				msgs = append(msgs, "  ✗ "+v.Error())
+				msgs = append(msgs, "  ✗ "+x.text(v.Error()))
 			}
 			tc.Failure = &jUnitFailure{
 				Message: fmt.Sprintf("%d violation(s)", len(msgs)),
@@ -487,6 +538,7 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 // NegativeText returns a human-readable negative conformance report.
 func NegativeText(result *conformance.NegativeResult) string {
 	var b strings.Builder
+	x := newRedactor(result.Secrets, false)
 
 	fmt.Fprintf(&b, "\nNegative conformance probes — %s %s\n", result.SpecTitle, result.SpecVersion)
 
@@ -495,7 +547,7 @@ func NegativeText(result *conformance.NegativeResult) string {
 		case p.Skipped:
 			fmt.Fprintf(&b, "  SKIP  %s\n", p.Description)
 		case p.Error != "":
-			fmt.Fprintf(&b, "  ERR   %s\n         error: %s\n", p.Description, p.Error)
+			fmt.Fprintf(&b, "  ERR   %s\n         error: %s\n", p.Description, x.text(p.Error))
 		case p.Passed():
 			fmt.Fprintf(&b, "  PASS  %s  %d  %dms\n", p.Description, p.StatusCode, p.DurationMs)
 		default:
@@ -628,6 +680,14 @@ func JSON(result *scenario.Result) ([]byte, error) {
 		DurationMs: result.Duration.Milliseconds(),
 	}
 
+	if result.UsedRandomness {
+		seed := result.Seed
+		report.Seed = &seed
+	}
+	report.Error = x.text(result.SetupError)
+	for _, v := range result.Variables {
+		report.Variables = append(report.Variables, JSONVariable{Name: v.Name, Value: x.variable(v)})
+	}
 	for _, sr := range result.Steps {
 		step := JSONStep{
 			Name:      sr.Label,
@@ -639,6 +699,9 @@ func JSON(result *scenario.Result) ([]byte, error) {
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
 			step.DurationMs = sr.Response.Duration.Milliseconds()
+		}
+		if sr.Attempts > 1 {
+			step.Attempts = sr.Attempts
 		}
 		for _, ar := range sr.Assertions {
 			step.Assertions = append(step.Assertions, JSONAssertion{

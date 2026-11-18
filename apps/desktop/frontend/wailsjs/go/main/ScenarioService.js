@@ -54,6 +54,10 @@ export function ListAccumulatedCoverage() {
   return window['go']['main']['ScenarioService']['ListAccumulatedCoverage']();
 }
 
+export function ListDynamicFunctions() {
+  return window['go']['main']['ScenarioService']['ListDynamicFunctions']();
+}
+
 export function ListScenarios() {
   return window['go']['main']['ScenarioService']['ListScenarios']();
 }

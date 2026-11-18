@@ -3,6 +3,7 @@ import { Plus, Play, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronRig
 import { cn } from '@/lib/utils'
 import { statusColor } from '@/lib/httpUtils'
 import { StepEditorCard } from './ScenarioStepEditor'
+import { StepExchange } from './StepExchange'
 import type { ScenarioDetail, ScenarioResult, StepDetail } from '@/lib/bridge'
 
 type Props = {
@@ -62,6 +63,9 @@ function StepResultStrip({ result, onRunFrom, running }: {
           )}
           {result.durationMs > 0 && (
             <span className="text-[var(--color-muted-foreground)]">{result.durationMs} ms</span>
+          )}
+          {(result.attempts ?? 0) > 1 && (
+            <span className="text-amber-400">{result.attempts} attempts</span>
           )}
         </button>
         <button
@@ -131,7 +135,8 @@ export function StepDetailPane({
                 running={running}
               />
             )}
-            <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+              {stepResult && <StepExchange result={stepResult} />}
               <StepEditorCard
                 step={step}
                 index={selectedStepIndex}
