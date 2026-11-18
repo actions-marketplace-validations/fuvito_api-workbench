@@ -15,7 +15,35 @@ headers:
     value: "Bearer {{token}}"
 ```
 
-Variables are resolved from the active environment first, then from values extracted by prior scenario steps. Unresolved references are left as-is.
+Variables are resolved in this order: values extracted by prior scenario steps, then the scenario's own `variables`, then the active environment. Unresolved references are left as-is.
+
+### Dynamic values
+
+`{{$name arg arg key=value}}` generates a value each time it is evaluated. Arguments are separated by spaces; use quotes for text with spaces (`format="MMM d, yyyy"`).
+
+| Function | Result |
+|---|---|
+| `$guid`, `$uuid` | random UUID v4 |
+| `$randomString [length]` | letters and digits (default 8) |
+| `$randomAlpha [length]` / `$randomHex [length]` | letters only / hex digits |
+| `$randomChoice a b c` | one of the given values |
+| `$randomInt [min] [max]` | whole number (default 0–1000) |
+| `$randomFloat [min] [max] [decimals=2]` | decimal number (default 0–1) |
+| `$randomBool` | `true` or `false` |
+| `$timestamp` / `$timestampMs` | Unix time in seconds / milliseconds |
+| `$isoTimestamp` | current time, ISO 8601 (UTC) |
+| `$date`, `$datetime`, `$time` | current date / date and time / time of day |
+
+`$date`, `$datetime`, `$time` and `$isoTimestamp` accept an offset (`+7d`, `-2h`; units `s m h d w M y`), `format=` (`yyyy-MM-dd`, `HH:mm`, or `iso`, `rfc1123`, `unix`, `unixms`) and `tz=` (an IANA name such as `Europe/Berlin`; default UTC). Example: `{{$date +7d format="yyyy-MM-dd"}}`.
+
+Dynamic values also work in environment variable values and in assertion `expected`, `path` and `name`. An unknown function or bad argument is an error (`clrsig validate` finds it; `clrsig run` refuses to send anything).
+
+**When a value is generated**
+
+- A scenario `variables` entry is generated **once per scenario run**; `{{email}}` is identical in every step and assertion of that run.
+- An inline call (`{{$guid}}` in a URL) is generated **every time it appears**, so two inline calls differ.
+- An environment variable that uses a function is generated **once per command** and shared by all scenarios run by that command (the desktop app generates it per scenario run).
+- Random values come from a seed. The report prints it (`seed: N`) when random values were used; `clrsig run --seed N` (or `CLRSIG_SEED=N`) replays the same values. Date and time functions read the clock and are not affected by the seed.
 
 ---
 
@@ -93,6 +121,13 @@ description: "Verifies CRUD operations for /users. Run after any changes to the 
                              # optional — when to run it and what it proves
 
 specFile: "/absolute/path/to/openapi.yaml"  # optional — absolute path or http(s) URL of an OpenAPI 3.x spec; enables schema assertions by operationId
+
+variables:                   # optional — scenario variables, generated once per run, in order
+  - name: email              # no spaces, braces or $
+    value: "user-{{$randomString 10}}@example.com"   # may use functions, environment variables and earlier variables
+  - name: apiToken
+    value: "{{token}}"
+    secret: true             # optional — masked as *** in reports
 
 steps:
   - label: Login             # required — short action phrase ("Login", "Create order", not "Step 1")

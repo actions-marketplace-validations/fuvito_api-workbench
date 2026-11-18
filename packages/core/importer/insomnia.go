@@ -11,9 +11,9 @@ import (
 // --- Insomnia v4 export JSON structures ---
 
 type insomniaExport struct {
-	Type      string              `json:"_type"`
-	Format    int                 `json:"__export_format"`
-	Resources []insomniaResource  `json:"resources"`
+	Type      string             `json:"_type"`
+	Format    int                `json:"__export_format"`
+	Resources []insomniaResource `json:"resources"`
 }
 
 type insomniaResource struct {
@@ -176,7 +176,7 @@ func convertInsomniaAuth(a *insomniaAuth) *domain.Auth {
 		return &domain.Auth{Type: domain.AuthBearer, Bearer: &domain.BearerAuth{Token: a.Token}}
 	case "basic":
 		return &domain.Auth{
-			Type: domain.AuthBasic,
+			Type:  domain.AuthBasic,
 			Basic: &domain.BasicAuth{Username: a.Username, Password: a.Password},
 		}
 	case "apikey":
@@ -185,7 +185,7 @@ func convertInsomniaAuth(a *insomniaAuth) *domain.Auth {
 			loc = domain.APIKeyInQuery
 		}
 		return &domain.Auth{
-			Type: domain.AuthAPIKey,
+			Type:   domain.AuthAPIKey,
 			APIKey: &domain.APIKeyAuth{Key: a.Key, Value: a.Value, Location: loc},
 		}
 	}

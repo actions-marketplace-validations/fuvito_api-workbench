@@ -314,3 +314,22 @@ describe('serializeScenarioToYAML — scalar quoting', () => {
     expect(serializeScenarioToYAML(minimal())).toMatch(/\n$/)
   })
 })
+
+describe('serializeScenarioToYAML — variables', () => {
+  it('keeps scenario variables, including functions and the secret flag', () => {
+    const out = serializeScenarioToYAML(minimal({
+      variables: [
+        { name: 'email', value: 'user-{{$randomString 10}}@example.com' },
+        { name: 'token', value: 'abc', secret: true },
+      ],
+    }))
+    expect(out).toContain('variables:')
+    expect(out).toContain('  - name: email')
+    expect(out).toContain('    value: "user-{{$randomString 10}}@example.com"')
+    expect(out).toContain('    secret: true')
+  })
+
+  it('emits nothing when there are no variables', () => {
+    expect(serializeScenarioToYAML(minimal())).not.toContain('variables:')
+  })
+})

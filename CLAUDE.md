@@ -406,3 +406,15 @@ Do not implement or stub any of these without explicit user direction.
 - **Desktop:** the Contracts export builds nothing in the frontend any more (`ScenarioService.ExportCoverageReport` renders with the same Go code as the CLI); Run Results tab gets **Export report** (`ExportRunReport`: html, junit, json, markdown, text). "Run folder" already existed.
 - **Catalog:** `fail-on` is offered in the builder; `report`, `var` and `against` are in the catalog as deferred (repeatable or single-positional modes the builder cannot express yet).
 
+
+### 2026-11-17 — Dynamic values and scenario variables, phase 1 (design: `docs/enhancements/2026-11-17-dynamic-values.md`)
+
+- **Syntax:** `{{$function arg key=value}}` next to `{{variable}}`. Functions: `$guid`/`$uuid`, `$randomString/Alpha/Hex/Choice`, `$randomInt/Float/Bool`, `$timestamp/$timestampMs/$isoTimestamp`, `$date/$datetime/$time` (offsets, `format=`, `tz=`). Evaluated by the Go core (`packages/core/variables`: `Engine`, `Check`, `ResolveEnvironment`).
+- **Scenario `variables:`** (additive optional field, `schemaVersion` stays "1"; older clrsig rejects bundles containing it): generated once per scenario run, in order, may use functions, environment values and earlier variables; `secret: true` masks in reports.
+- **Scopes:** extracted > scenario variables > environment. Environment values with functions are generated once per command (CLI) and shared by all scenarios; inline calls are generated at every occurrence.
+- **Assertions:** `expected` (strings), `path` and `name` are now interpolated (previously never were).
+- **Seed:** `clrsig run|bundle run --seed N` or `CLRSIG_SEED`; each scenario gets its own stream derived from the seed and its path, so values do not depend on run order. Reports show the seed (text, json, junit property, html, markdown) only when random values were used, plus generated scenario variables.
+- **Validation:** unknown function, bad arguments/offsets/time zones, duplicate, self-referencing or out-of-order variables are errors in `clrsig validate`, bundle import and before `clrsig run` sends anything; a scenario that fails to start reports a setup error.
+- **Importer:** Postman `$randomUUID`, `$randomBoolean`, `$randomAlphaNumeric` etc. are mapped; unsupported names are left as written and reported as warnings (stderr).
+- **Desktop:** scenario `variables` survive visual-editor saves; editing UI, autocomplete and showing the seed in run results are phase 3. The desktop generates environment functions per scenario run.
+- **Docs:** format spec, user guide. **Not yet:** `$calc` and fake-data functions (phase 2), `--seed` for `conform`, builder UI for `seed` beyond the catalog entry.

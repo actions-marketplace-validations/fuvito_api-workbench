@@ -75,11 +75,19 @@ type StepDetailIO struct {
 	RetryDelayMs     int                  `json:"retryDelayMs,omitempty"`
 }
 
+// VariableIO is a scenario variable; the editor keeps them so saving does not drop them.
+type VariableIO struct {
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Secret bool   `json:"secret,omitempty"`
+}
+
 type ScenarioDetailIO struct {
 	Path        string         `json:"path"`
 	Title       string         `json:"title"`
 	Description string         `json:"description"`
 	SpecFile    string         `json:"specFile,omitempty"`
+	Variables   []VariableIO   `json:"variables,omitempty"`
 	Steps       []StepDetailIO `json:"steps"`
 	Error       string         `json:"error,omitempty"`
 }
@@ -274,6 +282,9 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 		Title:       sc.Title,
 		Description: sc.Description,
 		SpecFile:    sc.SpecFile,
+	}
+	for _, v := range sc.Variables {
+		detail.Variables = append(detail.Variables, VariableIO{Name: v.Name, Value: v.Value, Secret: v.Secret})
 	}
 	for _, step := range sc.Steps {
 		sd := StepDetailIO{

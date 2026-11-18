@@ -343,7 +343,29 @@ steps:
 |---|---|
 | `title` | Display name shown in the UI and reports. |
 | `description` | Optional prose describing the overall scenario purpose. |
+| `variables` | Optional list of scenario variables (`name`, `value`, optional `secret`). Each is generated once per run and can use dynamic values such as `{{$randomString 10}}`. See "Dynamic values" below. |
 | `specFile` | Path to an OpenAPI spec (relative to the workspace). When set, Clear Signal maps each executed request to the spec's operations and accumulates coverage data visible in the **Contracts** tab. |
+
+### Dynamic values and scenario variables
+
+Tests do not have to use fixed data. `{{$guid}}`, `{{$randomString 10}}`, `{{$randomInt 1 100}}`, `{{$randomBool}}` and date functions such as `{{$date +7d}}` generate a fresh value when the request is sent. They work in URLs, headers, bodies, environment values and assertion values.
+
+To use one generated value in several places, put it in the scenario's `variables`:
+
+```yaml
+variables:
+  - name: email
+    value: "user-{{$randomString 10}}@example.com"
+steps:
+  - label: Create user
+    request: {method: POST, url: "{{baseUrl}}/users", body: {type: json, content: '{"email": "{{email}}"}'}}
+  - label: Fetch user
+    request: {method: GET, url: "{{baseUrl}}/users?email={{email}}"}
+    assertions:
+      - {type: jsonpath, path: "$[0].email", operator: eq, expected: "{{email}}"}
+```
+
+`{{email}}` is the same in both steps; two inline `{{$guid}}` calls are different. A function used in an environment variable is generated once per `clrsig` command. Random values come from a seed that the report shows; `clrsig run --seed 12345` (or `CLRSIG_SEED`) replays a run exactly. The complete function list is in the Format Spec tab.
 
 ### Step fields
 
@@ -523,6 +545,7 @@ Runs scenario files and prints the results. Give it one file, several, or a fold
 clrsig run ./scenarios/user-lifecycle.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --env ./environments/dev.yaml
 clrsig run ./scenarios/user-lifecycle.yaml --format json
+clrsig run ./scenarios/user-lifecycle.yaml --seed 12345   # replay the same random values
 clrsig run ./scenarios/user-lifecycle.yaml --spec openapi.yaml --coverage --workspace .
 
 # every scenario in a folder and its sub-folders

@@ -60,6 +60,11 @@ Exit codes:
 				return fmt.Errorf("no requests found in %s", path)
 			}
 
+			for _, r := range requests {
+				for _, w := range r.Warnings {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s: %s\n", r.Request.Title, w)
+				}
+			}
 			res := importer.Save(output, name, requests, dryRun)
 
 			if format == "json" {

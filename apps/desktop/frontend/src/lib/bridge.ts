@@ -786,8 +786,15 @@ export interface ScenarioDetail {
   title: string
   description: string
   specFile?: string
+  variables?: ScenarioVariable[]
   steps: StepDetail[]
   error?: string
+}
+
+export interface ScenarioVariable {
+  name: string
+  value: string
+  secret?: boolean
 }
 
 export interface AssertionResult {

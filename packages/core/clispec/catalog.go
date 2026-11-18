@@ -72,6 +72,14 @@ var catalog = []Command{
 				Group:    GroupAdvanced,
 			},
 			{
+				Name: "seed", Kind: KindInt, Default: "0",
+				Label: "Seed for random values",
+				Help: "Random and dynamic values ({{$randomInt 1 9}}, {{$guid}}, …) are generated from a seed. Leave this at 0 for a " +
+					"fresh random seed each run (it is printed in the report); give a number to replay a run exactly.",
+				Example: "12345",
+				Group:   GroupAdvanced,
+			},
+			{
 				Name: "show-extracted", Kind: KindBool, Default: "false",
 				Label: "Show secret-looking extracted values",
 				Help: "Reports hide extracted values whose names look secret (token, password, key, session …) and any " +

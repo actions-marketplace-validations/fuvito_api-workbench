@@ -77,3 +77,22 @@ func stepStrings(step *domain.ScenarioStep) []string {
 	}
 	return out
 }
+
+// CheckDynamic reports only the problems with variables and {{$function}} calls: the checks that
+// can be done before a run starts and that would otherwise make a scenario fail or send a wrong
+// request. clrsig run uses it to stop before sending anything.
+func CheckDynamic(sc *domain.Scenario) []Issue {
+	var issues []Issue
+	add := func(step int, name, msg string) {
+		issues = append(issues, Issue{Step: step, Name: name, Message: msg})
+	}
+	validateVariables(sc, add)
+	for i := range sc.Steps {
+		for _, text := range stepStrings(&sc.Steps[i]) {
+			for _, err := range variables.Check(text) {
+				add(i+1, sc.Steps[i].Label, err.Error())
+			}
+		}
+	}
+	return issues
+}

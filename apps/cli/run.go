@@ -17,6 +17,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/fuvito/api-workbench/packages/core/telemetry"
+	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
 type runOptions struct {
@@ -32,6 +33,9 @@ type runOptions struct {
 	vars          []string
 	reports       []string
 	showExtracted bool
+	seed          int64
+
+	engine *variables.Engine // set by runScenarios: the run's seeded generator
 }
 
 // scenarioRun is one executed scenario.
@@ -78,6 +82,7 @@ Exit codes:
 	cmd.Flags().StringArrayVar(&o.reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/run.xml (repeatable)")
 	cmd.Flags().StringArrayVar(&o.vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().BoolVar(&o.showExtracted, "show-extracted", false, "Show extracted values whose names look secret (tokens, passwords, keys); secret environment values are always hidden")
+	cmd.Flags().Int64Var(&o.seed, "seed", 0, "Seed for random and dynamic values ({{$randomInt}}, {{$guid}}, …); default: random, printed in the report (or set CLRSIG_SEED)")
 	cmd.Flags().BoolVar(&o.failFast, "fail-fast", false, "Stop after the first scenario that fails")
 	cmd.Flags().BoolVar(&o.noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
 
@@ -118,6 +123,15 @@ func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 	var problems []string
 	for i, p := range paths {
 		s, err := loadScenario(p, o.timeoutMs)
+		if err == nil {
+			if issues := scenario.CheckDynamic(s); len(issues) > 0 {
+				msgs := make([]string, len(issues))
+				for j, iss := range issues {
+					msgs[j] = iss.String()
+				}
+				err = fmt.Errorf("%s", strings.Join(msgs, "; "))
+			}
+		}
 		if err != nil {
 			if singleFile {
 				return err
@@ -137,6 +151,10 @@ func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 		return err
 	}
 	if env, err = finishEnvironment(cmd, env, o.vars); err != nil {
+		return err
+	}
+	o.engine, env, err = prepareDynamic(cmd, env, o.seed)
+	if err != nil {
 		return err
 	}
 
@@ -235,7 +253,7 @@ func executeScenario(cmd *cobra.Command, scenarioPath string, s *domain.Scenario
 	}
 
 	loadedSpec := loader.load(loadSrc, filepath.Dir(scenarioPath))
-	runner := newScenarioRunner(loadedSpec)
+	runner := newScenarioRunner(loadedSpec).WithEngine(o.engine, scenarioPath)
 
 	// Steps that use requestRef need their request files loaded first. Look next to the
 	// scenario, then in the requests/ folder beside its scenarios/ folder, then in the

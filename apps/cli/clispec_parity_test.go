@@ -73,7 +73,7 @@ func TestCatalogMatchesCobra(t *testing.T) {
 				if f.DefValue != wantDefault {
 					t.Errorf("--%s: default is %q in cobra, %q in catalog", in.Name, f.DefValue, wantDefault)
 				}
-				if got := f.Value.Type(); got != wantFlagType(in) {
+				if got := f.Value.Type(); got != wantFlagType(in) && !(in.Kind == clispec.KindInt && got == "int64") {
 					t.Errorf("--%s: cobra type is %q, catalog kind %q expects %q", in.Name, got, in.Kind, wantFlagType(in))
 				}
 				if in.Kind == clispec.KindEnum {

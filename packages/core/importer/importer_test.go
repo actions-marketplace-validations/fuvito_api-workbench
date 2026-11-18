@@ -2,6 +2,7 @@ package importer_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -439,5 +440,22 @@ func TestParseInsomnia_DefaultWorkspaceName(t *testing.T) {
 	name, _, _ := importer.ParseInsomniaExport(data)
 	if name == "" {
 		t.Error("want default workspace name")
+	}
+}
+
+func TestPostmanDynamicVariablesAreMapped(t *testing.T) {
+	col := `{"info":{"name":"c"},"item":[{"name":"r","request":{"method":"POST","url":{"raw":"http://x/{{$randomUUID}}"},
+"header":[{"key":"X","value":"{{$timestamp}} {{$randomBoolean}}"}],
+"body":{"mode":"raw","raw":"{\"n\":{{$randomInt}},\"c\":\"{{$randomColor}}\"}"}}}]}`
+	_, reqs, err := importer.ParsePostmanCollection([]byte(col))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := reqs[0].Request
+	if r.URL != "http://x/{{$guid}}" || r.Headers[0].Value != "{{$timestamp}} {{$randomBool}}" || !strings.Contains(r.Body.Content, `{{$randomInt}}`) {
+		t.Errorf("request = %+v", r)
+	}
+	if len(reqs[0].Warnings) != 1 || !strings.Contains(reqs[0].Warnings[0], "$randomColor") {
+		t.Errorf("warnings = %v", reqs[0].Warnings)
 	}
 }

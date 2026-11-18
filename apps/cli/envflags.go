@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -55,4 +57,40 @@ func applyVars(env *domain.Environment, vars []string) (*domain.Environment, err
 		}
 	}
 	return out, nil
+}
+
+// resolveSeed decides the seed for dynamic values: --seed, else the CLRSIG_SEED environment
+// variable, else a fresh random one (printed in the report whenever random values were used, so
+// the run can be replayed).
+func resolveSeed(cmd *cobra.Command, flag int64) (int64, error) {
+	if cmd.Flags().Changed("seed") {
+		return flag, nil
+	}
+	if v := strings.TrimSpace(os.Getenv("CLRSIG_SEED")); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("CLRSIG_SEED must be a whole number, got %q", v)
+		}
+		return n, nil
+	}
+	return variables.RandomSeed(), nil
+}
+
+// prepareDynamic creates the run's engine and generates the environment's dynamic values once, so
+// every scenario in the command sees the same generated environment values.
+func prepareDynamic(cmd *cobra.Command, env *domain.Environment, seedFlag int64) (*variables.Engine, *domain.Environment, error) {
+	seed, err := resolveSeed(cmd, seedFlag)
+	if err != nil {
+		return nil, nil, err
+	}
+	eng := variables.NewEngine(seed)
+	resolved, errs := variables.ResolveEnvironment(env, eng.Derive("environment"))
+	if len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		return nil, nil, fmt.Errorf("environment: %s", strings.Join(msgs, "; "))
+	}
+	return eng, resolved, nil
 }
