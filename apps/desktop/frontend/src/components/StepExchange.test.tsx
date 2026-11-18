@@ -22,6 +22,7 @@ describe('StepExchange', () => {
     }} />)
     const req = screen.getByRole('region', { name: 'Request' })
     const res = screen.getByRole('region', { name: 'Response' })
+    fireEvent.click(screen.getAllByRole('button', { name: /Headers \(1\)/ })[0])
     expect(req.className).toContain('sky')
     expect(res.className).toContain('emerald')
     expect(req).toHaveTextContent('POST')
@@ -34,13 +35,16 @@ describe('StepExchange', () => {
     expect(res).toHaveTextContent('"id": 7')
   })
 
-  it('keeps response headers closed until asked, request headers open', () => {
+  it('keeps request and response headers closed until asked', () => {
     render(<StepExchange result={{
       ...base, requestMethod: 'GET', requestUrl: 'http://x', requestHeaders: [{ name: 'X-A', value: '1' }],
       responseHeaders: [{ name: 'X-B', value: '2' }], responseBody: 'hi',
     }} />)
-    expect(screen.getByText('X-A:')).toBeInTheDocument()
+    expect(screen.queryByText('X-A:')).not.toBeInTheDocument()
     expect(screen.queryByText('X-B:')).not.toBeInTheDocument()
+    const toggles = screen.getAllByRole('button', { name: /Headers \(1\)/, expanded: false })
+    fireEvent.click(toggles[0])
+    expect(screen.getByText('X-A:')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Headers \(1\)/, expanded: false }))
     expect(screen.getByText('X-B:')).toBeInTheDocument()
   })

@@ -159,6 +159,40 @@ export function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'name', value
   )
 }
 
+function EditorSection({ title, count, addLabel, onAdd, children }: {
+  title: string
+  count: number
+  addLabel: string
+  onAdd: () => void
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(count > 0)
+  return (
+    <div className="px-3 py-2 border-b border-[var(--color-border)]">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+        >
+          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+          {title}
+          {count > 0 && (
+            <span className="px-1.5 rounded-full bg-[var(--color-border)] text-[10px] normal-case tracking-normal">{count}</span>
+          )}
+        </button>
+        {!open && (
+          <button type="button" onClick={() => { setOpen(true); onAdd() }} className={addBtnCls}>
+            <Plus size={10} /> {addLabel}
+          </button>
+        )}
+      </div>
+      {open && <div className="mt-1.5">{children}</div>}
+    </div>
+  )
+}
+
 export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown, onToggleDisabled }: {
   step: StepDetail
   index: number
@@ -336,9 +370,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
         )}
       </div>
 
-      {/* Headers */}
-      <div className="px-3 py-2 border-b border-[var(--color-border)]">
-        <div className={sectionLabelCls}>Headers</div>
+      <EditorSection title="Headers" count={(step.headers ?? []).length} addLabel="Add header" onAdd={addHeader}>
         {(step.headers ?? []).map((h, i) => (
           <KVRow
             key={i}
@@ -352,11 +384,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
         <button type="button" onClick={addHeader} className={addBtnCls}>
           <Plus size={10} /> Add header
         </button>
-      </div>
+      </EditorSection>
 
-      {/* Query Params */}
-      <div className="px-3 py-2 border-b border-[var(--color-border)]">
-        <div className={sectionLabelCls}>Query Params</div>
+      <EditorSection title="Query Params" count={(step.queryParams ?? []).length} addLabel="Add param" onAdd={addQueryParam}>
         {(step.queryParams ?? []).map((q, i) => (
           <KVRow
             key={i}
@@ -370,7 +400,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
         <button type="button" onClick={addQueryParam} className={addBtnCls}>
           <Plus size={10} /> Add param
         </button>
-      </div>
+      </EditorSection>
 
       {/* Assertions */}
       <div className="px-3 py-2 border-b border-[var(--color-border)]">
@@ -388,9 +418,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
         </button>
       </div>
 
-      {/* Extractions */}
-      <div className="px-3 py-2 border-b border-[var(--color-border)]">
-        <div className={sectionLabelCls}>Extractions</div>
+      <EditorSection title="Extractions" count={step.extractions.length} addLabel="Add extraction" onAdd={addExtraction}>
         {step.extractions.map((e, i) => (
           <ExtractionRow
             key={i}
@@ -402,7 +430,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
         <button type="button" onClick={addExtraction} className={addBtnCls}>
           <Plus size={10} /> Add extraction
         </button>
-      </div>
+      </EditorSection>
 
       {/* Advanced: fail policy, timeout, retry */}
       <div className="border-t border-[var(--color-border)]">

@@ -134,7 +134,7 @@ test.describe('Scenarios', () => {
     const btn = page.locator('aside').getByRole('button', { name: 'User flow' })
     await btn.click()
     await btn.click()
-    await expect(page.getByRole('tab')).toHaveCount(1)
+    await expect(page.getByRole('tab').filter({ hasNotText: /^(Definition|Result)/ })).toHaveCount(1)
   })
 
   test('scenario viewer shows step names', async ({ page }) => {
@@ -1190,10 +1190,12 @@ test.describe('Scenario visual editor — assertions', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: 'Run', exact: true }).click()
+    await page.getByRole('tab', { name: /^Result/ }).click()
 
     const req = page.getByRole('region', { name: 'Request', exact: true })
     const res = page.getByRole('region', { name: 'Response', exact: true })
     await expect(req).toContainText('https://api.example.com/users?v=1')
+    await req.getByRole('button', { name: /Headers \(1\)/ }).click()
     await expect(req).toContainText('Bearer ***')
     await expect(req).toContainText('"name": "Ada"')
     await expect(res).toContainText('"id": 42')

@@ -19,6 +19,10 @@ function resultOf(...steps: StepResult[]): ScenarioResult {
   return { title: 't', passed: true, durationMs: 1, steps }
 }
 
+function openResult() {
+  fireEvent.click(screen.getByRole('tab', { name: /Result/ }))
+}
+
 function setup(over: Partial<React.ComponentProps<typeof StepDetailPane>> = {}) {
   const props: React.ComponentProps<typeof StepDetailPane> = {
     visualDetail: detail,
@@ -60,13 +64,15 @@ describe('StepDetailPane', () => {
     expect(screen.queryByText('PASSED')).not.toBeInTheDocument()
   })
 
-  it('shows a passed result with status, duration and passing assertions, collapsed by default', () => {
+  it('shows a passed result in the Result tab with status, duration and assertions', () => {
     setup({ result: resultOf(res({ assertions: [{ type: 'status', passed: true, message: 'status eq 200' }] })) })
+    expect(screen.getByText('Last run:')).toBeInTheDocument()
     expect(screen.getByText('PASSED')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('First')).toBeInTheDocument()
+    openResult()
+    expect(screen.queryByDisplayValue('First')).not.toBeInTheDocument()
     expect(screen.getAllByText('200').length).toBeGreaterThan(0)
     expect(screen.getAllByText('12 ms').length).toBeGreaterThan(0)
-    expect(screen.queryByText('status eq 200')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('PASSED'))
     expect(screen.getByText('status eq 200')).toBeInTheDocument()
     fireEvent.click(screen.getByText('PASSED'))
     expect(screen.queryByText('status eq 200')).not.toBeInTheDocument()
@@ -82,6 +88,8 @@ describe('StepDetailPane', () => {
         ],
       })),
     })
+    expect(screen.getByText('1 assertion failed')).toBeInTheDocument()
+    openResult()
     expect(screen.getByText('FAILED')).toBeInTheDocument()
     expect(screen.getByText('boom')).toBeInTheDocument()
     expect(screen.getByText('expected 200 got 500')).toBeInTheDocument()
@@ -92,19 +100,22 @@ describe('StepDetailPane', () => {
     setup({ result: resultOf(res({ passed: false, skipped: true, statusCode: 0, durationMs: 0 })) })
     expect(screen.getByText('SKIPPED')).toBeInTheDocument()
     expect(screen.queryByText('Skipped — previous step failed.')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('SKIPPED'))
+    openResult()
     expect(screen.getByText('Skipped — previous step failed.')).toBeInTheDocument()
     expect(screen.queryByText(/ ms$/)).not.toBeInTheDocument()
   })
 
   it('lists extracted variables when the strip is open', () => {
     setup({ result: resultOf(res({ passed: false, extracted: { token: 'abc' } })) })
+    openResult()
     expect(screen.getByText('→ token:')).toBeInTheDocument()
     expect(screen.getByText('abc')).toBeInTheDocument()
   })
 
   it('tolerates a result with no assertions or extracted map', () => {
     setup({ result: resultOf(res({ passed: false, assertions: undefined as never, extracted: undefined as never })) })
+    expect(screen.getByText('FAILED')).toBeInTheDocument()
+    openResult()
     expect(screen.getByText('FAILED')).toBeInTheDocument()
   })
 
@@ -122,6 +133,52 @@ describe('StepDetailPane', () => {
   it('shows no result strip when the selected step has no result', () => {
     setup({ selectedStepIndex: 1, result: resultOf(res()) })
     expect(screen.queryByText('PASSED')).not.toBeInTheDocument()
+  })
+
+  it('disables the Result tab until the step has a result', () => {
+    setup({ selectedStepIndex: 1, result: resultOf(res()) })
+    expect(screen.getByRole('tab', { name: /Result/ })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: 'Definition' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('switches to Result once when a run ends on a failed step, and back to Definition when a run starts', () => {
+    const failed = resultOf(res({ passed: false, statusCode: 404 }))
+    const base: React.ComponentProps<typeof StepDetailPane> = {
+      visualDetail: detail, result: null, running: true, selectedStepIndex: 0, editStepCount: 2,
+      onUpdateStep: vi.fn(), onRemoveStep: vi.fn(), onMoveStep: vi.fn(), onToggleDisabled: vi.fn(), onRunFrom: vi.fn(),
+    }
+    const { rerender } = render(<StepDetailPane {...base} />)
+    rerender(<StepDetailPane {...base} running={false} result={failed} />)
+    expect(screen.getByRole('tab', { name: /Result/ })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('tab', { name: 'Definition' }))
+    rerender(<StepDetailPane {...base} running={false} result={{ ...failed }} />)
+    expect(screen.getByRole('tab', { name: 'Definition' })).toHaveAttribute('aria-selected', 'true')
+    rerender(<StepDetailPane {...base} running result={null} />)
+    rerender(<StepDetailPane {...base} running={false} result={resultOf(res())} />)
+    expect(screen.getByRole('tab', { name: 'Definition' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('marks a result stale once its step is edited', () => {
+    setup({ result: resultOf(res()) })
+    fireEvent.change(screen.getByDisplayValue('First'), { target: { value: 'Renamed' } })
+    expect(screen.getByText('stale: edited since this run')).toBeInTheDocument()
+    openResult()
+    expect(screen.getByText(/edited after the run/)).toBeInTheDocument()
+  })
+
+  it('opens a step\'s filled sections when the selection moves to it', () => {
+    const withHeader: ScenarioDetail = {
+      ...detail,
+      steps: [detail.steps[0], { ...detail.steps[1], headers: [{ name: 'X-Two', value: '2' }] }],
+    }
+    const base: React.ComponentProps<typeof StepDetailPane> = {
+      visualDetail: withHeader, result: null, running: false, selectedStepIndex: 0, editStepCount: 2,
+      onUpdateStep: vi.fn(), onRemoveStep: vi.fn(), onMoveStep: vi.fn(), onToggleDisabled: vi.fn(), onRunFrom: vi.fn(),
+    }
+    const { rerender } = render(<StepDetailPane {...base} />)
+    expect(screen.queryByDisplayValue('X-Two')).not.toBeInTheDocument()
+    rerender(<StepDetailPane {...base} selectedStepIndex={1} />)
+    expect(screen.getByDisplayValue('X-Two')).toBeInTheDocument()
   })
 
   it('forwards editor changes with the selected index', () => {

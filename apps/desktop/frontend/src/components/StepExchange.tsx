@@ -131,7 +131,7 @@ export function StepExchange({ result }: { result: StepResult }) {
             </>
           }
         >
-          <HeaderList headers={reqHeaders} tone="request" defaultOpen />
+          <HeaderList headers={reqHeaders} tone="request" defaultOpen={false} />
           {result.requestBody ? <BodyBlock text={result.requestBody} tone="request" /> : (
             <p className="text-xs text-[var(--color-muted-foreground)] italic">No body sent.</p>
           )}

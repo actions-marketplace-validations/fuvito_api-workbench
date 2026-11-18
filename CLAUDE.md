@@ -457,3 +457,11 @@ Do not implement or stub any of these without explicit user direction.
 - **Empty scenarios:** a dashed "Start here" row replaces the "No steps yet" text and creates a real first step on click; the bottom "Add step" button shows only when steps exist; Run is disabled with "Add a step to run" (`scenario.Validate` is unchanged). Empty or last-step-removed scenarios select Setup.
 - **Selection:** `ScenarioViewer` selection is `'setup' | number | null`; the Setup row is outside the `role="option"` set so arrow keys, scroll-into-view and Alt+Arrow reorder keep working on step indices; ArrowUp from step 1 selects Setup.
 - **Tests:** viewer, step-list and Playwright tests updated, new tests for Setup, Start here, Run disabled and the keyboard path. Not yet: the "Add your first request" prompt (template / saved-request shortcuts) and focusing the new step's label, and regenerated scenario screenshots.
+
+### 2026-11-18 — Scenarios screen declutter, phase 2
+
+- **Step pane:** a `Definition | Result` toggle replaces the "Step Editor" label. Result is disabled until the step has a result and shows a status dot and code. After a run that ends on a failed step the pane switches to Result once; starting a run switches back to Definition.
+- **Definition** shows a one-line "Last run: FAILED 404 92 ms 1 assertion failed" above the editor, with View result and Run from here. **Result** shows the result strip and `StepExchange` (request headers now start closed, like response headers).
+- **Stale results:** editing a step after a run marks its result stale (tab badge, dimmed Result view, note) until the next run or save.
+- **Calmer editor:** Headers, Query Params and Extractions are collapsible sections with a count badge; empty ones start closed and offer their add button in the header. The editor card is keyed by step index so each step opens the sections that have content.
+- Tests updated and added (pane toggle, auto-switch, stale, editor sections); Playwright adjusted.

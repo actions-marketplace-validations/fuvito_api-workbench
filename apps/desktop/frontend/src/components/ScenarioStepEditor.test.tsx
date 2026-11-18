@@ -164,6 +164,22 @@ describe('StepEditorCard', () => {
     return h
   }
 
+  it('collapses empty Headers, Query Params and Extractions and opens them when filled', () => {
+    setup(step({ headers: [{ name: 'X-A', value: '1' }] }))
+    expect(screen.getByRole('button', { name: /Headers/, expanded: true })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('X-A')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Query Params/, expanded: false })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Extractions/, expanded: false })).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('param')).not.toBeInTheDocument()
+  })
+
+  it('adds a row from a collapsed section header and shows a count when filled', () => {
+    const h = setup(step())
+    fireEvent.click(screen.getByRole('button', { name: 'Add param' }))
+    expect(h.onChange).toHaveBeenCalledWith({ queryParams: [{ name: '', value: '' }] })
+    expect(screen.getByRole('button', { name: /Query Params/, expanded: true })).toBeInTheDocument()
+  })
+
   it('shows the 1-based index, label and notes, and edits them', () => {
     const h = setup(step({ notes: 'n' }), { index: 2 })
     expect(screen.getByText('3')).toBeInTheDocument()
