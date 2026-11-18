@@ -33,8 +33,12 @@ Variables are resolved in this order: values extracted by prior scenario steps, 
 | `$timestamp` / `$timestampMs` | Unix time in seconds / milliseconds |
 | `$isoTimestamp` | current time, ISO 8601 (UTC) |
 | `$date`, `$datetime`, `$time` | current date / date and time / time of day |
+| `$calc <expression>` | arithmetic, see below |
+| `$randomEmail`, `$randomFirstName`, `$randomLastName`, `$randomFullName`, `$randomPhone`, `$randomWord` | small built-in fake-data set (emails use `example.com`, phones a fictional `555-01xx` line) |
 
 `$date`, `$datetime`, `$time` and `$isoTimestamp` accept an offset (`+7d`, `-2h`; units `s m h d w M y`), `format=` (`yyyy-MM-dd`, `HH:mm`, or `iso`, `rfc1123`, `unix`, `unixms`) and `tz=` (an IANA name such as `Europe/Berlin`; default UTC). Example: `{{$date +7d format="yyyy-MM-dd"}}`.
+
+`$calc` evaluates numbers, variable names, `+ - * / %`, parentheses and `round(x, n)`, `floor`, `ceil`, `abs`, `min`, `max`; for example `{{$calc price * quantity}}` or `{{$calc round(total / 3, 2)}}`. Variable names are written bare (not in braces); their values must be numbers. Integers stay integers (`10 / 5` is `2`), decimals are trimmed (`0.1 * 3` is `0.3`). Division by zero or a non-numeric variable is an error. Nothing else can be called.
 
 Dynamic values also work in environment variable values and in assertion `expected`, `path` and `name`. An unknown function or bad argument is an error (`clrsig validate` finds it; `clrsig run` refuses to send anything).
 

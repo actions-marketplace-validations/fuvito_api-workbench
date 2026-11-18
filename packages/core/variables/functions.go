@@ -10,9 +10,10 @@ import (
 
 // call is one parsed {{$name arg arg key=value}}.
 type call struct {
-	name string
-	args []string
-	opts map[string]string
+	name   string
+	args   []string
+	opts   map[string]string
+	lookup func(string) (string, bool) // resolves variable names in $calc; nil when only validating
 }
 
 var optionKeys = map[string]bool{"format": true, "tz": true, "decimals": true}
@@ -92,21 +93,28 @@ var functions map[string]function
 
 func init() {
 	functions = map[string]function{
-		"guid":         {0, 0, nil, "$guid", fnGUID},
-		"uuid":         {0, 0, nil, "$guid", fnGUID},
-		"randomHex":    {1, 1, nil, "$randomHex <length>", textFn(hexChars)},
-		"randomString": {1, 1, nil, "$randomString <length>", textFn(alnumChars)},
-		"randomAlpha":  {1, 1, nil, "$randomAlpha <length>", textFn(alphaChars)},
-		"randomChoice": {1, -1, nil, "$randomChoice <a> <b> ...", fnChoice},
-		"randomInt":    {0, 2, nil, "$randomInt [<min> <max>]", fnInt},
-		"randomFloat":  {0, 3, []string{"decimals"}, "$randomFloat [<min> <max> [<decimals>]]", fnFloat},
-		"randomBool":   {0, 0, nil, "$randomBool", fnBool},
-		"timestamp":    {0, 0, nil, "$timestamp", func(e *Engine, _ call) (string, error) { return strconv.FormatInt(e.now().Unix(), 10), nil }},
-		"timestampMs":  {0, 0, nil, "$timestampMs", func(e *Engine, _ call) (string, error) { return strconv.FormatInt(e.now().UnixMilli(), 10), nil }},
-		"isoTimestamp": {0, 0, nil, "$isoTimestamp", func(e *Engine, _ call) (string, error) { return e.now().UTC().Format("2006-01-02T15:04:05.000Z"), nil }},
-		"date":         {0, 1, []string{"format", "tz"}, "$date [<offset>] [format=…] [tz=…]", timeFn("date")},
-		"datetime":     {0, 1, []string{"format", "tz"}, "$datetime [<offset>] [format=…] [tz=…]", timeFn("iso")},
-		"time":         {0, 1, []string{"format", "tz"}, "$time [<offset>] [format=…] [tz=…]", timeFn("time")},
+		"guid":            {0, 0, nil, "$guid", fnGUID},
+		"uuid":            {0, 0, nil, "$guid", fnGUID},
+		"randomHex":       {1, 1, nil, "$randomHex <length>", textFn(hexChars)},
+		"randomString":    {1, 1, nil, "$randomString <length>", textFn(alnumChars)},
+		"randomAlpha":     {1, 1, nil, "$randomAlpha <length>", textFn(alphaChars)},
+		"randomChoice":    {1, -1, nil, "$randomChoice <a> <b> ...", fnChoice},
+		"randomInt":       {0, 2, nil, "$randomInt [<min> <max>]", fnInt},
+		"randomFloat":     {0, 3, []string{"decimals"}, "$randomFloat [<min> <max> [<decimals>]]", fnFloat},
+		"randomBool":      {0, 0, nil, "$randomBool", fnBool},
+		"timestamp":       {0, 0, nil, "$timestamp", func(e *Engine, _ call) (string, error) { return strconv.FormatInt(e.now().Unix(), 10), nil }},
+		"timestampMs":     {0, 0, nil, "$timestampMs", func(e *Engine, _ call) (string, error) { return strconv.FormatInt(e.now().UnixMilli(), 10), nil }},
+		"isoTimestamp":    {0, 0, nil, "$isoTimestamp", func(e *Engine, _ call) (string, error) { return e.now().UTC().Format("2006-01-02T15:04:05.000Z"), nil }},
+		"calc":            {1, 1, nil, "$calc <expression>, e.g. $calc price * quantity", fnCalc},
+		"randomEmail":     {0, 0, nil, "$randomEmail", fnEmail},
+		"randomFirstName": {0, 0, nil, "$randomFirstName", fnFirstName},
+		"randomLastName":  {0, 0, nil, "$randomLastName", fnLastName},
+		"randomFullName":  {0, 0, nil, "$randomFullName", fnFullName},
+		"randomPhone":     {0, 0, nil, "$randomPhone", fnPhone},
+		"randomWord":      {0, 0, nil, "$randomWord", fnWord},
+		"date":            {0, 1, []string{"format", "tz"}, "$date [<offset>] [format=…] [tz=…]", timeFn("date")},
+		"datetime":        {0, 1, []string{"format", "tz"}, "$datetime [<offset>] [format=…] [tz=…]", timeFn("iso")},
+		"time":            {0, 1, []string{"format", "tz"}, "$time [<offset>] [format=…] [tz=…]", timeFn("time")},
 	}
 }
 
@@ -121,12 +129,23 @@ func FunctionNames() []string {
 }
 
 // Call evaluates one function call: inner is the text between {{ and }}, starting with $.
-func (e *Engine) Call(inner string) (string, error) {
+func (e *Engine) Call(inner string) (string, error) { return e.CallWith(inner, nil) }
+
+// CallWith is Call with a lookup that $calc uses to read variables by name.
+func (e *Engine) CallWith(inner string, lookup func(string) (string, bool)) (string, error) {
 	inner = strings.TrimSpace(inner)
 	if !strings.HasPrefix(inner, "$") {
 		return "", fmt.Errorf("a function call starts with $")
 	}
-	c, err := parseCall(inner[1:])
+	var c call
+	var err error
+	if rest, isCalc := strings.CutPrefix(inner, "$calc"); isCalc && (rest == "" || rest[0] == ' ' || rest[0] == '	') {
+		// the expression is free text with spaces and operators, not a list of arguments
+		c = call{name: "calc", args: []string{strings.TrimSpace(rest)}}
+	} else {
+		c, err = parseCall(inner[1:])
+	}
+	c.lookup = lookup
 	if err != nil {
 		return "", fmt.Errorf("{{%s}}: %w", inner, err)
 	}
@@ -263,4 +282,11 @@ func timeFn(defaultFormat string) func(e *Engine, c call) (string, error) {
 		}
 		return formatTime(t, c.opts["format"], defaultFormat)
 	}
+}
+
+func fnCalc(_ *Engine, c call) (string, error) {
+	if c.args[0] == "" {
+		return "", fmt.Errorf("write an expression, e.g. $calc price * quantity")
+	}
+	return evalCalc(c.args[0], c.lookup)
 }

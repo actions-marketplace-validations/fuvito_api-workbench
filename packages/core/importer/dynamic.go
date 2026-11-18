@@ -20,6 +20,12 @@ var postmanDynamic = map[string]string{
 	"$randomInt":          "$randomInt",
 	"$randomBoolean":      "$randomBool",
 	"$randomAlphaNumeric": "$randomString 1",
+	"$randomEmail":        "$randomEmail",
+	"$randomFirstName":    "$randomFirstName",
+	"$randomLastName":     "$randomLastName",
+	"$randomFullName":     "$randomFullName",
+	"$randomPhoneNumber":  "$randomPhone",
+	"$randomWord":         "$randomWord",
 }
 
 // mapDynamic rewrites Postman dynamic variables inside req and returns the names it could not map.

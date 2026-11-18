@@ -365,7 +365,7 @@ steps:
       - {type: jsonpath, path: "$[0].email", operator: eq, expected: "{{email}}"}
 ```
 
-`{{email}}` is the same in both steps; two inline `{{$guid}}` calls are different. A function used in an environment variable is generated once per `clrsig` command. Random values come from a seed that the report shows; `clrsig run --seed 12345` (or `CLRSIG_SEED`) replays a run exactly. The complete function list is in the Format Spec tab.
+`{{email}}` is the same in both steps; two inline `{{$guid}}` calls are different. A function used in an environment variable is generated once per `clrsig` command. Random values come from a seed that the report shows; `clrsig run --seed 12345` (or `CLRSIG_SEED`) replays a run exactly. `{{$calc price * quantity}}` does arithmetic, and `{{$randomEmail}}`, `{{$randomFullName}}` and similar give realistic fake data. The complete function list is in the Format Spec tab.
 
 ### Step fields
 

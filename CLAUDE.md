@@ -417,4 +417,9 @@ Do not implement or stub any of these without explicit user direction.
 - **Validation:** unknown function, bad arguments/offsets/time zones, duplicate, self-referencing or out-of-order variables are errors in `clrsig validate`, bundle import and before `clrsig run` sends anything; a scenario that fails to start reports a setup error.
 - **Importer:** Postman `$randomUUID`, `$randomBoolean`, `$randomAlphaNumeric` etc. are mapped; unsupported names are left as written and reported as warnings (stderr).
 - **Desktop:** scenario `variables` survive visual-editor saves; editing UI, autocomplete and showing the seed in run results are phase 3. The desktop generates environment functions per scenario run.
-- **Docs:** format spec, user guide. **Not yet:** `$calc` and fake-data functions (phase 2), `--seed` for `conform`, builder UI for `seed` beyond the catalog entry.
+- **Docs:** format spec, user guide. **Not yet:** `--seed` for `conform`, builder UI for `seed` beyond the catalog entry.
+
+### 2026-11-17 — Dynamic values, phase 2
+
+- **`$calc <expression>`:** own evaluator in `variables/calc.go` (numbers, bare variable names, `+ - * / %`, parentheses, `round floor ceil abs min max`); integers stay integers, floats trimmed, errors for division by zero, unknown or non-numeric variables; `validate` checks syntax without values. No dependency, cannot call anything else.
+- **Fake data:** `$randomEmail`, `$randomFirstName`, `$randomLastName`, `$randomFullName`, `$randomPhone`, `$randomWord` from a small embedded set, following the seed. Postman names are mapped by the importer.

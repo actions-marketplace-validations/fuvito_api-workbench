@@ -86,7 +86,7 @@ func (r *Resolver) Interpolate(s string) string {
 	return varPattern.ReplaceAllStringFunc(s, func(match string) string {
 		name := strings.TrimSpace(match[2 : len(match)-2])
 		if strings.HasPrefix(name, "$") {
-			out, err := r.eng.Call(name)
+			out, err := r.eng.CallWith(name, r.Get)
 			if err != nil {
 				r.errs = append(r.errs, err)
 				return match
