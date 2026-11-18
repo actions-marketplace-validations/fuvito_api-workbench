@@ -83,7 +83,7 @@ function mount(props: Partial<React.ComponentProps<typeof ScenarioViewer>> & { i
 }
 
 async function loaded() {
-  await screen.findByDisplayValue('desc')
+  await screen.findByRole('button', { name: 'Setup' })
 }
 
 function list() {
@@ -120,7 +120,7 @@ describe('ScenarioViewer — loading', () => {
     expect(b.loadScenario).toHaveBeenCalledWith('/ws/scenarios/s.yaml')
     expect(labels()).toEqual(['One', 'Two', 'Three'])
     expect(within(list()).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByDisplayValue('desc')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('desc')).not.toBeInTheDocument()
   })
 
   it('shows the load error reported by the backend', async () => {
@@ -135,12 +135,45 @@ describe('ScenarioViewer — loading', () => {
     expect(await screen.findByText(/ipc down/)).toBeInTheDocument()
   })
 
-  it('selects nothing for a scenario without steps', async () => {
+  it('opens Setup and shows the Start here row for a scenario without steps', async () => {
     b.loadScenario.mockResolvedValue(detail({ steps: [] }))
     mount()
     await loaded()
-    expect(screen.getByText('No steps yet.')).toBeInTheDocument()
-    expect(screen.getByText('Select a step to edit, or add a new one.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Start here')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add step/ })).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue('desc')).toBeInTheDocument()
+  })
+
+  it('creates a real first step from the Start here row', async () => {
+    b.loadScenario.mockResolvedValue(detail({ steps: [] }))
+    mount()
+    await loaded()
+    fireEvent.click(screen.getByText('Start here'))
+    expect(within(list()).getAllByRole('option')).toHaveLength(1)
+    expect(within(list()).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText('Start here')).not.toBeInTheDocument()
+  })
+
+  it('disables Run when the scenario has no steps', async () => {
+    b.loadScenario.mockResolvedValue(detail({ steps: [] }))
+    mount()
+    await loaded()
+    const run = screen.getByRole('button', { name: /^Run/ })
+    expect(run).toBeDisabled()
+    expect(run).toHaveAttribute('title', 'Add a step to run')
+    fireEvent.click(run)
+    expect(b.runScenario).not.toHaveBeenCalled()
+  })
+
+  it('switches between Setup and steps with the keyboard', async () => {
+    mount()
+    await loaded()
+    fireEvent.keyDown(list(), { key: 'ArrowUp' })
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(list()).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'false')
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Setup' }), { key: 'ArrowDown' })
+    expect(within(list()).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
   })
 
   it('restores a cached result', async () => {
@@ -164,6 +197,7 @@ describe('ScenarioViewer — loading', () => {
       specFile: 'api.yaml', covered: 1, total: 2, percent: 50, totalRuns: 2, passedRuns: 2, failedRuns: 0, exercised: ['GET /a'], missed: ['GET /b'],
     })
     mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Coverage 1\/2 · 50%/ }))
     expect(await screen.findByText('Accumulated Coverage')).toBeInTheDocument()
     expect(b.getAccumulatedCoverage).toHaveBeenCalledWith('api.yaml')
   })
@@ -182,6 +216,7 @@ describe('ScenarioViewer — loading', () => {
       specFile: 'api.yaml', covered: 1, total: 2, percent: 50, totalRuns: 2, passedRuns: 2, failedRuns: 0, exercised: [], missed: [],
     })
     mount()
+    fireEvent.click(await screen.findByRole('button', { name: /Coverage 1\/2/ }))
     fireEvent.click(await screen.findByTitle('Reset accumulated coverage'))
     await waitFor(() => expect(b.resetAccumulatedCoverage).toHaveBeenCalledWith('api.yaml'))
     await waitFor(() => expect(screen.queryByText('Accumulated Coverage')).not.toBeInTheDocument())
@@ -211,6 +246,7 @@ describe('ScenarioViewer — editing', () => {
   it('edits description and spec file', async () => {
     mount()
     await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
     fireEvent.change(screen.getByPlaceholderText('What does this scenario test?'), { target: { value: 'new desc' } })
     fireEvent.change(screen.getByPlaceholderText(/OpenAPI spec path/), { target: { value: 'spec.yaml' } })
     expect(screen.getByRole('button', { name: /Save/ })).toBeInTheDocument()
@@ -248,13 +284,13 @@ describe('ScenarioViewer — editing', () => {
     expect(within(list()).getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('clears the selection when the last step is removed', async () => {
+  it('selects Setup when the last step is removed', async () => {
     b.loadScenario.mockResolvedValue(detail({ steps: [step({ label: 'Only' })] }))
     mount()
     await screen.findByDisplayValue('My scenario')
     fireEvent.click(within(within(list()).getAllByRole('option')[0]).getByTitle('Remove step'))
-    expect(screen.getByText('No steps yet.')).toBeInTheDocument()
-    expect(screen.getByText('Select a step to edit, or add a new one.')).toBeInTheDocument()
+    expect(screen.getByText('Start here')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('duplicates a step right after the original and selects the copy', async () => {
@@ -468,8 +504,21 @@ describe('ScenarioViewer — running', () => {
     mount()
     await loaded()
     fireEvent.click(screen.getByRole('button', { name: /^Run/ }))
-    expect(await screen.findByText('cannot fetch spec')).toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'Setup warning' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'result' }))
+    expect(screen.getByText('cannot fetch spec')).toBeInTheDocument()
     expect(screen.getByText('specFile warning:')).toBeInTheDocument()
+  })
+
+  it('shows a setup error under the header and opens its details in Setup', async () => {
+    b.runScenario.mockResolvedValue(resultOf([], { passed: false, error: 'variable "x" is bad' }))
+    mount()
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: /^Run/ }))
+    expect(await screen.findByText('Scenario could not start.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByText(/variable "x" is bad/).length).toBeGreaterThan(0)
   })
 
   it('shows accumulated coverage returned by the run', async () => {
@@ -479,6 +528,7 @@ describe('ScenarioViewer — running', () => {
     mount()
     await loaded()
     fireEvent.click(screen.getByRole('button', { name: /^Run/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Coverage 2\/2 · 100%/ }))
     expect(await screen.findByText('Accumulated Coverage')).toBeInTheDocument()
   })
 
@@ -568,7 +618,7 @@ describe('ScenarioViewer — running', () => {
     await act(async () => { release(resultOf([{ passed: true }])) })
   })
 
-  it('shows a progress bar while running and a result bar afterwards', async () => {
+  it('shows a progress bar while running and no extra bar afterwards', async () => {
     let release!: (r: ScenarioResult) => void
     b.runScenario.mockReturnValue(new Promise(r => { release = r }))
     const { container } = mount()
@@ -578,8 +628,8 @@ describe('ScenarioViewer — running', () => {
     expect(container.querySelector('[style*="slide"]')).toBeInTheDocument()
     await act(async () => { release(resultOf([{ passed: true }, { passed: false }, { passed: false, skipped: true }])) })
     expect(container.querySelector('[style*="slide"]')).not.toBeInTheDocument()
-    expect(container.querySelector('.bg-emerald-500.transition-all')).toBeInTheDocument()
-    expect(container.querySelector('.bg-red-500.transition-all')).toBeInTheDocument()
+    expect(container.querySelector('.bg-emerald-500.transition-all')).not.toBeInTheDocument()
+    expect(screen.getAllByText('FAILED').length).toBeGreaterThan(0)
   })
 
   it('opens and closes the stats dialog', async () => {

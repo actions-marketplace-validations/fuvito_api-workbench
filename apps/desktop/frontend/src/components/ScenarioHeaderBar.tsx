@@ -22,6 +22,9 @@ type Props = {
   onSave: () => void
   onShowYaml: () => void
   onGetCliCommand?: () => void
+  noSteps?: boolean
+  coverage?: { covered: number; total: number; percent: number }
+  onShowCoverage?: () => void
 }
 
 export function ScenarioHeaderBar({
@@ -30,6 +33,7 @@ export function ScenarioHeaderBar({
   result, running, onShowStats, onRun, onCancel,
   saveError, savedFlash, isDirty,
   onDiscard, onSave, onShowYaml, onGetCliCommand,
+  noSteps = false, coverage, onShowCoverage,
 }: Props) {
   const steps = result?.steps ?? []
   const passed = steps.filter(s => s.passed && !s.skipped).length
@@ -104,6 +108,20 @@ export function ScenarioHeaderBar({
         </div>
       )}
 
+      {coverage && !running && (
+        <button
+          type="button"
+          onClick={onShowCoverage}
+          title="Spec coverage: open the details in Setup"
+          className={cn(
+            'shrink-0 text-xs px-2 py-0.5 rounded border border-[var(--color-border)] hover:bg-[var(--color-muted)] transition-colors',
+            coverage.percent >= 100 ? 'text-emerald-400' : coverage.percent >= 50 ? 'text-amber-400' : 'text-red-400',
+          )}
+        >
+          Coverage {coverage.covered}/{coverage.total} · {Math.round(coverage.percent)}%
+        </button>
+      )}
+
       {isDirty && !savedFlash && (
         <>
           {saveError && (
@@ -153,10 +171,11 @@ export function ScenarioHeaderBar({
         <button
           type="button"
           onClick={onRun}
-          disabled={running || !detailLoaded}
+          disabled={running || !detailLoaded || noSteps}
+          title={noSteps ? 'Add a step to run' : undefined}
           className={cn(
             'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-opacity bg-[var(--color-accent)] text-white',
-            (running || !detailLoaded) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
+            (running || !detailLoaded || noSteps) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90',
           )}
         >
           {running

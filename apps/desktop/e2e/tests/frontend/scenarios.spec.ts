@@ -134,7 +134,7 @@ test.describe('Scenarios', () => {
     const btn = page.locator('aside').getByRole('button', { name: 'User flow' })
     await btn.click()
     await btn.click()
-    await expect(page.getByRole('tab')).toHaveCount(1)
+    await expect(page.getByRole('tab').filter({ hasNotText: /^(Definition|Result)/ })).toHaveCount(1)
   })
 
   test('scenario viewer shows step names', async ({ page }) => {
@@ -813,12 +813,13 @@ const SCENARIO_DETAIL_WITH_NOTES = {
 }
 
 test.describe('Scenario view mode — description and step notes', () => {
-  test('scenario description is shown in the meta section', async ({ page }) => {
+  test('scenario description is shown in Setup', async ({ page }) => {
     await withScenarios(page, { detail: SCENARIO_DETAIL_WITH_NOTES })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
-    // Description is always shown in the scenario meta section input
+    // The description lives in the Setup row of the step list
+    await page.getByRole('button', { name: 'Setup' }).click()
     await expect(page.getByPlaceholder('What does this scenario test?')).toHaveValue('End-to-end user lifecycle')
   })
 
@@ -1152,6 +1153,7 @@ test.describe('Scenario visual editor — assertions', () => {
     await withScenarios(page, { detail })
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await page.getByRole('button', { name: 'Setup' }).click()
     await expect(page.getByLabel('Variable 1 name')).toHaveValue('email')
 
     await page.getByRole('button', { name: 'Add variable' }).click()
@@ -1169,6 +1171,8 @@ test.describe('Scenario visual editor — assertions', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: /^Run$/ }).click()
+    await page.getByRole('button', { name: 'Setup' }).click()
+    await page.getByRole('tab', { name: 'result' }).click()
     await expect(page.getByText('clrsig run --seed 4242')).toBeVisible()
     await expect(page.getByText('u-abc@example.com')).toBeVisible()
   })
@@ -1186,10 +1190,12 @@ test.describe('Scenario visual editor — assertions', () => {
     await gotoApp(page)
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await page.getByRole('button', { name: 'Run', exact: true }).click()
+    await page.getByRole('tab', { name: /^Result/ }).click()
 
     const req = page.getByRole('region', { name: 'Request', exact: true })
     const res = page.getByRole('region', { name: 'Response', exact: true })
     await expect(req).toContainText('https://api.example.com/users?v=1')
+    await req.getByRole('button', { name: /Headers \(1\)/ }).click()
     await expect(req).toContainText('Bearer ***')
     await expect(req).toContainText('"name": "Ada"')
     await expect(res).toContainText('"id": 42')

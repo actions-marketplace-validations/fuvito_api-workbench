@@ -450,3 +450,27 @@ Do not implement or stub any of these without explicit user direction.
 
 - `StepResultIO` carries the request as sent (`requestMethod`, `requestUrl` with query parameters, `requestHeaders`, `requestBody`), built by `exchangeRequest` with credentials masked (sensitive header/parameter names, the auth block, and every secret value). New `StepExchange` component: blue Request and green Response sections (collapsible; response headers closed by default), shown for the selected step in the scenario editor and for each step in the run log.
 
+### 2026-11-18 — Scenarios screen declutter, phase 1 (design: `docs/enhancements/2026-11-18-scenarios-screen-ux.md`)
+
+- **Setup row:** a pinned item at the top of the step list (UI only; not an entry in `steps:`, no format change). **Definition** tab holds description, spec file and variables; **Result** tab holds the specFile warning, seed, generated variables, setup error and full coverage. The scenario bands that used to sit above the step list are gone, and so is the post-run pass/fail bar.
+- **Header:** a compact coverage chip (`Coverage 5/8 · 62%`) next to the PASSED/FAILED badge opens Setup's Result tab; a setup error shows as one alert line under the header.
+- **Empty scenarios:** a dashed "Start here" row replaces the "No steps yet" text and creates a real first step on click; the bottom "Add step" button shows only when steps exist; Run is disabled with "Add a step to run" (`scenario.Validate` is unchanged). Empty or last-step-removed scenarios select Setup.
+- **Selection:** `ScenarioViewer` selection is `'setup' | number | null`; the Setup row is outside the `role="option"` set so arrow keys, scroll-into-view and Alt+Arrow reorder keep working on step indices; ArrowUp from step 1 selects Setup.
+- **Tests:** viewer, step-list and Playwright tests updated, new tests for Setup, Start here, Run disabled and the keyboard path. Not yet: the "Add your first request" prompt (template / saved-request shortcuts) and focusing the new step's label, and regenerated scenario screenshots.
+
+### 2026-11-18 — Scenarios screen declutter, phase 2
+
+- **Step pane:** a `Definition | Result` toggle replaces the "Step Editor" label. Result is disabled until the step has a result and shows a status dot and code. After a run that ends on a failed step the pane switches to Result once; starting a run switches back to Definition.
+- **Definition** shows a one-line "Last run: FAILED 404 92 ms 1 assertion failed" above the editor, with View result and Run from here. **Result** shows the result strip and `StepExchange` (request headers now start closed, like response headers).
+- **Stale results:** editing a step after a run marks its result stale (tab badge, dimmed Result view, note) until the next run or save.
+- **Calmer editor:** Headers, Query Params and Extractions are collapsible sections with a count badge; empty ones start closed and offer their add button in the header. The editor card is keyed by step index so each step opens the sections that have content.
+- Tests updated and added (pane toggle, auto-switch, stale, editor sections); Playwright adjusted.
+
+### 2026-11-18 — Scenarios screen declutter, phase 3 (partial)
+
+- `RequestSummary` (in `StepExchange.tsx`) is the read-only "request as sent" view with neutral props (`method`, `url`, `headers`, `body`); `StepExchange` uses it for the step Result tab and the run log.
+- **Not done:** showing it on the main request screen. That screen's response carries no request-as-sent (`ResponseOutput` has only the response), so it needs a Go change (a masked request in the output, reusing `exchangeRequest`). Raised for a decision in the design document.
+
+### 2026-11-18 — Scenarios screen declutter, phase 4
+
+- **Run-from-here warning:** `lib/runFrom.ts` (`missingOnRunFrom`) finds values extracted by steps before the start point and used by a step that still runs (URL, headers, params, body, assertions, extraction paths); scenario variables and names re-extracted before use are excluded. The step pane shows "Starting here skips earlier steps, so {{token}} is not set." next to Run from here (Definition and Result views). Frontend only.

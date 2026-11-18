@@ -8,10 +8,11 @@ import type { ScenarioVariable } from '@/lib/bridge'
 type Props = {
   variables: ScenarioVariable[]
   onChange: (variables: ScenarioVariable[]) => void
+  defaultOpen?: boolean
 }
 
-export function ScenarioVariablesSection({ variables, onChange }: Props) {
-  const [open, setOpen] = useState(variables.length > 0)
+export function ScenarioVariablesSection({ variables, onChange, defaultOpen }: Props) {
+  const [open, setOpen] = useState(defaultOpen ?? variables.length > 0)
 
   function update(i: number, patch: Partial<ScenarioVariable>) {
     onChange(variables.map((v, idx) => (idx === i ? { ...v, ...patch } : v)))

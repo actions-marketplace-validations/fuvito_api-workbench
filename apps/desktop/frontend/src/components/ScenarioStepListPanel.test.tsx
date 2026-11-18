@@ -22,6 +22,8 @@ function panel(over: Partial<React.ComponentProps<typeof StepListPanel>> = {}) {
     steps: [step({ label: 'One' }), step({ label: 'Two' }), step({ label: 'Three' })],
     selectedStepIndex: 0,
     onSelectStep: vi.fn(),
+    setupSelected: false,
+    onSelectSetup: vi.fn(),
     result: null,
     running: false,
     onMoveStep: vi.fn(),
@@ -54,9 +56,20 @@ describe('StepListPanel', () => {
     expect(screen.queryAllByRole('option')).toHaveLength(0)
   })
 
-  it('shows an empty message when there are no steps', () => {
-    panel({ steps: [] })
-    expect(screen.getByText('No steps yet.')).toBeInTheDocument()
+  it('shows a Start here row instead of the add button when there are no steps', () => {
+    const { props } = panel({ steps: [] })
+    expect(screen.queryByRole('button', { name: /Add step/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Start here'))
+    expect(props.onAddStep).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the Setup row outside the option set with its badges', () => {
+    const { props } = panel({ variableCount: 2, setupAlert: 'error' })
+    expect(screen.getAllByRole('option')).toHaveLength(3)
+    expect(screen.getByText('2 variables')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Setup error' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Setup' }))
+    expect(props.onSelectSetup).toHaveBeenCalledTimes(1)
   })
 
   it('adds a step', () => {

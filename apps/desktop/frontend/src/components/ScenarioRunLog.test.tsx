@@ -237,6 +237,7 @@ describe('ScenarioRunLog', () => {
       ]))
       await expand()
       expect(await screen.findByText('http://x/users?v=1')).toBeInTheDocument()
+      fireEvent.click(screen.getAllByRole('button', { name: /Headers \(1\)/ })[0])
       expect(screen.getByText('X-Req:')).toBeInTheDocument()
       expect(screen.getByText(/"id": "u1"/)).toBeInTheDocument()
       expect(screen.getByRole('region', { name: 'Request' })).toBeInTheDocument()

@@ -7,13 +7,10 @@ import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage, ScenarioVariable } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
 import { ScenarioHeaderBar } from './ScenarioHeaderBar'
-import { ScenarioMetaSection } from './ScenarioMetaSection'
-import { ScenarioVariablesSection } from './ScenarioVariablesSection'
-import { ScenarioRunInfo } from './ScenarioRunInfo'
+import { ScenarioSetupPane, type SetupTab } from './ScenarioSetupPane'
 import { StepListPanel } from './ScenarioStepListPanel'
 import { StepDetailPane } from './ScenarioDetailPane'
 import { ScenarioYamlDialog } from './ScenarioYamlDialog'
-import { CoverageBanner } from './ScenarioCoverageBanner'
 import { ScenarioStatsDialog } from './ScenarioStatsDialog'
 
 type Props = {
@@ -41,7 +38,10 @@ export function ScenarioViewer({
   const [detail, setDetail] = useState<ScenarioDetail | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedEnvPath, setSelectedEnvPath] = useState(activeEnvPath)
-  const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null)
+  const [selection, setSelection] = useState<'setup' | number | null>(null)
+  const [setupTab, setSetupTab] = useState<SetupTab>('definition')
+  const selectedStepIndex = selection === 'setup' ? null : selection
+  const setSelectedStepIndex = setSelection
 
   const [showYamlDialog, setShowYamlDialog] = useState(false)
 
@@ -77,7 +77,8 @@ export function ScenarioViewer({
     setVisualDetail(null)
     setVisualDirty(false)
     setSelectedEnvPath(activeEnvPath)
-    setSelectedStepIndex(null)
+    setSelection(null)
+    setSetupTab('definition')
     setAccumulatedCoverage(null)
   }
 
@@ -128,7 +129,7 @@ export function ScenarioViewer({
         else {
           setDetail(d)
           initDraft(d)
-          if (d.steps.length > 0) setSelectedStepIndex(0)
+          setSelection(d.steps.length > 0 ? 0 : 'setup')
           if (d.specFile) {
             getAccumulatedCoverage(d.specFile)
               .then(acc => { if (acc) setAccumulatedCoverage(acc) })
@@ -177,6 +178,7 @@ export function ScenarioViewer({
   }
 
   async function handleRun() {
+    if (noSteps) return
     if (visualDirty && !(await handleSave())) return
     onRunningChange(true)
     onResultChange(null)
@@ -185,12 +187,18 @@ export function ScenarioViewer({
       applyRunResult(r)
       const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
+      else if (r.error) showSetupResult()
     } catch (e) {
       onResultChange({ title: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
     } finally {
       onRunningChange(false)
       onRunComplete?.()
     }
+  }
+
+  function showSetupResult() {
+    setSetupTab('result')
+    setSelection('setup')
   }
 
   function handleCancel() {
@@ -207,6 +215,7 @@ export function ScenarioViewer({
       applyRunResult(r)
       const firstFailed = (r.steps ?? []).findIndex(s => !s.passed && !s.skipped)
       if (firstFailed >= 0) setSelectedStepIndex(firstFailed)
+      else if (r.error) showSetupResult()
       else setSelectedStepIndex(fromStep)
     } catch (e) {
       onResultChange({ title: scenarioName, passed: false, durationMs: 0, steps: [], error: String(e) })
@@ -264,7 +273,7 @@ export function ScenarioViewer({
     setVisualDetail({ ...visualDetail, steps: newSteps })
     setVisualDirty(true)
     if (selectedStepIndex === i) {
-      setSelectedStepIndex(newSteps.length > 0 ? Math.min(i, newSteps.length - 1) : null)
+      setSelectedStepIndex(newSteps.length > 0 ? Math.min(i, newSteps.length - 1) : 'setup')
     } else if (selectedStepIndex !== null && selectedStepIndex > i) {
       setSelectedStepIndex(selectedStepIndex - 1)
     }
@@ -280,7 +289,7 @@ export function ScenarioViewer({
       return { ...prev, steps }
     })
     setVisualDirty(true)
-    setSelectedStepIndex(prev => {
+    setSelection(prev => {
       if (prev === from) return from + dir
       if (prev === from + dir) return from
       return prev
@@ -384,9 +393,9 @@ export function ScenarioViewer({
 
   useEffect(() => { onDirtyChange?.(visualDirty) }, [visualDirty]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const passed = result ? (result.steps ?? []).filter(s => s.passed && !s.skipped).length : 0
-  const failed = result ? (result.steps ?? []).filter(s => !s.passed && !s.skipped).length : 0
-  const skipped = result ? (result.steps ?? []).filter(s => s.skipped).length : 0
+  const noSteps = (visualDetail?.steps.length ?? 0) === 0
+  const coverage = accumulatedCoverage ?? result?.coverage
+  const setupAlert: 'error' | 'warning' | null = result?.error ? 'error' : result?.specError ? 'warning' : null
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
@@ -411,6 +420,9 @@ export function ScenarioViewer({
         onSave={handleSave}
         onShowYaml={() => setShowYamlDialog(true)}
         onGetCliCommand={onGetCliCommand}
+        noSteps={noSteps}
+        coverage={coverage ? { covered: coverage.covered, total: coverage.total, percent: coverage.percent } : undefined}
+        onShowCoverage={showSetupResult}
       />
 
       {running && (
@@ -419,44 +431,12 @@ export function ScenarioViewer({
             style={{ animation: 'slide 1.4s ease-in-out infinite' }} />
         </div>
       )}
-      {result && !running && (passed + failed + skipped) > 0 && (
-        <div className="shrink-0 h-1 flex">
-          {passed  > 0 && <div className="bg-emerald-500 transition-all" style={{ flex: passed }} />}
-          {failed  > 0 && <div className="bg-red-500 transition-all" style={{ flex: failed }} />}
-          {skipped > 0 && <div className="bg-[var(--color-muted-foreground)]/30 transition-all" style={{ flex: skipped }} />}
+      {result?.error && !running && (
+        <div role="alert" className="shrink-0 px-4 py-1.5 text-xs text-red-400 bg-red-500/10 border-b border-red-500/20 flex items-center gap-2">
+          <span className="font-semibold">Scenario could not start.</span>
+          <button type="button" onClick={showSetupResult} className="underline hover:no-underline">Details in Setup</button>
         </div>
       )}
-
-      {result?.specError && !running && (
-        <div className="shrink-0 px-4 py-2 text-xs text-amber-400 bg-amber-500/10 border-b border-amber-500/20">
-          <span className="font-semibold">specFile warning: </span>{result.specError}
-        </div>
-      )}
-
-      {(accumulatedCoverage || result?.coverage) && !running && (
-        <CoverageBanner
-          coverage={result?.coverage}
-          accumulated={accumulatedCoverage ?? undefined}
-          onReset={handleResetCoverage}
-        />
-      )}
-
-      {visualDetail && (
-        <ScenarioMetaSection
-          description={visualDetail.description ?? ''}
-          specFile={visualDetail.specFile ?? ''}
-          onChange={updateMeta}
-        />
-      )}
-
-      {visualDetail && (
-        <ScenarioVariablesSection
-          variables={visualDetail.variables ?? []}
-          onChange={variables => updateMeta({ variables })}
-        />
-      )}
-
-      {result && !running && <ScenarioRunInfo result={result} />}
 
       <div ref={containerRef} className="flex-1 flex overflow-hidden">
         <StepListPanel
@@ -467,6 +447,10 @@ export function ScenarioViewer({
           steps={visualDetail?.steps ?? []}
           selectedStepIndex={selectedStepIndex}
           onSelectStep={setSelectedStepIndex}
+          setupSelected={selection === 'setup'}
+          onSelectSetup={() => setSelection('setup')}
+          setupAlert={setupAlert}
+          variableCount={visualDetail?.variables?.length ?? 0}
           result={result}
           running={running}
           onMoveStep={moveVisualStep}
@@ -484,18 +468,31 @@ export function ScenarioViewer({
           <div className="w-px h-full bg-[var(--color-border)] group-hover:bg-[var(--color-accent)] transition-colors" />
         </div>
 
-        <StepDetailPane
-          visualDetail={visualDetail}
-          result={result}
-          running={running}
-          selectedStepIndex={selectedStepIndex}
-          editStepCount={visualDetail?.steps.length ?? 0}
-          onUpdateStep={updateVisualStep}
-          onRemoveStep={removeVisualStep}
-          onMoveStep={moveVisualStep}
-          onToggleDisabled={toggleVisualStepDisabled}
-          onRunFrom={handleRunFrom}
-        />
+        {selection === 'setup' && visualDetail ? (
+          <ScenarioSetupPane
+            tab={setupTab}
+            onTabChange={setSetupTab}
+            detail={visualDetail}
+            result={result}
+            running={running}
+            accumulatedCoverage={accumulatedCoverage}
+            onChange={updateMeta}
+            onResetCoverage={handleResetCoverage}
+          />
+        ) : (
+          <StepDetailPane
+            visualDetail={visualDetail}
+            result={result}
+            running={running}
+            selectedStepIndex={selectedStepIndex}
+            editStepCount={visualDetail?.steps.length ?? 0}
+            onUpdateStep={updateVisualStep}
+            onRemoveStep={removeVisualStep}
+            onMoveStep={moveVisualStep}
+            onToggleDisabled={toggleVisualStepDisabled}
+            onRunFrom={handleRunFrom}
+          />
+        )}
       </div>
 
       {showYamlDialog && visualDetail && (
