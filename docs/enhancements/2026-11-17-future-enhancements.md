@@ -1,6 +1,6 @@
 # Future enhancements backlog
 
-- **Status:** Items 1–10 approved and implemented (see [CI and parity batch](2026-11-17-ci-and-parity-batch.md)); items 11–17 remain ideas for the project owner to think about
+- **Status:** Items 1–10 approved and implemented (see [CI and parity batch](2026-11-17-ci-and-parity-batch.md)); item 11 implemented with the [Postman gap review](2026-11-17-postman-gap-review.md) (C); items 12–17 remain ideas for the project owner to think about
 - **Date:** 2026-11-17
 - **Purpose:** a place to keep ideas that came out of building the CLI Command Builder, HTML reports and folder runs, so they are not lost. Nothing here is a commitment.
 
@@ -24,7 +24,7 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 | 8 ✅ | `--var name=value` overrides | CI | S | Next |
 | 9 ✅ | `markdown` report format (PR comments, job summaries) | CI | M | Next |
 | 10 ✅ | `diff` against a git ref | CI | M | Next |
-| 11 | Baseline mode for `conform` | Adoption | M–L | Later |
+| 11 ✅ | Baseline mode for `conform` | Adoption | M–L | Later |
 | 12 | `validate --strict` (scenario quality lint) | Quality | S–M | Later |
 | 13 | `clrsig init` (workspace and CI scaffolding) | Adoption | M | Later |
 | 14 | Select scenarios by tag or name | Scale | M | Later |
@@ -95,7 +95,9 @@ Ideas already written up elsewhere are only linked here: the remaining phases of
 
 ## Adoption and quality
 
-### 11. Baseline mode for `conform` — M–L
+### 11. Baseline mode for `conform` — M–L ✅ done
+
+> **Implemented** (Postman gap review, item C): `conform --write-baseline <file>` and `--baseline <file>`; file format in `format-spec.md` ("Conform Baseline File").
 
 - **Problem.** Pointing `conform` at a long-lived API often reports hundreds of violations at once, so the check is switched off instead of fixed gradually.
 - **Idea.** `--write-baseline file` records today's violations; `--baseline file` fails only on violations that are not in it, and reports fixed ones, so quality can only ratchet up.
@@ -161,3 +163,4 @@ Alongside these, the CLI Command Builder's phase 2 ("Test it here") is the large
 | 2026-11-17 | Backlog written; nothing approved. The project owner will consider the ideas as future enhancements | assistant |
 | 2026-11-17 | Items 1–10 approved ("go with all above other than later items"); built as one batch | project owner |
 | 2026-11-17 | Items 11–17 ("Later" and "Think twice") stay on the backlog until the project owner decides | project owner |
+| 2026-11-17 | Item 11 built as part of "complete" the Postman gap review (its item C); items 12–17 stay on the backlog | project owner |

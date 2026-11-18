@@ -778,8 +778,21 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--format`, `-f` / `--output`, `-o` | `text`, `json`, `junit`, `html` or `markdown`; write the report to a file. |
 | `--report` | `format=file`, repeatable: also write a report in another format from the same run. |
 | `--var` | `name=value`, repeatable: set or override an environment variable for this run. |
+| `--write-baseline` | Record today's violations in a file (YAML, or JSON for a `.json` name) and exit `0`. |
+| `--baseline` | Accept the violations recorded in that file: only **new** ones fail the run, and fixed ones are reported. |
 
 Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error.
+
+#### Adopting `conform` on an API that already has violations
+
+Pointing `conform` at a long-lived API often reports many violations at once. Record them, commit the file, and let CI fail only on **new** ones:
+
+```bash
+clrsig conform openapi.yaml -b http://localhost:8080 --write-baseline conform-baseline.yaml   # once
+clrsig conform openapi.yaml -b http://localhost:8080 --baseline conform-baseline.yaml         # in CI
+```
+
+The baseline summary (`Baseline: 12 known, 1 new, 3 fixed`, with each new and fixed violation) is printed to stderr, so `--format json` on stdout stays machine-readable. When violations are fixed, run `--write-baseline` again to remove them, so quality can only improve; a regression of a fixed one then fails. A violation is identified by its operation (`GET /users/{id}`), its kind (`request`, `response`, `error`, `probe`) and the field and rule that broke, not by ids or timestamps, so the file does not change between runs. The JUnit/HTML/JSON reports still list every violation; only the exit code follows the baseline. Secrets never appear in the file.
 
 ### `clrsig diff` and `clrsig impact`
 

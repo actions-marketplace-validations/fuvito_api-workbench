@@ -447,6 +447,22 @@ scenarios:                         # optional — one or more
 
 ---
 
+## Conform Baseline File
+
+Written by `clrsig conform --write-baseline <file>` and read by `--baseline <file>`. It lists the violations a team has accepted for now. YAML or JSON by file extension (`.json` is JSON). Unknown fields are errors.
+
+```yaml
+schemaVersion: "1"           # required — always "1" (quoted string); a newer version is refused
+violations:                  # sorted, no duplicates, no timestamps (so the file only changes when violations do)
+  - operation: "GET /users/{id}"   # required — method and path template from the spec
+    kind: response                 # required — request | response | error | probe
+    detail: "/id: property is missing"   # optional — field and rule; empty for an error; "<probe kind>: <description>" for a probe
+```
+
+A violation is identified by `operation` + `kind` + `detail`. Secret values are replaced with `***`.
+
+---
+
 ## File Naming Conventions
 
 | File type | Convention | Example |

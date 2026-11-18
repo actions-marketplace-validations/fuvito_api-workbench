@@ -433,3 +433,11 @@ Do not implement or stub any of these without explicit user direction.
 - **AI prompt** now teaches scenario variables, dynamic functions and interpolated assertions (guard test updated).
 - Playwright: 2 new tests; the 5 `smoke` tests still need a live `wails dev` server.
 
+
+### 2026-11-17 — Postman gap review items A–E (design: `docs/enhancements/2026-11-17-postman-gap-review.md`)
+
+- **B — redirect control:** request `followRedirects: false` returns a 3xx as it is (default unchanged); request files, scenario step requests, bundles, desktop request editor ("No redirects") and step editor. Finding (not changed): the response validator treats an undeclared status code as "nothing to validate".
+- **A — `retry` and `timeoutMs` are real:** the runner applies step `timeoutMs` (overrides the request timeout) and `retry` (total attempts; re-sent after a network error or 5xx only, never after a failed assertion; max 10 attempts, delay up to 60 s, validated). `StepResult.Attempts` is shown in text, JSON, HTML, Markdown and the desktop; the "not applied" warnings and docs are gone.
+- **D — OAuth2:** the client-credentials scenario pattern is documented (user guide, AI prompt) and covered by an end-to-end CLI test; no dedicated auth type.
+- **E — client certificates (mTLS):** `executor.TLSFiles` (cert, key, extra CA; paths only, `${NAME}` expanded at run time); Settings panel fields; `--client-cert`, `--client-key`, `--ca-cert` (and `CLRSIG_CLIENT_CERT`, `CLRSIG_CLIENT_KEY`, `CLRSIG_CA_CERT`) on every CLI command that sends requests, validated before anything is sent. Encrypted private keys are not supported.
+- **C — conform baseline (backlog 11):** `conform --write-baseline <file>` records violations, `--baseline <file>` fails only on new ones and reports fixed ones. New versioned file format (`schemaVersion: "1"`, documented in `format-spec.md`); violation identity = operation + kind + detail; no timestamps (stable diffs); secrets redacted; summary on stderr so machine formats stay pure.

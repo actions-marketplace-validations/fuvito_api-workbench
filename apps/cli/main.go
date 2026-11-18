@@ -420,6 +420,7 @@ func conformCmd() *cobra.Command {
 	var reports []string
 	var showCoverage bool
 	var runNegative bool
+	var baselineFile, writeBaseline string
 	var start = time.Now()
 
 	cmd := &cobra.Command{
@@ -432,7 +433,10 @@ response schema.
 Exit codes:
   0  all operations conformed
   1  one or more violations or execution failures
-  2  spec parse or configuration error`,
+  2  spec parse or configuration error
+
+With --baseline, violations already recorded in the baseline file are accepted and
+only new ones fail the run; --write-baseline records the current violations.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src := args[0]
@@ -440,6 +444,20 @@ Exit codes:
 			plan, err := planReports(format, reports, outputFile)
 			if err != nil {
 				return err
+			}
+
+			if baselineFile != "" && writeBaseline != "" {
+				return fmt.Errorf("use --baseline or --write-baseline, not both")
+			}
+			var base *conformance.Baseline
+			if baselineFile != "" {
+				baseData, err := os.ReadFile(baselineFile)
+				if err != nil {
+					return fmt.Errorf("reading baseline: %w (record one with --write-baseline %s)", err, baselineFile)
+				}
+				if base, err = conformance.ParseBaseline(baseData, baselineFile); err != nil {
+					return err
+				}
 			}
 
 			data, specFormat, err := fetchSpec(src)
@@ -553,9 +571,23 @@ Exit codes:
 			if negResult != nil {
 				_, negFailed, _, _ = negResult.Counts()
 			}
+			runFailed := failed > 0 || negFailed > 0
+			current := conformance.Violations(result, negResult)
+			if writeBaseline != "" {
+				if err := conformance.WriteBaselineFile(writeBaseline, conformance.NewBaseline(current)); err != nil {
+					return fmt.Errorf("writing baseline: %w", err)
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "Baseline written: %d violation%s recorded in %s\n", len(current), plural(len(current)), writeBaseline)
+				runFailed = false // recording the current state accepts it
+			}
+			if base != nil {
+				diff := conformance.Compare(current, base)
+				fmt.Fprint(cmd.ErrOrStderr(), diff.Text())
+				runFailed = len(diff.New) > 0
+			}
 			tel := newTelemetryClient()
 			telResult := "pass"
-			if failed > 0 || negFailed > 0 {
+			if runFailed {
 				telResult = "fail"
 			}
 			passed, failedCount, _ := result.Counts()
@@ -565,7 +597,7 @@ Exit codes:
 				DurationMs:     time.Since(start).Milliseconds(),
 				AssertionCount: passed + failedCount,
 			})
-			if failed > 0 || negFailed > 0 {
+			if runFailed {
 				return &exitError{1}
 			}
 			return nil
@@ -583,6 +615,8 @@ Exit codes:
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
+	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")
+	cmd.Flags().StringVar(&writeBaseline, "write-baseline", "", "Record the current violations in this file (YAML or JSON by extension) and exit 0")
 	cmd.Flags().BoolVar(&runNegative, "negative", false, "Also run negative probes: drop required fields, wrong types, missing auth, missing params")
 	return cmd
 }

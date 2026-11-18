@@ -195,6 +195,20 @@ var catalog = []Command{
 				Group: GroupAdvanced,
 			},
 			{
+				Name: "baseline", Kind: KindString,
+				Label:   "Accept recorded violations",
+				Help:    "Violations already listed in this baseline file are accepted; only new ones fail the run, and fixed ones are reported.",
+				Example: "conform-baseline.yaml",
+				Group:   GroupAdvanced, Deferred: true,
+			},
+			{
+				Name: "write-baseline", Kind: KindString,
+				Label:   "Record violations as a baseline",
+				Help:    "Write today's violations to this file and exit 0, so a long-lived API can adopt the check and improve gradually.",
+				Example: "conform-baseline.yaml",
+				Group:   GroupAdvanced, Deferred: true,
+			},
+			{
 				Name: "tags", Kind: KindString,
 				Label:   "Only these tags",
 				Help:    "Only check operations that carry one of these OpenAPI tags. Separate several with commas.",
