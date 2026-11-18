@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
 // Issue is a single validation finding for a scenario file.
@@ -38,6 +39,7 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 	if sc.Title == "" {
 		add(0, "", "scenario title is required")
 	}
+	validateVariables(sc, add)
 	if len(sc.Steps) == 0 {
 		add(0, "", "scenario has no steps")
 		return issues
@@ -98,6 +100,12 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 			}
 			if (a.Type == domain.AssertionHeader || a.Type == domain.AssertionJSONPath) && a.Path == "" {
 				add(num, name, fmt.Sprintf("%s assertion requires a path", a.Type))
+			}
+		}
+
+		for _, text := range stepStrings(&step) {
+			for _, err := range variables.Check(text) {
+				add(num, name, err.Error())
 			}
 		}
 

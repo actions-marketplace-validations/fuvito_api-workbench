@@ -58,6 +58,7 @@ type BundleScenarioFile struct {
 	Title       string     `yaml:"title" json:"title"`
 	Description string     `yaml:"description,omitempty" json:"description,omitempty"`
 	SpecFile    string     `yaml:"specFile,omitempty" json:"specFile,omitempty"`
+	Variables   []EnvVar   `yaml:"variables,omitempty" json:"variables,omitempty"`
 	Steps       []StepFile `yaml:"steps" json:"steps"`
 }
 
@@ -136,7 +137,7 @@ func bundleFileToDomain(bf *BundleFile) (*Bundle, error) {
 		b.Requests = append(b.Requests, BundleRequest{File: r.File, Request: req})
 	}
 	for i, s := range bf.Scenarios {
-		sf := ScenarioFile{SchemaVersion: "1", Title: s.Title, Description: s.Description, SpecFile: s.SpecFile, Steps: s.Steps}
+		sf := ScenarioFile{SchemaVersion: "1", Title: s.Title, Description: s.Description, SpecFile: s.SpecFile, Variables: s.Variables, Steps: s.Steps}
 		sc, err := scenarioFileToDomain(&sf)
 		if err != nil {
 			return nil, fmt.Errorf("scenarios[%d] %q: %w", i, s.Title, err)
@@ -179,7 +180,7 @@ func bundleDomainToFile(b *Bundle) *BundleFile {
 	for _, s := range b.Scenarios {
 		sf := scenarioDomainToFile(s.Scenario)
 		bf.Scenarios = append(bf.Scenarios, BundleScenarioFile{
-			File: s.File, Title: sf.Title, Description: sf.Description, SpecFile: sf.SpecFile, Steps: sf.Steps,
+			File: s.File, Title: sf.Title, Description: sf.Description, SpecFile: sf.SpecFile, Variables: sf.Variables, Steps: sf.Steps,
 		})
 	}
 	return bf

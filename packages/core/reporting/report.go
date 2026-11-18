@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
@@ -15,13 +16,26 @@ import (
 
 // Text returns a human-readable scenario result suitable for terminal output.
 // Uses plain ASCII (no ANSI codes) so it is safe in CI logs.
-func Text(result *scenario.Result) string {
+func Text(result *scenario.Result) string { return textScenario(result, true) }
+
+// textScenario is Text; showSeed is false when several scenarios share one run seed that the
+// combined report prints once.
+func textScenario(result *scenario.Result, showSeed bool) string {
 	var b strings.Builder
 	x := redactorFor(result)
 
 	fmt.Fprintf(&b, "Scenario: %s\n", result.Scenario.Title)
 	if result.Scenario.Description != "" {
 		fmt.Fprintf(&b, "          %s\n", result.Scenario.Description)
+	}
+	if showSeed && result.UsedRandomness {
+		fmt.Fprintf(&b, "          seed: %d\n", result.Seed)
+	}
+	for _, v := range result.Variables {
+		fmt.Fprintf(&b, "          var %s = %s\n", v.Name, x.variable(v))
+	}
+	if result.SetupError != "" {
+		fmt.Fprintf(&b, "          error: %s\n", x.text(result.SetupError))
 	}
 	fmt.Fprintln(&b)
 
@@ -107,6 +121,9 @@ type JSONReport struct {
 	Scenario   string                `json:"scenario"`
 	Passed     bool                  `json:"passed"`
 	DurationMs int64                 `json:"durationMs"`
+	Seed       *int64                `json:"seed,omitempty"`
+	Error      string                `json:"error,omitempty"`
+	Variables  []JSONVariable        `json:"variables,omitempty"`
 	Steps      []JSONStep            `json:"steps"`
 	Coverage   *JSONScenarioCoverage `json:"coverage,omitempty"`
 }
@@ -118,6 +135,12 @@ type JSONScenarioCoverage struct {
 	Percent   float64          `json:"percent"`
 	Exercised []JSONCoverageOp `json:"exercised"`
 	Missed    []JSONCoverageOp `json:"missed"`
+}
+
+// JSONVariable is a scenario variable and the value it was given for the run.
+type JSONVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type JSONStep struct {
@@ -145,31 +168,41 @@ type JSONAssertion struct {
 // ---- JUnit XML ----
 
 type jUnitTestSuites struct {
-	XMLName    xml.Name       `xml:"testsuites"`
-	Name       string         `xml:"name,attr"`
-	Tests      int            `xml:"tests,attr"`
-	Failures   int            `xml:"failures,attr"`
-	Errors     int            `xml:"errors,attr"`
-	Time       string         `xml:"time,attr"`
-	TestSuites []jUnitSuite   `xml:"testsuite"`
+	XMLName    xml.Name     `xml:"testsuites"`
+	Name       string       `xml:"name,attr"`
+	Tests      int          `xml:"tests,attr"`
+	Failures   int          `xml:"failures,attr"`
+	Errors     int          `xml:"errors,attr"`
+	Time       string       `xml:"time,attr"`
+	TestSuites []jUnitSuite `xml:"testsuite"`
+}
+
+type jUnitProperty struct {
+	Name  string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
+}
+
+type jUnitProperties struct {
+	Property []jUnitProperty `xml:"property"`
 }
 
 type jUnitSuite struct {
-	Name     string        `xml:"name,attr"`
-	Tests    int           `xml:"tests,attr"`
-	Failures int           `xml:"failures,attr"`
-	Errors   int           `xml:"errors,attr"`
-	Time     string        `xml:"time,attr"`
-	Cases    []jUnitCase   `xml:"testcase"`
+	Name       string           `xml:"name,attr"`
+	Tests      int              `xml:"tests,attr"`
+	Failures   int              `xml:"failures,attr"`
+	Errors     int              `xml:"errors,attr"`
+	Time       string           `xml:"time,attr"`
+	Properties *jUnitProperties `xml:"properties,omitempty"`
+	Cases      []jUnitCase      `xml:"testcase"`
 }
 
 type jUnitCase struct {
-	Name      string         `xml:"name,attr"`
-	ClassName string         `xml:"classname,attr"`
-	Time      string         `xml:"time,attr"`
-	Skipped   *struct{}      `xml:"skipped"`
-	Failure   *jUnitFailure  `xml:"failure"`
-	Error     *jUnitError    `xml:"error"`
+	Name      string        `xml:"name,attr"`
+	ClassName string        `xml:"classname,attr"`
+	Time      string        `xml:"time,attr"`
+	Skipped   *struct{}     `xml:"skipped"`
+	Failure   *jUnitFailure `xml:"failure"`
+	Error     *jUnitError   `xml:"error"`
 }
 
 type jUnitFailure struct {
@@ -235,6 +268,17 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 		Time:     secStr(result.Duration.Milliseconds()),
 	}
 
+	if result.UsedRandomness {
+		suite.Properties = &jUnitProperties{Property: []jUnitProperty{{Name: "seed", Value: strconv.FormatInt(result.Seed, 10)}}}
+	}
+	if result.SetupError != "" {
+		suite.Tests++
+		suite.Errors++
+		suite.Cases = append(suite.Cases, jUnitCase{
+			Name: "scenario variables", ClassName: result.Scenario.Title, Time: "0.000",
+			Error: &jUnitError{Message: x.text(result.SetupError), Text: x.text(result.SetupError)},
+		})
+	}
 	for _, sr := range result.Steps {
 		stepMs := int64(0)
 		if sr.Response != nil {
@@ -340,13 +384,13 @@ func ConformText(result *conformance.ConformResult, coverage *conformance.Covera
 
 // JSONConformReport is the machine-readable structure for a conformance run.
 type JSONConformReport struct {
-	SpecTitle   string           `json:"specTitle"`
-	SpecVersion string           `json:"specVersion"`
-	BaseURL     string           `json:"baseURL"`
-	Passed      bool             `json:"passed"`
-	DurationMs  int64            `json:"durationMs"`
-	Operations  []JSONConformOp  `json:"operations"`
-	Coverage    *JSONCoverage    `json:"coverage,omitempty"`
+	SpecTitle   string          `json:"specTitle"`
+	SpecVersion string          `json:"specVersion"`
+	BaseURL     string          `json:"baseURL"`
+	Passed      bool            `json:"passed"`
+	DurationMs  int64           `json:"durationMs"`
+	Operations  []JSONConformOp `json:"operations"`
+	Coverage    *JSONCoverage   `json:"coverage,omitempty"`
 }
 
 type JSONConformOp struct {
@@ -632,6 +676,14 @@ func JSON(result *scenario.Result) ([]byte, error) {
 		DurationMs: result.Duration.Milliseconds(),
 	}
 
+	if result.UsedRandomness {
+		seed := result.Seed
+		report.Seed = &seed
+	}
+	report.Error = x.text(result.SetupError)
+	for _, v := range result.Variables {
+		report.Variables = append(report.Variables, JSONVariable{Name: v.Name, Value: x.variable(v)})
+	}
 	for _, sr := range result.Steps {
 		step := JSONStep{
 			Name:      sr.Label,

@@ -15,15 +15,15 @@ import (
 // RequestFile is the on-disk representation of a Request.
 // It maps 1-to-1 with the domain type but carries YAML/JSON tags.
 type RequestFile struct {
-	SchemaVersion string     `yaml:"schemaVersion" json:"schemaVersion"`
-	Title         string     `yaml:"title,omitempty" json:"title,omitempty"`
-	Method        string     `yaml:"method" json:"method"`
-	URL           string     `yaml:"url" json:"url"`
-	Headers       []KVPair   `yaml:"headers,omitempty" json:"headers,omitempty"`
-	QueryParams   []KVPair   `yaml:"queryParams,omitempty" json:"queryParams,omitempty"`
-	Body          *BodyFile  `yaml:"body,omitempty" json:"body,omitempty"`
-	Auth          *AuthFile  `yaml:"auth,omitempty" json:"auth,omitempty"`
-	Timeout       string     `yaml:"timeout,omitempty" json:"timeout,omitempty"` // e.g. "30s"
+	SchemaVersion string    `yaml:"schemaVersion" json:"schemaVersion"`
+	Title         string    `yaml:"title,omitempty" json:"title,omitempty"`
+	Method        string    `yaml:"method" json:"method"`
+	URL           string    `yaml:"url" json:"url"`
+	Headers       []KVPair  `yaml:"headers,omitempty" json:"headers,omitempty"`
+	QueryParams   []KVPair  `yaml:"queryParams,omitempty" json:"queryParams,omitempty"`
+	Body          *BodyFile `yaml:"body,omitempty" json:"body,omitempty"`
+	Auth          *AuthFile `yaml:"auth,omitempty" json:"auth,omitempty"`
+	Timeout       string    `yaml:"timeout,omitempty" json:"timeout,omitempty"` // e.g. "30s"
 }
 
 type KVPair struct {

@@ -122,6 +122,12 @@ func scenarioSummary(result *scenario.Result) string {
 func scenarioSection(result *scenario.Result) htmlSection {
 	x := redactorFor(result)
 	sec := htmlSection{Heading: result.Scenario.Title, Note: result.Scenario.Description}
+	for _, v := range result.Variables {
+		sec.Rows = append(sec.Rows, htmlRow{Status: "INFO", Title: "variable " + v.Name, Meta: x.variable(v)})
+	}
+	if result.SetupError != "" {
+		sec.Rows = append(sec.Rows, htmlRow{Status: "ERR", Title: "scenario could not start", Lines: []htmlLine{{Mark: "!", Text: x.text(result.SetupError)}}})
+	}
 	for _, sr := range result.Steps {
 		row := htmlRow{Title: sr.Label}
 		switch {
@@ -174,12 +180,19 @@ func opLines(ops []openapi.CoveredOperation) []string {
 // HTML returns a self-contained, human-readable HTML report for a scenario run.
 // Pass a non-nil cov to append a spec coverage section. Extracted variable values
 // are deliberately left out so the file is safe to share as a CI artifact.
+func withSeed(summary string, seed int64, used bool) string {
+	if !used {
+		return summary
+	}
+	return fmt.Sprintf("%s  ·  seed %d", summary, seed)
+}
+
 func scenarioDoc(result *scenario.Result, cov *openapi.ScenarioCoverageResult) htmlDoc {
 	doc := htmlDoc{
 		Title:    result.Scenario.Title,
 		Subtitle: "Scenario run",
 		Passed:   result.Passed,
-		Summary:  scenarioSummary(result),
+		Summary:  withSeed(scenarioSummary(result), result.Seed, result.UsedRandomness),
 		Sections: []htmlSection{scenarioSection(result)},
 	}
 	if cov != nil {
@@ -229,8 +242,9 @@ func multiDoc(title string, results []*scenario.Result, total time.Duration, cov
 		doc.Sections = append(doc.Sections, coverageSection(heading, c.Result))
 	}
 	doc.Passed = passedScenarios == len(results)
-	doc.Summary = fmt.Sprintf("%d/%d scenarios passed  (%d steps, %d/%d assertions passed)  %dms",
-		passedScenarios, len(results), steps, assertsPassed, assertsTotal, total.Milliseconds())
+	seed, used := runSeed(results)
+	doc.Summary = withSeed(fmt.Sprintf("%d/%d scenarios passed  (%d steps, %d/%d assertions passed)  %dms",
+		passedScenarios, len(results), steps, assertsPassed, assertsTotal, total.Milliseconds()), seed, used)
 	return doc
 }
 

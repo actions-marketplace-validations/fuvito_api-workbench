@@ -24,7 +24,7 @@ func TestInterpolate_Simple(t *testing.T) {
 		{"{{baseUrl}}/items", "https://api.example.com/items"},
 		{"{{baseUrl}}/{{version}}/items", "https://api.example.com/v1/items"},
 		{"no variables here", "no variables here"},
-		{"{{missing}}", "{{missing}}"},        // unresolved left unchanged
+		{"{{missing}}", "{{missing}}"},               // unresolved left unchanged
 		{"{{ baseUrl }}", "https://api.example.com"}, // whitespace trimmed
 	}
 	for _, c := range cases {

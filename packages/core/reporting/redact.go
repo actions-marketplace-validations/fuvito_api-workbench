@@ -92,6 +92,15 @@ func (x redactor) text(s string) string {
 	return s
 }
 
+// variable returns a scenario variable's value as it may appear in a report: a variable marked
+// secret is never shown.
+func (x redactor) variable(v scenario.ResolvedVariable) string {
+	if v.Secret {
+		return Redacted
+	}
+	return x.text(v.Value)
+}
+
 // extracted returns the extracted variables as they may appear in a report.
 func (x redactor) extracted(m map[string]string) map[string]string {
 	if len(m) == 0 {
