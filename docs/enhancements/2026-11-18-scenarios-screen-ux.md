@@ -1,6 +1,6 @@
 # Scenarios screen: declutter (UX review)
 
-**Status:** Accepted (direction); not started
+**Status:** Accepted (reviewed); not started
 **Date:** 2026-11-18
 **Related:** `2026-11-18 Scenarios Screen UX Simplification Report.md` (earlier, code-independent report; this one is grounded in the components and takes a smaller route)
 
@@ -37,9 +37,11 @@ Keep one screen, no global modes. Three changes, in this order.
 
 - First item in the step list, styled differently from steps (own icon, no number, not reorderable, not deletable, no enable/disable). It is **UI only**: it is not an entry in `steps:`, so the file format, `schemaVersion`, `format-spec.md`, CLI, bundles, importers, report indices and "run from step N" are untouched. It is deliberately not called "Step 0": it has no request and no pass/fail, and a literal step would invite "can I disable it?" questions.
 - **Definition** tab: description, spec file, scenario variables (the existing `ScenarioMetaSection` and `ScenarioVariablesSection` content). Room for later scenario-level defaults (default headers, timeout, base URL).
-- **Result** tab (after a run): seed and replay command, generated variable values, "Scenario could not start" error, specFile warning, and a one-line coverage summary (`5/8 operations, 62%`, with accumulated coverage and reset). Same `Definition | Result` pattern as steps (section B).
+- **Result** tab (after a run): seed and replay command, generated variable values, "Scenario could not start" error, specFile warning, and the full coverage detail (this run, not yet covered, accumulated, quality, reset). Same `Definition | Result` pattern as steps (section B).
 - "Always runs first, whatever step you start from" is already true: scenario variables are generated once per run before any step. Nothing changes at runtime.
+- **Coverage stays visible.** Coverage is the product's primary purpose (API Contract Validation), so a compact indicator (`5/8 · 62%`) sits in the header next to the PASSED/FAILED badge; clicking it opens Setup's Result tab. Only the detail moves.
 - Failures stay visible without opening it: the Setup row shows a red dot, and a setup error also appears as a one-line alert under the header.
+- **Selection model.** `selectedStepIndex` becomes a `'setup' | number` union. The Setup row must stay out of the `role="option"` set (or offset indices by one): arrow-key navigation in `ScenarioStepListPanel`, scroll-into-view in `ScenarioViewer` and the Alt+Arrow reorder shortcut all assume list index equals step index. `result.steps[i]` stays aligned because Setup is not in `steps`.
 - A scenario with steps opens with step 1 selected; an empty one opens with Setup selected (see the ghost row below).
 - Not in scope: setup that sends requests (log in first). That would be a before-all hook with its own failure semantics; today a login is step 1, and the OAuth2 pattern is documented that way.
 
@@ -52,11 +54,11 @@ When a scenario has zero steps (new, or the user deleted them all), the list sho
 - **Deleting the last step is allowed**; the ghost row returns and Setup stays.
 - **No duplicate add controls:** the bottom "+ Add step" button is shown only when at least one step exists.
 - **Selection:** a new or empty scenario opens with Setup selected, the ghost row right below it.
-- **To verify before building:** a zero-step scenario can be saved and loaded (validator, serializer), and Run is disabled with the tooltip "Add a step to run" (runner behaviour not yet checked).
+- **Verified behaviour:** the visual editor saves and loads a zero-step scenario, but `scenario.Validate` reports "scenario has no steps" (YAML dialog, bundle and CLI validation), and Run is not disabled today: running it returns a green PASSED with zero steps. Decision: keep the validator as is and **disable Run for zero steps** with the tooltip "Add a step to run".
 
 #### Run from here (follow-up, optional)
 
-Starting at step N skips earlier steps, so values they extract (a token, an id) do not exist. The Setup/step view should warn: "Starting here: `token`, `userId` are not set (extracted in steps 1-2)". This is the real pain point behind "setup always runs"; Setup alone does not solve it. Verify the runner's current behaviour before building.
+Starting at step N skips earlier steps, so values they extract (a token, an id) do not exist. The Setup/step view should warn: "Starting here: `token`, `userId` are not set (extracted in steps 1-2)". This is the real pain point behind "setup always runs"; Setup alone does not solve it. Runner behaviour is verified: steps before the start point do not run, so `{{token}}` stays literal and the request goes out unexpanded (typically a confusing 404). Defined `variables:` still exist; only extracted values are missing. The warning is computed in the frontend: collect `extractions[].name` from steps before N and scan steps from N (URL, headers, params, body, assertions) for `{{name}}`. No Go change. Later idea, out of scope: seed missing values from the last run's cached extracted values.
 
 ### B. Per-step `Definition | Result` toggle in the detail pane
 
@@ -65,10 +67,12 @@ Starting at step N skips earlier steps, so values they extract (a token, an id) 
 - After a run, auto-select `Result` for the first failed step (or the selected step if it ran); any edit to that step switches back to `Definition`. Users can always click either.
 - A one-line "Last run: FAILED · 404 · 92 ms · 1 assertion failed" stays above the editor in `Definition`, so the editor never hides the verdict.
 - "Run from here" stays in both views.
+- Auto-switch happens once, on the transition into a completed run, never on later edits. The first edit after a run switches back to `Definition` once (not per keystroke).
+- **Stale results:** a step's result survives unsaved edits until save or rerun, so when that step is dirty the Result tab is dimmed and marked "stale".
 
 ### C. Calmer step editor
 
-- Collapse empty Headers, Params, Extractions and Advanced by default (Advanced already opens when it has non-default values); show a count badge when collapsed. Assertions stay open.
+- Collapse empty Headers, Params, Extractions and Advanced by default (Advanced already opens when it has non-default values); show a count badge when collapsed. Assertions stay open. Body also collapses when `bodyType` is `none` (the common GET case).
 - Result tab: response headers collapsed (already), request headers collapsed, bodies capped to about 20 lines with "expand".
 
 ## 4. Request views vs. step content
@@ -78,16 +82,18 @@ You asked that the request screen and the step content look similar but not iden
 - the step `Result` tab (resolved request as sent, credentials masked, already produced by `exchangeRequest`);
 - the main request screen's response area (the request that was sent).
 
+`RequestSummary` takes a neutral props shape (method, url, headers, body) so the step Result tab and the request screen both feed it without leaking `StepResultIO` types. Credentials are already masked Go-side by `exchangeRequest`; no security logic in the component.
+
 Differences stay intentional: editors show templates (`{{baseUrl}}`), summaries show resolved values; summaries are read-only and copyable. An optional `Template | Resolved` toggle in the step `Result` tab is possible later, not needed now.
 
 ## 5. Phasing
 
 | Phase | Delivers | Size |
 |---|---|---|
-| 1 | A (pinned Setup row) | Frontend only; move existing components into it, no format or runtime change |
+| 1 | A (pinned Setup row, header coverage chip, ghost row, Run disabled at zero steps) | Frontend only; larger than a component move: selection/keyboard/reorder model changes, one small behaviour change, many tests |
 | 2 | B + C (step toggle, calmer editor) | Frontend only; one state value per scenario view |
 | 3 | `RequestSummary` shared with the request screen | Frontend only; refactor `StepExchange` |
-| 4 (optional) | Run-from-here "values not set" warning | Frontend; needs the runner behaviour checked |
+| 4 | Run-from-here "values not set" warning | Frontend only (runner check done) |
 | Later, only if still crowded | Optional collapse of the step list, or Build/Run/Inspect modes from the earlier report | Reassess after 1-3 |
 
 ## 6. Requirement review
@@ -99,16 +105,19 @@ Differences stay intentional: editors show templates (`{{baseUrl}}`), summaries 
 
 ## 7. Risks
 
-- Moving variables and coverage into Setup lowers their discoverability. Mitigation: the Setup row shows a variable count and a status dot, and errors also appear under the header.
+- Moving variables and coverage into Setup lowers their discoverability. Mitigation: the Setup row shows a variable count and a status dot, the header keeps a coverage chip, and errors also appear under the header.
+- A stale Result tab can show a response that no longer matches an edited step. Mitigation: dim and mark it stale while the step is dirty.
 - "Setup" could be mistaken for a step that sends requests. Mitigation: distinct icon, no number, no run status of its own.
 - Auto-switching tabs can surprise. Mitigation: only auto-switch right after a run, never while typing.
 - A failed run with the toggle on `Definition` could be missed. Mitigation: the "Last run" verdict line and the list status dot.
 
-## 8. Open decisions
+## 8. Decisions
 
-1. Auto-select `Result` after a run? *Recommend yes, for failed steps only.*
-2. Go further with global modes now? *Recommend no; revisit after phases 1-2.*
-3. Add the Run-from-here warning (phase 4)? *Recommend yes, after checking the runner.*
+1. Auto-select `Result` after a run? *Decided: yes, failed steps only, once.*
+2. Go further with global modes now? *Decided: no; revisit after phases 1-2.*
+3. Add the Run-from-here warning (phase 4)? *Decided: yes; runner check done.*
+4. Zero-step scenarios: keep `scenario.Validate` flagging them and disable Run? *Decided: yes.*
+5. The thin post-run pass/fail bar (band 2) repeats the header badge. *Decided: remove it after a run; keep the progress bar while running.*
 
 ## 9. Decision log
 
@@ -117,3 +126,18 @@ Differences stay intentional: editors show templates (`{{baseUrl}}`), summaries 
 | 2026-11-18 | Proposal written | Claude |
 | 2026-11-18 | Replace the "Scenario details strip" with a pinned UI-only Setup row (not a real step, no format change); name it "Setup", not "Step 0"; defer global modes | Owner, Claude |
 | 2026-11-18 | Empty scenario shows a UI-only "Start here" ghost row after Setup (not a real step, not saved); deleting the last step is allowed | Owner, Claude |
+| 2026-11-18 | Review by Devin folded in: header coverage chip, selection sentinel, Run disabled at zero steps (validator unchanged), stale Result marking, once-only auto-switch, body collapse, neutral `RequestSummary` props, drop post-run bar | Owner, Claude |
+
+## 10. Review outcome and next steps
+
+Devin's review verified the band count, the runtime claims (variables defined before the step loop, run-from skips extraction) and the frontend-only scope. One objection: coverage hidden inside a tab undersells the product's purpose. **Accepted**: header coverage chip (section A). All other notes were accepted and are folded into sections 3-8.
+
+Build order (each phase is a separate commit, tests and screenshots updated in the same change):
+
+1. **Phase 1:** selection sentinel and keyboard/scroll/reorder fixes; Setup row with Definition and Result tabs; header coverage chip; remove bands 3-7 and the post-run bar; ghost row; Run disabled at zero steps.
+2. **Phase 2:** per-step `Definition | Result` toggle (once-only auto-switch, stale marking); collapse empty sections and body-none.
+3. **Phase 3:** `RequestSummary` shared by step Result and the request screen.
+4. **Phase 4:** run-from-here "values not set" warning.
+5. **With each phase:** update `ScenarioViewer.test.tsx`, `ScenarioDetailPane`, `ScenarioStepResult`, `ScenarioStepListPanel` tests and the Playwright scenario specs; regenerate scenario screenshots; add a `CLAUDE.md` changelog entry and a user-guide update; set this document to `Done` when phase 4 ships.
+
+Nothing is built yet; starting phase 1 needs the owner's go-ahead.
