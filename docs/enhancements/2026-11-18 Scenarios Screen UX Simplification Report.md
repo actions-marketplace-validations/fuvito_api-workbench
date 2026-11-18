@@ -1,3 +1,5 @@
+# Please disregard this document, 2026-11-18-scenarios-screen-ux.md was built based on this document, and this was an early draft
+
 ## Scenarios Screen UX Report
 
 ### Executive summary
