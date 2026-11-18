@@ -85,6 +85,26 @@ Lookup order, most specific first: values extracted by steps → scenario variab
 
 "One run" means one `clrsig run` invocation, one desktop Run All, or one single request send.
 
+**Does the same function give the same value?** It depends only on where it is written:
+
+```yaml
+variables:
+  - name: orderNo
+    value: "{{$randomInt 1000 9999}}"     # generated ONCE, when the scenario starts
+  - name: otherNo
+    value: "{{$randomInt 1000 9999}}"     # a separate variable: generated separately, so a different value
+steps:
+  - request:
+      url: "{{baseUrl}}/orders/{{orderNo}}?copy={{orderNo}}"     # the same value everywhere orderNo is used
+      body: {content: '{"a":{{$randomInt 1 9}},"b":{{$randomInt 1 9}}}'}   # inline: two calls, two independent values
+```
+
+- `{{orderNo}}` is the same in every step, header, URL, body and assertion of that scenario run.
+- Writing the same function twice inline, or defining it in two variables, gives two independent values (they can still match by chance).
+- Two scenarios that define the same variable each get their **own** value, because a scenario variable is generated once per scenario run.
+- An environment variable written with a function is generated once for the whole command, so every scenario in a folder run sees the same value.
+- With the same `--seed`, every one of these values replays identically.
+
 ### 4.4 Reproducibility: a seed
 
 All randomness comes from one seeded generator. The seed is chosen at random unless given (`--seed 12345`, or the environment variable `CLRSIG_SEED`), and it is **printed in every report** (text header, JSON `seed`, JUnit property, HTML and Markdown header). Each scenario derives its own generator from the run seed and the scenario's path, so the values do not depend on execution order and stay the same if scenarios later run in parallel. A failing CI run can then be replayed exactly with `--seed`.
@@ -98,6 +118,7 @@ A small built-in evaluator in the core: numbers, variables (their text parsed as
 ### 4.6 Validation and errors
 
 - `clrsig validate` (and the builder, and desktop save) check every `{{$…}}`: unknown function, wrong number or type of arguments, bad offset or format, and variable cycles are reported with their location.
+- **Assertions can use variables and functions.** Today assertion values are never interpolated (only requests are), so a test cannot check that a response echoes a generated value. Phase 1 interpolates the assertion `expected` value and its `path` (header name or JSONPath) with the same rules, so `expected: "{{email}}"` works. This is a behaviour change for any assertion that currently contains literal `{{...}}` text.
 - At run time an unknown `$` function or a failed evaluation stops that scenario with a clear error; it never sends the literal text.
 - An unknown plain `{{name}}` keeps today's behaviour (left as written, with the existing missing-variable hint).
 
@@ -136,7 +157,7 @@ A small built-in evaluator in the core: numbers, variables (their text parsed as
 
 | Phase | Delivers |
 |---|---|
-| **1 — Variables and core functions** | scenario `variables:` (ordered list) and scope rules; `$guid`, `$randomString/Alpha/Hex/Choice`, `$randomInt/Float/Bool`, `$timestamp*`, `$date/$datetime/$time` with offsets and formats; seed (`--seed`, report header); validation; importer name mapping; `format-spec.md`, AI prompt, user guide; CLI Command Builder `--seed`. Acceptance: one scenario with a generated email used by create and fetch passes; the same `--seed` gives identical requests; a typo is a validation error; the Postman fixture with `{{$randomInt}}` imports and runs. |
+| **1 — Variables and core functions** | interpolation of assertion values (`expected`, `path`); scenario `variables:` (ordered list) and scope rules; `$guid`, `$randomString/Alpha/Hex/Choice`, `$randomInt/Float/Bool`, `$timestamp*`, `$date/$datetime/$time` with offsets and formats; seed (`--seed`, report header); validation; importer name mapping; `format-spec.md`, AI prompt, user guide; CLI Command Builder `--seed`. Acceptance: one scenario with a generated email used by create and fetch passes; the same `--seed` gives identical requests; a typo is a validation error; the Postman fixture with `{{$randomInt}}` imports and runs. |
 | **2 — Calculations and fake data** | `$calc` (with its error cases) and the small fake-data set |
 | **3 — Desktop** | autocomplete with function help, Variables section in the scenario editor, run result shows seed and variables |
 
@@ -166,3 +187,5 @@ A small built-in evaluator in the core: numbers, variables (their text parsed as
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-17 | Proposal written from the project owner's request: dynamic values, scenario scope, easy and conventional, evaluated in the core | assistant |
+| 2026-11-17 | Project owner replied "yes" to the nine recommendations in section 9 and asked how the same function behaves in scenario variables (answered in 4.3) | project owner |
+| 2026-11-17 | Found while answering: assertion values are not interpolated today; added to phase 1 | assistant |
