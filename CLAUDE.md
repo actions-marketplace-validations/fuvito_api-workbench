@@ -450,3 +450,10 @@ Do not implement or stub any of these without explicit user direction.
 
 - `StepResultIO` carries the request as sent (`requestMethod`, `requestUrl` with query parameters, `requestHeaders`, `requestBody`), built by `exchangeRequest` with credentials masked (sensitive header/parameter names, the auth block, and every secret value). New `StepExchange` component: blue Request and green Response sections (collapsible; response headers closed by default), shown for the selected step in the scenario editor and for each step in the run log.
 
+### 2026-11-18 — Scenarios screen declutter, phase 1 (design: `docs/enhancements/2026-11-18-scenarios-screen-ux.md`)
+
+- **Setup row:** a pinned item at the top of the step list (UI only; not an entry in `steps:`, no format change). **Definition** tab holds description, spec file and variables; **Result** tab holds the specFile warning, seed, generated variables, setup error and full coverage. The scenario bands that used to sit above the step list are gone, and so is the post-run pass/fail bar.
+- **Header:** a compact coverage chip (`Coverage 5/8 · 62%`) next to the PASSED/FAILED badge opens Setup's Result tab; a setup error shows as one alert line under the header.
+- **Empty scenarios:** a dashed "Start here" row replaces the "No steps yet" text and creates a real first step on click; the bottom "Add step" button shows only when steps exist; Run is disabled with "Add a step to run" (`scenario.Validate` is unchanged). Empty or last-step-removed scenarios select Setup.
+- **Selection:** `ScenarioViewer` selection is `'setup' | number | null`; the Setup row is outside the `role="option"` set so arrow keys, scroll-into-view and Alt+Arrow reorder keep working on step indices; ArrowUp from step 1 selects Setup.
+- **Tests:** viewer, step-list and Playwright tests updated, new tests for Setup, Start here, Run disabled and the keyboard path. Not yet: the "Add your first request" prompt (template / saved-request shortcuts) and focusing the new step's label, and regenerated scenario screenshots.
