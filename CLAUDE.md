@@ -465,3 +465,12 @@ Do not implement or stub any of these without explicit user direction.
 - **Stale results:** editing a step after a run marks its result stale (tab badge, dimmed Result view, note) until the next run or save.
 - **Calmer editor:** Headers, Query Params and Extractions are collapsible sections with a count badge; empty ones start closed and offer their add button in the header. The editor card is keyed by step index so each step opens the sections that have content.
 - Tests updated and added (pane toggle, auto-switch, stale, editor sections); Playwright adjusted.
+
+### 2026-11-18 — Scenarios screen declutter, phase 3 (partial)
+
+- `RequestSummary` (in `StepExchange.tsx`) is the read-only "request as sent" view with neutral props (`method`, `url`, `headers`, `body`); `StepExchange` uses it for the step Result tab and the run log.
+- **Not done:** showing it on the main request screen. That screen's response carries no request-as-sent (`ResponseOutput` has only the response), so it needs a Go change (a masked request in the output, reusing `exchangeRequest`). Raised for a decision in the design document.
+
+### 2026-11-18 — Scenarios screen declutter, phase 4
+
+- **Run-from-here warning:** `lib/runFrom.ts` (`missingOnRunFrom`) finds values extracted by steps before the start point and used by a step that still runs (URL, headers, params, body, assertions, extraction paths); scenario variables and names re-extracted before use are excluded. The step pane shows "Starting here skips earlier steps, so {{token}} is not set." next to Run from here (Definition and Result views). Frontend only.

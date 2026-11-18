@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { statusColor } from '@/lib/httpUtils'
 import { StepEditorCard } from './ScenarioStepEditor'
 import { StepExchange } from './StepExchange'
+import { missingOnRunFrom, describeMissing } from '@/lib/runFrom'
 import type { ScenarioDetail, ScenarioResult, StepDetail } from '@/lib/bridge'
 
 type Props = {
@@ -21,6 +22,14 @@ type Props = {
 
 type StepRes = NonNullable<ScenarioResult['steps']>[number]
 type View = 'definition' | 'result'
+
+function RunFromWarning({ text }: { text: string }) {
+  return (
+    <p role="note" className="shrink-0 px-3 py-1 text-[11px] text-amber-400 bg-amber-500/10 border-b border-amber-500/20">
+      {text}
+    </p>
+  )
+}
 
 function StepResultStrip({ result, onRunFrom, running }: {
   result: StepRes
@@ -173,6 +182,11 @@ export function StepDetailPane({
     else if (stepResult && !stepResult.passed && !stepResult.skipped) setView('result')
   }
 
+  const missing = selectedStepIndex !== null && visualDetail
+    ? missingOnRunFrom(visualDetail.steps, visualDetail.variables, selectedStepIndex)
+    : []
+  const runFromWarning = missing.length > 0 ? describeMissing(missing) : null
+
   const effectiveView: View = view === 'result' && stepResult ? 'result' : 'definition'
   const isStale = selectedStepIndex !== null && (stale.includes(-1) || stale.includes(selectedStepIndex))
   const markStale = (i: number) => setStale(prev => (prev.includes(i) ? prev : [...prev, i]))
@@ -217,6 +231,7 @@ export function StepDetailPane({
                 onRunFrom={() => onRunFrom(selectedStepIndex)}
                 running={running}
               />
+              {runFromWarning && <RunFromWarning text={runFromWarning} />}
               <div className={cn('flex-1 overflow-y-auto p-3 flex flex-col gap-3', isStale && 'opacity-60')}>
                 {isStale && (
                   <p className="text-xs text-amber-400">This step was edited after the run, so the result below may not match it.</p>
@@ -227,6 +242,7 @@ export function StepDetailPane({
           ) : (
             <>
               {stepResult && <LastRunLine result={stepResult} stale={isStale} onOpen={() => setView('result')} onRunFrom={() => onRunFrom(selectedStepIndex)} running={running} />}
+              {stepResult && runFromWarning && <RunFromWarning text={runFromWarning} />}
               <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
                 <StepEditorCard
                   key={selectedStepIndex}

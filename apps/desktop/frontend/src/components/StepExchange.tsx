@@ -106,9 +106,37 @@ function BodyBlock({ text, tone }: { text: string; tone: keyof typeof TONES }) {
   )
 }
 
+export type RequestSummaryProps = {
+  method?: string
+  url?: string
+  headers?: Header[]
+  body?: string
+}
+
+// The request as it was sent, read-only: method and URL, headers, body, in the order of the step
+// editor. Takes plain values so any screen can show it; credentials are masked before they arrive.
+export function RequestSummary({ method, url, headers = [], body }: RequestSummaryProps) {
+  return (
+    <Section
+      tone="request"
+      title="Request"
+      summary={
+        <>
+          {method && <span className={cn('font-mono font-bold shrink-0', METHOD_BADGE[method] ?? '')}>{method}</span>}
+          <span className="font-mono text-[var(--color-muted-foreground)] truncate">{url}</span>
+        </>
+      }
+    >
+      <HeaderList headers={headers} tone="request" defaultOpen={false} />
+      {body ? <BodyBlock text={body} tone="request" /> : (
+        <p className="text-xs text-[var(--color-muted-foreground)] italic">No body sent.</p>
+      )}
+    </Section>
+  )
+}
+
 // The exchange of one step: the request as it was sent and the response that came back.
 export function StepExchange({ result }: { result: StepResult }) {
-  const reqHeaders = result.requestHeaders ?? []
   const resHeaders = result.responseHeaders ?? []
   const hasRequest = !!result.requestMethod || !!result.requestUrl
   const hasResponse = result.statusCode > 0 || !!result.responseBody || resHeaders.length > 0
@@ -119,25 +147,13 @@ export function StepExchange({ result }: { result: StepResult }) {
   return (
     <div className="flex flex-col gap-2" aria-label="Step request and response">
       {hasRequest && (
-        <Section
-          tone="request"
-          title="Request"
-          summary={
-            <>
-              {result.requestMethod && (
-                <span className={cn('font-mono font-bold shrink-0', METHOD_BADGE[result.requestMethod] ?? '')}>{result.requestMethod}</span>
-              )}
-              <span className="font-mono text-[var(--color-muted-foreground)] truncate">{result.requestUrl}</span>
-            </>
-          }
-        >
-          <HeaderList headers={reqHeaders} tone="request" defaultOpen={false} />
-          {result.requestBody ? <BodyBlock text={result.requestBody} tone="request" /> : (
-            <p className="text-xs text-[var(--color-muted-foreground)] italic">No body sent.</p>
-          )}
-        </Section>
+        <RequestSummary
+          method={result.requestMethod}
+          url={result.requestUrl}
+          headers={result.requestHeaders}
+          body={result.requestBody}
+        />
       )}
-
       {hasResponse && (
         <Section
           tone="response"

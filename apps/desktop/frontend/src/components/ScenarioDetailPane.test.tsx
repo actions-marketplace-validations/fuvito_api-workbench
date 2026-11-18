@@ -181,6 +181,22 @@ describe('StepDetailPane', () => {
     expect(screen.getByDisplayValue('X-Two')).toBeInTheDocument()
   })
 
+  it('warns that run-from-here leaves extracted values unset', () => {
+    const steps = [
+      { label: 'Login', method: 'POST', url: '/l', assertions: [], extractions: [{ name: 'token', source: 'jsonpath', path: '$.t' }] },
+      { label: 'Use', method: 'GET', url: '/u/{{token}}', assertions: [], extractions: [] },
+    ]
+    setup({ visualDetail: { ...detail, steps }, selectedStepIndex: 1, result: resultOf(res(), res()) })
+    expect(screen.getByRole('note')).toHaveTextContent('{{token}} is not set')
+    openResult()
+    expect(screen.getByRole('note')).toHaveTextContent('{{token}} is not set')
+  })
+
+  it('shows no run-from warning when nothing is missing', () => {
+    setup({ result: resultOf(res()) })
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+
   it('forwards editor changes with the selected index', () => {
     const p = setup({ selectedStepIndex: 1 })
     fireEvent.change(screen.getByDisplayValue('Second'), { target: { value: 'Renamed' } })

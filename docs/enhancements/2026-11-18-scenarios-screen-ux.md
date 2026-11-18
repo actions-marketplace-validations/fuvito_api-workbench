@@ -92,7 +92,7 @@ Differences stay intentional: editors show templates (`{{baseUrl}}`), summaries 
 |---|---|---|
 | 1 | A (pinned Setup row, header coverage chip, ghost row, Run disabled at zero steps) | Frontend only; larger than a component move: selection/keyboard/reorder model changes, one small behaviour change, many tests |
 | 2 | B + C (step toggle, calmer editor) | Frontend only; one state value per scenario view |
-| 3 | `RequestSummary` shared with the request screen | Frontend only; refactor `StepExchange` |
+| 3 | `RequestSummary` shared with the request screen | Part 1 done: component extracted from `StepExchange` (frontend). Part 2 needs a Go change: the request screen's `ResponseOutput` carries no request-as-sent, so showing it there means adding a masked request to the output (reuse `exchangeRequest`). Not frontend-only, as first written; awaiting decision |
 | 4 | Run-from-here "values not set" warning | Frontend only (runner check done) |
 | Later, only if still crowded | Optional collapse of the step list, or Build/Run/Inspect modes from the earlier report | Reassess after 1-3 |
 
@@ -134,6 +134,7 @@ Devin's review verified the band count, the runtime claims (variables defined be
 
 Build order (each phase is a separate commit, tests and screenshots updated in the same change):
 
+0. **Status 2026-11-18:** phases 1 and 2 are built; phase 3 part 1 is built (see section 5).
 1. **Phase 1:** selection sentinel and keyboard/scroll/reorder fixes; Setup row with Definition and Result tabs; header coverage chip; remove bands 3-7 and the post-run bar; ghost row; Run disabled at zero steps.
 2. **Phase 2:** per-step `Definition | Result` toggle (once-only auto-switch, stale marking); collapse empty sections and body-none.
 3. **Phase 3:** `RequestSummary` shared by step Result and the request screen.
