@@ -17,7 +17,6 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
-	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/history"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
@@ -47,6 +46,7 @@ func main() {
 		SilenceUsage:  true,
 	}
 
+	addTLSFlags(root)
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())
@@ -114,7 +114,7 @@ func requestCmd() *cobra.Command {
 				resolved.Timeout = time.Duration(timeoutMs) * time.Millisecond
 			}
 
-			exec := executor.New(executor.Options{})
+			exec := newExecutor()
 			resp, execErr := exec.Execute(context.Background(), resolved)
 
 			method := string(resolved.Method)
@@ -487,7 +487,7 @@ Exit codes:
 				}
 			}
 
-			exec := executor.New(executor.Options{})
+			exec := newExecutor()
 			runner := conformance.New(exec)
 			result := runner.Run(context.Background(), spec, baseURL, env, opts)
 

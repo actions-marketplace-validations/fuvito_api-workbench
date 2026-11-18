@@ -32,6 +32,7 @@ const (
 // Neither the desktop frontend nor the CLI may duplicate this logic.
 type Executor struct {
 	client         *http.Client
+	initErr        error // a certificate that could not be loaded; reported by every Execute
 	defaultTimeout time.Duration
 	maxBodySize    int64
 }
@@ -45,6 +46,8 @@ type Options struct {
 	// automatically replayed on subsequent requests. Use for scenario runs;
 	// leave false for stateless single-request execution.
 	WithCookies bool
+	// TLS names client-certificate and CA files for mutual TLS (see TLSFiles).
+	TLS TLSFiles
 }
 
 func New(opts Options) *Executor {
@@ -57,9 +60,9 @@ func New(opts Options) *Executor {
 		maxBody = defaultMaxBodySize
 	}
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: opts.TLSSkipVerify}, //nolint:gosec
-	}
+	tlsConfig := &tls.Config{InsecureSkipVerify: opts.TLSSkipVerify} //nolint:gosec
+	initErr := opts.TLS.Apply(tlsConfig)
+	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	if opts.ProxyURL != "" {
 		if u, err := url.Parse(opts.ProxyURL); err == nil {
 			transport.Proxy = http.ProxyURL(u)
@@ -73,6 +76,7 @@ func New(opts Options) *Executor {
 	}
 
 	return &Executor{
+		initErr:        initErr,
 		client:         client,
 		defaultTimeout: timeout,
 		maxBodySize:    maxBody,
@@ -83,6 +87,9 @@ func New(opts Options) *Executor {
 // The caller is responsible for variable interpolation before calling Execute.
 // ctx can be used to cancel the request externally; req.Timeout further constrains it.
 func (e *Executor) Execute(ctx context.Context, req *domain.Request) (*domain.Response, error) {
+	if e.initErr != nil {
+		return nil, e.initErr
+	}
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid request: %w", err)
 	}

@@ -367,6 +367,36 @@ steps:
 
 `{{email}}` is the same in both steps; two inline `{{$guid}}` calls are different. A function used in an environment variable is generated once per `clrsig` command. Random values come from a seed that the report shows; `clrsig run --seed 12345` (or `CLRSIG_SEED`) replays a run exactly. `{{$calc price * quantity}}` does arithmetic, and `{{$randomEmail}}`, `{{$randomFullName}}` and similar give realistic fake data. In the desktop app, the **Variables** section under a scenario's description edits these (the lock marks a value as secret, so reports mask it). Typing `{{` in a URL, header, body or variable value lists your variables and every dynamic function with a one-line description; picking a function inserts a working example to adjust. After a run, the scenario shows the generated values and, when random values were used, the seed that replays them with `clrsig run --seed`; a scenario that cannot start (for example an unknown function) shows the reason instead of running. The complete function list is in the Format Spec tab.
 
+### Authenticating with OAuth2 (client credentials)
+
+There is no separate OAuth2 auth type: for service-to-service APIs a scenario does the same thing in two steps. The first step asks the token endpoint for a token and extracts it; later steps use it as a bearer token.
+
+```yaml
+steps:
+  - label: Get token
+    request:
+      method: POST
+      url: "{{authUrl}}/oauth/token"
+      body:
+        type: form-urlencoded
+        content: "grant_type=client_credentials&client_id={{clientId}}&client_secret={{clientSecret}}"
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+    extractions:
+      - {name: accessToken, source: jsonpath, path: $.access_token}
+  - label: Call the API
+    request:
+      method: GET
+      url: "{{baseUrl}}/me"
+      auth:
+        type: bearer
+        token: "{{accessToken}}"
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+```
+
+Keep the client secret out of the file: in the environment, give `clientSecret` the value `${CLIENT_SECRET}` with `secret: true`, and set `CLIENT_SECRET` in your CI secrets. Reports mask secret environment values, and an extracted value whose name looks secret (`accessToken`) is masked too. The token is fetched once per scenario run; put the token step first in each scenario that needs it. Values that contain `&`, `=` or other special characters must be URL-encoded in a form body. Flows that need a browser (authorization code, PKCE) are not supported: paste a token into an environment variable instead.
+
 ### Step fields
 
 | Field | Description |
@@ -579,6 +609,16 @@ clrsig run ./scenarios --env ./environments/ci.yaml
 | `--var` | (none) | `name=value`, repeatable: set or override one environment variable for this run only. Put secrets in environment variables, not here (command lines are visible to other processes). |
 | `--report` | (none) | `format=file`, repeatable: also write a report in another format from the same run. See [Several reports from one run](#several-reports-from-one-run). |
 | `--show-extracted` | off | Show extracted values whose names look secret. See [Secrets in reports](#secrets-in-reports). |
+
+### Client certificates (mutual TLS)
+
+For APIs that require a client certificate, every command that sends requests (`run`, `request`, `conform`, `bundle run`, `mcp`) accepts:
+
+```bash
+clrsig run ./scenarios --client-cert client.pem --client-key client.key --ca-cert private-ca.pem
+```
+
+or the environment variables `CLRSIG_CLIENT_CERT`, `CLRSIG_CLIENT_KEY` and `CLRSIG_CA_CERT` (a flag wins). Give paths, not contents: in CI, write the certificate from your secret store to a temporary file first. A wrong or half-configured path stops the command before any request is sent (exit 2). The key must be unencrypted PEM.
 
 ### Exit codes
 
@@ -899,6 +939,8 @@ Open via the gear icon at the bottom of the Activity Rail (the icon bar on the f
 | **Default timeout** | Request timeout in milliseconds (applies when the per-request timeout is 0). |
 | **Proxy URL** | HTTP/HTTPS proxy for all outbound requests (e.g. `http://proxy:8080`). Leave empty to use the system proxy. |
 | **TLS skip verify** | Disable certificate verification. Use only for local development with self-signed certificates. |
+| **Client certificate file**, **Client key file** | Mutual TLS: the PEM certificate and private key sent to servers that require a client certificate. Only the file *paths* are stored (a `${NAME}` reference is expanded when a request is sent); the key must not be password-protected. Both are needed together. |
+| **CA certificate file** | A PEM file of extra certificate authorities to trust (added to the system ones), for servers signed by a private CA. |
 | **Anonymous telemetry** | Opt-in usage counters (off by default). No request contents or personal data. Same switch as `clrsig telemetry enable`. |
 
 Changes preview immediately. Click **Save** to persist; **Cancel** reverts to the last saved values.

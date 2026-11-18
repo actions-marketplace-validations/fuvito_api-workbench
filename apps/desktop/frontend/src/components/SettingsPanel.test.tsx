@@ -95,3 +95,22 @@ describe('SettingsPanel', () => {
     expect(h.onReset).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('SettingsPanel — client certificates', () => {
+  it('edits the three file paths and saves them', () => {
+    const h = setup()
+    fireEvent.change(screen.getByLabelText('Client certificate file'), { target: { value: '/c/client.pem' } })
+    fireEvent.change(screen.getByLabelText('Client key file'), { target: { value: '/c/client.key' } })
+    fireEvent.change(screen.getByLabelText('CA certificate file'), { target: { value: '${CA_FILE}' } })
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({
+      clientCertFile: '/c/client.pem', clientKeyFile: '/c/client.key', caFile: '${CA_FILE}',
+    }))
+  })
+
+  it('shows saved paths', () => {
+    setup({ ...defaults, clientCertFile: '/c/client.pem' })
+    expect((screen.getByLabelText('Client certificate file') as HTMLInputElement).value).toBe('/c/client.pem')
+    expect((screen.getByLabelText('Client key file') as HTMLInputElement).value).toBe('')
+  })
+})

@@ -131,6 +131,7 @@ func buildExecutorOpts(ss *SettingsService, withCookies bool) *executor.Executor
 		TLSSkipVerify: cfg.TLSSkipVerify,
 		ProxyURL:      cfg.ProxyURL,
 		WithCookies:   withCookies,
+		TLS:           executor.TLSFiles{ClientCertFile: cfg.ClientCertFile, ClientKeyFile: cfg.ClientKeyFile, CAFile: cfg.CAFile},
 	}
 	if cfg.DefaultTimeoutMs > 0 {
 		opts.DefaultTimeout = time.Duration(cfg.DefaultTimeoutMs) * time.Millisecond

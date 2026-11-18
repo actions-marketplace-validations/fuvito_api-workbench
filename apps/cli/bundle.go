@@ -11,7 +11,6 @@ import (
 
 	"github.com/fuvito/api-workbench/packages/core/bundle"
 	"github.com/fuvito/api-workbench/packages/core/domain"
-	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
@@ -70,7 +69,7 @@ func cwdSpecPath(src string) string {
 
 // newScenarioRunner builds a runner that validates responses against spec when one is given.
 func newScenarioRunner(spec *openapi.Spec) *scenario.Runner {
-	exec := executor.New(executor.Options{})
+	exec := newExecutor()
 	if spec != nil {
 		return scenario.NewWithSpec(exec, spec)
 	}

@@ -18,6 +18,7 @@ import (
 // not write to os.Stderr and does not call os.Exit on RunE errors.
 func newTestRoot() *cobra.Command {
 	root := &cobra.Command{Use: "clrsig", SilenceErrors: true, SilenceUsage: true}
+	addTLSFlags(root)
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())

@@ -24,7 +24,7 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
   const [proxyError, setProxyError] = useState('')
 
   function isChanged<K extends keyof AppSettings>(key: K): boolean {
-    return local[key] !== DEFAULTS[key]
+    return (local[key] ?? '') !== (DEFAULTS[key] ?? '') // optional text settings are empty when unset
   }
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
@@ -135,6 +135,39 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                     Allow self-signed / invalid certificates
                   </span>
                 </label>
+              </Row>
+
+              <Row label="Client certificate file" changed={isChanged('clientCertFile')}>
+                <input
+                  type="text"
+                  value={local.clientCertFile ?? ''}
+                  onChange={e => set('clientCertFile', e.target.value)}
+                  placeholder="/path/to/client.pem (or ${CLIENT_CERT})"
+                  aria-label="Client certificate file"
+                  className={inputCls}
+                />
+              </Row>
+
+              <Row label="Client key file" changed={isChanged('clientKeyFile')}>
+                <input
+                  type="text"
+                  value={local.clientKeyFile ?? ''}
+                  onChange={e => set('clientKeyFile', e.target.value)}
+                  placeholder="/path/to/client.key (not password-protected)"
+                  aria-label="Client key file"
+                  className={inputCls}
+                />
+              </Row>
+
+              <Row label="CA certificate file" changed={isChanged('caFile')}>
+                <input
+                  type="text"
+                  value={local.caFile ?? ''}
+                  onChange={e => set('caFile', e.target.value)}
+                  placeholder="/path/to/ca.pem (extra CAs to trust)"
+                  aria-label="CA certificate file"
+                  className={inputCls}
+                />
               </Row>
 
             </div>

@@ -170,6 +170,10 @@ export interface AppSettings {
   proxyUrl: string
   tlsSkipVerify: boolean
   telemetryEnabled: boolean
+  // mutual TLS: file paths only (may contain ${NAME}); never the certificate contents
+  clientCertFile?: string
+  clientKeyFile?: string
+  caFile?: string
 }
 
 export interface HistoryEntry {
