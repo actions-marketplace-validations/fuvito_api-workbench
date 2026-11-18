@@ -1,0 +1,44 @@
+schemaVersion: "1"
+title: Calculations ($calc)
+description: |
+  $calc does arithmetic on numbers and on variables that hold numbers (written bare, without braces):
+  + - * / %, parentheses, and round(), floor(), ceil(), abs(), min(), max().
+  Change price or taxRate and run again; the assertions follow because they use the same variables.
+
+variables:
+  - name: price
+    value: "19.99"
+  - name: quantity
+    value: "{{$randomInt 2 9}}"
+  - name: taxRate
+    value: "0.2"
+  - name: subtotal
+    value: "{{$calc round(price * quantity, 2)}}"
+  - name: total
+    value: "{{$calc round(subtotal * (1 + taxRate), 2)}}"
+
+steps:
+  - label: Send an order total
+    notes: "The server echoes the body, so you can see the arithmetic. subtotal and total were calculated once, before the first step."
+    request:
+      method: POST
+      url: "{{baseUrl}}/echo"
+      body:
+        type: json
+        content: '{"price":{{price}},"quantity":{{quantity}},"subtotal":{{subtotal}},"total":{{total}},"cheapest":{{$calc min(price, 25, 30)}},"half":{{$calc quantity / 2}},"remainder":{{$calc quantity % 2}}}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.body"
+        operator: contains
+        expected: '"subtotal":{{subtotal}}'
+      - type: jsonpath
+        path: "$.body"
+        operator: contains
+        expected: '"total":{{total}}'
+      - type: jsonpath
+        path: "$.body"
+        operator: contains
+        expected: '"cheapest":19.99'

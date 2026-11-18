@@ -441,3 +441,7 @@ Do not implement or stub any of these without explicit user direction.
 - **D — OAuth2:** the client-credentials scenario pattern is documented (user guide, AI prompt) and covered by an end-to-end CLI test; no dedicated auth type.
 - **E — client certificates (mTLS):** `executor.TLSFiles` (cert, key, extra CA; paths only, `${NAME}` expanded at run time); Settings panel fields; `--client-cert`, `--client-key`, `--ca-cert` (and `CLRSIG_CLIENT_CERT`, `CLRSIG_CLIENT_KEY`, `CLRSIG_CA_CERT`) on every CLI command that sends requests, validated before anything is sent. Encrypted private keys are not supported.
 - **C — conform baseline (backlog 11):** `conform --write-baseline <file>` records violations, `--baseline <file>` fails only on new ones and reports fixed ones. New versioned file format (`schemaVersion: "1"`, documented in `format-spec.md`); violation identity = operation + kind + detail; no timestamps (stable diffs); secrets redacted; summary on stderr so machine formats stay pure.
+
+### 2026-11-17 — Demo workspace: dynamic values
+
+- `demo_workspace/scenarios/4-dynamic-values/` (unique-users, function-playground, calculations, dates-and-offsets), `requests/8-dynamic-values/echo-dynamic.yaml`, and a `runId` environment function in `environments/local.yaml`. A Go test runs every scenario five times (each run generates different values) and sends the request twice to check the values differ.

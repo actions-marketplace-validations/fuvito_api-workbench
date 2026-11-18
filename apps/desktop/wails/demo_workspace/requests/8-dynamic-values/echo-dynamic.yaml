@@ -1,0 +1,24 @@
+schemaVersion: "1"
+title: Echo with dynamic values
+method: POST
+url: "{{baseUrl}}/echo"
+queryParams:
+  - name: requestId
+    value: "{{$guid}}"
+  - name: expires
+    value: "{{$date +7d}}"
+headers:
+  - name: X-Run-Id
+    value: "{{runId}}"
+  - name: X-Nonce
+    value: "{{$randomHex 12}}"
+body:
+  type: json
+  content: |
+    {
+      "name": "{{$randomFullName}}",
+      "email": "{{$randomEmail}}",
+      "quantity": {{$randomInt 1 10}},
+      "total": {{$calc round(19.99 * 3, 2)}},
+      "createdAt": "{{$isoTimestamp}}"
+    }

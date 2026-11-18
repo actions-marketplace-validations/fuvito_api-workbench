@@ -1,0 +1,70 @@
+schemaVersion: "1"
+title: Unique users (scenario variables)
+description: |
+  Every run creates a different user, so the scenario never collides with data from an earlier run.
+  The scenario variables below are generated ONCE per run and are identical in every step and
+  assertion. Run it twice and compare the values shown under the run result.
+  Try: change the $randomChoice options, or run it from the CLI with the same --seed to replay the same user.
+
+variables:
+  - name: firstName
+    value: "{{$randomFirstName}}"
+  - name: email
+    value: "{{$randomString 8}}@example.com"
+  - name: role
+    value: "{{$randomChoice viewer editor admin}}"
+  - name: label
+    value: "{{firstName}} ({{runId}})"
+
+steps:
+  - label: Create user
+    notes: "name, email and role come from the scenario variables above. runId is an environment value (see environments/local.yaml) generated once per run."
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      body:
+        type: json
+        content: '{"name":"{{label}}","email":"{{email}}","role":"{{role}}"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: 201
+      - type: jsonpath
+        path: "$.email"
+        operator: eq
+        expected: "{{email}}"
+      - type: jsonpath
+        path: "$.role"
+        operator: eq
+        expected: "{{role}}"
+    extractions:
+      - name: newId
+        source: jsonpath
+        path: "$.id"
+
+  - label: Fetch it back
+    notes: "The same email and label again: a scenario variable never changes during a run."
+    request:
+      method: GET
+      url: "{{baseUrl}}/users/{{newId}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.name"
+        operator: eq
+        expected: "{{label}}"
+      - type: jsonpath
+        path: "$.email"
+        operator: eq
+        expected: "{{email}}"
+
+  - label: Delete it
+    request:
+      method: DELETE
+      url: "{{baseUrl}}/users/{{newId}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 204

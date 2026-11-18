@@ -1,0 +1,57 @@
+schemaVersion: "1"
+title: Dates and offsets
+description: |
+  Date and time functions read the clock, so they are not affected by --seed. Offsets: +7d, -2h, +30m
+  (units s m h d w M y). format= takes yyyy-MM-dd style patterns or iso, rfc1123, unix, unixms;
+  tz= takes an IANA name such as Europe/Berlin (default UTC).
+
+variables:
+  - name: dueDate
+    value: "{{$date +14d}}"
+  - name: yesterday
+    value: "{{$date -1d format=yyyy-MM-dd}}"
+
+steps:
+  - label: Echo dates
+    request:
+      method: GET
+      url: "{{baseUrl}}/echo"
+      queryParams:
+        - name: today
+          value: "{{$date}}"
+        - name: due
+          value: "{{dueDate}}"
+        - name: yesterday
+          value: "{{yesterday}}"
+        - name: nextMonth
+          value: "{{$date +1M format=yyyy-MM}}"
+        - name: berlin
+          value: "{{$datetime tz=Europe/Berlin}}"
+        - name: later
+          value: "{{$time +90m format=HH:mm}}"
+        - name: unixMs
+          value: "{{$timestampMs}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.queryParams.today"
+        operator: matches
+        expected: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      - type: jsonpath
+        path: "$.queryParams.due"
+        operator: eq
+        expected: "{{dueDate}}"
+      - type: jsonpath
+        path: "$.queryParams.nextMonth"
+        operator: matches
+        expected: '^[0-9]{4}-[0-9]{2}$'
+      - type: jsonpath
+        path: "$.queryParams.later"
+        operator: matches
+        expected: '^[0-9]{2}:[0-9]{2}$'
+      - type: jsonpath
+        path: "$.queryParams.unixMs"
+        operator: matches
+        expected: '^[0-9]{13}$'

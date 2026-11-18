@@ -1,0 +1,94 @@
+schemaVersion: "1"
+title: Function playground (every function, echoed back)
+description: |
+  Sends one request that uses many dynamic functions inline, and the echo endpoint reflects them
+  back so you can see what was generated. An inline call is generated EVERY time it appears, so
+  guid and guidAgain differ. Edit a value and run again; type "{{" in a field to browse the
+  function list.
+
+steps:
+  - label: Echo generated values
+    request:
+      method: GET
+      url: "{{baseUrl}}/echo"
+      queryParams:
+        - name: guid
+          value: "{{$guid}}"
+        - name: guidAgain
+          value: "{{$guid}}"
+        - name: text
+          value: "{{$randomString 12}}"
+        - name: letters
+          value: "{{$randomAlpha 6}}"
+        - name: hex
+          value: "{{$randomHex 8}}"
+        - name: pick
+          value: "{{$randomChoice red green blue}}"
+        - name: int
+          value: "{{$randomInt 100 200}}"
+        - name: float
+          value: "{{$randomFloat 1 5 decimals=3}}"
+        - name: flag
+          value: "{{$randomBool}}"
+        - name: unix
+          value: "{{$timestamp}}"
+        - name: iso
+          value: "{{$isoTimestamp}}"
+        - name: email
+          value: "{{$randomEmail}}"
+        - name: name
+          value: "{{$randomFullName}}"
+        - name: phone
+          value: "{{$randomPhone}}"
+        - name: word
+          value: "{{$randomWord}}"
+        - name: sum
+          value: "{{$calc 2 + 3 * 4}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+      - type: jsonpath
+        path: "$.queryParams.guid"
+        operator: matches
+        expected: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      - type: jsonpath
+        path: "$.queryParams.guidAgain"
+        operator: matches
+        expected: '^[0-9a-f-]{36}$'
+      - type: jsonpath
+        path: "$.queryParams.text"
+        operator: matches
+        expected: '^[A-Za-z0-9]{12}$'
+      - type: jsonpath
+        path: "$.queryParams.hex"
+        operator: matches
+        expected: '^[0-9a-f]{8}$'
+      - type: jsonpath
+        path: "$.queryParams.pick"
+        operator: matches
+        expected: '^(red|green|blue)$'
+      - type: jsonpath
+        path: "$.queryParams.int"
+        operator: matches
+        expected: '^(1[0-9]{2}|200)$'
+      - type: jsonpath
+        path: "$.queryParams.float"
+        operator: matches
+        expected: '^[1-5]\.[0-9]{3}$'
+      - type: jsonpath
+        path: "$.queryParams.flag"
+        operator: matches
+        expected: '^(true|false)$'
+      - type: jsonpath
+        path: "$.queryParams.email"
+        operator: contains
+        expected: "@example.com"
+      - type: jsonpath
+        path: "$.queryParams.phone"
+        operator: matches
+        expected: '^\+1-555-01[0-9]{2}$'
+      - type: jsonpath
+        path: "$.queryParams.sum"
+        operator: eq
+        expected: "14"
