@@ -3,6 +3,7 @@ import { Plus, Play, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronRig
 import { cn } from '@/lib/utils'
 import { statusColor } from '@/lib/httpUtils'
 import { StepEditorCard } from './ScenarioStepEditor'
+import { StepExchange } from './StepExchange'
 import type { ScenarioDetail, ScenarioResult, StepDetail } from '@/lib/bridge'
 
 type Props = {
@@ -134,7 +135,8 @@ export function StepDetailPane({
                 running={running}
               />
             )}
-            <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+              {stepResult && <StepExchange result={stepResult} />}
               <StepEditorCard
                 step={step}
                 index={selectedStepIndex}

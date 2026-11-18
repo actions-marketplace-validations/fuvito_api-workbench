@@ -445,6 +445,8 @@ Keep the client secret out of the file: in the environment, give `clientSecret` 
 
 Open a scenario tab and click **Run** in the scenario header bar. While the scenario is running the button changes to **Stop** (amber square icon) — click it at any time to cancel the in-flight run. Steps that have already completed are preserved in the results view; the remaining steps are marked cancelled.
 
+After a run, select a step to see exactly what happened: a blue **Request** section shows the request as it was sent (the URL with its query parameters, the headers and the body, with variables and dynamic values filled in) and a green **Response** section shows the status, time, headers and body that came back. Credentials are masked in the request: `Authorization`, cookies, API keys, tokens and any value of a secret variable appear as `***`. The same two sections appear for each step in the run log.
+
 ### Running all scenarios (Run All)
 
 Click **Run All** in the Scenarios sidebar or in the scenario header bar. All scenarios in the workspace execute in sequence. A dedicated **Runner** tab opens (or becomes active) and shows:

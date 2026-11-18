@@ -824,6 +824,11 @@ export interface StepResult {
   responseBody?: string
   responseHeaders?: Array<{ name: string; value: string }>
   attempts?: number
+  // the request as it was sent (variables and dynamic values filled in, credentials masked)
+  requestMethod?: string
+  requestUrl?: string
+  requestHeaders?: Array<{ name: string; value: string }>
+  requestBody?: string
 }
 
 export interface ScenarioCoverage {

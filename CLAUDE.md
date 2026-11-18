@@ -445,3 +445,8 @@ Do not implement or stub any of these without explicit user direction.
 ### 2026-11-17 — Demo workspace: dynamic values
 
 - `demo_workspace/scenarios/4-dynamic-values/` (unique-users, function-playground, calculations, dates-and-offsets), `requests/8-dynamic-values/echo-dynamic.yaml`, and a `runId` environment function in `environments/local.yaml`. A Go test runs every scenario five times (each run generates different values) and sends the request twice to check the values differ.
+
+### 2026-11-17 — Scenario steps show the request and the response
+
+- `StepResultIO` carries the request as sent (`requestMethod`, `requestUrl` with query parameters, `requestHeaders`, `requestBody`), built by `exchangeRequest` with credentials masked (sensitive header/parameter names, the auth block, and every secret value). New `StepExchange` component: blue Request and green Response sections (collapsible; response headers closed by default), shown for the selected step in the scenario editor and for each step in the run log.
+

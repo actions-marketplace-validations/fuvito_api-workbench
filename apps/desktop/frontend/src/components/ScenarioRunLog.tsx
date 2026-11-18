@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronRight, RefreshC
 import { cn } from '@/lib/utils'
 import type { ScenarioRunEntry, ScenarioResult, StepResult } from '@/lib/bridge'
 import { getScenarioRunHistory, loadScenarioResult } from '@/lib/bridge'
+import { StepExchange } from './StepExchange'
 
 type Props = {
   workspacePath: string
@@ -27,15 +28,10 @@ function statusColor(code: number): string {
   return 'text-red-400'
 }
 
-function tryPrettyJSON(s: string): string {
-  try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s }
-}
 
 // ── Full step result (from cached ScenarioResult) ─────────────────────────────
 
 function FullStepRow({ step, index }: { step: StepResult; index: number }) {
-  const [bodyOpen, setBodyOpen] = useState(false)
-  const [headersOpen, setHeadersOpen] = useState(false)
   return (
     <div className={cn(
       'border-t border-[var(--color-border)] pl-4 pr-3',
@@ -117,48 +113,10 @@ function FullStepRow({ step, index }: { step: StepResult; index: number }) {
         </div>
       )}
 
-      {/* Response body & headers toggles */}
-      {(step.responseBody || (step.responseHeaders?.length ?? 0) > 0) && (
-        <div className="pl-7 pb-1.5 flex gap-3">
-          {step.responseBody && (
-            <button
-              type="button"
-              onClick={() => setBodyOpen(o => !o)}
-              className="flex items-center gap-0.5 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-            >
-              {bodyOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-              Response body
-            </button>
-          )}
-          {(step.responseHeaders?.length ?? 0) > 0 && (
-            <button
-              type="button"
-              onClick={() => setHeadersOpen(o => !o)}
-              className="flex items-center gap-0.5 text-[10px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
-            >
-              {headersOpen ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-              Headers ({step.responseHeaders!.length})
-            </button>
-          )}
-        </div>
-      )}
-
-      {bodyOpen && step.responseBody && (
-        <pre className="ml-7 mb-1.5 text-[10px] leading-tight font-mono text-[var(--color-foreground)] bg-[var(--color-background)] border border-[var(--color-border)] rounded px-2 py-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-all">
-          {tryPrettyJSON(step.responseBody)}
-        </pre>
-      )}
-
-      {headersOpen && step.responseHeaders && (
-        <div className="ml-7 mb-1.5 border border-[var(--color-border)] rounded overflow-hidden">
-          {step.responseHeaders.map((h, i) => (
-            <div key={i} className="flex gap-1.5 px-2 py-0.5 text-[10px] font-mono border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-muted)]">
-              <span className="text-[var(--color-muted-foreground)] shrink-0">{h.name}:</span>
-              <span className="text-[var(--color-foreground)] truncate flex-1" title={h.value}>{h.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Request as sent and the response, in their own colours */}
+      <div className="pl-7 pr-1 pb-2">
+        <StepExchange result={step} />
+      </div>
     </div>
   )
 }

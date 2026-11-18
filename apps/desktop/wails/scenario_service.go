@@ -113,6 +113,12 @@ type StepResultIO struct {
 	ResponseHeaders []HeaderIO          `json:"responseHeaders,omitempty"`
 	// Attempts is set only when the step was re-sent by its retry policy.
 	Attempts int `json:"attempts,omitempty"`
+	// The request as it was sent, after variables and dynamic values were filled in. Credentials
+	// are masked (see exchangeRequest).
+	RequestMethod  string     `json:"requestMethod,omitempty"`
+	RequestURL     string     `json:"requestUrl,omitempty"`
+	RequestHeaders []HeaderIO `json:"requestHeaders,omitempty"`
+	RequestBody    string     `json:"requestBody,omitempty"`
 }
 
 type CoverageIO struct {
@@ -882,6 +888,9 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 		if sr.Attempts > 1 {
 			step.Attempts = sr.Attempts
+		}
+		if sr.Request != nil {
+			step.RequestMethod, step.RequestURL, step.RequestHeaders, step.RequestBody = exchangeRequest(sr.Request, result.Secrets)
 		}
 		if sr.Response != nil {
 			step.StatusCode = sr.Response.StatusCode
