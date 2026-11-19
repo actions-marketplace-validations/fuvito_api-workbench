@@ -863,27 +863,33 @@ func domainToRequestFileIO(req *domain.Request) *RequestFileIO {
 	if req.Body != nil {
 		out.Body = &BodyIO{Type: string(req.Body.Type), Content: req.Body.Content}
 	}
-	if req.Auth != nil {
-		af := &AuthIO{Type: string(req.Auth.Type)}
-		if req.Auth.Bearer != nil {
-			af.Token = req.Auth.Bearer.Token
-		}
-		if req.Auth.Basic != nil {
-			af.Username = req.Auth.Basic.Username
-			af.Password = req.Auth.Basic.Password
-		}
-		if req.Auth.APIKey != nil {
-			af.Key = req.Auth.APIKey.Key
-			af.Value = req.Auth.APIKey.Value
-			af.Location = string(req.Auth.APIKey.Location)
-		}
-		out.Auth = af
-	}
+	out.Auth = authDomainToIO(req.Auth)
 	if req.Timeout > 0 {
 		out.TimeoutMs = req.Timeout.Milliseconds()
 	}
 	out.NoFollowRedirects = req.NoFollowRedirects
 	return out
+}
+
+// authDomainToIO maps a request's auth block for the UI; nil stays nil.
+func authDomainToIO(a *domain.Auth) *AuthIO {
+	if a == nil {
+		return nil
+	}
+	af := &AuthIO{Type: string(a.Type)}
+	if a.Bearer != nil {
+		af.Token = a.Bearer.Token
+	}
+	if a.Basic != nil {
+		af.Username = a.Basic.Username
+		af.Password = a.Basic.Password
+	}
+	if a.APIKey != nil {
+		af.Key = a.APIKey.Key
+		af.Value = a.APIKey.Value
+		af.Location = string(a.APIKey.Location)
+	}
+	return af
 }
 
 func requestFileIOToDomain(r RequestFileIO) *domain.Request {

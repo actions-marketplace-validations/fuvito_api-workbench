@@ -5,6 +5,8 @@ import { statusColor } from '@/lib/httpUtils'
 import { StepEditorCard } from './ScenarioStepEditor'
 import { StepExchange } from './StepExchange'
 import { missingOnRunFrom, describeMissing } from '@/lib/runFrom'
+import { buildStepVarInfo } from '@/lib/stepVars'
+import type { EnvVars } from '@/lib/stepVars'
 import type { ScenarioDetail, ScenarioResult, StepDetail } from '@/lib/bridge'
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
   onToggleDisabled: (index: number) => void
   onRunFrom: (index: number) => void
   resultStale?: boolean
+  envVars?: EnvVars
 }
 
 type StepRes = NonNullable<ScenarioResult['steps']>[number]
@@ -163,7 +166,7 @@ function LastRunLine({ result, stale, onOpen, onRunFrom, running }: {
 
 export function StepDetailPane({
   visualDetail, result, running, selectedStepIndex, editStepCount,
-  onUpdateStep, onRemoveStep, onMoveStep, onToggleDisabled, onRunFrom, resultStale = false,
+  onUpdateStep, onRemoveStep, onMoveStep, onToggleDisabled, onRunFrom, resultStale = false, envVars,
 }: Props) {
   const step = selectedStepIndex !== null ? visualDetail?.steps[selectedStepIndex] : undefined
   const stepResult = selectedStepIndex !== null ? result?.steps?.[selectedStepIndex] ?? null : null
@@ -187,6 +190,10 @@ export function StepDetailPane({
     ? missingOnRunFrom(visualDetail.steps, visualDetail.variables, selectedStepIndex)
     : []
   const runFromWarning = missing.length > 0 ? describeMissing(missing) : null
+
+  const vars = selectedStepIndex !== null && visualDetail
+    ? buildStepVarInfo(visualDetail.steps, selectedStepIndex, visualDetail.variables, envVars)
+    : undefined
 
   const effectiveView: View = view === 'result' && stepResult ? 'result' : 'definition'
   const isStale = selectedStepIndex !== null && (resultStale || stale.includes(selectedStepIndex))
@@ -250,6 +257,7 @@ export function StepDetailPane({
                 <StepEditorCard
                   key={selectedStepIndex}
                   step={step}
+                  vars={vars}
                   index={selectedStepIndex}
                   isFirst={selectedStepIndex === 0}
                   isLast={selectedStepIndex === editStepCount - 1}

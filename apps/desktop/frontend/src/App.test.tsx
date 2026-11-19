@@ -88,7 +88,8 @@ describe('App — workspace shell', () => {
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Scenarios' }))
     expect(await screen.findByText('Smoke')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Requests' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'History' }))
     expect(await screen.findByText('No requests yet')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Contracts' }))
     expect(await screen.findByText('No coverage data yet')).toBeInTheDocument()
@@ -97,10 +98,11 @@ describe('App — workspace shell', () => {
 
   it('collapses the sidebar by clicking the active rail tab again, and persists it', async () => {
     await ready()
-    fireEvent.click(screen.getByRole('button', { name: 'Explorer' }))
+    // the rail button comes first; the panel strip has a "Requests" tab too
+    fireEvent.click(screen.getAllByRole('button', { name: 'Requests' })[0])
     expect(screen.queryByText('health')).not.toBeInTheDocument()
     expect(localStorage.getItem('ui.sidebarOpen')).toBe('false')
-    fireEvent.click(screen.getByRole('button', { name: 'Explorer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Requests' }))
     expect(await screen.findByText('health')).toBeInTheDocument()
     expect(localStorage.getItem('ui.sidebarOpen')).toBe('true')
   })

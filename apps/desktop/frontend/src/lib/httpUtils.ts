@@ -1,4 +1,4 @@
-import type { KVPair, BodyState, AuthState } from '@/types'
+import type { KVPair, BodyState, BodyType, AuthState } from '@/types'
 import type { AuthPayload, RequestFileIO } from '@/lib/bridge'
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
@@ -69,6 +69,14 @@ export const HTTP_REQUEST_HEADERS: string[] = [
   'X-Request-Start',
   'X-Response-Time',
 ]
+export const BODY_TYPES: { value: BodyType; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'json', label: 'JSON' },
+  { value: 'raw', label: 'Raw' },
+  { value: 'form-urlencoded', label: 'Form URL Encoded' },
+  { value: 'multipart', label: 'Multipart Form' },
+]
+
 export type HttpMethod = typeof HTTP_METHODS[number]
 
 export const METHOD_COLOR: Record<HttpMethod, string> = {
@@ -113,6 +121,16 @@ export function authStateToPayload(auth: AuthState): AuthPayload | undefined {
   return undefined
 }
 
+export function authPayloadToState(a?: AuthPayload | null): AuthState {
+  if (!a) return { type: 'none' }
+  if (a.type === 'bearer') return { type: 'bearer', token: a.token ?? '' }
+  if (a.type === 'basic') return { type: 'basic', username: a.username ?? '', password: a.password ?? '' }
+  if (a.type === 'apikey') {
+    return { type: 'apikey', key: a.key ?? '', value: a.value ?? '', location: (a.location as 'header' | 'query') || 'header' }
+  }
+  return { type: 'none' }
+}
+
 export function requestFileIOToState(r: RequestFileIO): {
   method: HttpMethod
   url: string
@@ -124,14 +142,7 @@ export function requestFileIOToState(r: RequestFileIO): {
   const toKV = (pairs: Array<{ name: string; value: string }> = []): KVPair[] =>
     pairs.map(p => ({ id: crypto.randomUUID(), name: p.name, value: p.value, enabled: true }))
 
-  let auth: AuthState = { type: 'none' }
-  if (r.auth && r.auth.type !== 'none' && r.auth.type !== '') {
-    if (r.auth.type === 'bearer') auth = { type: 'bearer', token: r.auth.token }
-    else if (r.auth.type === 'basic') auth = { type: 'basic', username: r.auth.username, password: r.auth.password }
-    else if (r.auth.type === 'apikey') {
-      auth = { type: 'apikey', key: r.auth.key, value: r.auth.value, location: (r.auth.location as 'header' | 'query') || 'header' }
-    }
-  }
+  const auth = authPayloadToState(r.auth)
 
   const method = (HTTP_METHODS as readonly string[]).includes(r.method?.toUpperCase())
     ? r.method.toUpperCase() as HttpMethod

@@ -40,9 +40,9 @@ function entry(over: Partial<HistoryEntry> = {}): HistoryEntry {
   }
 }
 
-function setup(over: Partial<SidebarProps> = {}) {
-  const props: SidebarProps = {
-    tab: 'history',
+function baseProps(over: Partial<SidebarProps> = {}): SidebarProps {
+  return {
+    tab: 'explorer',
     workspacePath: '/ws',
     fileTree: [],
     history: [],
@@ -52,8 +52,20 @@ function setup(over: Partial<SidebarProps> = {}) {
     onClearHistory: vi.fn(), onImportOpenAPI: vi.fn(),
     ...over,
   }
+}
+
+function setup(over: Partial<SidebarProps> = {}) {
+  const props = baseProps(over)
   render(<Sidebar {...props} />)
   return props
+}
+
+beforeEach(() => { localStorage.clear() })
+
+function setupHistory(over: Partial<SidebarProps> = {}) {
+  const p = setup(over)
+  fireEvent.click(screen.getByRole('button', { name: 'History' }))
+  return p
 }
 
 describe('Sidebar — tab routing', () => {
@@ -105,13 +117,13 @@ describe('Sidebar — history', () => {
   afterEach(() => vi.useRealTimers())
 
   it('shows an empty state with no entries and no clear control', () => {
-    setup()
+    setupHistory()
     expect(screen.getByText('No requests yet')).toBeInTheDocument()
     expect(screen.queryByText('Clear history')).not.toBeInTheDocument()
   })
 
   it('renders entries with method, status, duration and url', () => {
-    setup({ history: [entry({ method: 'POST', statusCode: 201, durationMs: 7, url: 'https://x/y' })] })
+    setupHistory({ history: [entry({ method: 'POST', statusCode: 201, durationMs: 7, url: 'https://x/y' })] })
     expect(screen.getByText('POST')).toBeInTheDocument()
     expect(screen.getByText('201')).toBeInTheDocument()
     expect(screen.getByText('7ms')).toBeInTheDocument()
@@ -120,7 +132,7 @@ describe('Sidebar — history', () => {
   })
 
   it('shows a dash when there is no status code', () => {
-    setup({ history: [entry({ statusCode: 0 })] })
+    setupHistory({ history: [entry({ statusCode: 0 })] })
     expect(screen.getByText('—')).toBeInTheDocument()
   })
 
@@ -129,7 +141,7 @@ describe('Sidebar — history', () => {
     const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
     const older = new Date(now); older.setDate(now.getDate() - 10)
     const lastYear = new Date('2025-03-02T09:00:00')
-    setup({
+    setupHistory({
       history: [
         entry({ id: 1, executedAt: now.toISOString() }),
         entry({ id: 2, executedAt: yesterday.toISOString() }),
@@ -144,32 +156,32 @@ describe('Sidebar — history', () => {
   })
 
   it('keeps entries on the same day in one group', () => {
-    setup({ history: [entry({ id: 1 }), entry({ id: 2, url: 'https://x/2' })] })
+    setupHistory({ history: [entry({ id: 1 }), entry({ id: 2, url: 'https://x/2' })] })
     expect(screen.getAllByText('Today')).toHaveLength(1)
   })
 
   it('selects a history entry on click', () => {
     const e = entry()
-    const p = setup({ history: [e] })
+    const p = setupHistory({ history: [e] })
     fireEvent.click(screen.getByText('https://api.test/users'))
     expect(p.onSelectHistory).toHaveBeenCalledWith(e)
   })
 
   it('omits the re-run control when no handler is supplied', () => {
-    setup({ history: [entry()] })
+    setupHistory({ history: [entry()] })
     expect(screen.queryByTitle('Re-run this request')).not.toBeInTheDocument()
   })
 
   it('re-runs an entry', () => {
     const e = entry()
     const onRerun = vi.fn()
-    setup({ history: [e], onRerun })
+    setupHistory({ history: [e], onRerun })
     fireEvent.click(screen.getByTitle('Re-run this request'))
     expect(onRerun).toHaveBeenCalledWith(e)
   })
 
   it('requires confirmation before clearing history', () => {
-    const p = setup({ history: [entry()] })
+    const p = setupHistory({ history: [entry()] })
     fireEvent.click(screen.getByText('Clear history'))
     expect(p.onClearHistory).not.toHaveBeenCalled()
     expect(screen.getByText('Clear all history?')).toBeInTheDocument()
@@ -179,10 +191,32 @@ describe('Sidebar — history', () => {
   })
 
   it('cancelling the confirmation leaves history intact', () => {
-    const p = setup({ history: [entry()] })
+    const p = setupHistory({ history: [entry()] })
     fireEvent.click(screen.getByText('Clear history'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(p.onClearHistory).not.toHaveBeenCalled()
     expect(screen.getByText('Clear history')).toBeInTheDocument()
+  })
+})
+
+describe('Sidebar — requests and history views', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('shows the requests list first, with the same strip style as the scenario panel', () => {
+    setup()
+    expect(screen.getByRole('button', { name: 'Requests' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByText('No requests yet')).not.toBeInTheDocument()
+  })
+
+  it('switches to history and back, and remembers the choice', () => {
+    const { unmount } = render(<Sidebar {...baseProps()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByText('No requests yet')).toBeInTheDocument()
+    unmount()
+    render(<Sidebar {...baseProps()} />)
+    expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Requests' }))
+    expect(screen.queryByText('No requests yet')).not.toBeInTheDocument()
   })
 })

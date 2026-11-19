@@ -793,6 +793,7 @@ export interface StepDetail {
   retryMaxAttempts?: number
   retryDelayMs?: number
   noFollowRedirects?: boolean
+  auth?: AuthPayload
 }
 
 export interface ScenarioDetail {

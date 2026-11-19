@@ -9,21 +9,23 @@ test.describe('App shell', () => {
     expect(errors).toHaveLength(0)
   })
 
-  test('activity rail shows Explorer, Scenarios and History buttons', async ({ page }) => {
+  test('activity rail shows Requests and Scenarios buttons, and History sits next to the requests list', async ({ page }) => {
     await gotoApp(page)
-    await expect(page.getByTitle('Explorer')).toBeVisible()
-    await expect(page.getByTitle('History')).toBeVisible()
+    await expect(page.getByTitle('Requests')).toBeVisible()
+    await expect(page.getByTitle('Scenarios')).toBeVisible()
+    await expect(page.getByTitle('History')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'History' })).toBeVisible()
   })
 
-  test('Explorer panel is active by default', async ({ page }) => {
+  test('Requests panel is active by default', async ({ page }) => {
     await gotoApp(page)
-    // With an empty workspace the Explorer panel shows the empty state
+    // With an empty workspace the Requests panel shows the empty state
     await expect(page.getByText('No request files yet')).toBeVisible()
   })
 
-  test('switching to history tab shows history empty state', async ({ page }) => {
+  test('switching to the History view shows the history empty state', async ({ page }) => {
     await gotoApp(page)
-    await page.getByTitle('History').click()
+    await page.getByRole('button', { name: 'History' }).click()
     await expect(page.getByText('Send a request to see it here')).toBeVisible()
   })
 

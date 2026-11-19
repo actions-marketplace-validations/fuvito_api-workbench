@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AssertionRow, ExtractionRow, KVRow, StepEditorCard } from './ScenarioStepEditor'
+import { METHOD_COLOR } from '@/lib/httpUtils'
+import { buildStepVarInfo } from '@/lib/stepVars'
 import type { StepDetail, AssertionDetail, ExtractionDetail } from '@/lib/bridge'
 
 describe('AssertionRow', () => {
@@ -148,8 +150,18 @@ describe('KVRow', () => {
 
   it('uses default placeholders', () => {
     render(<KVRow pair={{ name: '', value: '' }} onChange={vi.fn()} onRemove={vi.fn()} />)
-    expect(screen.getByPlaceholderText('name')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('value')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Key')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Value')).toBeInTheDocument()
+  })
+
+  it('offers header-name suggestions and variable completion in the value, like the request screen', () => {
+    const { container } = render(
+      <KVRow pair={{ name: '', value: '' }} onChange={vi.fn()} onRemove={vi.fn()} keySuggestions={['Accept', 'Authorization']} varNames={['token', 'host']} />,
+    )
+    expect(Array.from(container.querySelectorAll('datalist option')).map(o => o.getAttribute('value'))).toEqual(['Accept', 'Authorization'])
+    fireEvent.change(screen.getByPlaceholderText('Value'), { target: { value: '{{to' } })
+    expect(screen.getByRole('button', { name: /^token/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^host/ })).not.toBeInTheDocument()
   })
 })
 
@@ -163,6 +175,86 @@ describe('StepEditorCard', () => {
     render(<StepEditorCard step={s} index={over.index ?? 0} isFirst={over.isFirst ?? false} isLast={over.isLast ?? false} {...h} />)
     return h
   }
+
+  it('colours the method selector like the request screen and the step list', () => {
+    setup(step({ method: 'DELETE' }))
+    expect(screen.getByDisplayValue('DELETE').className).toContain(METHOD_COLOR.DELETE)
+  })
+
+  it('labels the body types the way the request screen does and leaves out multipart', () => {
+    setup()
+    const opts = Array.from((screen.getByTitle('Request body type') as HTMLSelectElement).options).map(o => o.textContent)
+    expect(opts).toEqual(['None', 'JSON', 'Raw', 'Form URL Encoded'])
+  })
+
+  it('keeps multipart selectable for a step that already uses it', () => {
+    setup(step({ bodyType: 'multipart' }))
+    const opts = Array.from((screen.getByTitle('Request body type') as HTMLSelectElement).options).map(o => o.textContent)
+    expect(opts).toContain('Multipart Form')
+  })
+
+  describe('URL variables', () => {
+    const steps = [
+      step({ label: 'Login', extractions: [{ name: 'token', source: 'jsonpath', path: '$.t' }] }),
+      step({ label: 'Use', url: '{{base}}/u/{{token}}/{{nope}}/{{$guid}}' }),
+    ]
+    const vars = buildStepVarInfo(steps, 1, [{ name: 'base', value: 'http://h' }], { region: { value: 'eu', secret: false } })
+
+    function setupWithVars(s: StepDetail = steps[1]) {
+      const h = { onChange: vi.fn(), onRemove: vi.fn(), onMoveUp: vi.fn(), onMoveDown: vi.fn(), onToggleDisabled: vi.fn() }
+      render(<StepEditorCard step={s} index={1} isFirst={false} isLast {...h} vars={vars} />)
+      return h
+    }
+
+    it('shows where each variable in the URL comes from and flags unknown ones', () => {
+      setupWithVars()
+      const bar = screen.getByLabelText('Variables in the URL')
+      expect(bar).toHaveTextContent('base = http://h')
+      expect(bar).toHaveTextContent('token ← extracted in step 1')
+      expect(bar).toHaveTextContent('⚠ nope not defined')
+      expect(bar).not.toHaveTextContent('$guid')
+    })
+
+    it('shows no bar when the URL has no variables or no context is given', () => {
+      setupWithVars(step({ url: '/plain' }))
+      expect(screen.queryByLabelText('Variables in the URL')).not.toBeInTheDocument()
+    })
+
+    it('completes {{ with scenario variables, earlier extractions and environment names', () => {
+      const h = setupWithVars(step({ url: '' }))
+      fireEvent.change(screen.getByPlaceholderText('https://api.example.com/path'), { target: { value: '{{' } })
+      for (const n of ['base', 'token', 'region']) {
+        expect(screen.getByRole('button', { name: new RegExp(`^${n}`) })).toBeInTheDocument()
+      }
+      expect(h.onChange).toHaveBeenLastCalledWith({ url: '{{' })
+    })
+  })
+
+  describe('Auth', () => {
+    const payload = (over: object) => ({ type: 'none', token: '', username: '', password: '', key: '', value: '', location: '', ...over })
+
+    it('starts closed with no auth and opens with the type as a badge when set', () => {
+      const { unmount } = render(<StepEditorCard step={step()} index={0} isFirst isLast onChange={vi.fn()} onRemove={vi.fn()} onMoveUp={vi.fn()} onMoveDown={vi.fn()} onToggleDisabled={vi.fn()} />)
+      expect(screen.getByRole('button', { name: /^Auth/, expanded: false })).toBeInTheDocument()
+      unmount()
+      setup(step({ auth: payload({ type: 'bearer', token: '{{t}}' }) }))
+      expect(screen.getByRole('button', { name: /^Auth\s*bearer/, expanded: true })).toBeInTheDocument()
+      expect(screen.getByDisplayValue('{{t}}')).toBeInTheDocument()
+    })
+
+    it('sets, changes and clears the auth of the step', () => {
+      const h = setup(step({ auth: payload({ type: 'bearer', token: 'x' }) }))
+      fireEvent.change(screen.getByDisplayValue('Bearer Token'), { target: { value: 'basic' } })
+      expect(h.onChange).toHaveBeenLastCalledWith({ auth: payload({ type: 'basic' }) })
+      fireEvent.change(screen.getByDisplayValue('Bearer Token'), { target: { value: 'none' } })
+      expect(h.onChange).toHaveBeenLastCalledWith({ auth: undefined })
+    })
+
+    it('is not offered for a step that references a request file', () => {
+      setup(step({ requestRef: 'requests/a.yaml' }))
+      expect(screen.queryByRole('button', { name: /^Auth/ })).not.toBeInTheDocument()
+    })
+  })
 
   it('collapses empty Headers, Query Params and Extractions and opens them when filled', () => {
     setup(step({ headers: [{ name: 'X-A', value: '1' }] }))
@@ -266,7 +358,7 @@ describe('StepEditorCard', () => {
       const h = setup(step({ headers: [{ name: 'A', value: '1' }, { name: 'B', value: '2' }] }))
       fireEvent.click(screen.getByText('Add header'))
       expect(h.onChange).toHaveBeenLastCalledWith({ headers: [{ name: 'A', value: '1' }, { name: 'B', value: '2' }, { name: '', value: '' }] })
-      fireEvent.change(screen.getAllByPlaceholderText('Header-Name')[1], { target: { value: 'C' } })
+      fireEvent.change(screen.getAllByPlaceholderText('Header')[1], { target: { value: 'C' } })
       expect(h.onChange).toHaveBeenLastCalledWith({ headers: [{ name: 'A', value: '1' }, { name: 'C', value: '2' }] })
       fireEvent.click(screen.getAllByTitle('Remove')[0])
       expect(h.onChange).toHaveBeenLastCalledWith({ headers: [{ name: 'B', value: '2' }] })
@@ -276,7 +368,7 @@ describe('StepEditorCard', () => {
       const h = setup(step({ queryParams: [{ name: 'p', value: 'v' }] }))
       fireEvent.click(screen.getByText('Add param'))
       expect(h.onChange).toHaveBeenLastCalledWith({ queryParams: [{ name: 'p', value: 'v' }, { name: '', value: '' }] })
-      fireEvent.change(screen.getByPlaceholderText('param'), { target: { value: 'q' } })
+      fireEvent.change(screen.getByPlaceholderText('Parameter'), { target: { value: 'q' } })
       expect(h.onChange).toHaveBeenLastCalledWith({ queryParams: [{ name: 'q', value: 'v' }] })
       fireEvent.click(screen.getByTitle('Remove'))
       expect(h.onChange).toHaveBeenLastCalledWith({ queryParams: [] })

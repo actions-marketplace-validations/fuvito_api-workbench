@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   loadScenario, runScenario, saveScenarioRaw, saveScenarioResult,
-  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario,
+  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario, getEnvironment,
 } from '@/lib/bridge'
+import type { EnvVars } from '@/lib/stepVars'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage, ScenarioVariable } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
@@ -63,6 +64,23 @@ export function ScenarioViewer({
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   const [accumulatedCoverage, setAccumulatedCoverage] = useState<AccumulatedCoverage | null>(null)
+  // Variables of the environment chosen for the run, so steps can show where {{names}} come from.
+  const [envVars, setEnvVars] = useState<EnvVars>({})
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      if (!selectedEnvPath) { setEnvVars({}); return }
+      try {
+        const env = await getEnvironment(selectedEnvPath)
+        if (cancelled) return
+        setEnvVars(Object.fromEntries((env?.variables ?? []).filter(v => v.name).map(v => [v.name, { value: v.value, secret: !!v.secret }])))
+      } catch {
+        if (!cancelled) setEnvVars({})
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [selectedEnvPath])
   const [leftPanelPct, setLeftPanelPct] = useState<number>(() => {
     const saved = Number(localStorage.getItem('ui.scenarioStepPanelPct'))
     return isNaN(saved) || saved === 0 ? 35 : Math.min(50, Math.max(20, saved))
@@ -506,6 +524,7 @@ export function ScenarioViewer({
             onToggleDisabled={toggleVisualStepDisabled}
             onRunFrom={handleRunFrom}
             resultStale={resultStale}
+            envVars={envVars}
           />
         )}
       </div>

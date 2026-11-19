@@ -974,9 +974,9 @@ test.describe('Scenario visual editor — headers and query params', () => {
     await withScenarios(page, { detail: SCENARIO_DETAIL })
     await gotoApp(page)
     await openInEditMode(page)
-    await expect(page.getByPlaceholder('Header-Name')).toHaveCount(0)
+    await expect(page.getByPlaceholder('Header', { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Add header' }).first().click()
-    await expect(page.getByPlaceholder('Header-Name').first()).toBeVisible()
+    await expect(page.getByPlaceholder('Header', { exact: true }).first()).toBeVisible()
   })
 
   test('Query Params section is present in visual editor', async ({ page }) => {
@@ -999,7 +999,7 @@ test.describe('Scenario visual editor — headers and query params', () => {
     await gotoApp(page)
     await openInEditMode(page)
     await page.getByRole('button', { name: 'Add header' }).first().click()
-    await page.getByPlaceholder('Header-Name').first().fill('Authorization')
+    await page.getByPlaceholder('Header', { exact: true }).first().fill('Authorization')
     await page.getByPlaceholder('value').first().fill('Bearer {{token}}')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
@@ -1038,7 +1038,7 @@ test.describe('Scenario visual editor — headers and query params', () => {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     await expect(page.getByText('Create user').first()).toBeVisible()
     // Step 0 (Create user) is selected by default; its header appears in the editor
-    await expect(page.getByPlaceholder('Header-Name').first()).toHaveValue('Content-Type')
+    await expect(page.getByPlaceholder('Header', { exact: true }).first()).toHaveValue('Content-Type')
   })
 
   test('query param value is visible in the step editor', async ({ page }) => {

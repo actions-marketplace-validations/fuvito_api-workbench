@@ -18,9 +18,9 @@ function setup(over: Partial<React.ComponentProps<typeof ActivityRail>> = {}) {
 }
 
 describe('ActivityRail', () => {
-  it('renders the four primary tabs, settings, help and toggle', () => {
+  it('renders the three primary tabs, settings, help and toggle', () => {
     setup()
-    for (const name of ['Explorer', 'Scenarios', 'History', 'Contracts', 'Settings', 'Help']) {
+    for (const name of ['Requests', 'Scenarios', 'Contracts', 'Settings', 'Help']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
     expect(screen.getByTitle('Expand rail')).toBeInTheDocument()
@@ -37,14 +37,15 @@ describe('ActivityRail', () => {
   })
 
   it('marks only the active tab as current when the sidebar is open', () => {
-    setup({ activeTab: 'history' })
-    expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'Explorer' })).not.toHaveAttribute('aria-current')
+    setup({ activeTab: 'coverage' })
+    expect(screen.getByRole('button', { name: 'Contracts' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Requests' })).not.toHaveAttribute('aria-current')
+    expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
   })
 
   it('marks nothing as current when the sidebar is closed', () => {
     setup({ sidebarOpen: false })
-    expect(screen.getByRole('button', { name: 'Explorer' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Requests' })).not.toHaveAttribute('aria-current')
   })
 
   it('reports tab clicks', () => {
@@ -73,16 +74,16 @@ describe('ActivityRail', () => {
     const { container } = setup()
     expect((container.firstChild as HTMLElement).style.width).toBe('44px')
     expect(screen.queryByText('Collapse')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Explorer' })).toHaveAttribute('title', 'Explorer')
+    expect(screen.getByRole('button', { name: 'Requests' })).toHaveAttribute('title', 'Requests')
   })
 
   it('shows labels and no tooltips when expanded', () => {
     const { container } = setup({ expanded: true })
     expect((container.firstChild as HTMLElement).style.width).toBe('160px')
-    expect(screen.getByText('Explorer')).toBeInTheDocument()
+    expect(screen.getByText('Requests')).toBeInTheDocument()
     expect(screen.getByText('Contracts')).toBeInTheDocument()
     expect(screen.getByText('Collapse')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Explorer' })).not.toHaveAttribute('title')
+    expect(screen.getByRole('button', { name: 'Requests' })).not.toHaveAttribute('title')
     expect(screen.getByTitle('Collapse rail')).toBeInTheDocument()
   })
 

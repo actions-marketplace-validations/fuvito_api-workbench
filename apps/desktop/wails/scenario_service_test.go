@@ -631,3 +631,44 @@ func TestCreateScenario_SpecialCharactersInTitle(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadScenarioKeepsStepAuthForTheEditor(t *testing.T) {
+	ss, ws := newSS(t)
+	path := writeFile(t, filepath.Join(ws.workspacePath, "scenarios", "auth.yaml"), `schemaVersion: "1"
+title: auth
+steps:
+  - label: bearer
+    request:
+      method: GET
+      url: http://x/a
+      auth: {type: bearer, token: "{{token}}"}
+  - label: basic
+    request:
+      method: GET
+      url: http://x/b
+      auth: {type: basic, username: u, password: "{{pw}}"}
+  - label: apikey
+    request:
+      method: GET
+      url: http://x/c
+      auth: {type: apikey, key: X-Key, value: "{{k}}", location: query}
+  - label: none
+    request: {method: GET, url: http://x/d}
+`)
+	d := ss.LoadScenario(path)
+	if d.Error != "" {
+		t.Fatal(d.Error)
+	}
+	if a := d.Steps[0].Auth; a == nil || a.Type != "bearer" || a.Token != "{{token}}" {
+		t.Errorf("bearer: %+v", a)
+	}
+	if a := d.Steps[1].Auth; a == nil || a.Type != "basic" || a.Username != "u" || a.Password != "{{pw}}" {
+		t.Errorf("basic: %+v", a)
+	}
+	if a := d.Steps[2].Auth; a == nil || a.Type != "apikey" || a.Key != "X-Key" || a.Value != "{{k}}" || a.Location != "query" {
+		t.Errorf("apikey: %+v", a)
+	}
+	if d.Steps[3].Auth != nil {
+		t.Errorf("a step without auth must stay nil: %+v", d.Steps[3].Auth)
+	}
+}
