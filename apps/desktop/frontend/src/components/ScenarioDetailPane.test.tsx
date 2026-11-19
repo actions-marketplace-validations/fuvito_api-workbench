@@ -187,14 +187,25 @@ describe('StepDetailPane', () => {
       { label: 'Use', method: 'GET', url: '/u/{{token}}', assertions: [], extractions: [] },
     ]
     setup({ visualDetail: { ...detail, steps }, selectedStepIndex: 1, result: resultOf(res(), res()) })
-    expect(screen.getByRole('note')).toHaveTextContent('{{token}} is not set')
+    expect(screen.getByRole('note')).toHaveTextContent('{{token}} (extracted in step 1) is not set')
     openResult()
-    expect(screen.getByRole('note')).toHaveTextContent('{{token}} is not set')
+    expect(screen.getByRole('note')).toHaveTextContent('{{token}} (extracted in step 1) is not set')
   })
 
   it('shows no run-from warning when nothing is missing', () => {
     setup({ result: resultOf(res()) })
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+
+  it('marks every result stale when the viewer reports a structural edit', () => {
+    const base: React.ComponentProps<typeof StepDetailPane> = {
+      visualDetail: detail, result: resultOf(res(), res()), running: false, selectedStepIndex: 1, editStepCount: 2,
+      onUpdateStep: vi.fn(), onRemoveStep: vi.fn(), onMoveStep: vi.fn(), onToggleDisabled: vi.fn(), onRunFrom: vi.fn(),
+    }
+    const { rerender } = render(<StepDetailPane {...base} />)
+    expect(screen.queryByText('stale: edited since this run')).not.toBeInTheDocument()
+    rerender(<StepDetailPane {...base} resultStale />)
+    expect(screen.getByText('stale: edited since this run')).toBeInTheDocument()
   })
 
   it('forwards editor changes with the selected index', () => {

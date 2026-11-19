@@ -62,6 +62,21 @@ export function serializeScenarioToYAML(d: ScenarioDetail): string {
           lines.push(`        type: ${step.bodyType}`)
           if (step.bodyContent) lines.push(`        content: ${yamlScalar(step.bodyContent)}`)
         }
+        const a = step.auth
+        if (a && (a.type === 'bearer' || a.type === 'basic' || a.type === 'apikey')) {
+          lines.push('      auth:')
+          lines.push(`        type: ${a.type}`)
+          if (a.type === 'bearer') lines.push(`        token: ${yamlScalar(a.token ?? '')}`)
+          if (a.type === 'basic') {
+            lines.push(`        username: ${yamlScalar(a.username ?? '')}`)
+            lines.push(`        password: ${yamlScalar(a.password ?? '')}`)
+          }
+          if (a.type === 'apikey') {
+            lines.push(`        key: ${yamlScalar(a.key ?? '')}`)
+            lines.push(`        value: ${yamlScalar(a.value ?? '')}`)
+            lines.push(`        location: ${a.location || 'header'}`)
+          }
+        }
       }
       if (step.failPolicy && step.failPolicy !== 'stop') {
         lines.push(`    failPolicy: ${step.failPolicy}`)

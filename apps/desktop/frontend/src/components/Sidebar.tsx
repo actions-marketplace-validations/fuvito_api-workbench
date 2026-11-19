@@ -117,11 +117,38 @@ export function Sidebar({
   onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
 }: SidebarProps) {
   const [confirmingClear, setConfirmingClear] = useState(false)
+  const [requestsView, setRequestsView] = useState<'requests' | 'history'>(() => {
+    try { return localStorage.getItem('ui.requestsView') === 'history' ? 'history' : 'requests' } catch { return 'requests' }
+  })
+  function changeRequestsView(v: 'requests' | 'history') {
+    setRequestsView(v)
+    try { localStorage.setItem('ui.requestsView', v) } catch { /* best effort */ }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {tab === 'explorer' && (
-        <WorkspacePanel
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="shrink-0 flex border-b border-[var(--color-border)] bg-[var(--color-background)]">
+            {(['requests', 'history'] as const).map(v => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => changeRequestsView(v)}
+                aria-pressed={requestsView === v}
+                className={cn(
+                  'px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors border-b-2',
+                  requestsView === v
+                    ? 'text-[var(--color-foreground)] border-[var(--color-accent)]'
+                    : 'text-[var(--color-muted-foreground)] border-transparent hover:text-[var(--color-foreground)]',
+                )}
+              >
+                {v === 'requests' ? 'Requests' : 'History'}
+              </button>
+            ))}
+          </div>
+          {requestsView === 'requests' && (
+            <WorkspacePanel
           workspacePath={workspacePath}
           fileTree={fileTree}
           onOpenWorkspace={onOpenWorkspace}
@@ -154,45 +181,9 @@ export function Sidebar({
           onPasteToFolder={onPasteToRequestFolder}
           onPasteToRoot={onPasteToRequestRoot}
         />
-      )}
-
-      {tab === 'scenarios' && (
-        <ScenariosPanel
-          workspacePath={workspacePath}
-          scenarios={scenarios ?? []}
-          scenarioError={scenarioError}
-          runAllState={runAllState}
-          onRunAllScenarios={onRunAllScenarios}
-          onSelectScenario={onSelectScenario}
-          onNewScenario={onNewScenario}
-          onNewScenarioFile={onNewScenarioFile}
-          onDuplicateScenario={onDuplicateScenario}
-          onDeleteScenario={onDeleteScenario}
-          onRenameScenario={onRenameScenario}
-          onNewFolder={onNewScenarioFolder}
-          onDeleteScenarioFolder={onDeleteScenarioFolder}
-          onRenameScenarioFolder={onRenameScenarioFolder}
-          onRefresh={onRefresh}
-          onMoveScenario={onMoveScenario}
-          clipboard={clipboard}
-          onCopyScenario={onCopyScenario}
-          onCutScenario={onCutScenario}
-          onPasteToScenarioFolder={onPasteToScenarioFolder}
-          runLogTrigger={runLogTrigger}
-          onRunFolder={onRunScenarioFolder}
-        />
-      )}
-
-      {tab === 'coverage' && (
-        <CoverageSidebarPanel
-          workspacePath={workspacePath}
-          selectedSpecFile={selectedCoverageSpecFile ?? null}
-          onSelectSpec={sf => onSelectCoverageSpec?.(sf)}
-        />
-      )}
-
-      {tab === 'history' && (
-        <div className="flex flex-col flex-1 overflow-hidden">
+          )}
+          {requestsView === 'history' && (
+            <div className="flex flex-col flex-1 overflow-hidden">
           {history.length > 0 && (
             <div className="flex items-center justify-end px-2 py-1 border-b border-[var(--color-border)] shrink-0 gap-2">
               {confirmingClear ? (
@@ -284,7 +275,45 @@ export function Sidebar({
             ))}
           </div>
         </div>
+          )}
+        </div>
       )}
+
+      {tab === 'scenarios' && (
+        <ScenariosPanel
+          workspacePath={workspacePath}
+          scenarios={scenarios ?? []}
+          scenarioError={scenarioError}
+          runAllState={runAllState}
+          onRunAllScenarios={onRunAllScenarios}
+          onSelectScenario={onSelectScenario}
+          onNewScenario={onNewScenario}
+          onNewScenarioFile={onNewScenarioFile}
+          onDuplicateScenario={onDuplicateScenario}
+          onDeleteScenario={onDeleteScenario}
+          onRenameScenario={onRenameScenario}
+          onNewFolder={onNewScenarioFolder}
+          onDeleteScenarioFolder={onDeleteScenarioFolder}
+          onRenameScenarioFolder={onRenameScenarioFolder}
+          onRefresh={onRefresh}
+          onMoveScenario={onMoveScenario}
+          clipboard={clipboard}
+          onCopyScenario={onCopyScenario}
+          onCutScenario={onCutScenario}
+          onPasteToScenarioFolder={onPasteToScenarioFolder}
+          runLogTrigger={runLogTrigger}
+          onRunFolder={onRunScenarioFolder}
+        />
+      )}
+
+      {tab === 'coverage' && (
+        <CoverageSidebarPanel
+          workspacePath={workspacePath}
+          selectedSpecFile={selectedCoverageSpecFile ?? null}
+          onSelectSpec={sf => onSelectCoverageSpec?.(sf)}
+        />
+      )}
+
     </div>
   )
 }

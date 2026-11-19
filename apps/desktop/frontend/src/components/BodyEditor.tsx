@@ -2,17 +2,10 @@ import { useState } from 'react'
 import { FolderOpen, X, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { inputCls, selectCls } from '@/lib/styles'
+import { BODY_TYPES } from '@/lib/httpUtils'
 import type { BodyState, BodyType } from '@/types'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
 import type { KVPair } from '@/types'
-
-const BODY_TYPES: { value: BodyType; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'json', label: 'JSON' },
-  { value: 'raw', label: 'Raw' },
-  { value: 'form-urlencoded', label: 'Form URL Encoded' },
-  { value: 'multipart', label: 'Multipart Form' },
-]
 
 const PLACEHOLDER: Record<BodyType, string> = {
   none: '',

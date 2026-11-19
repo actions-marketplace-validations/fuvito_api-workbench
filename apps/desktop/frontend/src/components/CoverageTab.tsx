@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import type { AccumulatedCoverage } from '@/lib/bridge'
 import { getAccumulatedCoverage, resetAccumulatedCoverage, saveContentToFile, openInSystemViewer, exportCoverageReport } from '@/lib/bridge'
 import { QualityPanel } from './QualityPanel'
-import { parseOp, specLabel } from '@/lib/coverage-report'
+import { parseOp, specLabel, operationOutcomes, share } from '@/lib/coverage-report'
 
 type Props = {
   workspacePath: string
@@ -25,20 +25,37 @@ const METHOD_BG: Record<string, string> = {
 }
 
 
-function ProgressBar({ pct }: { pct: number }) {
-  const color = pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'
-  const textColor = pct >= 80 ? 'text-emerald-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
+const TILE_TONE = {
+  neutral: { value: 'text-[var(--color-foreground)]', idle: '', edge: 'border-l-[var(--color-muted-foreground)]/40' },
+  pass: { value: 'text-emerald-400', idle: 'text-[var(--color-muted-foreground)]', edge: 'border-l-emerald-500' },
+  fail: { value: 'text-red-400', idle: 'text-[var(--color-muted-foreground)]', edge: 'border-l-red-500' },
+  warn: { value: 'text-amber-400', idle: 'text-[var(--color-muted-foreground)]', edge: 'border-l-amber-500' },
+} as const
+
+// One of the equal totals tiles: how many operations, and what share of all of them.
+function StatTile({ label, count, total, hint, tone }: {
+  label: string
+  count: number
+  total: number
+  hint: string
+  tone: keyof typeof TILE_TONE
+}) {
+  const t = TILE_TONE[tone]
+  const active = tone === 'neutral' || count > 0
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-2 rounded-full bg-[var(--color-muted)] overflow-hidden">
-        <div
-          className={cn('h-full rounded-full transition-all', color)}
-          style={{ width: `${Math.min(pct, 100)}%` }}
-        />
+    <div
+      role="group"
+      aria-label={label}
+      className={cn('rounded border border-[var(--color-border)] border-l-4 bg-[var(--color-card)] px-4 py-3', active ? t.edge : 'border-l-[var(--color-border)]')}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">{label}</div>
+      <div className="flex items-baseline gap-2 mt-1">
+        <span className={cn('text-3xl font-bold tabular-nums', active ? t.value : t.idle)}>{count}</span>
+        <span className="text-sm tabular-nums text-[var(--color-muted-foreground)]">{share(count, total)}%</span>
       </div>
-      <span className={cn('text-sm font-bold tabular-nums w-10 text-right shrink-0', textColor)}>
-        {Math.round(pct)}%
-      </span>
+      <div className="text-[11px] text-[var(--color-muted-foreground)] mt-0.5">
+        {hint} <span className="opacity-70">· of {total}</span>
+      </div>
     </div>
   )
 }
@@ -115,8 +132,7 @@ function SpecDetailPanel({
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [coveredOpen, setCoveredOpen] = useState(true)
   const [missedOpen, setMissedOpen] = useState(true)
-  const pct = Math.round(entry.percent)
-  const pctColor = pct >= 80 ? 'text-emerald-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
+  const out = operationOutcomes(entry)
 
   function sortOps(ops: string[]) {
     return [...ops].sort((a, b) => {
@@ -129,23 +145,36 @@ function SpecDetailPanel({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* Stats header */}
+      {/* Totals: four equal tiles. Covered only says an operation was called; passing and failing say
+          what happened, so a fully covered spec can still show failures. */}
       <div className="px-6 py-5 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-4 mb-3">
-          <span className={cn('text-4xl font-bold tabular-nums', pctColor)}>{pct}%</span>
-          <div className="flex-1 min-w-0">
-            <ProgressBar pct={pct} />
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
-              <span className={cn('font-semibold', pctColor)}>{entry.covered}/{entry.total} operations covered</span>
-              <span className="text-[var(--color-muted-foreground)]">{entry.totalRuns} run{entry.totalRuns !== 1 ? 's' : ''}</span>
-              <span className="text-emerald-400">{entry.passedRuns} passed</span>
-              {entry.failedRuns > 0 && <span className="text-red-400">{entry.failedRuns} failed</span>}
-              {entry.lastRunAt && (
-                <span className="text-[var(--color-muted-foreground)]">
-                  Last run: {new Date(entry.lastRunAt).toLocaleString()}
-                </span>
-              )}
-            </div>
+        {/* Two pairs that each add up: Covered + Not covered = all operations; Passing + Failing = Covered. */}
+        <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile label="Covered" count={out.covered} total={out.total} hint="called by a scenario" tone="neutral" />
+            <StatTile label="Not covered" count={out.notCovered} total={out.total} hint="no scenario calls them" tone="warn" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <StatTile label="Passing" count={out.passing} total={out.total} hint="covered, last result passed" tone="pass" />
+            <StatTile label="Failing" count={out.failing} total={out.total} hint="covered, last result failed" tone="fail" />
+          </div>
+        </div>
+        {out.noResult > 0 && (
+          <p className="mt-2 text-[11px] text-[var(--color-muted-foreground)]">
+            {out.noResult} covered operation{out.noResult === 1 ? ' has' : 's have'} no recorded result yet; run the scenarios again.
+          </p>
+        )}
+        <div className="flex items-center gap-4 mt-3">
+          <div className="flex-1 min-w-0 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">Scenario runs</span>
+            <span className="text-[var(--color-muted-foreground)]">{entry.totalRuns} run{entry.totalRuns !== 1 ? 's' : ''}</span>
+            <span className="text-emerald-400">{entry.passedRuns} passed</span>
+            {entry.failedRuns > 0 && <span className="text-red-400">{entry.failedRuns} failed</span>}
+            {entry.lastRunAt && (
+              <span className="text-[var(--color-muted-foreground)]">
+                Last run: {new Date(entry.lastRunAt).toLocaleString()}
+              </span>
+            )}
           </div>
           {confirmingReset ? (
             <div className="flex items-center gap-2 shrink-0">

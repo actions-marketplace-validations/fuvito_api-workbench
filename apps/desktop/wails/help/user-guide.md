@@ -29,7 +29,7 @@
 
 A **workspace** is an ordinary folder on your filesystem. Clear Signal reads and writes files inside it; nothing is stored in a cloud account or a hidden database.
 
-**To open an existing workspace:** use **File → Open Workspace** in the menu bar, or click the folder icon at the top of the Explorer panel in the sidebar.
+**To open an existing workspace:** use **File → Open Workspace** in the menu bar, or click the folder icon at the top of the Requests panel in the sidebar.
 
 **To create a new workspace:** use **File → New Workspace**, then pick an empty folder. Clear Signal creates a starter structure with a sample environment and a sample request so you can see the layout immediately.
 
@@ -183,15 +183,15 @@ Secret values are also kept out of **reports**: wherever one would appear (an as
 ## 6. Sending requests and reading responses
 
 1. Set the HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS) using the dropdown.
-2. Enter the URL. Pasting a URL containing a query string (e.g. `https://api.example.com/items?page=1&limit=20`) automatically extracts the parameters into the **Params** tab.
-3. Fill in the **Params**, **Headers**, **Body**, and **Auth** tabs as needed.
+2. Enter the URL. Pasting a URL containing a query string (e.g. `https://api.example.com/items?page=1&limit=20`) automatically extracts the parameters into the **Query Params** tab.
+3. Fill in the **Query Params**, **Headers**, **Body**, and **Auth** tabs as needed.
 4. Press **Send** (or **Enter** in the URL bar). While the request is in progress, the button changes to **Cancel** — click it to abort.
 
 ### Request tabs
 
 | Tab | Purpose |
 |---|---|
-| **Params** | Query parameters appended to the URL. Toggle rows on/off with the checkbox. |
+| **Query Params** | Query parameters appended to the URL. Toggle rows on/off with the checkbox. |
 | **Headers** | Request headers (key/value pairs). |
 | **Body** | Request body — JSON, raw text, form URL-encoded, or multipart. JSON has a **Format** button that pretty-prints in place. |
 | **Auth** | Authentication — Bearer token, Basic credentials, or API Key (header or query param). |
@@ -216,7 +216,7 @@ The right panel shows:
 
 ### Request history
 
-Click the **History** rail tab (clock icon) to see your last 100 requests, grouped by date — **Today**, **Yesterday**, and older dates. Each entry shows the method badge, status code, duration, and URL. 
+Open the **Requests** panel and switch to its **History** view (next to the request list, the same way **Run Log** sits next to the scenario list) to see your last 100 requests, grouped by date — **Today**, **Yesterday**, and older dates. Each entry shows the method badge, status code, duration, and URL. 
 
 - **Click an entry** to restore its method, URL, headers, body, and auth into the editor. A confirmation dialog appears first if the current tab has unsaved changes. Auth is restored only when its values were `{{variable}}` references at the time the request was sent — literal tokens are never written to the history database.
 - **Re-run button (↺):** hover over any entry to reveal a re-run button on the right edge. Clicking it restores the request *and* immediately sends it, so you can replay a previous call in one click.
@@ -496,7 +496,16 @@ Click a spec card to view its full detail in the main area.
 
 ### The Contracts tab (main area)
 
-The detail view shows a table with one row per operation:
+At the top, four equal tiles give the totals, each as a count and its share of all operations in the spec:
+
+- **Covered**: operations that at least one scenario calls.
+- **Not covered**: operations no scenario calls (the same list as the *Not covered* section of the table).
+- **Passing**: covered operations whose most recent result passed.
+- **Failing**: covered operations whose most recent result failed.
+
+They come in two pairs that add up: Covered plus Not covered make up the whole spec, and Passing plus Failing make up Covered. Being covered only says an operation was called, so a spec at 100% coverage can still show failures. Below the tiles, the **Scenario runs** line counts whole scenario runs (runs, passed, failed, last run), which is a different thing from operation results.
+
+The detail view then shows a table with one row per operation:
 
 | Column | Meaning |
 |---|---|

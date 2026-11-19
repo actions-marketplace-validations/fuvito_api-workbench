@@ -149,6 +149,9 @@ steps:
       body:
         type: json
         content: '{"username":"{{username}}","password":"{{password}}"}'
+      # auth:                # optional — an inline request takes every field of a request file, including auth
+      #   type: bearer       # bearer | basic | apikey (see Request File); use {{variables}} so secrets stay out of the file
+      #   token: "{{token}}"
 
     # requestRef: "requests/login.yaml"
     # Alternative to inline request — path relative to the scenario file.

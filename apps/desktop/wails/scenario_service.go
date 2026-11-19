@@ -75,6 +75,8 @@ type StepDetailIO struct {
 	RetryDelayMs     int                  `json:"retryDelayMs,omitempty"`
 	// NoFollowRedirects is the step request's followRedirects: false.
 	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
+	// Auth is the step request's auth block; the editor keeps it so saving does not drop it.
+	Auth *AuthIO `json:"auth,omitempty"`
 }
 
 // VariableIO is a scenario variable; the editor keeps them so saving does not drop them.
@@ -321,6 +323,7 @@ func (s *ScenarioService) LoadScenario(path string) ScenarioDetailIO {
 			sd.Method = string(step.Request.Method)
 			sd.URL = step.Request.URL
 			sd.NoFollowRedirects = step.Request.NoFollowRedirects
+			sd.Auth = authDomainToIO(step.Request.Auth)
 			for _, h := range step.Request.Headers {
 				sd.Headers = append(sd.Headers, KVPairIO{Name: h.Name, Value: h.Value})
 			}

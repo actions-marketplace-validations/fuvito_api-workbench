@@ -5,6 +5,8 @@ import { statusColor } from '@/lib/httpUtils'
 import { StepEditorCard } from './ScenarioStepEditor'
 import { StepExchange } from './StepExchange'
 import { missingOnRunFrom, describeMissing } from '@/lib/runFrom'
+import { buildStepVarInfo } from '@/lib/stepVars'
+import type { EnvVars } from '@/lib/stepVars'
 import type { ScenarioDetail, ScenarioResult, StepDetail } from '@/lib/bridge'
 
 type Props = {
@@ -18,6 +20,8 @@ type Props = {
   onMoveStep: (from: number, dir: -1 | 1) => void
   onToggleDisabled: (index: number) => void
   onRunFrom: (index: number) => void
+  resultStale?: boolean
+  envVars?: EnvVars
 }
 
 type StepRes = NonNullable<ScenarioResult['steps']>[number]
@@ -162,13 +166,13 @@ function LastRunLine({ result, stale, onOpen, onRunFrom, running }: {
 
 export function StepDetailPane({
   visualDetail, result, running, selectedStepIndex, editStepCount,
-  onUpdateStep, onRemoveStep, onMoveStep, onToggleDisabled, onRunFrom,
+  onUpdateStep, onRemoveStep, onMoveStep, onToggleDisabled, onRunFrom, resultStale = false, envVars,
 }: Props) {
   const step = selectedStepIndex !== null ? visualDetail?.steps[selectedStepIndex] : undefined
   const stepResult = selectedStepIndex !== null ? result?.steps?.[selectedStepIndex] ?? null : null
 
   const [view, setView] = useState<View>('definition')
-  // -1 stands for "every step": a move or removal shifts which result belongs to which step.
+  // Steps edited since the run; a structural edit makes every result stale (`resultStale`).
   const [stale, setStale] = useState<number[]>([])
   const [prevResult, setPrevResult] = useState(result)
   const [prevRunning, setPrevRunning] = useState(running)
@@ -187,19 +191,25 @@ export function StepDetailPane({
     : []
   const runFromWarning = missing.length > 0 ? describeMissing(missing) : null
 
+  const vars = selectedStepIndex !== null && visualDetail
+    ? buildStepVarInfo(visualDetail.steps, selectedStepIndex, visualDetail.variables, envVars)
+    : undefined
+
   const effectiveView: View = view === 'result' && stepResult ? 'result' : 'definition'
-  const isStale = selectedStepIndex !== null && (stale.includes(-1) || stale.includes(selectedStepIndex))
+  const isStale = selectedStepIndex !== null && (resultStale || stale.includes(selectedStepIndex))
   const markStale = (i: number) => setStale(prev => (prev.includes(i) ? prev : [...prev, i]))
 
   const tabCls = (active: boolean, disabled: boolean) => cn(
-    'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-colors',
-    active ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]',
-    disabled && 'opacity-40 cursor-not-allowed hover:text-[var(--color-muted-foreground)]',
+    'flex items-center gap-1.5 px-4 py-2 -mb-px text-xs font-medium border-b-2 transition-colors',
+    active
+      ? 'border-[var(--color-accent)] text-[var(--color-foreground)]'
+      : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:border-[var(--color-border)]',
+    disabled && 'opacity-40 cursor-not-allowed hover:text-[var(--color-muted-foreground)] hover:border-transparent',
   )
 
   return (
     <div className="flex-1 overflow-hidden min-w-0 flex flex-col">
-      <div role="tablist" aria-label="Step views" className="shrink-0 flex items-center gap-1 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-background)]">
+      <div role="tablist" aria-label="Step views" className="shrink-0 flex items-end gap-1 px-3 pt-1 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         <button type="button" role="tab" aria-selected={effectiveView === 'definition'} onClick={() => setView('definition')} className={tabCls(effectiveView === 'definition', false)}>
           Definition
         </button>
@@ -247,13 +257,14 @@ export function StepDetailPane({
                 <StepEditorCard
                   key={selectedStepIndex}
                   step={step}
+                  vars={vars}
                   index={selectedStepIndex}
                   isFirst={selectedStepIndex === 0}
                   isLast={selectedStepIndex === editStepCount - 1}
                   onChange={updates => { markStale(selectedStepIndex); onUpdateStep(selectedStepIndex, updates) }}
-                  onRemove={() => { setStale([-1]); onRemoveStep(selectedStepIndex) }}
-                  onMoveUp={() => { setStale([-1]); onMoveStep(selectedStepIndex, -1) }}
-                  onMoveDown={() => { setStale([-1]); onMoveStep(selectedStepIndex, 1) }}
+                  onRemove={() => onRemoveStep(selectedStepIndex)}
+                  onMoveUp={() => onMoveStep(selectedStepIndex, -1)}
+                  onMoveDown={() => onMoveStep(selectedStepIndex, 1)}
                   onToggleDisabled={() => onToggleDisabled(selectedStepIndex)}
                 />
               </div>

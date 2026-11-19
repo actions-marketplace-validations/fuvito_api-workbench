@@ -14,6 +14,7 @@ vi.mock('@/lib/bridge', () => ({
   getAccumulatedCoverage: vi.fn(),
   resetAccumulatedCoverage: vi.fn(),
   cancelScenario: vi.fn(),
+  getEnvironment: vi.fn(),
   validateScenarioYAML: vi.fn(),
 }))
 vi.mock('./ScenarioYamlPane', () => ({
@@ -250,6 +251,44 @@ describe('ScenarioViewer — editing', () => {
     fireEvent.change(screen.getByPlaceholderText('What does this scenario test?'), { target: { value: 'new desc' } })
     fireEvent.change(screen.getByPlaceholderText(/OpenAPI spec path/), { target: { value: 'spec.yaml' } })
     expect(screen.getByRole('button', { name: /Save/ })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['adding a step', () => fireEvent.click(screen.getByRole('button', { name: /Add step/ }))],
+    ['duplicating a step', () => fireEvent.click(within(within(list()).getAllByRole('option')[0]).getByTitle('Duplicate step'))],
+    ['moving a step', () => fireEvent.click(within(within(list()).getAllByRole('option')[0]).getByTitle('Move down (Alt+↓)'))],
+    ['removing a step', () => fireEvent.click(within(within(list()).getAllByRole('option')[2]).getByTitle('Remove step'))],
+  ])('marks the run results stale after %s, because they are positional', async (_name, act) => {
+    b.loadScenarioResult.mockResolvedValue(resultOf([{ passed: true }, { passed: true }, { passed: false }]))
+    mount()
+    await loaded()
+    await screen.findByTitle('View run statistics')
+    expect(screen.queryByTitle('Stale: steps changed since this run')).not.toBeInTheDocument()
+    act()
+    expect(screen.getAllByTitle('Stale: steps changed since this run').length).toBeGreaterThan(0)
+  })
+
+  it('tells where a URL variable comes from, using the environment chosen for the run', async () => {
+    b.loadScenario.mockResolvedValue(detail({
+      variables: [{ name: 'user', value: 'ada' }],
+      steps: [step({ label: 'One', url: '{{region}}/{{user}}/{{ghost}}' })],
+    }))
+    b.getEnvironment.mockResolvedValue({ path: '/e/dev.yaml', name: 'dev', variables: [{ name: 'region', value: 'eu', secret: false }] })
+    mount({ environments: [{ path: '/e/dev.yaml', name: 'dev' }], activeEnvPath: '/e/dev.yaml' } as never)
+    await loaded()
+    const bar = await screen.findByLabelText('Variables in the URL')
+    await waitFor(() => expect(bar).toHaveTextContent('region = eu'))
+    expect(bar).toHaveTextContent('user = ada')
+    expect(bar).toHaveTextContent('⚠ ghost not defined')
+    expect(b.getEnvironment).toHaveBeenCalledWith('/e/dev.yaml')
+  })
+
+  it('still works when the environment cannot be read', async () => {
+    b.loadScenario.mockResolvedValue(detail({ steps: [step({ label: 'One', url: '{{region}}' })] }))
+    b.getEnvironment.mockRejectedValue(new Error('gone'))
+    mount({ activeEnvPath: '/e/dev.yaml' })
+    await loaded()
+    expect(await screen.findByLabelText('Variables in the URL')).toHaveTextContent('⚠ region not defined')
   })
 
   it('adds a step and selects it', async () => {

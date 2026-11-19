@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Trash2, Plus, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { METHOD_COLOR, HTTP_METHODS, HTTP_REQUEST_HEADERS, BODY_TYPES } from '@/lib/httpUtils'
+import type { HttpMethod } from '@/lib/httpUtils'
+import { varsIn } from '@/lib/stepVars'
+import type { StepVarInfo } from '@/lib/stepVars'
+import { HighlightedInput } from '@/components/HighlightedInput'
+import { VarValueInput } from '@/components/KeyValueEditor'
+import { AuthEditor } from '@/components/AuthEditor'
+import { authPayloadToState, authStateToPayload } from '@/lib/httpUtils'
 import { inputCls as baseInputCls, selectCls as baseSelectCls } from '@/lib/styles'
 import type { StepDetail, AssertionDetail, ExtractionDetail } from '@/lib/bridge'
 
-const BODY_TYPES = ['none', 'json', 'raw', 'form-urlencoded']
-const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 const ASSERTION_TYPES = ['status', 'jsonpath', 'header', 'schema']
 const STATUS_OPERATORS = ['eq', 'ne', 'gt', 'lt']
 const ALL_OPERATORS = ['eq', 'ne', 'gt', 'lt', 'contains', 'matches']
@@ -126,26 +132,35 @@ export function ExtractionRow({ extraction, onChange, onRemove }: {
   )
 }
 
-export function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'name', valuePlaceholder = 'value' }: {
+export function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'Key', valuePlaceholder = 'Value', keySuggestions, varNames }: {
   pair: { name: string; value: string }
   onChange: (u: { name?: string; value?: string }) => void
   onRemove: () => void
   keyPlaceholder?: string
   valuePlaceholder?: string
+  keySuggestions?: string[]
+  varNames?: string[]
 }) {
+  const listId = useId()
   return (
     <div className="flex items-center gap-1 mb-1">
+      {keySuggestions && (
+        <datalist id={listId}>
+          {keySuggestions.map(s => <option key={s} value={s} />)}
+        </datalist>
+      )}
       <input
         value={pair.name}
         onChange={e => onChange({ name: e.target.value })}
         placeholder={keyPlaceholder}
-        className={cn(inputCls, 'flex-1 min-w-0')}
+        list={keySuggestions ? listId : undefined}
+        className={cn(inputCls, 'flex-1 min-w-0 font-mono')}
       />
-      <input
+      <VarValueInput
         value={pair.value}
-        onChange={e => onChange({ value: e.target.value })}
+        onChange={v => onChange({ value: v })}
         placeholder={valuePlaceholder}
-        className={cn(inputCls, 'flex-1 min-w-0')}
+        envVarNames={varNames}
       />
       <button
         type="button"
@@ -159,11 +174,12 @@ export function KVRow({ pair, onChange, onRemove, keyPlaceholder = 'name', value
   )
 }
 
-function EditorSection({ title, count, addLabel, onAdd, children }: {
+function EditorSection({ title, count, addLabel, onAdd, badge, children }: {
   title: string
   count: number
-  addLabel: string
-  onAdd: () => void
+  addLabel?: string
+  onAdd?: () => void
+  badge?: string
   children: React.ReactNode
 }) {
   const [open, setOpen] = useState(count > 0)
@@ -179,10 +195,10 @@ function EditorSection({ title, count, addLabel, onAdd, children }: {
           {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
           {title}
           {count > 0 && (
-            <span className="px-1.5 rounded-full bg-[var(--color-border)] text-[10px] normal-case tracking-normal">{count}</span>
+            <span className="px-1.5 rounded-full bg-[var(--color-border)] text-[10px] normal-case tracking-normal">{badge ?? count}</span>
           )}
         </button>
-        {!open && (
+        {!open && addLabel && onAdd && (
           <button type="button" onClick={() => { setOpen(true); onAdd() }} className={addBtnCls}>
             <Plus size={10} /> {addLabel}
           </button>
@@ -193,8 +209,9 @@ function EditorSection({ title, count, addLabel, onAdd, children }: {
   )
 }
 
-export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown, onToggleDisabled }: {
+export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemove, onMoveUp, onMoveDown, onToggleDisabled, vars }: {
   step: StepDetail
+  vars?: StepVarInfo
   index: number
   isFirst: boolean
   isLast: boolean
@@ -204,9 +221,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
   onMoveDown: () => void
   onToggleDisabled: () => void
 }) {
-  const hasNonDefaultOptions = (step.failPolicy && step.failPolicy !== 'stop') ||
+  const hasNonDefaultOptions = !!((step.failPolicy && step.failPolicy !== 'stop') ||
     (step.timeoutMs && step.timeoutMs > 0) ||
-    (step.retryMaxAttempts && step.retryMaxAttempts > 0)
+    (step.retryMaxAttempts && step.retryMaxAttempts > 0))
   const [showAdvanced, setShowAdvanced] = useState(!!hasNonDefaultOptions)
 
   function updateHeader(i: number, u: { name?: string; value?: string }) {
@@ -315,17 +332,34 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
           <select
             value={step.method ?? 'GET'}
             onChange={e => onChange({ method: e.target.value })}
-            className={selectCls}
+            className={cn(selectCls, 'font-mono font-semibold', METHOD_COLOR[(step.method ?? 'GET') as HttpMethod])}
           >
             {HTTP_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
-          <input
+          <HighlightedInput
             value={step.url ?? ''}
-            onChange={e => onChange({ url: e.target.value })}
+            onChange={url => onChange({ url })}
             placeholder="https://api.example.com/path"
-            className={cn(inputCls, 'flex-1 min-w-0 font-mono')}
+            className={cn(inputCls, 'font-mono')}
+            envVarNames={vars?.names}
+            padding="px-2"
           />
         </div>
+        {vars && varsIn(step.url ?? '').length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap mb-1.5" aria-label="Variables in the URL">
+            {varsIn(step.url ?? '').map(name => {
+              const h = vars.hint(name)
+              const warn = h.kind === 'missing' || h.kind === 'later'
+              return (
+                <span key={name} className={cn('text-[10px] font-mono', warn ? 'text-amber-400' : 'text-[var(--color-muted-foreground)]')}>
+                  {warn ? `⚠ ${name} ` : name}
+                  {!warn && <span className="opacity-50">{h.kind === 'extracted' ? ' ← ' : ' = '}</span>}
+                  {h.text}
+                </span>
+              )
+            })}
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <select
             value={step.bodyType ?? 'none'}
@@ -333,7 +367,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             className={selectCls}
             title="Request body type"
           >
-            {BODY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {BODY_TYPES
+              .filter(t => t.value !== 'multipart' || step.bodyType === 'multipart')
+              .map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
           {(step.bodyType === 'json' || step.bodyType === 'raw' || step.bodyType === 'form-urlencoded') && (
             <button
@@ -377,8 +413,10 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             pair={h}
             onChange={u => updateHeader(i, u)}
             onRemove={() => removeHeader(i)}
-            keyPlaceholder="Header-Name"
-            valuePlaceholder="value"
+            keyPlaceholder="Header"
+            valuePlaceholder="Value"
+            keySuggestions={HTTP_REQUEST_HEADERS}
+            varNames={vars?.names}
           />
         ))}
         <button type="button" onClick={addHeader} className={addBtnCls}>
@@ -393,14 +431,29 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             pair={q}
             onChange={u => updateQueryParam(i, u)}
             onRemove={() => removeQueryParam(i)}
-            keyPlaceholder="param"
-            valuePlaceholder="value"
+            keyPlaceholder="Parameter"
+            valuePlaceholder="Value"
+            varNames={vars?.names}
           />
         ))}
         <button type="button" onClick={addQueryParam} className={addBtnCls}>
           <Plus size={10} /> Add param
         </button>
       </EditorSection>
+
+      {!step.requestRef && (
+        <EditorSection title="Auth" count={step.auth ? 1 : 0} badge={step.auth?.type}>
+          <div className="flex flex-col gap-2">
+            <AuthEditor
+              auth={authPayloadToState(step.auth)}
+              onChange={a => onChange({ auth: authStateToPayload(a) })}
+            />
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              Use a variable such as <code className="font-mono">{'{{token}}'}</code> so the secret is not written into the scenario file.
+            </p>
+          </div>
+        </EditorSection>
+      )}
 
       {/* Assertions */}
       <div className="px-3 py-2 border-b border-[var(--color-border)]">

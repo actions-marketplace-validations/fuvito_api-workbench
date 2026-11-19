@@ -277,3 +277,61 @@ func TestRequestFileIOMapping(t *testing.T) {
 		t.Errorf("absent body/auth should stay absent: %+v", plain)
 	}
 }
+
+func TestExecute_ReturnsTheRequestAsSentWithCredentialsMasked(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	rs, ws := newRS(t)
+	envDir := filepath.Join(ws.workspacePath, "environments")
+	os.MkdirAll(envDir, 0o755)
+	info, err := ws.SaveEnvironment(EnvironmentIO{Name: "e", Path: filepath.Join(envDir, "e.yaml"), Variables: []EnvironmentVariableIO{
+		{Name: "base", Value: srv.URL}, {Name: "pw", Value: "s3cret-value", Secret: true},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.SelectEnvironment(info.Path); err != nil {
+		t.Fatal(err)
+	}
+
+	out := rs.Execute(RequestInput{
+		Method:      "POST",
+		URL:         "{{base}}/items",
+		QueryParams: []QueryParamIO{{Name: "a", Value: "1"}, {Name: "api_key", Value: "k-123"}},
+		Headers:     []HeaderIO{{Name: "X-Trace", Value: "t1"}, {Name: "X-Note", Value: "has {{pw}} inside"}},
+		Body:        &BodyIO{Type: "json", Content: `{"password":"{{pw}}"}`},
+		Auth:        &AuthIO{Type: "bearer", Token: "literal-token"},
+	})
+	if out.Error != "" {
+		t.Fatal(out.Error)
+	}
+	if out.RequestMethod != "POST" || !strings.HasPrefix(out.RequestURL, srv.URL+"/items?a=1&api_key=***") {
+		t.Errorf("sent request: %s %s", out.RequestMethod, out.RequestURL)
+	}
+	if strings.Contains(out.RequestBody, "s3cret-value") || !strings.Contains(out.RequestBody, "***") {
+		t.Errorf("secret value must be masked in the body: %q", out.RequestBody)
+	}
+	headers := map[string]string{}
+	for _, h := range out.RequestHeaders {
+		headers[h.Name] = h.Value
+	}
+	if headers["X-Trace"] != "t1" || headers["X-Note"] != "has *** inside" || headers["Authorization"] != "Bearer ***" {
+		t.Errorf("sent headers: %+v", headers)
+	}
+	for _, h := range out.RequestHeaders {
+		if strings.Contains(h.Value, "literal-token") || strings.Contains(h.Value, "s3cret-value") {
+			t.Errorf("credential leaked in %+v", h)
+		}
+	}
+}
+
+func TestExecute_ErrorsStillReportTheRequest(t *testing.T) {
+	rs, _ := newRS(t)
+	out := rs.Execute(RequestInput{Method: "GET", URL: "http://127.0.0.1:1/never"})
+	if out.Error == "" {
+		t.Fatal("expected a connection error")
+	}
+	if out.RequestMethod != "GET" || out.RequestURL != "http://127.0.0.1:1/never" {
+		t.Errorf("sent request on error: %s %s", out.RequestMethod, out.RequestURL)
+	}
+}

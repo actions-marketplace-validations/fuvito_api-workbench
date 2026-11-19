@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseOp, specLabel } from './coverage-report'
+import { parseOp, specLabel, operationOutcomes, share } from './coverage-report'
 
 // ── parseOp ──────────────────────────────────────────────────────────────────
 
@@ -34,5 +34,31 @@ describe('specLabel', () => {
 
   it('works with URL', () => {
     expect(specLabel('http://localhost:8090/openapi.yaml')).toBe('openapi.yaml')
+  })
+})
+
+describe('operationOutcomes', () => {
+  const results = { 'GET /a': { lastPassed: true }, 'POST /b': { lastPassed: false } }
+
+  it('splits covered operations into passing and failing by their last result', () => {
+    expect(operationOutcomes({ total: 4, exercised: ['GET /a', 'POST /b'], missed: ['GET /c', 'GET /d'], operationResults: results }))
+      .toEqual({ total: 4, covered: 2, passing: 1, failing: 1, noResult: 0, notCovered: 2 })
+  })
+
+  it('counts covered operations without a result separately', () => {
+    expect(operationOutcomes({ total: 2, exercised: ['GET /a', 'POST /b'], missed: [] }))
+      .toEqual({ total: 2, covered: 2, passing: 0, failing: 0, noResult: 2, notCovered: 0 })
+  })
+
+  it('derives never-tested from the total when the missed list is absent', () => {
+    expect(operationOutcomes({ total: 5, exercised: ['GET /a'] }).notCovered).toBe(4)
+  })
+})
+
+describe('share', () => {
+  it('rounds to a whole percent and tolerates an empty total', () => {
+    expect(share(1, 3)).toBe(33)
+    expect(share(2, 3)).toBe(67)
+    expect(share(0, 0)).toBe(0)
   })
 })

@@ -8,6 +8,7 @@ import { detectFormat, countMatches } from '@/lib/responseHighlight'
 import { TimingBar, TimingDialog } from './ResponseTiming'
 import { DiffView } from './ResponseDiffView'
 import { BodyContent } from './ResponseBody'
+import { RequestSummary } from './StepExchange'
 
 // ---- Time ago ----
 
@@ -77,7 +78,7 @@ type ResponseViewerProps = {
 }
 
 export function ResponseViewer({ response, previousResponse, loading, cachedAt, onClear, onCollapse, onAddToScenario }: ResponseViewerProps) {
-  const [activeTab, setActiveTab] = useState<'Body' | 'Headers'>('Body')
+  const [activeTab, setActiveTab] = useState<'Body' | 'Headers' | 'Request'>('Body')
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -88,6 +89,8 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
   const [copied, setCopied] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const hasRequest = !!response && !!response.requestMethod
+  const shownTab = activeTab === 'Request' && !hasRequest ? 'Body' : activeTab
 
   const bodyText = useMemo(
     () => response && !response.error ? (rawMode ? response.body : prettyBody(response.body)) : '',
@@ -337,10 +340,10 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
       {/* Tabs */}
       {response && !response.error && (
         <div className="flex border-b border-[var(--color-border)] px-3 shrink-0">
-          {(['Body', 'Headers'] as const).map(tab => (
+          {(hasRequest ? ['Body', 'Headers', 'Request'] as const : ['Body', 'Headers'] as const).map(tab => (
             <button key={tab} type="button" onClick={() => setActiveTab(tab)}
               className={cn('px-3 py-1.5 text-xs border-b-2 transition-colors',
-                activeTab === tab
+                shownTab === tab
                   ? 'border-[var(--color-accent)] text-[var(--color-foreground)]'
                   : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]')}>
               {tab}
@@ -354,16 +357,22 @@ export function ResponseViewer({ response, previousResponse, loading, cachedAt, 
         {loading && <p className="text-xs text-[var(--color-muted-foreground)] animate-pulse">Sending request…</p>}
         {!loading && !response && <p className="text-xs text-[var(--color-muted-foreground)]">Send a request to see the response.</p>}
         {!loading && response?.error && (
-          <div className="text-xs text-red-400 font-mono whitespace-pre-wrap break-all">{response.error}</div>
+          <div className="flex flex-col gap-3">
+            <div className="text-xs text-red-400 font-mono whitespace-pre-wrap break-all">{response.error}</div>
+            {hasRequest && <RequestSummary method={response.requestMethod} url={response.requestUrl} headers={response.requestHeaders} body={response.requestBody} />}
+          </div>
         )}
-        {!loading && response && !response.error && activeTab === 'Body' && !showDiff && (
+        {!loading && response && !response.error && shownTab === 'Body' && !showDiff && (
           <BodyContent body={response.body} headers={response.headers} search={debouncedSearch} activeMatch={activeMatch} raw={rawMode} />
         )}
-        {!loading && response && !response.error && activeTab === 'Body' && showDiff && (
+        {!loading && response && !response.error && shownTab === 'Body' && showDiff && (
           <DiffView prev={prevBodyPretty} curr={bodyText} />
         )}
-        {!loading && response && !response.error && activeTab === 'Headers' && (
+        {!loading && response && !response.error && shownTab === 'Headers' && (
           <HeadersTable headers={response.headers} />
+        )}
+        {!loading && response && !response.error && shownTab === 'Request' && (
+          <RequestSummary method={response.requestMethod} url={response.requestUrl} headers={response.requestHeaders} body={response.requestBody} />
         )}
       </div>
     </div>

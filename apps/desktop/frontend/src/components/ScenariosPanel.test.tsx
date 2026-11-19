@@ -145,7 +145,7 @@ describe('ScenariosPanel', () => {
     it('offers the root menu with run-all only', () => {
       const onRunFolder = vi.fn()
       setup({ onRunFolder })
-      rightClick('scenarios')
+      fireEvent.contextMenu(screen.getByTestId('scenario-root'))
       expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Run all scenarios' }))
       expect(onRunFolder).toHaveBeenCalledWith('')

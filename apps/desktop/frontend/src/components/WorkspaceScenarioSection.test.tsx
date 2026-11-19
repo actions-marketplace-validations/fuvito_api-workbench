@@ -45,7 +45,7 @@ function dnd(data: string) {
 describe('WorkspaceScenarioSection — tree', () => {
   it('builds nested folders from scenario paths and folder sentinels', () => {
     setup()
-    expect(screen.getByText('scenarios')).toBeInTheDocument()
+    expect(screen.queryByText('scenarios')).not.toBeInTheDocument()
     expect(screen.getByText('auth')).toBeInTheDocument()
     expect(screen.getByText('tokens')).toBeInTheDocument()
     expect(screen.getByText('empty')).toBeInTheDocument()
@@ -68,18 +68,31 @@ describe('WorkspaceScenarioSection — tree', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 
-  it('collapses and expands the root and individual folders', () => {
+  it('collapses and expands individual folders', () => {
     setup()
     fireEvent.click(folderRow('auth'))
     expect(screen.queryByText('Login')).not.toBeInTheDocument()
     expect(screen.getByText('Root smoke')).toBeInTheDocument()
     fireEvent.click(folderRow('auth'))
     expect(screen.getByText('Login')).toBeInTheDocument()
+  })
 
-    fireEvent.click(folderRow('scenarios'))
-    expect(screen.queryByText('Root smoke')).not.toBeInTheDocument()
-    fireEvent.click(folderRow('scenarios'))
-    expect(screen.getByText('Root smoke')).toBeInTheDocument()
+  it('scales its tree icons with the font size like the requests tree (they are not inside buttons)', () => {
+    const { container } = setup()
+    // index.css sizes `button svg` and `.ui-icon svg` from the font size; a bare svg would stay at its size attribute
+    const bare = Array.from(container.querySelectorAll('svg')).filter(svg =>
+      !svg.closest('button') && !svg.closest('.ui-icon') && !svg.classList.contains('ui-icon') && svg.getAttribute('width') !== '10')
+    expect(bare).toEqual([])
+    expect(container.querySelectorAll('.ui-icon').length).toBeGreaterThan(0)
+  })
+
+  it('has no root folder node: top-level scenarios and folders start at the left edge', () => {
+    setup()
+    const smoke = screen.getByText('Root smoke').closest('[draggable]') as HTMLElement
+    const auth = folderRow('auth')
+    expect(smoke.style.paddingLeft).toBe('20px')
+    expect(auth.style.paddingLeft).toBe('8px')
+    expect(screen.getByText('Login').closest('[draggable]')!.getAttribute('style')).toContain('padding-left: 32px')
   })
 
   it('shows an empty state with actions when there are no scenarios', () => {
@@ -259,29 +272,23 @@ describe('WorkspaceScenarioSection — root toolbar', () => {
     expect(queryInline()).not.toBeInTheDocument()
   })
 
-  it('re-opens a collapsed root when creating', () => {
-    setup({ onNewScenario: vi.fn(), onNewFolder: vi.fn() })
-    fireEvent.click(folderRow('scenarios'))
-    expect(screen.queryByText('Root smoke')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByTitle('New scenario'))
-    expect(screen.getByText('Root smoke')).toBeInTheDocument()
-    fireEvent.keyDown(inlineInput(), { key: 'Escape' })
-
-    fireEvent.click(folderRow('scenarios'))
-    fireEvent.click(screen.getByTitle('New folder'))
-    expect(screen.getByText('Root smoke')).toBeInTheDocument()
+  it('shows the toolbar actions without hovering anything', () => {
+    setup({ onNewScenario: vi.fn(), onNewFolder: vi.fn(), onRefresh: vi.fn(), onRunAllScenarios: vi.fn() })
+    for (const t of ['Run all scenarios', 'Refresh scenarios', 'New scenario from template', 'New folder', 'New scenario']) {
+      expect(screen.getByTitle(t).className).not.toContain('opacity-0')
+    }
   })
 
   it('opens the folder context menu for the root with an empty path', () => {
     const onFolderContextMenu = vi.fn()
     setup({ onFolderContextMenu })
-    fireEvent.contextMenu(screen.getByText('scenarios'))
+    fireEvent.contextMenu(screen.getByTestId('scenario-root'))
     expect(onFolderContextMenu).toHaveBeenCalledWith(expect.anything(), '', 'scenarios')
   })
 
   it('tolerates a root context menu without a handler', () => {
     setup()
-    expect(() => fireEvent.contextMenu(screen.getByText('scenarios'))).not.toThrow()
+    expect(() => fireEvent.contextMenu(screen.getByTestId('scenario-root'))).not.toThrow()
   })
 })
 
@@ -376,7 +383,7 @@ describe('WorkspaceScenarioSection — drag and drop', () => {
   it('moves a dropped scenario to the root', () => {
     const onMoveScenario = vi.fn()
     setup({ onMoveScenario })
-    const row = folderRow('scenarios')
+    const row = screen.getByTestId('scenario-root')
     fireEvent.dragOver(row, dnd(''))
     fireEvent.drop(row, dnd('/ws/scenarios/auth/login.yaml'))
     expect(onMoveScenario).toHaveBeenCalledWith('/ws/scenarios/auth/login.yaml', '')
@@ -392,7 +399,7 @@ describe('WorkspaceScenarioSection — drag and drop', () => {
     fireEvent.dragLeave(row, { relatedTarget: document.body })
     expect(row.className).not.toContain('bg-[var(--color-accent)]/10')
 
-    const root = folderRow('scenarios')
+    const root = screen.getByTestId('scenario-root')
     fireEvent.dragOver(root, dnd(''))
     expect(root.className).toContain('bg-[var(--color-accent)]/10')
     fireEvent.dragLeave(root, { relatedTarget: document.body })

@@ -28,10 +28,7 @@ export function ScenarioSetupPane({
 
   return (
     <div className="flex-1 overflow-hidden min-w-0 flex flex-col">
-      <div role="tablist" aria-label="Setup views" className="shrink-0 flex items-center gap-1 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mr-2">
-          Setup
-        </span>
+      <div role="tablist" aria-label="Setup views" className="shrink-0 flex items-end gap-1 px-3 pt-1 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         {(['definition', 'result'] as const).map(t => {
           const disabled = t === 'result' && !resultAvailable
           return (
@@ -43,11 +40,11 @@ export function ScenarioSetupPane({
               disabled={disabled}
               onClick={() => onTabChange(t)}
               className={cn(
-                'px-2 py-0.5 rounded text-xs capitalize transition-colors',
+                'px-4 py-2 -mb-px text-xs font-medium capitalize border-b-2 transition-colors',
                 active === t
-                  ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold'
-                  : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]',
-                disabled && 'opacity-40 cursor-not-allowed hover:text-[var(--color-muted-foreground)]',
+                  ? 'border-[var(--color-accent)] text-[var(--color-foreground)]'
+                  : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:border-[var(--color-border)]',
+                disabled && 'opacity-40 cursor-not-allowed hover:text-[var(--color-muted-foreground)] hover:border-transparent',
               )}
             >
               {t}

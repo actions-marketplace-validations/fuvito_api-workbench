@@ -161,6 +161,11 @@ export interface ResponseData {
   size: number
   timing: TimingData
   error?: string
+  // the request as it was sent, credentials masked by the Go core; not stored in the response cache
+  requestMethod?: string
+  requestUrl?: string
+  requestHeaders?: Array<{ name: string; value: string }>
+  requestBody?: string
 }
 
 export interface AppSettings {
@@ -788,6 +793,7 @@ export interface StepDetail {
   retryMaxAttempts?: number
   retryDelayMs?: number
   noFollowRedirects?: boolean
+  auth?: AuthPayload
 }
 
 export interface ScenarioDetail {

@@ -1,7 +1,7 @@
-import { FolderOpen, Play, Clock, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal } from 'lucide-react'
+import { FolderOpen, Play, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type RailTab = 'explorer' | 'scenarios' | 'history' | 'coverage'
+export type RailTab = 'explorer' | 'scenarios' | 'coverage'
 
 type NavItem = {
   tab: RailTab
@@ -12,9 +12,8 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { tab: 'explorer',  icon: FolderOpen, label: 'Explorer',  title: 'Explorer',  activeColor: 'text-sky-400' },
+  { tab: 'explorer',  icon: FolderOpen, label: 'Requests',  title: 'Requests',  activeColor: 'text-sky-400' },
   { tab: 'scenarios', icon: Play,       label: 'Scenarios', title: 'Scenarios', activeColor: 'text-violet-400' },
-  { tab: 'history',   icon: Clock,      label: 'History',   title: 'History',   activeColor: 'text-amber-400' },
   { tab: 'coverage',  icon: BarChart2,  label: 'Contracts', title: 'Contracts', activeColor: 'text-emerald-400' },
 ]
 

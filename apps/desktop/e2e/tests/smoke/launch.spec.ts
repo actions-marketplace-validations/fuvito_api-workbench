@@ -27,12 +27,12 @@ test.describe('App launch (smoke)', () => {
     await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled()
   })
 
-  test('activity rail shows Explorer, Scenarios and History buttons', async ({ page }) => {
+  test('activity rail shows Requests and Scenarios buttons, with History in the requests panel', async ({ page }) => {
     await page.goto('/')
     await page.getByPlaceholder('https://api.example.com/endpoint').waitFor({ timeout: 15_000 })
-    await expect(page.getByTitle('Explorer')).toBeVisible()
+    await expect(page.getByTitle('Requests')).toBeVisible()
     await expect(page.getByTitle('Scenarios')).toBeVisible()
-    await expect(page.getByTitle('History')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'History' })).toBeVisible()
   })
 
   test('settings panel opens from gear button', async ({ page }) => {

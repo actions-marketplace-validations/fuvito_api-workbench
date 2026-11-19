@@ -127,7 +127,8 @@ export default function App() {
   })
   const [railTab, setRailTab] = useState<RailTab>(() => {
     const saved = localStorage.getItem('ui.railTab')
-    const valid: RailTab[] = ['explorer', 'scenarios', 'coverage', 'history']
+    const valid: RailTab[] = ['explorer', 'scenarios', 'coverage']
+    // 'history' was a rail tab of its own before it moved next to the requests list
     return valid.includes(saved as RailTab) ? (saved as RailTab) : 'explorer'
   })
   const [sidebarOpen, setSidebarOpen] = useState(() => {

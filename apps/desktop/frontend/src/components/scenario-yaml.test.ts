@@ -341,3 +341,32 @@ describe('serializeScenarioToYAML — redirects', () => {
     expect(serializeScenarioToYAML(minimal({ steps: [step] }))).not.toContain('followRedirects')
   })
 })
+
+describe('serializeScenarioToYAML — step auth', () => {
+  const step = (auth?: import('@/lib/bridge').AuthPayload) => minimal({
+    steps: [{ label: 'S', method: 'GET', url: '/a', auth, assertions: [], extractions: [] }],
+  })
+  const payload = (over: Partial<import('@/lib/bridge').AuthPayload>) =>
+    ({ type: 'none', token: '', username: '', password: '', key: '', value: '', location: '', ...over })
+
+  it('emits a bearer auth block under the request', () => {
+    const yaml = serializeScenarioToYAML(step(payload({ type: 'bearer', token: '{{token}}' })))
+    expect(yaml).toContain('      auth:\n        type: bearer\n        token: "{{token}}"')
+  })
+
+  it('emits basic and apikey blocks', () => {
+    const basic = serializeScenarioToYAML(step(payload({ type: 'basic', username: 'u', password: '{{pw}}' })))
+    expect(basic).toContain('        type: basic\n        username: u\n        password: "{{pw}}"')
+    const key = serializeScenarioToYAML(step(payload({ type: 'apikey', key: 'X-Key', value: '{{k}}', location: 'query' })))
+    expect(key).toContain('        type: apikey\n        key: X-Key\n        value: "{{k}}"\n        location: query')
+  })
+
+  it('defaults an api key to the header location', () => {
+    expect(serializeScenarioToYAML(step(payload({ type: 'apikey', key: 'K', value: 'v' })))).toContain('        location: header')
+  })
+
+  it('writes nothing for no auth or type none', () => {
+    expect(serializeScenarioToYAML(step(undefined))).not.toContain('auth:')
+    expect(serializeScenarioToYAML(step(payload({ type: 'none' })))).not.toContain('auth:')
+  })
+})

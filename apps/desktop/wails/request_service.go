@@ -70,6 +70,12 @@ type ResponseOutput struct {
 	Size       int64      `json:"size"`
 	Timing     TimingIO   `json:"timing"`
 	Error      string     `json:"error,omitempty"`
+	// The request as it was sent (variables and dynamic values filled in), with credentials
+	// masked by exchangeRequest. The UI shows it; it is never written to history or the cache.
+	RequestMethod  string     `json:"requestMethod,omitempty"`
+	RequestURL     string     `json:"requestUrl,omitempty"`
+	RequestHeaders []HeaderIO `json:"requestHeaders,omitempty"`
+	RequestBody    string     `json:"requestBody,omitempty"`
 }
 
 type HistoryEntryIO struct {
@@ -177,6 +183,10 @@ func (s *RequestService) Execute(input RequestInput) ResponseOutput {
 	}
 	resolver := variables.NewResolver(env)
 	resolved := resolver.InterpolateRequest(req)
+	sent := func(out ResponseOutput) ResponseOutput {
+		out.RequestMethod, out.RequestURL, out.RequestHeaders, out.RequestBody = exchangeRequest(resolved, variables.SecretValues(env))
+		return out
+	}
 
 	// Per-request cancellable context so CancelRequest() can abort in-flight calls.
 	// Store only the most recent cancel so the Cancel button in the UI works for the
@@ -200,12 +210,12 @@ func (s *RequestService) Execute(input RequestInput) ResponseOutput {
 	if err != nil {
 		out := ResponseOutput{Error: err.Error()}
 		s.recordHistory(input, out)
-		return out
+		return sent(out)
 	}
 
 	out := domainToOutput(resp)
 	s.recordHistory(input, out)
-	return out
+	return sent(out)
 }
 
 // GetHistory returns the most recent history entries (up to 100).

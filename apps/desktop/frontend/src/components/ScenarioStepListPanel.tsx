@@ -16,6 +16,7 @@ type Props = {
   onSelectSetup: () => void
   setupAlert?: 'error' | 'warning' | null
   variableCount?: number
+  resultStale?: boolean
   result: ScenarioResult | null
   running: boolean
   onMoveStep: (from: number, dir: -1 | 1) => void
@@ -27,17 +28,11 @@ type Props = {
 
 export function StepListPanel({
   widthPct, listRef, loadError, detailLoaded, steps,
-  selectedStepIndex, onSelectStep, setupSelected, onSelectSetup, setupAlert = null, variableCount = 0, result, running,
+  selectedStepIndex, onSelectStep, setupSelected, onSelectSetup, setupAlert = null, variableCount = 0, resultStale = false, result, running,
   onMoveStep, onRemoveStep, onDuplicateStep, onToggleDisabled, onAddStep,
 }: Props) {
   return (
     <div className="shrink-0 flex flex-col overflow-hidden" style={{ width: `${widthPct}%` }}>
-
-      <div className="shrink-0 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-background)]">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">
-          Steps
-        </span>
-      </div>
 
       {detailLoaded && !loadError && (
         <div
@@ -51,14 +46,14 @@ export function StepListPanel({
             else if (e.key === 'ArrowDown' && steps.length > 0) { e.preventDefault(); onSelectStep(0) }
           }}
           className={cn(
-            'shrink-0 flex items-center gap-2 px-3 py-2 cursor-pointer border-l-2 border-b border-b-[var(--color-border)] select-none transition-colors',
+            'shrink-0 flex items-center gap-2 px-3 py-3 cursor-pointer border-l-4 border-b-2 border-b-[var(--color-border)] select-none transition-colors',
             setupSelected
-              ? 'bg-[var(--color-accent)]/10 border-l-[var(--color-accent)]'
-              : 'border-l-transparent hover:bg-[var(--color-muted)]',
+              ? 'bg-[var(--color-accent)]/15 border-l-[var(--color-accent)]'
+              : 'bg-[var(--color-card)] border-l-[var(--color-muted-foreground)]/40 hover:bg-[var(--color-muted)]',
           )}
         >
-          <SlidersHorizontal size={13} className="shrink-0 text-[var(--color-muted-foreground)]" />
-          <span className={cn('text-xs font-medium', setupSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
+          <SlidersHorizontal size={14} className={cn('shrink-0', setupSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-muted-foreground)]')} />
+          <span className={cn('text-xs font-bold uppercase tracking-wider', setupSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-foreground)]')}>
             Setup
           </span>
           {variableCount > 0 && (
@@ -75,6 +70,15 @@ export function StepListPanel({
           )}
         </div>
       )}
+
+      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-[var(--color-background)] border-b border-[var(--color-border)]">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)]">
+          Steps
+        </span>
+        {steps.length > 0 && (
+          <span className="px-1.5 rounded-full bg-[var(--color-muted)] text-[10px] text-[var(--color-muted-foreground)]">{steps.length}</span>
+        )}
+      </div>
 
       <div
         ref={listRef}
@@ -126,6 +130,7 @@ export function StepListPanel({
               step={step}
               index={i}
               result={result?.steps?.[i] ?? null}
+              resultStale={resultStale}
               selected={selectedStepIndex === i}
               onSelect={onSelectStep}
               editMode

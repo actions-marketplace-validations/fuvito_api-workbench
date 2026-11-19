@@ -102,7 +102,7 @@ async function openContracts(page: Page, theme: 'dark' | 'light') {
   )
   await gotoApp(page)
   await page.getByTitle('Contracts', { exact: true }).click()
-  await page.getByText('operations covered').waitFor({ timeout: 5_000 })
+  await page.getByRole('group', { name: 'Covered', exact: true }).waitFor({ timeout: 5_000 })
 }
 
 for (const theme of ['dark', 'light'] as const) {

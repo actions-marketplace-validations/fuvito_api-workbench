@@ -83,8 +83,10 @@ body {
 }
 
 /* Scale UI icons (Lucide SVGs) with font size.
-   SVG presentation attributes have zero specificity so plain CSS wins. */
-button svg, a svg {
+   SVG presentation attributes have zero specificity so plain CSS wins.
+   Icons inside buttons and links scale automatically; add .ui-icon to an icon (or its wrapper)
+   that is not inside one, so tree rows built from divs match the rows built from buttons. */
+button svg, a svg, .ui-icon svg, svg.ui-icon {
   width:  calc(var(--font-size-code) * 1.1);
   height: calc(var(--font-size-code) * 1.1);
 }

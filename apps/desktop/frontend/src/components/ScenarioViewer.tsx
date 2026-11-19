@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   loadScenario, runScenario, saveScenarioRaw, saveScenarioResult,
-  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario,
+  loadScenarioResult, getAccumulatedCoverage, resetAccumulatedCoverage, cancelScenario, getEnvironment,
 } from '@/lib/bridge'
+import type { EnvVars } from '@/lib/stepVars'
 import { DiscardChangesDialog } from '@/components/ConfirmDialogs'
 import type { ScenarioDetail, ScenarioResult, StepDetail, EnvInfo, AccumulatedCoverage, ScenarioVariable } from '@/lib/bridge'
 import { serializeScenarioToYAML } from './scenario-yaml'
@@ -48,12 +49,38 @@ export function ScenarioViewer({
   const [visualDetail, setVisualDetail] = useState<ScenarioDetail | null>(null)
   const [visualDirty, setVisualDirty] = useState(false)
 
+  // Results are positional (result.steps[i] belongs to step i), so adding, duplicating, removing or
+  // moving a step leaves every result below it on the wrong step until the next run.
+  const [resultStale, setResultStale] = useState(false)
+  const [prevResult, setPrevResult] = useState(result)
+  if (prevResult !== result) {
+    setPrevResult(result)
+    setResultStale(false)
+  }
+
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   const [accumulatedCoverage, setAccumulatedCoverage] = useState<AccumulatedCoverage | null>(null)
+  // Variables of the environment chosen for the run, so steps can show where {{names}} come from.
+  const [envVars, setEnvVars] = useState<EnvVars>({})
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      if (!selectedEnvPath) { setEnvVars({}); return }
+      try {
+        const env = await getEnvironment(selectedEnvPath)
+        if (cancelled) return
+        setEnvVars(Object.fromEntries((env?.variables ?? []).filter(v => v.name).map(v => [v.name, { value: v.value, secret: !!v.secret }])))
+      } catch {
+        if (!cancelled) setEnvVars({})
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [selectedEnvPath])
   const [leftPanelPct, setLeftPanelPct] = useState<number>(() => {
     const saved = Number(localStorage.getItem('ui.scenarioStepPanelPct'))
     return isNaN(saved) || saved === 0 ? 35 : Math.min(50, Math.max(20, saved))
@@ -264,6 +291,7 @@ export function ScenarioViewer({
     const newSteps = [...visualDetail.steps, newStep]
     setVisualDetail({ ...visualDetail, steps: newSteps })
     setVisualDirty(true)
+    setResultStale(true)
     setSelectedStepIndex(newSteps.length - 1)
   }
 
@@ -272,6 +300,7 @@ export function ScenarioViewer({
     const newSteps = visualDetail.steps.filter((_, idx) => idx !== i)
     setVisualDetail({ ...visualDetail, steps: newSteps })
     setVisualDirty(true)
+    setResultStale(true)
     if (selectedStepIndex === i) {
       setSelectedStepIndex(newSteps.length > 0 ? Math.min(i, newSteps.length - 1) : 'setup')
     } else if (selectedStepIndex !== null && selectedStepIndex > i) {
@@ -289,6 +318,7 @@ export function ScenarioViewer({
       return { ...prev, steps }
     })
     setVisualDirty(true)
+    setResultStale(true)
     setSelection(prev => {
       if (prev === from) return from + dir
       if (prev === from + dir) return from
@@ -311,6 +341,7 @@ export function ScenarioViewer({
     const newSteps = [...visualDetail.steps.slice(0, i + 1), copy, ...visualDetail.steps.slice(i + 1)]
     setVisualDetail({ ...visualDetail, steps: newSteps })
     setVisualDirty(true)
+    setResultStale(true)
     setSelectedStepIndex(i + 1)
   }
 
@@ -450,6 +481,7 @@ export function ScenarioViewer({
           setupSelected={selection === 'setup'}
           onSelectSetup={() => setSelection('setup')}
           setupAlert={setupAlert}
+          resultStale={resultStale}
           variableCount={visualDetail?.variables?.length ?? 0}
           result={result}
           running={running}
@@ -491,6 +523,8 @@ export function ScenarioViewer({
             onMoveStep={moveVisualStep}
             onToggleDisabled={toggleVisualStepDisabled}
             onRunFrom={handleRunFrom}
+            resultStale={resultStale}
+            envVars={envVars}
           />
         )}
       </div>

@@ -44,10 +44,11 @@ describe('missingOnRunFrom', () => {
 
 describe('describeMissing', () => {
   it('words one and several values', () => {
-    expect(describeMissing([{ name: 'a', extractedIn: [1], usedIn: [2] }])).toBe('Starting here skips earlier steps, so {{a}} is not set.')
+    expect(describeMissing([{ name: 'a', extractedIn: [1], usedIn: [2] }]))
+      .toBe('Starting here skips earlier steps, so {{a}} (extracted in step 1) is not set.')
     expect(describeMissing([
-      { name: 'a', extractedIn: [1], usedIn: [2] },
-      { name: 'b', extractedIn: [1], usedIn: [2] },
-    ])).toBe('Starting here skips earlier steps, so {{a}}, {{b}} are not set.')
+      { name: 'a', extractedIn: [1], usedIn: [3] },
+      { name: 'b', extractedIn: [1, 2], usedIn: [3] },
+    ])).toBe('Starting here skips earlier steps, so {{a}} (extracted in step 1), {{b}} (extracted in steps 1, 2) are not set.')
   })
 })

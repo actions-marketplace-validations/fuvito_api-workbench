@@ -202,14 +202,14 @@ describe('variable autocomplete', () => {
 })
 
 describe('tabs', () => {
-  it('starts on Params and shows badges for active entries only', () => {
+  it('starts on Query Params and shows badges for active entries only', () => {
     setup({
       queryParams: [kv('a'), kv('b', false), kv('')],
       headers: [kv('H')],
       body: { type: 'json', content: '' },
       auth: { type: 'bearer', token: 't' },
     })
-    expect(screen.getByRole('button', { name: /Params/ }).textContent).toBe('Params1')
+    expect(screen.getByRole('button', { name: /Query Params/ }).textContent).toBe('Query Params1')
     expect(screen.getByRole('button', { name: /Headers/ }).textContent).toBe('Headers1')
     expect(screen.getByRole('button', { name: /Body/ }).textContent).toBe('Body•')
     expect(screen.getByRole('button', { name: /Auth/ }).textContent).toBe('Auth•')
@@ -217,7 +217,7 @@ describe('tabs', () => {
 
   it('has no badges when nothing is configured', () => {
     setup()
-    for (const t of ['Params', 'Headers', 'Body', 'Auth']) {
+    for (const t of ['Query Params', 'Headers', 'Body', 'Auth']) {
       expect(screen.getByRole('button', { name: t }).textContent).toBe(t)
     }
   })
