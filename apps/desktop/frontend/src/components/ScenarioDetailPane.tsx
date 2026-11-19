@@ -192,14 +192,16 @@ export function StepDetailPane({
   const markStale = (i: number) => setStale(prev => (prev.includes(i) ? prev : [...prev, i]))
 
   const tabCls = (active: boolean, disabled: boolean) => cn(
-    'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs transition-colors',
-    active ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)] font-semibold' : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]',
-    disabled && 'opacity-40 cursor-not-allowed hover:text-[var(--color-muted-foreground)]',
+    'flex items-center gap-1.5 px-4 py-2 -mb-px text-xs font-medium border-b-2 transition-colors',
+    active
+      ? 'border-[var(--color-accent)] text-[var(--color-foreground)]'
+      : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:border-[var(--color-border)]',
+    disabled && 'opacity-40 cursor-not-allowed hover:text-[var(--color-muted-foreground)] hover:border-transparent',
   )
 
   return (
     <div className="flex-1 overflow-hidden min-w-0 flex flex-col">
-      <div role="tablist" aria-label="Step views" className="shrink-0 flex items-center gap-1 px-3 py-1 border-b border-[var(--color-border)] bg-[var(--color-background)]">
+      <div role="tablist" aria-label="Step views" className="shrink-0 flex items-end gap-1 px-3 pt-1 border-b border-[var(--color-border)] bg-[var(--color-card)]">
         <button type="button" role="tab" aria-selected={effectiveView === 'definition'} onClick={() => setView('definition')} className={tabCls(effectiveView === 'definition', false)}>
           Definition
         </button>

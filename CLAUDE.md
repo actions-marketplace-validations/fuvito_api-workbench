@@ -469,7 +469,7 @@ Do not implement or stub any of these without explicit user direction.
 ### 2026-11-18 — Scenarios screen declutter, phase 3 (partial)
 
 - `RequestSummary` (in `StepExchange.tsx`) is the read-only "request as sent" view with neutral props (`method`, `url`, `headers`, `body`); `StepExchange` uses it for the step Result tab and the run log.
-- **Not done:** showing it on the main request screen. That screen's response carries no request-as-sent (`ResponseOutput` has only the response), so it needs a Go change (a masked request in the output, reusing `exchangeRequest`). Raised for a decision in the design document.
+- **Request screen:** `RequestService.Execute` now returns the request as sent in `ResponseOutput` (`requestMethod`, `requestUrl`, `requestHeaders`, `requestBody`), built by the same `exchangeRequest` that masks scenario steps (sensitive header/parameter names, the auth block and every secret environment value). The response viewer gets a **Request** tab (and shows the request under a network error). It is returned to the UI only: history stores no bodies and the response cache writes its own fields, so the sent request is never persisted. Go tests cover masking and the error path.
 
 ### 2026-11-18 — Scenarios screen declutter, phase 4
 

@@ -182,6 +182,36 @@ describe('ResponseViewer — tabs', () => {
     expect(screen.queryByText('2 headers')).not.toBeInTheDocument()
   })
 
+  it('offers a Request tab with the request as sent only when the response carries one', () => {
+    const { unmount } = renderViewer()
+    expect(screen.queryByRole('button', { name: 'Request' })).not.toBeInTheDocument()
+    unmount()
+    renderViewer({ response: resp({
+      requestMethod: 'POST', requestUrl: 'http://x/items?a=1',
+      requestHeaders: [{ name: 'Authorization', value: 'Bearer ***' }], requestBody: '{"n":1}',
+    }) })
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }))
+    expect(screen.getByRole('region', { name: 'Request' })).toHaveTextContent('http://x/items?a=1')
+    fireEvent.click(screen.getByRole('button', { name: /Headers \(1\)/ }))
+    expect(screen.getByText('Bearer ***')).toBeInTheDocument()
+    expect(screen.getByText(/"n": 1/)).toBeInTheDocument()
+  })
+
+  it('falls back to Body when a new response has no request', () => {
+    const withReq = resp({ requestMethod: 'GET', requestUrl: 'http://x' })
+    const { rerender } = render(<ResponseViewer response={withReq} loading={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }))
+    rerender(<ResponseViewer response={resp()} loading={false} />)
+    expect(screen.queryByRole('button', { name: 'Request' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Alice/)).toBeInTheDocument()
+  })
+
+  it('shows the request under a network error', () => {
+    renderViewer({ response: resp({ error: 'connection refused', requestMethod: 'GET', requestUrl: 'http://x/down' }) })
+    expect(screen.getByText('connection refused')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Request' })).toHaveTextContent('http://x/down')
+  })
+
   it('copies all headers and shows confirmation', async () => {
     vi.useFakeTimers()
     try {
