@@ -118,6 +118,20 @@ describe('TreeNode — directories', () => {
     expect(screen.getByText('health')).toBeInTheDocument()
   })
 
+  it('toggles a folder when its name or the empty part of its row is clicked, like scenario folders', () => {
+    const { props } = renderTree()
+    fireEvent.click(screen.getByText('users'))
+    expect(props.onToggleCollapse).toHaveBeenCalledTimes(1)
+    expect(props.onToggleCollapse).toHaveBeenLastCalledWith('/ws/requests/users')
+    fireEvent.click(screen.getByText('users').closest('div[class*="group"]') as HTMLElement)
+    expect(props.onToggleCollapse).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not make folder names bold', () => {
+    renderTree()
+    expect(screen.getByText('users').className).not.toMatch(/font-(medium|semibold|bold)/)
+  })
+
   it('toggles collapse when the chevron button is clicked', () => {
     const { props } = renderTree()
     fireEvent.click(screen.getAllByRole('button')[0])

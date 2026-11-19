@@ -79,6 +79,8 @@ export type SidebarProps = {
   onRenameScenarioFolder?: (folderPath: string, newName: string) => void
   runAllState?: RunAllState
   runLogTrigger?: number
+  activeScenarioPath?: string | null
+  dirtyScenarioPaths?: Set<string>
   onRunAllScenarios?: () => void
   scenarioError?: string | null
   onRunFolder?: (folderPath: string) => void
@@ -110,7 +112,7 @@ export function Sidebar({
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewScenarioFolder, onDeleteScenarioFolder, onRenameScenarioFolder,
-  runAllState, onRunAllScenarios, scenarioError, runLogTrigger,
+  runAllState, onRunAllScenarios, scenarioError, runLogTrigger, activeScenarioPath, dirtyScenarioPaths,
   onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun,
   selectedCoverageSpecFile, onSelectCoverageSpec,
   clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
@@ -302,6 +304,8 @@ export function Sidebar({
           onCutScenario={onCutScenario}
           onPasteToScenarioFolder={onPasteToScenarioFolder}
           runLogTrigger={runLogTrigger}
+          activeScenarioPath={activeScenarioPath}
+          dirtyScenarioPaths={dirtyScenarioPaths}
           onRunFolder={onRunScenarioFolder}
         />
       )}

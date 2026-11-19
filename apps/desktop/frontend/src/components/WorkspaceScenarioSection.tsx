@@ -78,6 +78,9 @@ type Props = {
   onRefresh?: () => void
   onMoveScenario?: (srcPath: string, destFolderRelPath: string) => void
   clipboard?: FileClipboard | null
+  // the scenario open in the active tab, and scenarios with unsaved edits, like the requests tree
+  activeScenarioPath?: string | null
+  dirtyScenarioPaths?: Set<string>
   renamingScenarioPath: string | null
   onRenamingChange: (path: string | null) => void
   renamingFolderPath: string | null
@@ -92,7 +95,7 @@ function ScenarioRow({
   s, indent,
   renamingScenarioPath, onRenamingChange,
   onSelectScenario, onDuplicateScenario, onDeleteScenario, onRenameScenario,
-  onScenarioContextMenu, clipboard,
+  onScenarioContextMenu, clipboard, activeScenarioPath, dirtyScenarioPaths,
 }: {
   s: ScenarioInfo
   indent: number
@@ -104,8 +107,11 @@ function ScenarioRow({
   onRenameScenario?: (path: string, newName: string) => void
   onScenarioContextMenu: (e: React.MouseEvent, path: string, name: string) => void
   clipboard?: FileClipboard | null
+  activeScenarioPath?: string | null
+  dirtyScenarioPaths?: Set<string>
 }) {
   const isCut = clipboard?.op === 'cut' && clipboard.srcPath === s.path
+  const isActive = !!activeScenarioPath && activeScenarioPath === s.path
   return (
     <div
       draggable
@@ -114,11 +120,13 @@ function ScenarioRow({
         e.dataTransfer.effectAllowed = 'move'
       }}
       className={cn(
-        'group flex items-center gap-1.5 pr-2 py-0.5 text-xs transition-colors cursor-grab active:cursor-grabbing',
-        'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
+        'group flex items-center gap-1.5 pr-2 py-0.5 text-xs transition-colors cursor-grab active:cursor-grabbing border-l-2',
+        isActive
+          ? 'bg-[var(--color-muted)] text-[var(--color-foreground)] border-[var(--color-accent)]'
+          : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] border-transparent',
         isCut && 'opacity-40 italic',
       )}
-      style={{ paddingLeft: `${8 + indent * 12 + 12}px` }}
+      style={{ paddingLeft: `${6 + indent * 12 + 12}px` }}
     >
       <Play size={12} className="ui-icon shrink-0 text-violet-400" />
       {renamingScenarioPath === s.path ? (
@@ -137,6 +145,9 @@ function ScenarioRow({
           title="Click to open · Double-click to rename"
         >
           <span className="truncate flex-1">{s.title}</span>
+          {dirtyScenarioPaths?.has(s.path) && (
+            <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
+          )}
           {!!s.stepCount && (
             <span className="shrink-0 text-[10px] tabular-nums text-[var(--color-muted-foreground)]">
               {s.stepCount}
@@ -181,7 +192,7 @@ function FolderRow({
   onFolderContextMenu,
   renamingScenarioPath, onRenamingChange,
   onSelectScenario, onDuplicateScenario, onDeleteScenario, onRenameScenario,
-  onScenarioContextMenu, onMoveScenario, clipboard,
+  onScenarioContextMenu, onMoveScenario, clipboard, activeScenarioPath, dirtyScenarioPaths,
 }: {
   node: FolderNode
   indent: number
@@ -204,6 +215,8 @@ function FolderRow({
   onScenarioContextMenu: (e: React.MouseEvent, path: string, name: string) => void
   onMoveScenario?: (srcPath: string, destFolderRelPath: string) => void
   clipboard?: FileClipboard | null
+  activeScenarioPath?: string | null
+  dirtyScenarioPaths?: Set<string>
 }) {
   const [creatingInFolder, setCreatingInFolder] = useState(false)
   const [creatingSubfolder, setCreatingSubfolder] = useState(false)
@@ -221,7 +234,7 @@ function FolderRow({
           if (src) onMoveScenario?.(src, node.relPath)
         }}
         className={cn(
-          'group flex items-center gap-1 pr-2 py-0.5 hover:bg-[var(--color-muted)] transition-colors cursor-pointer',
+          'group flex items-center gap-1.5 pr-2 py-0.5 hover:bg-[var(--color-muted)] transition-colors cursor-pointer',
           isDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40',
         )}
         style={{ paddingLeft: `${8 + indent * 12}px` }}
@@ -243,7 +256,7 @@ function FolderRow({
           />
         ) : (
           <span
-            className="flex-1 min-w-0 text-xs font-medium text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] truncate"
+            className="flex-1 min-w-0 text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] truncate"
             onDoubleClick={e => { e.stopPropagation(); onRenamingFolderChange(node.relPath) }}
           >
             {node.name}
@@ -264,19 +277,19 @@ function FolderRow({
             )}
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); setCreatingSubfolder(true); if (!open) onToggle() }}
-              title="New subfolder"
-              className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
-            >
-              <FolderPlus size={10} />
-            </button>
-            <button
-              type="button"
               onClick={e => { e.stopPropagation(); setCreatingInFolder(true); if (!open) onToggle() }}
               title="New scenario in folder"
               className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
             >
               <FilePlus size={10} />
+            </button>
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setCreatingSubfolder(true); if (!open) onToggle() }}
+              title="New subfolder"
+              className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            >
+              <FolderPlus size={10} />
             </button>
             {onDeleteFolder && (
               <button
@@ -337,6 +350,8 @@ function FolderRow({
                 onScenarioContextMenu={onScenarioContextMenu}
                 onMoveScenario={onMoveScenario}
                 clipboard={clipboard}
+                activeScenarioPath={activeScenarioPath}
+                dirtyScenarioPaths={dirtyScenarioPaths}
               />
             ) : (
               <ScenarioRow
@@ -351,6 +366,8 @@ function FolderRow({
                 onRenameScenario={onRenameScenario}
                 onScenarioContextMenu={onScenarioContextMenu}
                 clipboard={clipboard}
+                activeScenarioPath={activeScenarioPath}
+                dirtyScenarioPaths={dirtyScenarioPaths}
               />
             )
           )}
@@ -377,7 +394,7 @@ export function WorkspaceScenarioSection({
   onMoveScenario, clipboard,
   renamingScenarioPath, onRenamingChange,
   renamingFolderPath, onRenamingFolderChange,
-  onScenarioContextMenu, onFolderContextMenu,
+  onScenarioContextMenu, onFolderContextMenu, activeScenarioPath, dirtyScenarioPaths,
 }: Props) {
   const [creatingScenario, setCreatingScenario] = useState(false)
   const [creatingFolder, setCreatingFolder] = useState(false)
@@ -509,6 +526,8 @@ export function WorkspaceScenarioSection({
                       onRenameScenario={onRenameScenario}
                       onScenarioContextMenu={onScenarioContextMenu}
                       clipboard={clipboard}
+                      activeScenarioPath={activeScenarioPath}
+                      dirtyScenarioPaths={dirtyScenarioPaths}
                     />
                   ))}
                 </>
@@ -555,6 +574,8 @@ export function WorkspaceScenarioSection({
                         onScenarioContextMenu={onScenarioContextMenu}
                         onMoveScenario={onMoveScenario}
                         clipboard={clipboard}
+                        activeScenarioPath={activeScenarioPath}
+                        dirtyScenarioPaths={dirtyScenarioPaths}
                       />
                     ) : (
                       <ScenarioRow
@@ -569,6 +590,8 @@ export function WorkspaceScenarioSection({
                         onRenameScenario={onRenameScenario}
                         onScenarioContextMenu={onScenarioContextMenu}
                         clipboard={clipboard}
+                        activeScenarioPath={activeScenarioPath}
+                        dirtyScenarioPaths={dirtyScenarioPaths}
                       />
                     )
                   )}

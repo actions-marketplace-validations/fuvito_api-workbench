@@ -1115,6 +1115,8 @@ export default function App() {
                     runAllState={runAllState ?? undefined}
                     onRunAllScenarios={handleRunAll}
                     runLogTrigger={runLogTrigger}
+                    activeScenarioPath={activeTab.kind === 'scenario' ? activeTab.scenarioPath : null}
+                    dirtyScenarioPaths={new Set(tabs.tabs.filter(t => t.kind === 'scenario' && t.scenarioDirty && t.scenarioPath).map(t => t.scenarioPath!))}
                     onRunFolder={handleRunFolder}
                     onRunScenarioFolder={handleRunScenarioFolder}
                     folderRunState={folderRunState}

@@ -90,9 +90,48 @@ describe('WorkspaceScenarioSection — tree', () => {
     setup()
     const smoke = screen.getByText('Root smoke').closest('[draggable]') as HTMLElement
     const auth = folderRow('auth')
-    expect(smoke.style.paddingLeft).toBe('20px')
+    // 2px of the left padding is the active-row border, so the text sits where it always did
+    expect(smoke.style.paddingLeft).toBe('18px')
     expect(auth.style.paddingLeft).toBe('8px')
-    expect(screen.getByText('Login').closest('[draggable]')!.getAttribute('style')).toContain('padding-left: 32px')
+    expect(screen.getByText('Login').closest('[draggable]')!.getAttribute('style')).toContain('padding-left: 30px')
+  })
+
+  describe('looks like the requests tree', () => {
+    it('does not make folder names bold', () => {
+      setup()
+      for (const name of ['auth', 'tokens', 'empty']) {
+        const cls = screen.getByText(name).className
+        expect(cls).not.toMatch(/font-(medium|semibold|bold)/)
+      }
+    })
+
+    it('uses the same gap between a folder\'s chevron, icon and name', () => {
+      setup()
+      expect(folderRow('auth').className).toContain('gap-1.5')
+    })
+
+    it('highlights the scenario that is open in the active tab, like the active request file', () => {
+      setup({ activeScenarioPath: '/ws/scenarios/auth/login.yaml' })
+      const login = screen.getByText('Login').closest('[draggable]') as HTMLElement
+      expect(login.className).toContain('border-[var(--color-accent)]')
+      expect(login.className).toContain('bg-[var(--color-muted)]')
+      const other = screen.getByText('Root smoke').closest('[draggable]') as HTMLElement
+      expect(other.className).toContain('border-transparent')
+      expect(other.className).not.toContain('border-[var(--color-accent)]')
+    })
+
+    it('marks scenarios with unsaved changes with the amber dot', () => {
+      setup({ dirtyScenarioPaths: new Set(['/ws/scenarios/smoke.yaml']) })
+      const smoke = screen.getByText('Root smoke').closest('[draggable]') as HTMLElement
+      expect(within(smoke).getByTitle('Unsaved changes').className).toContain('bg-amber-400')
+      expect(within(screen.getByText('Login').closest('[draggable]') as HTMLElement).queryByTitle('Unsaved changes')).not.toBeInTheDocument()
+    })
+
+    it('orders the folder actions like the requests tree: new item, then new subfolder', () => {
+      setup({ onRunFolder: vi.fn(), onDeleteFolder: vi.fn() })
+      const titles = Array.from(folderRow('auth').querySelectorAll('button')).map(b => b.getAttribute('title'))
+      expect(titles).toEqual(['Run all scenarios in folder', 'New scenario in folder', 'New subfolder', 'Delete folder'])
+    })
   })
 
   it('shows an empty state with actions when there are no scenarios', () => {

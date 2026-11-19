@@ -131,15 +131,16 @@ export function TreeNode({
       >
         <div
           className={cn(
-            'group flex items-center gap-1.5 hover:bg-[var(--color-muted)] transition-colors',
+            'group flex items-center gap-1.5 hover:bg-[var(--color-muted)] transition-colors cursor-pointer',
             isDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40',
           )}
           style={{ paddingLeft: `${8 + indent}px` }}
+          onClick={() => onToggleCollapse(node.path)}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, node) }}
         >
           <button
             type="button"
-            onClick={() => onToggleCollapse(node.path)}
+            onClick={e => { e.stopPropagation(); onToggleCollapse(node.path) }}
             className="flex items-center gap-1.5 py-0.5 shrink-0 text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)]"
           >
             <span className="shrink-0">
@@ -158,7 +159,7 @@ export function TreeNode({
               />
             ) : (
               <span
-                className="truncate text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] cursor-default select-none"
+                className="truncate text-xs text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] select-none"
                 onDoubleClick={depth > 0 ? () => setLocalRenaming(true) : undefined}
                 title={depth > 0 ? 'Double-click to rename' : undefined}
               >
