@@ -71,7 +71,7 @@ describe('CoverageTab — empty states', () => {
     render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
     expect(await screen.findByText(/disk gone/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
-    expect(await screen.findByText('67%', { selector: 'span.text-4xl' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Covered' })).toBeInTheDocument()
     expect(b.getAccumulatedCoverage).toHaveBeenCalledTimes(2)
   })
 })
@@ -86,13 +86,13 @@ describe('CoverageTab — header', () => {
   it('omits the path hint when the spec is a bare filename', async () => {
     b.getAccumulatedCoverage.mockResolvedValue(cov({ specFile: 'api.yaml' }))
     render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
-    await screen.findByText('67%', { selector: 'span.text-4xl' })
+    await screen.findByRole('group', { name: 'Covered' })
     expect(screen.queryByText('(api.yaml)')).not.toBeInTheDocument()
   })
 
   it('refreshes on the Refresh button and when refreshTrigger changes', async () => {
     const { rerender } = render(<CoverageTab workspacePath="/ws" specFile="api.yaml" refreshTrigger={0} />)
-    await screen.findByText('67%', { selector: 'span.text-4xl' })
+    await screen.findByRole('group', { name: 'Covered' })
     expect(b.getAccumulatedCoverage).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByTitle('Refresh'))
     await waitFor(() => expect(b.getAccumulatedCoverage).toHaveBeenCalledTimes(2))
@@ -111,8 +111,7 @@ describe('CoverageTab — header', () => {
 describe('CoverageTab — detail', () => {
   it('summarises coverage, runs and the last run time', async () => {
     render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
-    expect(await screen.findByText('67%', { selector: 'span.text-4xl' })).toBeInTheDocument()
-    expect(screen.getByText('2/3 operations covered')).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: 'Covered' })).toBeInTheDocument()
     expect(screen.getByText('4 runs')).toBeInTheDocument()
     expect(screen.getByText('3 passed')).toBeInTheDocument()
     expect(screen.getByText('1 failed')).toBeInTheDocument()
@@ -123,24 +122,70 @@ describe('CoverageTab — detail', () => {
     b.getAccumulatedCoverage.mockResolvedValue(cov({ totalRuns: 1, passedRuns: 1, failedRuns: 0, lastRunAt: undefined }))
     render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
     expect(await screen.findByText('1 run')).toBeInTheDocument()
-    expect(screen.queryByText(/failed/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^\d+ failed$/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Last run:/)).not.toBeInTheDocument()
   })
 
-  it.each([
-    [90, 'text-emerald-400'],
-    [50, 'text-amber-400'],
-    [10, 'text-red-400'],
-  ])('colours %i%% coverage with %s', async (percent, cls) => {
-    b.getAccumulatedCoverage.mockResolvedValue(cov({ percent }))
-    render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
-    expect((await screen.findByText(`${percent}%`, { selector: 'span.text-4xl' })).className).toContain(cls)
+  describe('totals tiles', () => {
+    const tile = (name: string) => screen.findByRole('group', { name })
+
+    it('shows four equal tiles with a count and its share of all operations', async () => {
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      const covered = await tile('Covered')
+      expect(covered).toHaveTextContent('2')
+      expect(covered).toHaveTextContent('67%')
+      expect(covered).toHaveTextContent('of 3')
+      expect(await tile('Passing')).toHaveTextContent(/1\s*33%/)
+      expect(await tile('Failing')).toHaveTextContent(/1\s*33%/)
+      expect(await tile('Not covered')).toHaveTextContent(/1\s*33%/)
+      expect(screen.queryByText('67%', { selector: 'span.text-4xl' })).not.toBeInTheDocument()
+    })
+
+    it('does not look healthy when everything is covered but something fails', async () => {
+      b.getAccumulatedCoverage.mockResolvedValue(cov({ covered: 2, total: 2, percent: 100, missed: [] }))
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      expect(await tile('Covered')).toHaveTextContent('100%')
+      const failing = await tile('Failing')
+      expect(failing).toHaveTextContent(/1\s*50%/)
+      expect(failing.querySelector('span.text-3xl')!.className).toContain('text-red-400')
+      expect(await tile('Not covered')).toHaveTextContent(/0\s*0%/)
+    })
+
+    it('mutes passing, failing and not-covered tiles that are zero', async () => {
+      b.getAccumulatedCoverage.mockResolvedValue(cov({
+        covered: 1, total: 1, percent: 100, exercised: ['GET /users'], missed: [],
+        operationResults: { 'GET /users': { lastPassed: true, lastRunAt: new Date().toISOString() } },
+      }))
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      const num = async (n: string) => (await tile(n)).querySelector('span.text-3xl')!.className
+      expect(await num('Passing')).toContain('text-emerald-400')
+      expect(await num('Failing')).toContain('text-[var(--color-muted-foreground)]')
+      expect(await num('Not covered')).toContain('text-[var(--color-muted-foreground)]')
+    })
+
+    it('colours not-covered operations amber when there are any', async () => {
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      expect((await tile('Not covered')).querySelector('span.text-3xl')!.className).toContain('text-amber-400')
+    })
+
+    it('says so when covered operations have no recorded result', async () => {
+      b.getAccumulatedCoverage.mockResolvedValue(cov({ operationResults: undefined }))
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      expect(await screen.findByText(/2 covered operations have no recorded result yet/)).toBeInTheDocument()
+      expect(await tile('Passing')).toHaveTextContent(/0\s*0%/)
+    })
+
+    it('handles a spec with no operations', async () => {
+      b.getAccumulatedCoverage.mockResolvedValue(cov({ covered: 0, total: 0, percent: 0, exercised: [], missed: [], operationResults: {} }))
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      expect(await tile('Covered')).toHaveTextContent(/0\s*0%/)
+    })
   })
 
   it('lists covered and missed operations sorted by path then method, with results', async () => {
     render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
-    await screen.findByText('Covered')
-    expect(screen.getByText('Not covered')).toBeInTheDocument()
+    await screen.findByRole('button', { name: /^Covered/ })
+    expect(screen.getByRole('button', { name: /Not covered/ })).toBeInTheDocument()
     const methods = screen.getAllByText(/^(GET|POST|DELETE)$/).map(e => e.textContent)
     expect(methods).toEqual(['GET', 'POST', 'DELETE'])
     expect(screen.getByText('✓ Pass')).toBeInTheDocument()
@@ -152,16 +197,16 @@ describe('CoverageTab — detail', () => {
 
   it('collapses and expands the covered and missed sections', async () => {
     render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
-    await screen.findByText('Covered')
-    fireEvent.click(screen.getByText('Covered'))
+    await screen.findByRole('button', { name: /^Covered/ })
+    fireEvent.click(screen.getByRole('button', { name: /^Covered/ }))
     expect(screen.queryByText('POST')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('Covered'))
+    fireEvent.click(screen.getByRole('button', { name: /^Covered/ }))
     expect(screen.getByText('POST')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByText('Not covered'))
+    fireEvent.click(screen.getByRole('button', { name: /Not covered/ }))
     expect(screen.queryByText('DELETE')).not.toBeInTheDocument()
     expect(screen.queryByText('Add these to your scenarios')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('Not covered'))
+    fireEvent.click(screen.getByRole('button', { name: /Not covered/ }))
     expect(screen.getByText('DELETE')).toBeInTheDocument()
   })
 

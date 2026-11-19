@@ -496,7 +496,16 @@ Click a spec card to view its full detail in the main area.
 
 ### The Contracts tab (main area)
 
-The detail view shows a table with one row per operation:
+At the top, four equal tiles give the totals, each as a count and its share of all operations in the spec:
+
+- **Covered**: operations that at least one scenario calls.
+- **Not covered**: operations no scenario calls (the same list as the *Not covered* section of the table).
+- **Passing**: covered operations whose most recent result passed.
+- **Failing**: covered operations whose most recent result failed.
+
+They come in two pairs that add up: Covered plus Not covered make up the whole spec, and Passing plus Failing make up Covered. Being covered only says an operation was called, so a spec at 100% coverage can still show failures. Below the tiles, the **Scenario runs** line counts whole scenario runs (runs, passed, failed, last run), which is a different thing from operation results.
+
+The detail view then shows a table with one row per operation:
 
 | Column | Meaning |
 |---|---|

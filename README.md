@@ -66,6 +66,8 @@ Every time a scenario runs against an OpenAPI spec, Clear Signal maps each reque
 
 **One card per spec.** The sidebar lists every spec you have tested with its coverage percentage, operations covered, and passed/failed run counts. Green at 80% and above, amber at 40% and above, red below.
 
+**Totals that cannot flatter you.** Four equal tiles at the top count *Covered* and *Not covered* operations, then *Passing* and *Failing* ones among the covered, each with its share of the spec. Full coverage with a failing operation shows up as exactly that, not as a green bar.
+
 **Every operation, at a glance.** The main view lists each operation in the spec as *Covered* or *Not covered*, with the result of the most recent run that hit it. A failing operation (`PUT /users/{id}` above) stands out immediately, and so does one nobody has tested.
 
 ### Quality signals: what have you *not* proven?
