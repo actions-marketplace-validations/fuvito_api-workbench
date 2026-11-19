@@ -18,6 +18,7 @@ type Props = {
   onMoveStep: (from: number, dir: -1 | 1) => void
   onToggleDisabled: (index: number) => void
   onRunFrom: (index: number) => void
+  resultStale?: boolean
 }
 
 type StepRes = NonNullable<ScenarioResult['steps']>[number]
@@ -162,13 +163,13 @@ function LastRunLine({ result, stale, onOpen, onRunFrom, running }: {
 
 export function StepDetailPane({
   visualDetail, result, running, selectedStepIndex, editStepCount,
-  onUpdateStep, onRemoveStep, onMoveStep, onToggleDisabled, onRunFrom,
+  onUpdateStep, onRemoveStep, onMoveStep, onToggleDisabled, onRunFrom, resultStale = false,
 }: Props) {
   const step = selectedStepIndex !== null ? visualDetail?.steps[selectedStepIndex] : undefined
   const stepResult = selectedStepIndex !== null ? result?.steps?.[selectedStepIndex] ?? null : null
 
   const [view, setView] = useState<View>('definition')
-  // -1 stands for "every step": a move or removal shifts which result belongs to which step.
+  // Steps edited since the run; a structural edit makes every result stale (`resultStale`).
   const [stale, setStale] = useState<number[]>([])
   const [prevResult, setPrevResult] = useState(result)
   const [prevRunning, setPrevRunning] = useState(running)
@@ -188,7 +189,7 @@ export function StepDetailPane({
   const runFromWarning = missing.length > 0 ? describeMissing(missing) : null
 
   const effectiveView: View = view === 'result' && stepResult ? 'result' : 'definition'
-  const isStale = selectedStepIndex !== null && (stale.includes(-1) || stale.includes(selectedStepIndex))
+  const isStale = selectedStepIndex !== null && (resultStale || stale.includes(selectedStepIndex))
   const markStale = (i: number) => setStale(prev => (prev.includes(i) ? prev : [...prev, i]))
 
   const tabCls = (active: boolean, disabled: boolean) => cn(
@@ -253,9 +254,9 @@ export function StepDetailPane({
                   isFirst={selectedStepIndex === 0}
                   isLast={selectedStepIndex === editStepCount - 1}
                   onChange={updates => { markStale(selectedStepIndex); onUpdateStep(selectedStepIndex, updates) }}
-                  onRemove={() => { setStale([-1]); onRemoveStep(selectedStepIndex) }}
-                  onMoveUp={() => { setStale([-1]); onMoveStep(selectedStepIndex, -1) }}
-                  onMoveDown={() => { setStale([-1]); onMoveStep(selectedStepIndex, 1) }}
+                  onRemove={() => onRemoveStep(selectedStepIndex)}
+                  onMoveUp={() => onMoveStep(selectedStepIndex, -1)}
+                  onMoveDown={() => onMoveStep(selectedStepIndex, 1)}
                   onToggleDisabled={() => onToggleDisabled(selectedStepIndex)}
                 />
               </div>

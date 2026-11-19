@@ -51,7 +51,11 @@ export function missingOnRunFrom(steps: StepDetail[], variables: ScenarioVariabl
   return [...used.entries()].map(([name, usedIn]) => ({ name, extractedIn: extractedIn.get(name) ?? [], usedIn }))
 }
 
+function stepsLabel(steps: number[]): string {
+  return `${steps.length === 1 ? 'step' : 'steps'} ${steps.join(', ')}`
+}
+
 export function describeMissing(missing: MissingValue[]): string {
-  const names = missing.map(m => `{{${m.name}}}`).join(', ')
+  const names = missing.map(m => `{{${m.name}}} (extracted in ${stepsLabel(m.extractedIn)})`).join(', ')
   return `Starting here skips earlier steps, so ${names} ${missing.length === 1 ? 'is' : 'are'} not set.`
 }

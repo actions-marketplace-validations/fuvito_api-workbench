@@ -252,6 +252,21 @@ describe('ScenarioViewer — editing', () => {
     expect(screen.getByRole('button', { name: /Save/ })).toBeInTheDocument()
   })
 
+  it.each([
+    ['adding a step', () => fireEvent.click(screen.getByRole('button', { name: /Add step/ }))],
+    ['duplicating a step', () => fireEvent.click(within(within(list()).getAllByRole('option')[0]).getByTitle('Duplicate step'))],
+    ['moving a step', () => fireEvent.click(within(within(list()).getAllByRole('option')[0]).getByTitle('Move down (Alt+↓)'))],
+    ['removing a step', () => fireEvent.click(within(within(list()).getAllByRole('option')[2]).getByTitle('Remove step'))],
+  ])('marks the run results stale after %s, because they are positional', async (_name, act) => {
+    b.loadScenarioResult.mockResolvedValue(resultOf([{ passed: true }, { passed: true }, { passed: false }]))
+    mount()
+    await loaded()
+    await screen.findByTitle('View run statistics')
+    expect(screen.queryByTitle('Stale: steps changed since this run')).not.toBeInTheDocument()
+    act()
+    expect(screen.getAllByTitle('Stale: steps changed since this run').length).toBeGreaterThan(0)
+  })
+
   it('adds a step and selects it', async () => {
     mount()
     await loaded()

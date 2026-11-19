@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import { METHOD_BADGE } from '@/lib/httpUtils'
 import type { StepDetail, StepResult } from '@/lib/bridge'
 
-export function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onDuplicate, onToggleDisabled, onRunFrom, running = false }: {
+export function StepListRow({ step, index, result, selected, onSelect, editMode = false, isFirst = false, isLast = false, onMoveUp, onMoveDown, onRemove, onDuplicate, onToggleDisabled, onRunFrom, running = false, resultStale = false }: {
   step: StepDetail
   index: number
   result: StepResult | null
@@ -19,6 +19,7 @@ export function StepListRow({ step, index, result, selected, onSelect, editMode 
   onToggleDisabled?: () => void
   onRunFrom?: () => void
   running?: boolean
+  resultStale?: boolean
 }) {
   const badge = step.method ? METHOD_BADGE[step.method] ?? '' : ''
   const isDisabled = step.disabled ?? false
@@ -40,8 +41,9 @@ export function StepListRow({ step, index, result, selected, onSelect, editMode 
         isDisabled && 'opacity-50',
       )}
     >
-      <span className={cn(
+      <span title={result && resultStale ? 'Stale: steps changed since this run' : undefined} className={cn(
         'shrink-0 w-5 h-5 mt-0.5 rounded-full flex items-center justify-center text-[11px] font-bold',
+        result && resultStale && 'opacity-40',
         isPending
           ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)] animate-pulse'
           : result
@@ -61,11 +63,13 @@ export function StepListRow({ step, index, result, selected, onSelect, editMode 
           </span>
           {isDisabled && <EyeOff size={9} className="shrink-0 text-amber-400" />}
           {result && (
-            result.skipped
-              ? <MinusCircle size={15} className="shrink-0 text-[var(--color-muted-foreground)]" />
-              : result.passed
-                ? <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
-                : <XCircle size={15} className="shrink-0 text-red-400" />
+            <span className={cn('shrink-0 flex', resultStale && 'opacity-40')} title={resultStale ? 'Stale: steps changed since this run' : undefined}>
+              {result.skipped
+                ? <MinusCircle size={15} className="text-[var(--color-muted-foreground)]" />
+                : result.passed
+                  ? <CheckCircle2 size={15} className="text-emerald-400" />
+                  : <XCircle size={15} className="text-red-400" />}
+            </span>
           )}
         </div>
         {step.notes && (

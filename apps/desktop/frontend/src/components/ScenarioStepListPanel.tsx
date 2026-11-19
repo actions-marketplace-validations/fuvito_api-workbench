@@ -16,6 +16,7 @@ type Props = {
   onSelectSetup: () => void
   setupAlert?: 'error' | 'warning' | null
   variableCount?: number
+  resultStale?: boolean
   result: ScenarioResult | null
   running: boolean
   onMoveStep: (from: number, dir: -1 | 1) => void
@@ -27,7 +28,7 @@ type Props = {
 
 export function StepListPanel({
   widthPct, listRef, loadError, detailLoaded, steps,
-  selectedStepIndex, onSelectStep, setupSelected, onSelectSetup, setupAlert = null, variableCount = 0, result, running,
+  selectedStepIndex, onSelectStep, setupSelected, onSelectSetup, setupAlert = null, variableCount = 0, resultStale = false, result, running,
   onMoveStep, onRemoveStep, onDuplicateStep, onToggleDisabled, onAddStep,
 }: Props) {
   return (
@@ -129,6 +130,7 @@ export function StepListPanel({
               step={step}
               index={i}
               result={result?.steps?.[i] ?? null}
+              resultStale={resultStale}
               selected={selectedStepIndex === i}
               onSelect={onSelectStep}
               editMode
