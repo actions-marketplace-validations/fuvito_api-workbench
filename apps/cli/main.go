@@ -39,9 +39,9 @@ func (e *exitError) Error() string { return "" }
 
 func main() {
 	root := &cobra.Command{
-		Use:     "clrsig",
-		Short:   "Clear Signal — API Contract Validation and Spec Conformance Testing",
-		Version: version,
+		Use:           "clrsig",
+		Short:         "Clear Signal — API Contract Validation and Spec Conformance Testing",
+		Version:       version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -754,6 +754,11 @@ func coverageListCmd() *cobra.Command {
 					FailedRuns int      `json:"failedRuns"`
 					LastRunAt  string   `json:"lastRunAt,omitempty"`
 					Exercised  []string `json:"exercised"`
+					// the four totals of the Contracts page: Covered + NotCovered = Total, Passing + Failing = Covered
+					NotCovered int `json:"notCovered"`
+					Passing    int `json:"passing"`
+					Failing    int `json:"failing"`
+					NoResult   int `json:"noResult"`
 				}
 				out := make([]jsonEntry, len(reports))
 				for i, r := range reports {
@@ -771,20 +776,22 @@ func coverageListCmd() *cobra.Command {
 						FailedRuns: r.FailedRuns,
 						LastRunAt:  lastRun,
 						Exercised:  r.Exercised,
+						NotCovered: r.Outcomes().NotCovered,
+						Passing:    r.Outcomes().Passing,
+						Failing:    r.Outcomes().Failing,
+						NoResult:   r.Outcomes().NoResult,
 					}
 				}
 				b, _ := json.MarshalIndent(out, "", "  ")
 				fmt.Fprintln(cmd.OutOrStdout(), string(b))
 			default:
 				for _, r := range reports {
-					pct := r.Percent
-					bar := coverageBar(pct, 20)
 					lastRun := ""
 					if !r.LastRunAt.IsZero() {
 						lastRun = "  last run " + r.LastRunAt.Format("2006-01-02 15:04")
 					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n  %s  %d/%d (%.1f%%)  %d run(s) · %d passed · %d failed%s\n\n",
-						r.SpecFile, bar, r.Covered, r.Total, pct,
+					fmt.Fprintf(cmd.OutOrStdout(), "%s\n  %s\n  scenario runs: %d run(s) · %d passed · %d failed%s\n\n",
+						r.SpecFile, reporting.OutcomesLine(r.Outcomes()),
 						r.TotalRuns, r.PassedRuns, r.FailedRuns, lastRun)
 				}
 			}
@@ -876,16 +883,26 @@ Exit codes:
 					Operation string `json:"operation"`
 					Missing   []int  `json:"missing"`
 				}
+				type jsonTotals struct {
+					Total      int `json:"total"`
+					Covered    int `json:"covered"`
+					NotCovered int `json:"notCovered"`
+					Passing    int `json:"passing"`
+					Failing    int `json:"failing"`
+					NoResult   int `json:"noResult"`
+				}
+				o := report.Outcomes()
 				type jsonOut struct {
-					SpecTitle            string    `json:"specTitle"`
-					SpecVersion          string    `json:"specVersion"`
-					Workspace            string    `json:"workspace"`
-					TotalRuns            int       `json:"totalRuns"`
-					HasGaps              bool      `json:"hasGaps"`
-					NeverExercised       []string  `json:"neverExercised"`
-					HappyPathOnly        []string  `json:"happyPathOnly"`
-					SecuredNeverAuthed   []string  `json:"securedNeverAuthed"`
-					ErrorsNeverTriggered []jsonGap `json:"errorsNeverTriggered"`
+					SpecTitle            string     `json:"specTitle"`
+					SpecVersion          string     `json:"specVersion"`
+					Workspace            string     `json:"workspace"`
+					TotalRuns            int        `json:"totalRuns"`
+					Totals               jsonTotals `json:"totals"`
+					HasGaps              bool       `json:"hasGaps"`
+					NeverExercised       []string   `json:"neverExercised"`
+					HappyPathOnly        []string   `json:"happyPathOnly"`
+					SecuredNeverAuthed   []string   `json:"securedNeverAuthed"`
+					ErrorsNeverTriggered []jsonGap  `json:"errorsNeverTriggered"`
 				}
 				var gaps []jsonGap
 				for _, g := range q.ErrorsNeverTriggered {
@@ -896,6 +913,7 @@ Exit codes:
 					SpecVersion:          version,
 					Workspace:            workspacePath,
 					TotalRuns:            report.TotalRuns,
+					Totals:               jsonTotals{o.Total, o.Covered, o.NotCovered, o.Passing, o.Failing, o.NoResult},
 					HasGaps:              hasGaps,
 					NeverExercised:       q.NeverExercised,
 					HappyPathOnly:        q.HappyPathOnly,
@@ -907,8 +925,8 @@ Exit codes:
 
 			default:
 				fmt.Fprintf(cmd.OutOrStdout(), "Coverage quality — %s  %s\n", title, version)
-				fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s  (%d run(s)  ·  %d/%d operations exercised)\n\n",
-					workspacePath, report.TotalRuns, report.Covered, report.Total)
+				fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s  (%d run(s))\n%s\n\n",
+					workspacePath, report.TotalRuns, reporting.OutcomesLine(report.Outcomes()))
 
 				if !hasGaps {
 					fmt.Fprintln(cmd.OutOrStdout(), "No gaps found — all operations exercised with error paths triggered and auth tested.")
@@ -1002,23 +1020,6 @@ func coverageResetCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
 	return cmd
-}
-
-// coverageBar renders a simple ASCII progress bar of the given width.
-func coverageBar(pct float64, width int) string {
-	filled := int(pct / 100 * float64(width))
-	if filled > width {
-		filled = width
-	}
-	bar := make([]byte, width)
-	for i := range bar {
-		if i < filled {
-			bar[i] = '='
-		} else {
-			bar[i] = '.'
-		}
-	}
-	return "[" + string(bar) + "]"
 }
 
 // --- Telemetry helpers ---

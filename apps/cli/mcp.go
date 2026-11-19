@@ -396,9 +396,8 @@ func mcpCoverage(raw json.RawMessage) (string, error) {
 
 	var sb strings.Builder
 	for _, r := range reports {
-		bar := coverageBar(r.Percent, 20)
-		fmt.Fprintf(&sb, "%s\n  %s  %d/%d (%.1f%%)  %d run(s)\n\n",
-			r.SpecFile, bar, r.Covered, r.Total, r.Percent, r.TotalRuns)
+		fmt.Fprintf(&sb, "%s\n  %s\n  scenario runs: %d run(s) · %d passed · %d failed\n\n",
+			r.SpecFile, reporting.OutcomesLine(r.Outcomes()), r.TotalRuns, r.PassedRuns, r.FailedRuns)
 	}
 	return sb.String(), nil
 }

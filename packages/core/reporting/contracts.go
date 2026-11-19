@@ -65,6 +65,59 @@ func contractsOps(r coverage.Report) []contractsOp {
 	return out
 }
 
+// OutcomesLine is the four totals on one line, for text output:
+// "Covered 10 (71%) · Not covered 4 (29%) · Passing 9 (64%) · Failing 1 (7%) · of 14 operations".
+func OutcomesLine(o coverage.Outcomes) string {
+	part := func(label string, n int) string {
+		return fmt.Sprintf("%s %d (%d%%)", label, n, coverage.Share(n, o.Total))
+	}
+	parts := []string{part("Covered", o.Covered), part("Not covered", o.NotCovered), part("Passing", o.Passing), part("Failing", o.Failing)}
+	if o.NoResult > 0 {
+		// covered operations whose last result was not recorded, so the parts still add up
+		parts = append(parts, part("No result", o.NoResult))
+	}
+	return strings.Join(append(parts, fmt.Sprintf("of %d operations", o.Total)), " · ")
+}
+
+// statusLabel is the one-word state of an operation, using the names of the Contracts totals.
+func statusLabel(op contractsOp) string {
+	switch {
+	case !op.Covered:
+		return "Not covered"
+	case op.Result == "Pass":
+		return "Passing"
+	case op.Result == "Fail":
+		return "Failing"
+	}
+	return "Covered (no result)"
+}
+
+type outcomeTile struct {
+	Label, Hint string
+	Count, Pct  int
+	Total       int
+	Value, Edge template.CSS
+}
+
+// outcomeTiles are the four totals in display order: Covered | Not covered, then Passing | Failing.
+// Passing, Failing and Not covered are muted at zero, so a clean zero is not celebrated.
+func outcomeTiles(o coverage.Outcomes) []outcomeTile {
+	const muted, edgeIdle = "#9ca3af", "#e5e7eb"
+	tile := func(label, hint string, count int, value, edge string, always bool) outcomeTile {
+		if !always && count == 0 {
+			value, edge = muted, edgeIdle
+		}
+		return outcomeTile{Label: label, Hint: hint, Count: count, Pct: coverage.Share(count, o.Total), Total: o.Total,
+			Value: template.CSS(value), Edge: template.CSS(edge)}
+	}
+	return []outcomeTile{
+		tile("Covered", "called by a scenario", o.Covered, "#111827", "#9ca3af", true),
+		tile("Not covered", "no scenario calls them", o.NotCovered, "#b45309", "#f59e0b", false),
+		tile("Passing", "covered, last result passed", o.Passing, "#059669", "#10b981", false),
+		tile("Failing", "covered, last result failed", o.Failing, "#dc2626", "#ef4444", false),
+	}
+}
+
 func csvCell(v string) string {
 	if strings.ContainsAny(v, ",\"\n") {
 		return `"` + strings.ReplaceAll(v, `"`, `""`) + `"`
@@ -113,7 +166,7 @@ func isoOrEmpty(t time.Time) string {
 // ContractsCSV renders one spec's operations and quality flags as CSV.
 func ContractsCSV(r coverage.Report, q *coverage.QualityReport) []byte {
 	var b strings.Builder
-	b.WriteString("Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes\n")
+	b.WriteString("Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes,Status\n")
 	for _, op := range contractsOps(r) {
 		covered := "Not Covered"
 		result := ""
@@ -122,7 +175,7 @@ func ContractsCSV(r coverage.Report, q *coverage.QualityReport) []byte {
 			result = op.Result
 		}
 		flags, missing := qualityColumns(op, q)
-		cells := []string{op.Method, op.Path, covered, result, isoOrEmpty(op.LastRunAt), flags, missing}
+		cells := []string{op.Method, op.Path, covered, result, isoOrEmpty(op.LastRunAt), flags, missing, statusLabel(op)}
 		for i, c := range cells {
 			cells[i] = csvCell(c)
 		}
@@ -162,14 +215,21 @@ func joinCodes(codes []int) string {
 // ContractsMarkdown renders one spec's coverage and quality gaps as Markdown for a wiki or a
 // pull-request description.
 func ContractsMarkdown(spec string, r coverage.Report, q *coverage.QualityReport, now time.Time) []byte {
-	pct := int(r.Percent + 0.5)
+	o := r.Outcomes()
+	cell := func(n int) string { return fmt.Sprintf("%d (%d%%)", n, coverage.Share(n, o.Total)) }
 	var l []string
 	add := func(s ...string) { l = append(l, s...) }
 
 	add(fmt.Sprintf("# Contracts Report — %s", mdEscape(specLabel(spec))), "",
 		fmt.Sprintf("Generated: %s", now.Format("2006-01-02 15:04")), "",
 		"## Summary", "",
-		fmt.Sprintf("**%d / %d operations covered (%d%%)**", r.Covered, r.Total, pct), "",
+		"| Covered | Not covered | Passing | Failing |", "|--------:|------------:|--------:|--------:|",
+		fmt.Sprintf("| %s | %s | %s | %s |", cell(o.Covered), cell(o.NotCovered), cell(o.Passing), cell(o.Failing)), "",
+		fmt.Sprintf("Covered + Not covered = %d operations; Passing + Failing = Covered. Passing and failing are each operation's most recent result.", o.Total))
+	if o.NoResult > 0 {
+		add("", fmt.Sprintf("_%d covered operation(s) have no recorded result yet._", o.NoResult))
+	}
+	add("", "## Scenario runs", "",
 		"| Metric | Value |", "|--------|-------|",
 		fmt.Sprintf("| Total runs | %d |", r.TotalRuns),
 		fmt.Sprintf("| Passed runs | %d |", r.PassedRuns),
@@ -236,8 +296,8 @@ type contractsHTMLOp struct {
 type contractsHTMLView struct {
 	Label                string
 	Generated, LastRun   string
-	Pct, Covered, Total  int
-	BarColor             template.CSS
+	Tiles                []outcomeTile
+	NoResult             int
 	Runs, Passed, Failed int
 	Ops                  []contractsHTMLOp
 	HasQuality           bool
@@ -266,6 +326,12 @@ table{width:100%;border-collapse:collapse;margin-top:.5rem}
 th{text-align:left;padding:5px 8px;border-bottom:2px solid #e5e7eb;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;white-space:nowrap}
 td{padding:5px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
 tr:last-child td{border-bottom:none}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.tile{border:1px solid #e5e7eb;border-left-width:4px;border-radius:6px;padding:.6rem .8rem}
+.tile .l{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:600}
+.tile .n{font-size:1.9rem;font-weight:700;line-height:1.2}.tile .n small{font-size:.9rem;font-weight:400;color:#6b7280;margin-left:.4rem}
+.tile .h{font-size:11px;color:#6b7280}
 .stat{display:inline-block;margin-right:1.5rem;font-size:.85rem;color:#6b7280}
 .stat strong{color:#111}
 .mono{font-family:monospace;font-size:12px}
@@ -279,14 +345,12 @@ ul{margin:0;padding-left:1.5rem}li{font-family:monospace;font-size:12px;padding:
 <body>
 <h1>Contracts Report — {{.Label}}</h1>
 <p style="margin:.25rem 0 1rem;font-size:.85rem;color:#6b7280">Generated {{.Generated}}</p>
-<div style="margin-bottom:1rem">
-  <span style="font-size:2rem;font-weight:700;color:{{.BarColor}}">{{.Pct}}%</span>
-  <span style="margin-left:.75rem;font-size:.95rem;color:#374151">{{.Covered}} / {{.Total}} operations covered</span>
-  <div style="margin-top:.5rem;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;max-width:400px">
-    <div style="height:100%;background:{{.BarColor}};border-radius:999px;width:{{.Pct}}%"></div>
-  </div>
+<div class="tiles">
+{{range $i, $t := .Tiles}}{{if eq $i 0}}<div class="pair">{{else if eq $i 2}}</div><div class="pair">{{end}}<div class="tile" style="border-left-color:{{$t.Edge}}"><div class="l">{{$t.Label}}</div><div class="n" style="color:{{$t.Value}}">{{$t.Count}}<small>{{$t.Pct}}%</small></div><div class="h">{{$t.Hint}} · of {{$t.Total}}</div></div>{{end}}</div>
 </div>
-<div>
+<p style="margin:.5rem 0 0;font-size:.75rem;color:#6b7280">Covered + Not covered = all operations; Passing + Failing = Covered (each operation's most recent result).{{if .NoResult}} {{.NoResult}} covered operation(s) have no recorded result yet.{{end}}</p>
+<div style="margin-top:.75rem">
+  <span class="stat" style="text-transform:uppercase;letter-spacing:.08em;font-size:10px;font-weight:600">Scenario runs</span>
   <span class="stat"><strong>{{.Runs}}</strong> run{{if ne .Runs 1}}s{{end}}</span>
   <span class="stat"><strong style="color:#059669">{{.Passed}}</strong> passed</span>
   {{if gt .Failed 0}}<span class="stat"><strong style="color:#dc2626">{{.Failed}}</strong> failed</span>{{end}}
@@ -325,17 +389,10 @@ ul{margin:0;padding-left:1.5rem}li{font-family:monospace;font-size:12px;padding:
 // ContractsHTML renders one spec's coverage and quality gaps as a self-contained, print-ready
 // HTML page. All text is escaped.
 func ContractsHTML(spec string, r coverage.Report, q *coverage.QualityReport, now time.Time) ([]byte, error) {
-	pct := int(r.Percent + 0.5)
-	bar := "#ef4444"
-	switch {
-	case pct >= 80:
-		bar = "#10b981"
-	case pct >= 40:
-		bar = "#f59e0b"
-	}
+	o := r.Outcomes()
 	v := contractsHTMLView{
 		Label: specLabel(spec), Generated: now.Format("2006-01-02 15:04"),
-		Pct: min(pct, 100), Covered: r.Covered, Total: r.Total, BarColor: template.CSS(bar),
+		Tiles: outcomeTiles(o), NoResult: o.NoResult,
 		Runs: r.TotalRuns, Passed: r.PassedRuns, Failed: r.FailedRuns,
 	}
 	if !r.LastRunAt.IsZero() {
@@ -372,10 +429,12 @@ func ContractsHTML(spec string, r coverage.Report, q *coverage.QualityReport, no
 // ContractsListCSV is the per-spec summary as CSV.
 func ContractsListCSV(reports []coverage.Report) []byte {
 	var b strings.Builder
-	b.WriteString("Spec,Covered,Total,Percent,Runs,Passed,Failed,Last Run\n")
+	b.WriteString("Spec,Covered,Total,Percent,Runs,Passed,Failed,Last Run,Not Covered,Passing,Failing\n")
 	for _, r := range reports {
+		o := r.Outcomes()
 		cells := []string{r.SpecFile, fmt.Sprint(r.Covered), fmt.Sprint(r.Total), fmt.Sprintf("%.0f", r.Percent),
-			fmt.Sprint(r.TotalRuns), fmt.Sprint(r.PassedRuns), fmt.Sprint(r.FailedRuns), isoOrEmpty(r.LastRunAt)}
+			fmt.Sprint(r.TotalRuns), fmt.Sprint(r.PassedRuns), fmt.Sprint(r.FailedRuns), isoOrEmpty(r.LastRunAt),
+			fmt.Sprint(o.NotCovered), fmt.Sprint(o.Passing), fmt.Sprint(o.Failing)}
 		for i, c := range cells {
 			cells[i] = csvCell(c)
 		}
@@ -392,11 +451,15 @@ func ContractsListMarkdown(reports []coverage.Report, now time.Time) []byte {
 		b.WriteString("_No coverage has been recorded yet._\n")
 		return []byte(b.String())
 	}
-	b.WriteString("| Spec | Covered | % | Runs | Passed | Failed | Last run |\n|------|---------|---|------|--------|--------|----------|\n")
+	b.WriteString("| Spec | Covered | Not covered | Passing | Failing | Scenario runs | Last run |\n|------|--------:|------------:|--------:|--------:|---------------|----------|\n")
 	for _, r := range reports {
-		fmt.Fprintf(&b, "| `%s` | %d / %d | %.0f%% | %d | %d | %d | %s |\n",
-			r.SpecFile, r.Covered, r.Total, r.Percent, r.TotalRuns, r.PassedRuns, r.FailedRuns, relTime(r.LastRunAt, now))
+		o := r.Outcomes()
+		cell := func(n int) string { return fmt.Sprintf("%d (%d%%)", n, coverage.Share(n, o.Total)) }
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s | %d · %d passed · %d failed | %s |\n",
+			r.SpecFile, cell(o.Covered), cell(o.NotCovered), cell(o.Passing), cell(o.Failing),
+			r.TotalRuns, r.PassedRuns, r.FailedRuns, relTime(r.LastRunAt, now))
 	}
+	b.WriteString("\nCovered + Not covered = all operations in the spec; Passing + Failing = Covered. Percentages are shares of all operations.\n")
 	return []byte(b.String())
 }
 
@@ -404,24 +467,33 @@ var contractsListTmpl = template.Must(template.New("list").Parse(`<!DOCTYPE html
 <html lang="en"><head><meta charset="UTF-8"><title>Contracts coverage</title>
 <style>body{font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:2rem;color:#111;font-size:14px}
 table{width:100%;border-collapse:collapse}th{text-align:left;padding:5px 8px;border-bottom:2px solid #e5e7eb;font-size:11px;text-transform:uppercase;color:#6b7280}
-td{padding:5px 8px;border-bottom:1px solid #f3f4f6}.mono{font-family:monospace;font-size:12px}@media print{body{padding:0}}</style></head>
+td{padding:5px 8px;border-bottom:1px solid #f3f4f6}small{color:#6b7280}.mono{font-family:monospace;font-size:12px}@media print{body{padding:0}}</style></head>
 <body><h1>Contracts coverage</h1><p style="color:#6b7280;font-size:.85rem">Generated {{.Generated}}</p>
-{{if .Rows}}<table><thead><tr><th>Spec</th><th>Covered</th><th>%</th><th>Runs</th><th>Passed</th><th>Failed</th><th>Last run</th></tr></thead><tbody>
-{{range .Rows}}<tr><td class="mono">{{.Spec}}</td><td>{{.Covered}} / {{.Total}}</td><td>{{.Pct}}%</td><td>{{.Runs}}</td><td>{{.Passed}}</td><td>{{.Failed}}</td><td>{{.When}}</td></tr>
-{{end}}</tbody></table>{{else}}<p>No coverage has been recorded yet.</p>{{end}}
+{{if .Rows}}<table><thead><tr><th>Spec</th><th>Covered</th><th>Not covered</th><th>Passing</th><th>Failing</th><th>Scenario runs</th><th>Last run</th></tr></thead><tbody>
+{{range .Rows}}<tr><td class="mono">{{.Spec}}</td><td>{{.Covered}} <small>{{.CoveredPct}}%</small></td><td>{{.NotCovered}} <small>{{.NotCoveredPct}}%</small></td><td{{if .Passing}} style="color:#059669;font-weight:600"{{end}}>{{.Passing}} <small>{{.PassingPct}}%</small></td><td{{if .Failing}} style="color:#dc2626;font-weight:600"{{end}}>{{.Failing}} <small>{{.FailingPct}}%</small></td><td>{{.Runs}} · {{.Passed}} passed · {{.Failed}} failed</td><td>{{.When}}</td></tr>
+{{end}}</tbody></table>
+<p style="color:#6b7280;font-size:.8rem">Covered + Not covered = all operations in the spec; Passing + Failing = Covered. Percentages are shares of all operations.</p>{{else}}<p>No coverage has been recorded yet.</p>{{end}}
 </body></html>
 `))
 
 // ContractsListHTML is the per-spec summary as an HTML page.
 func ContractsListHTML(reports []coverage.Report, now time.Time) ([]byte, error) {
 	type row struct {
-		Spec                                      string
-		Covered, Total, Pct, Runs, Passed, Failed int
-		When                                      string
+		Spec                                              string
+		Covered, NotCovered, Passing, Failing             int
+		CoveredPct, NotCoveredPct, PassingPct, FailingPct int
+		Runs, Passed, Failed                              int
+		When                                              string
 	}
 	rows := make([]row, 0, len(reports))
 	for _, r := range reports {
-		rows = append(rows, row{r.SpecFile, r.Covered, r.Total, int(r.Percent + 0.5), r.TotalRuns, r.PassedRuns, r.FailedRuns, relTime(r.LastRunAt, now)})
+		o := r.Outcomes()
+		sh := func(n int) int { return coverage.Share(n, o.Total) }
+		rows = append(rows, row{
+			Spec: r.SpecFile, Covered: o.Covered, NotCovered: o.NotCovered, Passing: o.Passing, Failing: o.Failing,
+			CoveredPct: sh(o.Covered), NotCoveredPct: sh(o.NotCovered), PassingPct: sh(o.Passing), FailingPct: sh(o.Failing),
+			Runs: r.TotalRuns, Passed: r.PassedRuns, Failed: r.FailedRuns, When: relTime(r.LastRunAt, now),
+		})
 	}
 	var buf bytes.Buffer
 	err := contractsListTmpl.Execute(&buf, struct {

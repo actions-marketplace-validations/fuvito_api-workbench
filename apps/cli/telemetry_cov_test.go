@@ -107,7 +107,7 @@ func TestCoverageList_TextAndJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"a.yaml", "2/4 (50.0%)", "3 run(s) · 2 passed · 1 failed", "last run 2026-03-04", "b.yaml", "1/1 (100.0%)"} {
+	for _, want := range []string{"a.yaml", "Covered 2 (50%) · Not covered 2 (50%)", "of 4 operations", "scenario runs: 3 run(s) · 2 passed · 1 failed", "last run 2026-03-04", "b.yaml", "Covered 1 (100%) · Not covered 0 (0%)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("text output missing %q:\n%s", want, out)
 		}

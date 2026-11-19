@@ -23,15 +23,17 @@ func TestExportCoverageReport(t *testing.T) {
 
 	csv := ss.ExportCoverageReport(specPath, "csv")
 	if csv.Error != "" || !strings.HasPrefix(csv.Content, "Method,Path,Coverage") ||
-		!strings.Contains(csv.Content, "GET,/ping,Covered,Pass") || !strings.Contains(csv.Content, "GET,/other,Not Covered") {
+		!strings.Contains(csv.Content, "GET,/ping,Covered,Pass") || !strings.Contains(csv.Content, ",Passing") ||
+		!strings.Contains(csv.Content, "GET,/other,Not Covered") || !strings.Contains(csv.Content, ",Not covered") {
 		t.Errorf("csv: %+v", csv)
 	}
 	md := ss.ExportCoverageReport(specPath, "markdown")
-	if md.Error != "" || !strings.Contains(md.Content, "# Contracts Report") || !strings.Contains(md.Content, "1 / 2 operations covered (50%)") {
+	if md.Error != "" || !strings.Contains(md.Content, "# Contracts Report") || !strings.Contains(md.Content, "| Covered | Not covered | Passing | Failing |") ||
+		!strings.Contains(md.Content, "| 1 (50%) | 1 (50%) | 1 (50%) | 0 (0%) |") {
 		t.Errorf("markdown: %+v", md)
 	}
 	html := ss.ExportCoverageReport(specPath, "html")
-	if html.Error != "" || !strings.HasPrefix(html.Content, "<!DOCTYPE html>") || !strings.Contains(html.Content, "Quality Gaps") {
+	if html.Error != "" || !strings.HasPrefix(html.Content, "<!DOCTYPE html>") || !strings.Contains(html.Content, "Quality Gaps") || !strings.Contains(html.Content, `<div class="l">Not covered</div>`) {
 		t.Errorf("html: %+v", html)
 	}
 }

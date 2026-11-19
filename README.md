@@ -87,7 +87,7 @@ Each row names the operation and, for error gaps, the exact status codes to go a
 
 ### Share it
 
-**Export** produces a CSV, a Markdown report (paste it into a pull request or wiki), or a print-ready HTML report. Reports include the coverage summary, the operation table, and every quality gap.
+**Export** produces a CSV, a Markdown report (paste it into a pull request or wiki), or a print-ready HTML report. Reports open with the same four totals as the page (Covered, Not covered, Passing, Failing), followed by the operation table and every quality gap. The command-line `coverage list` and `coverage quality` carry the same totals in text and JSON.
 
 ![Export menu — CSV, Markdown, HTML](docs/images/12-contracts-export-menu.png)
 

@@ -220,7 +220,7 @@ func TestMCP_Coverage(t *testing.T) {
 		t.Fatal(err)
 	}
 	text, isErr = toolText(t, rpcExchange(t, callTool("coverage", map[string]any{"workspace": ws}))[0])
-	if isErr || !strings.Contains(text, "1/2") || !strings.Contains(text, "50.0%") || !strings.Contains(text, "3 run(s)") {
+	if isErr || !strings.Contains(text, "Covered 1 (50%) · Not covered 1 (50%) · Passing 0 (0%) · Failing 0 (0%) · No result 1 (50%) · of 2 operations") || !strings.Contains(text, "3 run(s)") {
 		t.Errorf("coverage output: %q", text)
 	}
 }

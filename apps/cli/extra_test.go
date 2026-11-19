@@ -41,43 +41,6 @@ func execFull(t *testing.T, args ...string) (string, error) {
 	return buf.String(), err
 }
 
-// ---- coverageBar ----
-
-func TestCoverageBar_Empty(t *testing.T) {
-	bar := coverageBar(0, 10)
-	if !strings.HasPrefix(bar, "[") || !strings.HasSuffix(bar, "]") {
-		t.Fatalf("want bracketed bar, got %q", bar)
-	}
-	if strings.Contains(bar, "=") {
-		t.Errorf("0%% bar should have no filled segments, got %q", bar)
-	}
-}
-
-func TestCoverageBar_Full(t *testing.T) {
-	bar := coverageBar(100, 10)
-	if strings.Contains(bar, ".") {
-		t.Errorf("100%% bar should have no empty segments, got %q", bar)
-	}
-}
-
-func TestCoverageBar_Half(t *testing.T) {
-	bar := coverageBar(50, 10)
-	inner := bar[1 : len(bar)-1]
-	filled := strings.Count(inner, "=")
-	empty := strings.Count(inner, ".")
-	if filled != 5 || empty != 5 {
-		t.Errorf("50%% bar: want 5 filled + 5 empty, got %q", bar)
-	}
-}
-
-func TestCoverageBar_Over100(t *testing.T) {
-	bar := coverageBar(150, 10)
-	inner := bar[1 : len(bar)-1]
-	if len(inner) != 10 {
-		t.Errorf("bar width should be capped at 10, got %q", bar)
-	}
-}
-
 // ---- exitError ----
 
 func TestExitError_ErrorString(t *testing.T) {

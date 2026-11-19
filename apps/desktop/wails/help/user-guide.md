@@ -534,9 +534,11 @@ A compact summary of the same gaps also appears inline in the scenario result vi
 
 - **Reset data** — clears all accumulated coverage for the selected spec.
 - **Export** (dropdown button) — three formats:
-  - **Export CSV** — comma-separated file with one row per operation: method, path, coverage, last result, last run time, quality flags, and missing status codes.
-  - **Export Markdown** — Markdown report suitable for pasting into a wiki, PR description, or README. Includes the coverage summary, operations table, and all quality gap sections.
+  - **Export CSV** — comma-separated file with one row per operation: method, path, coverage, last result, last run time, quality flags, missing status codes, and a **Status** column (*Passing*, *Failing*, *Covered (no result)* or *Not covered*) so you can count the four totals in a spreadsheet.
+  - **Export Markdown** — Markdown report suitable for pasting into a wiki, PR description, or README. Starts with the same four totals as the page (Covered, Not covered, Passing, Failing, each with its share of all operations), then the scenario run counts, the operations table, and all quality gap sections.
   - **Export HTML** — full HTML report opened in your default browser, ready for print-to-PDF. Includes the same content as the Markdown report with styling.
+
+The command line produces the same reports, and its `coverage list` and `coverage quality` output (text and JSON) carries the same four totals: in JSON, `covered`, `notCovered`, `passing`, `failing` and `noResult` (covered operations whose last result was not recorded), with `total`. The per-spec CSV has the extra columns `Not Covered`, `Passing` and `Failing` after the original ones.
 
 ### Auto-refresh
 
