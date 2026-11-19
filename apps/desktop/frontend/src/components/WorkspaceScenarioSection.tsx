@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, X, Play, Plus, PlayCircle, Loader2, LayoutTemplate, CopyPlus, Trash2, ChevronDown, ChevronRight, Folder, FolderOpen, RefreshCw } from 'lucide-react'
+import { Search, X, Play, FilePlus, FolderPlus, PlayCircle, Loader2, LayoutTemplate, CopyPlus, Trash2, ChevronDown, ChevronRight, Folder, FolderOpen, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScenarioInfo } from '@/lib/bridge'
 import type { RunAllState } from '@/types'
@@ -118,9 +118,9 @@ function ScenarioRow({
         'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
         isCut && 'opacity-40 italic',
       )}
-      style={{ paddingLeft: `${8 + indent * 12 + (indent > 0 ? 12 : 0)}px` }}
+      style={{ paddingLeft: `${8 + indent * 12 + 12}px` }}
     >
-      <Play size={10} className="shrink-0 text-violet-400" />
+      <Play size={12} className="ui-icon shrink-0 text-violet-400" />
       {renamingScenarioPath === s.path ? (
         <RenameInput
           initialValue={s.title}
@@ -130,7 +130,7 @@ function ScenarioRow({
       ) : (
         <button
           type="button"
-          className="flex-1 min-w-0 flex items-center gap-1.5 text-left py-0.5"
+          className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
           onClick={() => onSelectScenario?.(s.path, s.title)}
           onDoubleClick={e => { e.stopPropagation(); onRenamingChange(s.path) }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onScenarioContextMenu(e, s.path, s.title) }}
@@ -228,11 +228,11 @@ function FolderRow({
         onClick={onToggle}
         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onFolderContextMenu?.(e, node.relPath, node.name) }}
       >
-        <span className="shrink-0 text-[var(--color-muted-foreground)]">
-          {open ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+        <span className="ui-icon shrink-0 text-[var(--color-muted-foreground)]">
+          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         </span>
-        <span className="shrink-0 text-amber-500">
-          {open ? <FolderOpen size={10} /> : <Folder size={10} />}
+        <span className="ui-icon shrink-0 text-amber-500">
+          {open ? <FolderOpen size={12} /> : <Folder size={12} />}
         </span>
 
         {renamingFolderPath === node.relPath ? (
@@ -268,7 +268,7 @@ function FolderRow({
               title="New subfolder"
               className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
             >
-              <Folder size={10} />
+              <FolderPlus size={10} />
             </button>
             <button
               type="button"
@@ -276,7 +276,7 @@ function FolderRow({
               title="New scenario in folder"
               className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
             >
-              <Plus size={10} />
+              <FilePlus size={10} />
             </button>
             {onDeleteFolder && (
               <button
@@ -296,7 +296,7 @@ function FolderRow({
         <>
           {creatingSubfolder && (
             <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: `${8 + (indent + 1) * 12}px` }}>
-              <Folder size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
+              <Folder size={12} className="ui-icon shrink-0 text-[var(--color-muted-foreground)]" />
               <RenameInput
                 initialValue=""
                 onConfirm={name => { setCreatingSubfolder(false); onNewFolder?.(node.relPath, name) }}
@@ -306,7 +306,7 @@ function FolderRow({
           )}
           {creatingInFolder && (
             <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: `${8 + (indent + 1) * 12 + 12}px` }}>
-              <Play size={10} className="shrink-0 text-violet-400" />
+              <Play size={12} className="ui-icon shrink-0 text-violet-400" />
               <RenameInput
                 initialValue=""
                 onConfirm={name => { setCreatingInFolder(false); onNewScenario?.(name, node.relPath) }}
@@ -383,7 +383,6 @@ export function WorkspaceScenarioSection({
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [scenarioQuery, setScenarioQuery] = useState('')
   const [rootDragOver, setRootDragOver] = useState(false)
-  const [rootOpen, setRootOpen] = useState(true)
 
   const filteredScenarios = scenarioQuery
     ? scenarios.filter(s => !s.isFolder && s.title.toLowerCase().includes(scenarioQuery.toLowerCase()))
@@ -400,6 +399,43 @@ export function WorkspaceScenarioSection({
       )}
       {(scenarios.some(s => !s.isFolder) || onNewScenario) && (
         <>
+          {/* Toolbar, like the requests panel: no root folder node, items start at the top level */}
+          <div className="px-2 py-1.5 border-b border-[var(--color-border)] flex items-center gap-1.5 justify-end">
+            {onRunAllScenarios && scenarios.filter(s => !s.isFolder).length > 0 && (
+              <button
+                type="button"
+                onClick={() => onRunAllScenarios()}
+                disabled={runAllState?.running}
+                title="Run all scenarios"
+                className="text-[var(--color-muted-foreground)] hover:text-violet-400 transition-colors disabled:opacity-40"
+              >
+                {runAllState?.running ? <Loader2 size={12} className="animate-spin" /> : <PlayCircle size={12} />}
+              </button>
+            )}
+            {onRefresh && (
+              <button type="button" onClick={() => onRefresh()} title="Refresh scenarios"
+                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+                <RefreshCw size={12} />
+              </button>
+            )}
+            <button type="button" onClick={() => onOpenTemplateGallery()} title="New scenario from template"
+              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors">
+              <LayoutTemplate size={12} />
+            </button>
+            {onNewFolder && (
+              <button type="button" onClick={() => setCreatingFolder(true)} title="New folder"
+                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+                <FolderPlus size={12} />
+              </button>
+            )}
+            {onNewScenario && (
+              <button type="button" onClick={() => setCreatingScenario(true)} title="New scenario"
+                className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
+                <FilePlus size={12} />
+              </button>
+            )}
+          </div>
+
           {scenarios.some(s => !s.isFolder) && (
             <div className="flex items-center gap-1.5 px-2 py-1 border-b border-[var(--color-border)]">
               <Search size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
@@ -418,8 +454,10 @@ export function WorkspaceScenarioSection({
             </div>
           )}
 
-          {/* Root "scenarios" folder row — mirrors the "requests" root node in the file tree */}
+          {/* Empty space below the items is the root: drop a scenario here to move it out of a folder */}
           <div
+            data-testid="scenario-root"
+            className={cn('min-h-full', rootDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40')}
             onDragOver={e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setRootDragOver(true) }}
             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setRootDragOver(false) }}
             onDrop={e => {
@@ -428,66 +466,13 @@ export function WorkspaceScenarioSection({
               const src = e.dataTransfer.getData('application/x-clrsigscenario')
               if (src) onMoveScenario?.(src, '')
             }}
-            className={cn(
-              'group flex items-center gap-1 pr-2 py-0.5 hover:bg-[var(--color-muted)] transition-colors cursor-pointer',
-              rootDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40',
-            )}
-            style={{ paddingLeft: '8px' }}
-            onClick={() => setRootOpen(o => !o)}
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onFolderContextMenu?.(e, '', 'scenarios') }}
           >
-            <span className="shrink-0 text-[var(--color-muted-foreground)]">
-              {rootOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-            </span>
-            <span className="shrink-0 text-amber-500">
-              {rootOpen ? <FolderOpen size={10} /> : <Folder size={10} />}
-            </span>
-            <span className="flex-1 min-w-0 text-xs font-medium text-[var(--color-muted-foreground)] group-hover:text-[var(--color-foreground)] truncate">
-              scenarios
-            </span>
-            <div className="flex items-center shrink-0 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              {onRunAllScenarios && scenarios.filter(s => !s.isFolder).length > 0 && (
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); onRunAllScenarios() }}
-                  disabled={runAllState?.running}
-                  title="Run all scenarios"
-                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-violet-400 transition-colors disabled:opacity-40"
-                >
-                  {runAllState?.running ? <Loader2 size={10} className="animate-spin" /> : <PlayCircle size={10} />}
-                </button>
-              )}
-              {onRefresh && (
-                <button type="button" onClick={e => { e.stopPropagation(); onRefresh() }} title="Refresh scenarios"
-                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
-                  <RefreshCw size={10} />
-                </button>
-              )}
-              <button type="button" onClick={e => { e.stopPropagation(); onOpenTemplateGallery() }} title="New scenario from template"
-                className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-accent)] transition-colors">
-                <LayoutTemplate size={10} />
-              </button>
-              {onNewFolder && (
-                <button type="button" onClick={e => { e.stopPropagation(); setCreatingFolder(true); if (!rootOpen) setRootOpen(true) }} title="New folder"
-                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
-                  <Folder size={10} />
-                </button>
-              )}
-              {onNewScenario && (
-                <button type="button" onClick={e => { e.stopPropagation(); setCreatingScenario(true); if (!rootOpen) setRootOpen(true) }} title="New scenario"
-                  className="p-0.5 rounded text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors">
-                  <Plus size={10} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {rootOpen && (
             <>
 
               {creatingFolder && (
-                <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: '20px' }}>
-                  <Folder size={10} className="shrink-0 text-amber-500" />
+                <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: '8px' }}>
+                  <Folder size={12} className="ui-icon shrink-0 text-amber-500" />
                   <RenameInput
                     initialValue=""
                     onConfirm={name => { setCreatingFolder(false); onNewFolder?.('', name) }}
@@ -496,8 +481,8 @@ export function WorkspaceScenarioSection({
                 </div>
               )}
               {creatingScenario && (
-                <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: '32px' }}>
-                  <Play size={10} className="shrink-0 text-violet-400" />
+                <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: '20px' }}>
+                  <Play size={12} className="ui-icon shrink-0 text-violet-400" />
                   <RenameInput
                     initialValue=""
                     onConfirm={name => { setCreatingScenario(false); onNewScenario?.(name) }}
@@ -515,7 +500,7 @@ export function WorkspaceScenarioSection({
                     <ScenarioRow
                       key={s.path}
                       s={s}
-                      indent={1}
+                      indent={0}
                       renamingScenarioPath={renamingScenarioPath}
                       onRenamingChange={onRenamingChange}
                       onSelectScenario={onSelectScenario}
@@ -552,7 +537,7 @@ export function WorkspaceScenarioSection({
                       <FolderRowStateful
                         key={node.relPath}
                         node={node}
-                        indent={1}
+                        indent={0}
                         renamingFolderPath={renamingFolderPath}
                         onRenamingFolderChange={onRenamingFolderChange}
                         onNewScenario={onNewScenario}
@@ -575,7 +560,7 @@ export function WorkspaceScenarioSection({
                       <ScenarioRow
                         key={node.info.path}
                         s={node.info}
-                        indent={1}
+                        indent={0}
                         renamingScenarioPath={renamingScenarioPath}
                         onRenamingChange={onRenamingChange}
                         onSelectScenario={onSelectScenario}
@@ -590,7 +575,7 @@ export function WorkspaceScenarioSection({
                 </>
               )}
             </>
-          )}
+          </div>
         </>
       )}
     </>
