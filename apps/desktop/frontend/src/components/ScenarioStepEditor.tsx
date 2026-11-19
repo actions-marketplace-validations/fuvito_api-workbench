@@ -204,9 +204,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
   onMoveDown: () => void
   onToggleDisabled: () => void
 }) {
-  const hasNonDefaultOptions = (step.failPolicy && step.failPolicy !== 'stop') ||
+  const hasNonDefaultOptions = !!((step.failPolicy && step.failPolicy !== 'stop') ||
     (step.timeoutMs && step.timeoutMs > 0) ||
-    (step.retryMaxAttempts && step.retryMaxAttempts > 0)
+    (step.retryMaxAttempts && step.retryMaxAttempts > 0))
   const [showAdvanced, setShowAdvanced] = useState(!!hasNonDefaultOptions)
 
   function updateHeader(i: number, u: { name?: string; value?: string }) {

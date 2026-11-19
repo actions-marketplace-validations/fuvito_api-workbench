@@ -1,6 +1,6 @@
 # Scenarios screen: declutter (UX review)
 
-**Status:** Done (phases 1-4); scenario screenshots in `docs/images` still to regenerate
+**Status:** Done (phases 1-4); scenario screenshots regenerated
 **Date:** 2026-11-18
 **Related:** `2026-11-18 Scenarios Screen UX Simplification Report.md` (earlier, code-independent report; this one is grounded in the components and takes a smaller route)
 

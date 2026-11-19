@@ -474,3 +474,4 @@ Do not implement or stub any of these without explicit user direction.
 ### 2026-11-18 — Scenarios screen declutter, phase 4
 
 - **Run-from-here warning:** `lib/runFrom.ts` (`missingOnRunFrom`) finds values extracted by steps before the start point and used by a step that still runs (URL, headers, params, body, assertions, extraction paths); scenario variables and names re-extracted before use are excluded. The step pane shows "Starting here skips earlier steps, so {{token}} is not set." next to Run from here (Definition and Result views). Frontend only.
+- Scenario screenshots (`06`, `07` dark and light, `08`) regenerated for the new layout. Fixed a stray `0` after "Advanced" in the step editor (a falsy number rendered by `hasNonDefaultOptions &&`).
