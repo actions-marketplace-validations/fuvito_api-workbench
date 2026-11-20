@@ -607,3 +607,9 @@ Do not implement or stub any of these without explicit user direction.
 - **B-005 variable overrides:** `variables.WithOverrides` (moved out of the CLI, which keeps `applyVars` as a wrapper with the same `--var …` error text); `ConformRunInput.Vars`; a "Variable overrides" box in the page's Options (this run only, never saved, not in Get CLI command).
 - **B-011 sample workspace content:** the Conformance workspace now has `scenarios/product-lifecycle.yaml` and four requests.
 - **Finding, not changed (B-009):** a URL with an unresolved `{{placeholder}}` is still sent and a declared 404 passes, so such an operation shows as Passing without being compared. Recorded in the backlog for a decision.
+
+### 2026-11-20 — Conformance Server starts like the Demo Server
+
+- Help → Dev Servers → **Start Conformance Server** is now the single entry: it starts the server and opens its temporary workspace (spec, local environment, sample scenario and requests), exactly as **Start Demo Server** does; the same item becomes **Stop Conformance Server** (the status-bar chip stops it too), and stopping closes the workspace and reopens the previous one. The separate "Open Conformance Workspace" item is gone; there was never a product reason for two (it was added after a plain start-only item). It is disabled, with the reason, while the Demo Server's workspace is open, and `requestWorkspaceSwitch` asks about unsaved tabs first, as for the demo.
+- `ConformanceServerService.Start` (server only) is still there for tests and API users but the app no longer calls it; `startConformanceServer` was removed from `bridge.ts`.
+- Test: a Playwright test drives Help → Dev Servers → Start Conformance Server (page opens, status chip, Stop entry).

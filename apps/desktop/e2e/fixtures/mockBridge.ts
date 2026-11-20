@@ -265,7 +265,7 @@ export function setupMockBridge() {
       },
       ConformanceServerService: {
         Start: () => Promise.resolve({ port: 8120, error: '' }),
-        OpenWorkspace: () => Promise.resolve({ port: 8120, workspacePath: '', error: '' }),
+        OpenWorkspace: () => { bridge['workspacePath'] = '/tmp/clrsig-conformance-mock'; return Promise.resolve({ port: 8120, workspacePath: '/tmp/clrsig-conformance-mock', error: '' }) },
         Stop: noop,
         IsRunning: () => Promise.resolve(false),
         GetPort: () => Promise.resolve(0),

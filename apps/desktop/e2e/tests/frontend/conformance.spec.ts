@@ -87,6 +87,22 @@ test.describe('Check Conformance page', () => {
     await expect(command).toContainText('--read-only')
   })
 
+  test('Help > Dev Servers > Start Conformance Server is one step, like the Demo Server', async ({ page }) => {
+    await gotoApp(page)
+    await page.getByRole('menuitem', { name: 'Help' }).click()
+    await page.getByRole('menuitem', { name: 'Dev Servers' }).hover()
+    await expect(page.getByRole('menuitem', { name: 'Open Conformance Workspace' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Start Conformance Server' }).click()
+
+    // The Check Conformance page opens and the server shows in the status bar.
+    await expect(page.getByRole('heading', { name: 'Check Conformance' })).toBeVisible()
+    await expect(page.getByText('Conformance :8120')).toBeVisible()
+
+    await page.getByRole('menuitem', { name: 'Help' }).click()
+    await page.getByRole('menuitem', { name: 'Dev Servers' }).hover()
+    await expect(page.getByRole('menuitem', { name: 'Stop Conformance Server' })).toBeVisible()
+  })
+
   test('with writes ticked the command has no --read-only', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Check spec conformance' }).click()

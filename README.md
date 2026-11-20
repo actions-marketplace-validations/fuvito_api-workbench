@@ -129,7 +129,7 @@ Spec Conformance Testing does not need a terminal. The **Check Conformance** pag
 
 ![A scenario's result: 1 of 3 responses match the spec, with the violations per step](docs/images/16-scenario-spec-conformance.png)
 
-**A server that is wrong on purpose.** *Help → Dev Servers → Open Conformance Workspace* starts a small API with its own spec, three of whose operations break it, and opens a workspace ready to check. It is the quickest way to see a conformance failure before you point the page at your own API.
+**A server that is wrong on purpose.** *Help → Dev Servers → Start Conformance Server* starts a small API with its own spec, three of whose operations break it, and opens a workspace ready to check, the same way the Demo Server does. It is the quickest way to see a conformance failure before you point the page at your own API.
 
 ---
 

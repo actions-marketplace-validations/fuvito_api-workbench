@@ -59,7 +59,6 @@ import {
   moveRequest,
   moveScenario,
   openDemoSpec,
-  startConformanceServer,
   stopConformanceServer,
   openConformanceSpec,
   openConformanceWorkspace,
@@ -118,19 +117,23 @@ export default function App() {
 
   const [conformancePort, setConformancePort] = useState(0)
   const [conformanceWorkspace, setConformanceWorkspace] = useState('')
+  const [conformanceStarting, setConformanceStarting] = useState(false)
+  // Like the Demo Server: starting it opens its temporary workspace (the spec, a local environment,
+  // a sample scenario and requests) and stopping it closes that workspace again.
   async function handleStartConformanceServer() {
-    const result = await startConformanceServer()
-    if (result.error) { setAppError(result.error); return }
-    setConformancePort(result.port)
-  }
-  async function handleOpenConformanceWorkspace() {
-    const result = await openConformanceWorkspace()
-    if (result.error) { setAppError(result.error); return }
-    setConformancePort(result.port)
-    setConformanceWorkspace(result.workspacePath ?? '')
-    await workspace.refreshWorkspace()
-    switchToExplorer()
-    tabs.openConformanceTab()
+    if (conformanceStarting) return
+    setConformanceStarting(true)
+    try {
+      const result = await openConformanceWorkspace()
+      if (result.error) { setAppError(result.error); return }
+      setConformancePort(result.port)
+      setConformanceWorkspace(result.workspacePath ?? '')
+      await workspace.refreshWorkspace()
+      switchToExplorer()
+      tabs.openConformanceTab()
+    } finally {
+      setConformanceStarting(false)
+    }
   }
   async function handleStopConformanceServer() {
     const port = conformancePort
@@ -769,18 +772,12 @@ export default function App() {
           { kind: 'separator' },
           {
             kind: 'action',
-            label: conformancePort > 0 ? 'Stop Conformance Server' : 'Start Conformance Server',
-            title: 'A deliberately imperfect API (three operations break its spec) for trying Spec Conformance Testing',
-            onClick: conformancePort > 0 ? handleStopConformanceServer : handleStartConformanceServer,
-          },
-          {
-            kind: 'action',
-            label: conformanceWorkspace ? 'Conformance Workspace is open' : 'Open Conformance Workspace',
-            disabled: !!conformanceWorkspace || demo.demoRunning,
-            title: demo.demoRunning
+            label: conformanceStarting ? 'Starting…' : conformancePort > 0 ? 'Stop Conformance Server' : 'Start Conformance Server',
+            disabled: conformanceStarting || (conformancePort === 0 && demo.demoRunning),
+            title: conformancePort === 0 && demo.demoRunning
               ? 'Stop the Demo Server first: its workspace is open'
-              : 'Start the Conformance Server and open a workspace with its spec and a local environment',
-            onClick: () => requestWorkspaceSwitch(handleOpenConformanceWorkspace),
+              : 'A deliberately imperfect API (three operations break its spec). Starting it opens a workspace with its spec, a local environment and a sample scenario',
+            onClick: conformancePort > 0 ? handleStopConformanceServer : () => requestWorkspaceSwitch(handleStartConformanceServer),
           },
           {
             kind: 'action',

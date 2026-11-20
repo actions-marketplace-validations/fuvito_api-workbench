@@ -80,3 +80,4 @@ The one living list of work that is not done yet. It is edited in place: tick an
 | ☑ | B-042 | `clrsig conform --read-only`, and the page's Get CLI command carrying the page's choices | 2026-11-19 |
 | ☑ | B-043 | Step `retry` / `timeoutMs` honoured by the runner | [Postman gap review](enhancements/2026-11-17-postman-gap-review.md) (A) |
 | ☑ | B-044 | Future-enhancements items 1–11 | See the status line of the [future enhancements](enhancements/2026-11-17-future-enhancements.md) file |
+| ☑ | B-045 | Conformance Server starts like the Demo Server: one menu item that starts it and opens its workspace (the separate "Open Conformance Workspace" item was removed) | Done 2026-11-20, raised by the owner |
