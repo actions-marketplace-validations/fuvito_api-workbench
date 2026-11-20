@@ -12,8 +12,9 @@ export function useDemo(deps: {
   setTabsState: React.Dispatch<React.SetStateAction<TabsStateTuple>>
   openFirstFileInTree: (tree: FileNode[]) => Promise<void>
   onWorkspaceOpened?: () => void
+  onError?: (message: string) => void
 }) {
-  const { refreshWorkspace, refreshHistory, setTabsState, openFirstFileInTree, onWorkspaceOpened } = deps
+  const { refreshWorkspace, refreshHistory, setTabsState, openFirstFileInTree, onWorkspaceOpened, onError } = deps
 
   const [demoRunning, setDemoRunning] = useState(false)
   const [demoPort, setDemoPort] = useState(0)
@@ -27,6 +28,7 @@ export function useDemo(deps: {
       const result = await startDemo()
       if (result.error) {
         console.error('demo start failed:', result.error)
+        onError?.(result.error)
         return
       }
       setDemoRunning(true)

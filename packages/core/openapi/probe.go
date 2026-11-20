@@ -70,6 +70,7 @@ func GenerateNegativeProbes(s *Spec, baseURL string) ([]NegativeProbe, error) {
 			if op == nil {
 				continue
 			}
+			op = withPathParameters(item, op)
 
 			var baseReq *domain.Request
 			if gr, ok := happyByOp[op.OperationID]; ok {

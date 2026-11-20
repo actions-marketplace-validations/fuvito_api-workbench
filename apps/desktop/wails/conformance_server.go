@@ -12,6 +12,9 @@ import (
 //go:embed help/conformance-openapi.yaml
 var conformanceOpenAPIYAML []byte
 
+//go:embed help/conformance-environment.yaml
+var conformanceEnvironmentYAML []byte
+
 // The Conformance Server is deliberately imperfect: every operation in
 // help/conformance-openapi.yaml conforms except getProduct, listCategories and
 // listOrders, which each break the spec in a different way. conformanceKnownViolations
@@ -40,6 +43,10 @@ func newConformanceMux() http.Handler {
 		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
 		w.Write(conformanceOpenAPIYAML) //nolint:errcheck
 	})
+	mux.HandleFunc("/environment.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+		w.Write(conformanceEnvironmentYAML) //nolint:errcheck
+	})
 	mux.HandleFunc("/docs", handleDemoSwaggerUI)
 	mux.HandleFunc("/health", s.health)
 	mux.HandleFunc("/products", s.handleProducts)
@@ -61,14 +68,13 @@ func (s *conformanceServer) handleProducts(w http.ResponseWriter, r *http.Reques
 		demoWriteJSON(w, http.StatusOK, s.products)
 	case http.MethodPost:
 		var in struct {
-			Name  string  `json:"name"`
-			Price float64 `json:"price"`
+			Name string `json:"name"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Name == "" {
-			demoErrJSON(w, http.StatusBadRequest, "name and price are required")
+			demoErrJSON(w, http.StatusBadRequest, "name is required")
 			return
 		}
-		p := conformanceProduct{ID: s.nextID, Name: in.Name, Price: in.Price}
+		p := conformanceProduct{ID: s.nextID, Name: in.Name, Price: 9.99}
 		s.nextID++
 		s.products = append(s.products, p)
 		demoWriteJSON(w, http.StatusCreated, p)

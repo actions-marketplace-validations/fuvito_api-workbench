@@ -13,6 +13,12 @@ type Settings struct {
 	ClientCertFile string `json:"clientCertFile,omitempty"`
 	ClientKeyFile  string `json:"clientKeyFile,omitempty"`
 	CAFile         string `json:"caFile,omitempty"` // extra CA certificates to trust
+
+	// Ports of the built-in Dev Servers. 0 = automatic: the first free port from the server's
+	// usual starting port. A port that is set and already in use is an error, never silently
+	// replaced.
+	DemoServerPort        int `json:"demoServerPort,omitempty"`
+	ConformanceServerPort int `json:"conformanceServerPort,omitempty"`
 }
 
 // DefaultSettings returns the out-of-the-box defaults.

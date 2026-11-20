@@ -1,0 +1,7 @@
+schemaVersion: "1"
+name: conformance-server
+variables:
+  - name: id
+    value: "1"
+  - name: name
+    value: "Lamp"

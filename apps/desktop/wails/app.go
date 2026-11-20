@@ -28,6 +28,10 @@ func NewApp() *App {
 	ss := NewSettingsService()
 	rs := NewRequestService(ws, ss)
 	ss.onSave = rs.RebuildExecutor // rebuild HTTP client whenever settings are saved
+	demo := NewDemoService(ws)
+	demo.portFn = func() int { return ss.GetSettings().DemoServerPort }
+	conf := NewConformanceServerService()
+	conf.portFn = func() int { return ss.GetSettings().ConformanceServerPort }
 	return &App{
 		workspaceService:  ws,
 		requestService:    rs,
@@ -35,8 +39,8 @@ func NewApp() *App {
 		importService:     NewImportService(ws),
 		bundleService:     NewBundleService(ws),
 		settingsService:   ss,
-		demoService:       NewDemoService(ws),
-		conformanceServer: NewConformanceServerService(),
+		demoService:       demo,
+		conformanceServer: conf,
 		scenarioService:   NewScenarioService(ws, ss),
 		helpService:       NewHelpService(),
 		cliBuilder:        NewCliBuilderService(ws),

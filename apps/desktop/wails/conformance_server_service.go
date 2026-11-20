@@ -15,6 +15,7 @@ type ConformanceServerService struct {
 	mu     sync.Mutex
 	server *http.Server
 	port   int
+	portFn func() int // configured port from Settings; nil or 0 = automatic
 }
 
 func NewConformanceServerService() *ConformanceServerService {
@@ -45,9 +46,13 @@ func (c *ConformanceServerService) Start() ConformanceServerResult {
 	if c.server != nil {
 		return ConformanceServerResult{Port: c.port}
 	}
-	port, err := findFreePort(8120)
+	configured := 0
+	if c.portFn != nil {
+		configured = c.portFn()
+	}
+	port, err := choosePort(configured, 8120, "the Conformance Server port")
 	if err != nil {
-		return ConformanceServerResult{Error: "could not find free port: " + err.Error()}
+		return ConformanceServerResult{Error: err.Error()}
 	}
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("localhost:%d", port),

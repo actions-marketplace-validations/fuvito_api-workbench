@@ -112,6 +112,7 @@ export default function App() {
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
     onWorkspaceOpened: switchToExplorer,
+    onError: message => setAppError(message),
   })
 
   const [conformancePort, setConformancePort] = useState(0)

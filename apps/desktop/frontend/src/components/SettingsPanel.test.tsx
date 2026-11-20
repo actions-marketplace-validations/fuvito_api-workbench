@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { SettingsPanel } from './SettingsPanel'
+import { SettingsPanel, portProblem } from './SettingsPanel'
 import type { AppSettings } from '@/lib/bridge'
 
 const defaults: AppSettings = { theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false, telemetryEnabled: false }
@@ -112,5 +112,36 @@ describe('SettingsPanel — client certificates', () => {
     setup({ ...defaults, clientCertFile: '/c/client.pem' })
     expect((screen.getByLabelText('Client certificate file') as HTMLInputElement).value).toBe('/c/client.pem')
     expect((screen.getByLabelText('Client key file') as HTMLInputElement).value).toBe('')
+  })
+})
+
+describe('SettingsPanel Dev server ports', () => {
+  it('saves the configured ports', () => {
+    const h = setup()
+    fireEvent.change(screen.getByLabelText('Demo Server port'), { target: { value: '9090' } })
+    fireEvent.change(screen.getByLabelText('Conformance Server port'), { target: { value: '9120' } })
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({ demoServerPort: 9090, conformanceServerPort: 9120 }))
+  })
+
+  it('refuses an out-of-range port or two servers on the same port', () => {
+    const h = setup()
+    fireEvent.change(screen.getByLabelText('Demo Server port'), { target: { value: '80' } })
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(screen.getByRole('alert')).toHaveTextContent('between 1024 and 65535')
+    expect(h.onSave).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText('Demo Server port'), { target: { value: '9000' } })
+    fireEvent.change(screen.getByLabelText('Conformance Server port'), { target: { value: '9000' } })
+    fireEvent.click(screen.getByRole('button', { name: /save/i }))
+    expect(screen.getByRole('alert')).toHaveTextContent('different ports')
+    expect(h.onSave).not.toHaveBeenCalled()
+  })
+
+  it('treats 0 as automatic for both', () => {
+    expect(portProblem(0, 0)).toBe('')
+    expect(portProblem(0, 9000)).toBe('')
+    expect(portProblem(1023, 0)).not.toBe('')
+    expect(portProblem(70000, 0)).not.toBe('')
   })
 })

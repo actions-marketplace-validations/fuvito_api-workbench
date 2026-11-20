@@ -5,7 +5,9 @@ info:
   description: >
     A deliberately imperfect API for trying Spec Conformance Testing. Most
     operations match this spec; three do not, each in a different way. The
-    list of known violations is in the user guide.
+    list of known violations is in the user guide. Requests are generated
+    with {{placeholders}} for path parameters, so run the check with an
+    environment that sets id (for example 1): see conformance-environment.yaml.
 paths:
   /health:
     get:
@@ -42,10 +44,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, price]
+              required: [name]
               properties:
                 name: {type: string}
-                price: {type: number}
       responses:
         "201":
           description: Created
@@ -72,6 +73,8 @@ paths:
       responses:
         "204":
           description: Deleted
+        "404":
+          description: Not found
   /categories:
     get:
       operationId: listCategories

@@ -151,7 +151,7 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 				continue
 			}
 
-			req := buildRequest(base, method, path, op)
+			req := buildRequest(base, method, path, withPathParameters(item, op))
 			gr := GeneratedRequest{
 				Request:     req,
 				OperationID: op.OperationID,
@@ -164,6 +164,34 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 	}
 
 	return results, nil
+}
+
+// withPathParameters returns op with the parameters declared on its path item added, so a
+// parameter written once for every method of a path (the usual place for {id}) is seen. An
+// operation's own parameter replaces a path-level one with the same name and location. op itself
+// is not modified.
+func withPathParameters(item *openapi3.PathItem, op *openapi3.Operation) *openapi3.Operation {
+	if len(item.Parameters) == 0 {
+		return op
+	}
+	merged := make(openapi3.Parameters, 0, len(item.Parameters)+len(op.Parameters))
+	for _, shared := range item.Parameters {
+		overridden := false
+		for _, own := range op.Parameters {
+			if shared != nil && own != nil && shared.Value != nil && own.Value != nil &&
+				shared.Value.Name == own.Value.Name && shared.Value.In == own.Value.In {
+				overridden = true
+				break
+			}
+		}
+		if !overridden {
+			merged = append(merged, shared)
+		}
+	}
+	merged = append(merged, op.Parameters...)
+	copied := *op
+	copied.Parameters = merged
+	return &copied
 }
 
 func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Request {

@@ -341,3 +341,36 @@ func TestParseSwagger2Bytes_OAuthBearer(t *testing.T) {
 	}
 	t.Error("addPet not found")
 }
+
+func TestGenerateRequests_PathLevelParameters(t *testing.T) {
+	spec, err := openapi.ParseBytes([]byte(`
+openapi: "3.0.3"
+info: {title: t, version: "1"}
+paths:
+  /items/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+      - {name: trace, in: header, required: true, schema: {type: string}}
+    get:
+      parameters:
+        - {name: trace, in: header, required: true, schema: {type: string}, description: own}
+      responses: {"200": {description: ok}}
+    delete:
+      responses: {"204": {description: gone}}
+`), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs, err := openapi.GenerateRequests(spec, "http://x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range reqs {
+		if r.Request.URL != "http://x/items/{{id}}" {
+			t.Errorf("%s: URL = %q, want the {{id}} placeholder", r.Request.Method, r.Request.URL)
+		}
+		if len(r.Request.Headers) != 1 || r.Request.Headers[0].Name != "trace" {
+			t.Errorf("%s: headers = %+v, want exactly one trace header (own parameter replaces the shared one)", r.Request.Method, r.Request.Headers)
+		}
+	}
+}

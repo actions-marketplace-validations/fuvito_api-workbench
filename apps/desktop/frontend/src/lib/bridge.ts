@@ -191,6 +191,9 @@ export interface AppSettings {
   clientCertFile?: string
   clientKeyFile?: string
   caFile?: string
+  // Dev Server ports; 0 or absent = pick a free port automatically
+  demoServerPort?: number
+  conformanceServerPort?: number
 }
 
 export interface HistoryEntry {

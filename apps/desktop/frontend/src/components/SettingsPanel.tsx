@@ -16,21 +16,23 @@ type SettingsPanelProps = {
 
 const DEFAULTS: AppSettings = {
   theme: 'dark', fontSize: 13, defaultTimeoutMs: 30000, proxyUrl: '', tlsSkipVerify: false,
-  telemetryEnabled: false,
+  telemetryEnabled: false, demoServerPort: 0, conformanceServerPort: 0,
 }
 
 export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }: SettingsPanelProps) {
   const [local, setLocal] = useState<AppSettings>({ ...settings })
   const [proxyError, setProxyError] = useState('')
+  const [portError, setPortError] = useState('')
 
   function isChanged<K extends keyof AppSettings>(key: K): boolean {
-    return (local[key] ?? '') !== (DEFAULTS[key] ?? '') // optional text settings are empty when unset
+    return (local[key] ?? DEFAULTS[key] ?? '') !== (DEFAULTS[key] ?? '') // an unset optional setting is its default
   }
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     const updated = { ...local, [key]: value }
     setLocal(updated)
     if (key === 'proxyUrl') setProxyError('')
+    if (key === 'demoServerPort' || key === 'conformanceServerPort') setPortError('')
     onPreview?.(updated)
   }
 
@@ -42,6 +44,11 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
         setProxyError('Enter a valid URL, e.g. http://proxy.example.com:8080')
         return
       }
+    }
+    const problem = portProblem(local.demoServerPort ?? 0, local.conformanceServerPort ?? 0)
+    if (problem) {
+      setPortError(problem)
+      return
     }
     onSave(local)
     onClose()
@@ -172,6 +179,38 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
 
             </div>
           </section>
+          {/* Dev servers */}
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Dev servers</h3>
+            <div className="flex flex-col gap-3">
+              <Row label="Demo Server port" changed={isChanged('demoServerPort')}>
+                <input
+                  type="number"
+                  min={0}
+                  max={65535}
+                  value={local.demoServerPort ?? 0}
+                  onChange={e => set('demoServerPort', Number.parseInt(e.target.value, 10) || 0)}
+                  aria-label="Demo Server port"
+                  className={inputCls}
+                />
+              </Row>
+              <Row label="Conformance Server port" changed={isChanged('conformanceServerPort')}>
+                <input
+                  type="number"
+                  min={0}
+                  max={65535}
+                  value={local.conformanceServerPort ?? 0}
+                  onChange={e => set('conformanceServerPort', Number.parseInt(e.target.value, 10) || 0)}
+                  aria-label="Conformance Server port"
+                  className={inputCls}
+                />
+              </Row>
+              <p className="text-[10px] text-[var(--color-muted-foreground)]">
+                0 picks a free port automatically (from 8090 and 8120). Set a port (1024–65535) to keep the same address every time; if it is taken, the server will not start and says so.
+              </p>
+              {portError && <span role="alert" className="text-[10px] text-red-400">{portError}</span>}
+            </div>
+          </section>
           {/* Privacy */}
           <section>
             <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-3">Privacy</h3>
@@ -238,6 +277,17 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
 }
 
 const inputCls = cn(baseInputCls, 'w-full px-2 py-1')
+
+// A configured Dev Server port is 0 (automatic) or 1024-65535, and the two servers cannot share one.
+export function portProblem(demo: number, conformance: number): string {
+  for (const [name, port] of [['Demo Server', demo], ['Conformance Server', conformance]] as const) {
+    if (port !== 0 && (port < 1024 || port > 65535)) {
+      return `${name} port must be 0 (automatic) or between 1024 and 65535.`
+    }
+  }
+  if (demo !== 0 && demo === conformance) return 'The two servers need different ports.'
+  return ''
+}
 
 function Row({ label, children, changed }: { label: string; children: React.ReactNode; changed?: boolean }) {
   return (

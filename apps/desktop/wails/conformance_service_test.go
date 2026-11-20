@@ -28,6 +28,17 @@ func conformanceSpecFile(t *testing.T) string {
 	return path
 }
 
+// conformanceEnvFile is the environment shipped with the server: it sets the path parameter and
+// body value the generated requests use as {{placeholders}}.
+func conformanceEnvFile(t *testing.T) string {
+	t.Helper()
+	path, err := filepath.Abs(filepath.Join("help", "conformance-environment.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 	var writes atomic.Int32
 	inner := newConformanceMux()
@@ -46,7 +57,7 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 		t.Fatalf("inspect: %+v (want 5 reads, 2 writes)", info)
 	}
 
-	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL})
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)})
 	if out.Error != "" {
 		t.Fatal(out.Error)
 	}
@@ -56,10 +67,18 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 	if out.Total != 7 || out.Covered != 5 || out.NotCovered != 2 || out.Passing != 2 || out.Failing != 3 {
 		t.Fatalf("totals: %+v", out)
 	}
+	// Each known violation must fail for its own reason: a bad field in the response body, not a
+	// request that could not be built or a 404.
+	cause := map[string]string{"getProduct": "/price", "listCategories": "name", "listOrders": "/id"}
 	var failing []string
 	for _, op := range out.Operations {
-		if op.Status == "failed" {
-			failing = append(failing, op.OperationID)
+		if op.Status != "failed" {
+			continue
+		}
+		failing = append(failing, op.OperationID)
+		if op.StatusCode != 200 || len(op.Violations) != 1 ||
+			!strings.Contains(op.Violations[0], cause[op.OperationID]) || strings.HasPrefix(op.Violations[0], "request:") {
+			t.Errorf("%s failed for the wrong reason: status %d, %q", op.OperationID, op.StatusCode, op.Violations)
 		}
 	}
 	want := append([]string(nil), conformanceKnownViolations...)
@@ -69,8 +88,8 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 		t.Fatalf("failing = %v, want the known violations %v", failing, want)
 	}
 
-	withWrites := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true})
-	if writes.Load() == 0 || withWrites.NotCovered != 0 {
+	withWrites := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: conformanceEnvFile(t), AllowWrites: true})
+	if writes.Load() == 0 || withWrites.NotCovered != 0 || withWrites.Passing != 4 || withWrites.Failing != 3 {
 		t.Fatalf("with AllowWrites the write operations must run: writes=%d %+v", writes.Load(), withWrites)
 	}
 }
@@ -127,12 +146,12 @@ func TestConformanceService_FiltersAndCoverageRecording(t *testing.T) {
 		t.Fatalf("filtered run was recorded: %+v", got)
 	}
 
-	notAsked := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true})
+	notAsked := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true, EnvPath: conformanceEnvFile(t)})
 	if notAsked.CoverageNote != "" || coverage.Load(ws, "specs/api.yaml").TotalRuns != 0 {
 		t.Fatal("coverage must be recorded only when asked")
 	}
 
-	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true, RecordCoverage: true})
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true, RecordCoverage: true, EnvPath: conformanceEnvFile(t)})
 	if !strings.HasPrefix(out.CoverageNote, "Added to coverage as specs/api.yaml") {
 		t.Fatalf("note = %q", out.CoverageNote)
 	}
