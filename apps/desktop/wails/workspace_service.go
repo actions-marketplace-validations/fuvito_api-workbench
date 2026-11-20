@@ -24,6 +24,9 @@ type workspaceConfig struct {
 	WorkspacePath    string   `json:"workspacePath"`
 	ActiveEnvPath    string   `json:"activeEnvPath"`
 	RecentWorkspaces []string `json:"recentWorkspaces,omitempty"`
+	// WorkspaceEnvs remembers the selected environment per workspace: workspace
+	// path -> environment file path relative to that workspace.
+	WorkspaceEnvs map[string]string `json:"workspaceEnvs,omitempty"`
 	WindowWidth      int      `json:"windowWidth,omitempty"`
 	WindowHeight     int      `json:"windowHeight,omitempty"`
 }
@@ -120,6 +123,7 @@ type WorkspaceService struct {
 	activeEnvPath    string
 	activeEnv        *domain.Environment
 	recentWorkspaces []string
+	workspaceEnvs    map[string]string
 }
 
 func NewWorkspaceService() *WorkspaceService {
@@ -130,6 +134,7 @@ func NewWorkspaceService() *WorkspaceService {
 	ws := &WorkspaceService{
 		ctx:              context.Background(),
 		recentWorkspaces: prunedRecentWorkspaces(cfg.RecentWorkspaces),
+		workspaceEnvs:    cfg.WorkspaceEnvs,
 	}
 	ws.persistConfig()
 	return ws
@@ -220,7 +225,7 @@ func (w *WorkspaceService) OpenWorkspace() (string, error) {
 	if dir == "" {
 		return w.workspacePath, nil // user cancelled
 	}
-	w.workspacePath = dir
+	w.enterWorkspace(dir)
 	w.addRecentWorkspace(dir)
 	w.persistConfig()
 	w.syncTitle()
@@ -296,6 +301,7 @@ func (w *WorkspaceService) SelectEnvironment(path string) error {
 	if path == "" {
 		w.activeEnv = nil
 		w.activeEnvPath = ""
+		w.rememberEnvironment("")
 		w.persistConfig()
 		return nil
 	}
@@ -305,8 +311,47 @@ func (w *WorkspaceService) SelectEnvironment(path string) error {
 	}
 	w.activeEnv = env
 	w.activeEnvPath = path
+	w.rememberEnvironment(path)
 	w.persistConfig()
 	return nil
+}
+
+// rememberEnvironment records the environment chosen for the open workspace
+// (relative to it, so a moved workspace keeps its choice). Temporary demo and
+// conformance workspaces are not remembered.
+func (w *WorkspaceService) rememberEnvironment(envPath string) {
+	if w.workspacePath == "" || isTempWorkspace(w.workspacePath) {
+		return
+	}
+	if envPath == "" {
+		delete(w.workspaceEnvs, w.workspacePath)
+		return
+	}
+	rel, err := filepath.Rel(w.workspacePath, envPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return
+	}
+	if w.workspaceEnvs == nil {
+		w.workspaceEnvs = map[string]string{}
+	}
+	w.workspaceEnvs[w.workspacePath] = rel
+}
+
+// enterWorkspace makes path the open workspace and selects the environment that
+// was last chosen for it. The previous workspace's environment never carries over.
+func (w *WorkspaceService) enterWorkspace(path string) {
+	w.workspacePath = path
+	w.activeEnv = nil
+	w.activeEnvPath = ""
+	rel, ok := w.workspaceEnvs[path]
+	if !ok {
+		return
+	}
+	full := filepath.Join(path, rel)
+	if env, err := w.loadEnvFile(full); err == nil {
+		w.activeEnv = env
+		w.activeEnvPath = full
+	}
 }
 
 // GetActiveEnvironment returns info about the currently selected environment (or nil).
@@ -764,6 +809,7 @@ func (w *WorkspaceService) persistConfig() {
 		WorkspacePath:    w.workspacePath,
 		ActiveEnvPath:    w.activeEnvPath,
 		RecentWorkspaces: w.recentWorkspaces,
+		WorkspaceEnvs:    w.workspaceEnvs,
 	})
 }
 
@@ -806,7 +852,7 @@ func (w *WorkspaceService) OpenWorkspaceByPath(path string) (string, error) {
 	if !fi.IsDir() {
 		return "", fmt.Errorf("path is not a directory: %s", path)
 	}
-	w.workspacePath = path
+	w.enterWorkspace(path)
 	w.addRecentWorkspace(path)
 	w.persistConfig()
 	w.syncTitle()
@@ -1020,7 +1066,7 @@ func (w *WorkspaceService) NewWorkspace() (string, error) {
 			log.Printf("creating example workspace: %v", err)
 		}
 	}
-	w.workspacePath = dir
+	w.enterWorkspace(dir)
 	w.addRecentWorkspace(dir)
 	w.persistConfig()
 	w.syncTitle()

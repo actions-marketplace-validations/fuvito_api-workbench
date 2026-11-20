@@ -667,3 +667,7 @@ Do not implement or stub any of these without explicit user direction.
 
 - **Behaviour change (owner request):** the app no longer reopens the last workspace or active environment on start or restart; it opens on the landing page. The last workspaces stay in the Recent list only.
 - **No residue:** at startup stale `clrsig-demo-*` and `clrsig-conformance-*` temp workspaces (left by a crash or kill) are deleted; temp workspaces are never added to the Recent list, and Recent entries for folders that no longer exist are dropped. Tests: `TestWorkspaceConfig_StartsOnLandingPage`, `TestWorkspaceConfig_TempWorkspacesLeaveNoResidue`.
+
+### 2026-11-20 — Environment remembered per workspace
+
+- The selected environment is stored per workspace (`workspaceEnvs` in `~/.clrsig/config.json`, path relative to the workspace, including "no environment") and restored when that workspace is opened (`enterWorkspace`); a workspace no longer inherits the previous one's environment. Temporary demo and conformance workspaces are not remembered. File → Close Workspace (already present) returns to the landing page. Test: `TestWorkspaceEnvironment_RememberedPerWorkspace`. Dashboard and open/close reminders: backlog B-055.

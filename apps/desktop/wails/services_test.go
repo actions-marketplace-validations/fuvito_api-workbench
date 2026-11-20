@@ -319,3 +319,38 @@ func TestOpenWorkspaceDirect_SelectsLocalEnvironment(t *testing.T) {
 		t.Errorf("workspace=%q env=%+v", ws.GetWorkspacePath(), ws.GetActiveEnvironment())
 	}
 }
+
+func TestWorkspaceEnvironment_RememberedPerWorkspace(t *testing.T) {
+	isolateHome(t)
+	a, b := t.TempDir(), t.TempDir()
+	for _, d := range []string{a, b} {
+		os.MkdirAll(filepath.Join(d, "environments"), 0o755)
+	}
+	ws := NewWorkspaceService()
+	ws.OpenWorkspaceByPath(a)
+	envA, err := ws.SaveEnvironment(EnvironmentIO{Name: "Staging", Variables: []EnvironmentVariableIO{{Name: "h", Value: "1"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.SelectEnvironment(envA.Path); err != nil {
+		t.Fatal(err)
+	}
+
+	ws.OpenWorkspaceByPath(b)
+	if ws.GetActiveEnvironment() != nil {
+		t.Error("another workspace must not inherit the previous environment")
+	}
+
+	restarted := NewWorkspaceService()
+	restarted.OpenWorkspaceByPath(a)
+	if env := restarted.GetActiveEnvironment(); env == nil || env.Name != "Staging" || restarted.ActiveEnvironment() == nil {
+		t.Errorf("workspace A should come back with its environment: %+v", env)
+	}
+
+	restarted.SelectEnvironment("")
+	again := NewWorkspaceService()
+	again.OpenWorkspaceByPath(a)
+	if again.GetActiveEnvironment() != nil {
+		t.Error("choosing no environment should be remembered too")
+	}
+}
