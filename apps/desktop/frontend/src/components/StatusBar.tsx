@@ -1,5 +1,5 @@
 import { Pencil, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, shortenPath } from '@/lib/utils'
 import type { EnvInfo } from '@/lib/bridge'
 
 type StatusBarProps = {
@@ -12,13 +12,6 @@ type StatusBarProps = {
   onEnvChange: (path: string) => void
   onEditEnv: () => void
   onStopDemo: () => void
-}
-
-const MAX_PATH_CHARS = 100
-
-// Long paths lose their start, not their end: the file name is the part that matters.
-export function shortenPath(path: string, max = MAX_PATH_CHARS): string {
-  return path.length <= max ? path : '…' + path.slice(path.length - (max - 1))
 }
 
 export function StatusBar({

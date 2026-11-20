@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { StatusBar, shortenPath } from './StatusBar'
+import { StatusBar } from './StatusBar'
+import { shortenPath } from '@/lib/utils'
 
 const envs = [{ name: 'local', path: '/e/local.yaml' }, { name: 'prod', path: '/e/prod.yaml' }]
 
