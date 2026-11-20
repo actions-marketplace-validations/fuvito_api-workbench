@@ -24,7 +24,7 @@ func finishEnvironment(cmd *cobra.Command, env *domain.Environment, vars []strin
 		env = overridden
 	}
 	for _, ref := range variables.MissingEnv(env) {
-		fmt.Fprintf(cmd.ErrOrStderr(), "warning: environment variable %s is not set (the environment variable %q refers to it as ${%s})\n", ref.Name, ref.Var, ref.Name)
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", ref.Message())
 	}
 	return env, nil
 }

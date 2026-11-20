@@ -156,7 +156,7 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         recordCoverage: recordCoverage && !filtered,
       }))
     } catch (e) {
-      setOutput({ error: String(e), specTitle: '', baseUrl, writes: allowWrites, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [] })
+      setOutput({ error: String(e), specTitle: '', baseUrl, writes: allowWrites, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] })
     } finally {
       setRunning(false)
     }
@@ -301,6 +301,12 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         </div>
 
         {output?.error && <p role="alert" className="text-xs text-red-400">{output.error}</p>}
+
+        {output && output.warnings?.length > 0 && (
+          <ul aria-label="Environment warnings" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
+            {output.warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        )}
 
         {output && !output.error && (
           <section aria-label="Conformance results" className="flex flex-col gap-3">

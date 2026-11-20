@@ -1,6 +1,7 @@
 package variables
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"sort"
@@ -35,6 +36,11 @@ func ExpandEnv(s string) string {
 type EnvRef struct {
 	Name string // the process environment variable, for example API_TOKEN
 	Var  string // the environment-file variable that refers to it, for example token
+}
+
+// Message is the sentence the CLI and the desktop show for an unset reference.
+func (r EnvRef) Message() string {
+	return fmt.Sprintf("environment variable %s is not set (the environment variable %q refers to it as ${%s})", r.Name, r.Var, r.Name)
 }
 
 // MissingEnv lists the ${NAME} references in env whose process environment variable is not set.

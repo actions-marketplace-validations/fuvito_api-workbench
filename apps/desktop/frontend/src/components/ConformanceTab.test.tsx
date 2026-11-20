@@ -17,7 +17,7 @@ const ctx = { workspace: '/ws', specs: [{ path: '/ws/api.yaml', label: 'api.yaml
 const info = { title: 'Shop', version: '1', serverUrl: 'http://localhost:8120', reads: 5, writes: 2 }
 const output = {
   specTitle: 'Shop', baseUrl: 'http://localhost:8120', writes: false, durationMs: 12, total: 7,
-  covered: 5, notCovered: 2, passing: 4, failing: 1, probes: [],
+  covered: 5, notCovered: 2, passing: 4, failing: 1, probes: [], warnings: [],
   operations: [
     { operationId: 'a', method: 'GET', path: '/ok', status: 'passed', statusCode: 200, durationMs: 3, violations: [] },
     { operationId: 'b', method: 'GET', path: '/bad', status: 'failed', statusCode: 200, durationMs: 4, violations: ['price: expected number'] },
@@ -143,6 +143,13 @@ describe('ConformanceTab options and export', () => {
     expect(screen.getByText(/1 rejected as they should be/)).toBeInTheDocument()
     expect(screen.getByText(/1 accepted by the server/)).toBeInTheDocument()
     expect(screen.getByTestId('conform-coverage-note')).toHaveTextContent('Added to coverage as api.yaml.')
+  })
+
+  it('shows environment warnings above the results', async () => {
+    bridge.runConformance.mockResolvedValue({ ...output, warnings: ['environment variable API_TOKEN is not set (the environment variable "token" refers to it as ${API_TOKEN})'] })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByRole('list', { name: 'Environment warnings' })).toHaveTextContent('API_TOKEN is not set')
   })
 
   it('saves a non-HTML export through the file dialog and shows export errors', async () => {

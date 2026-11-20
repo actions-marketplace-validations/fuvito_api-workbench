@@ -563,3 +563,9 @@ Do not implement or stub any of these without explicit user direction.
 - **Help → Dev Servers → Open Conformance Workspace** (`ConformanceServerService.OpenWorkspace`) starts the server and opens a temporary workspace (`clrsig-conformance-*`) with `specs/conformance-openapi.yaml` and an active `environments/local.yaml` (`id`, `name`, `baseUrl`), so the Check Conformance page runs with no setup; the Go test runs the page's service inside it and gets exactly the three known violations. Stopping the server (menu or status chip) removes the workspace, reopens the previous one and closes the tabs that belonged to it.
 - **Guard:** only one temporary workspace at a time; each of the two Dev Servers refuses to open its workspace while the other's is open (the swap and restore are not nestable). The plain Start/Stop of the Conformance Server still opens no workspace.
 - `lib/tabState.withoutTabsIn` is the shared "close the tabs of a temporary workspace" helper, now used by the Demo Server stop as well.
+
+### 2026-11-19 — Check Conformance: unset `${NAME}` warnings
+
+- **Correction:** the earlier note that the page lacked CLI parity for environment functions was wrong for `conform`: the CLI does not pre-generate environment functions for it (only scenario runs do, via `ResolveEnvironment`); `conform` applies `--var` overrides and warns about unset `${NAME}` references. The page already behaves the same for functions (the resolver generates them at each use).
+- **The real gap, now closed:** the page left an unset `${NAME}` as written without saying so, so requests failed for the wrong reason. `variables.EnvRef.Message()` (shared with the CLI's warning text, unchanged) feeds `ConformRunOutputIO.Warnings`, shown above the results. Test: `TestConformanceService_WarnsAboutUnsetEnvironmentReferences`; the CLI warning tests pass unchanged.
+- **Still not offered on the page:** `--var` overrides.

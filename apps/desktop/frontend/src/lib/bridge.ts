@@ -782,6 +782,7 @@ export interface ConformRunOutput {
   passing: number
   failing: number
   probes: ConformProbe[]
+  warnings: string[]
   coverageNote?: string
 }
 

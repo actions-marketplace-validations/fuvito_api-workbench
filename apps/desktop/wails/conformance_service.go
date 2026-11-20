@@ -15,6 +15,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
+	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
 // ConformanceService backs the Check conformance page. It is a thin wrapper over
@@ -158,6 +159,9 @@ type ConformRunOutputIO struct {
 	// Probes is empty unless negative probes were requested. An accepted probe means the server
 	// took a request it should have rejected.
 	Probes []ConformProbeIO `json:"probes"`
+	// Warnings are unset ${NAME} references in the environment: those values stay as written in
+	// the requests, which usually makes them fail for the wrong reason.
+	Warnings []string `json:"warnings"`
 	// CoverageNote says what happened to RecordCoverage: recorded under which spec name, or why not.
 	CoverageNote string `json:"coverageNote,omitempty"`
 }
@@ -234,6 +238,9 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	s.mu.Unlock()
 
 	res := conformOutputIO(out, baseURL, in.AllowWrites)
+	for _, ref := range variables.MissingEnv(env) {
+		res.Warnings = append(res.Warnings, ref.Message())
+	}
 	if in.RecordCoverage {
 		res.CoverageNote = s.recordCoverage(in, spec, baseURL, out)
 	}
@@ -328,6 +335,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		DurationMs: r.Duration.Milliseconds(),
 		Operations: []ConformOperationIO{},
 		Probes:     []ConformProbeIO{},
+		Warnings:   []string{},
 		Total:      len(r.Operations),
 	}
 	for _, op := range r.Operations {

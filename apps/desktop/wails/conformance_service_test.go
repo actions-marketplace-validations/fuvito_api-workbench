@@ -215,3 +215,20 @@ func TestScenarioSpecRef_ReusesTheNameAScenarioUses(t *testing.T) {
 		t.Fatalf("a spec no scenario uses must give \"\", got %q", got)
 	}
 }
+
+func TestConformanceService_WarnsAboutUnsetEnvironmentReferences(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	envPath := filepath.Join(t.TempDir(), "env.yaml")
+	env := "schemaVersion: \"1\"\nname: e\nvariables:\n  - name: id\n    value: \"1\"\n  - name: token\n    value: \"${CS_SURELY_UNSET_VAR}\"\n"
+	if err := os.WriteFile(envPath, []byte(env), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := svc.RunConformance(ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: envPath})
+	if len(out.Warnings) != 1 || !strings.Contains(out.Warnings[0], "CS_SURELY_UNSET_VAR") || !strings.Contains(out.Warnings[0], `"token"`) {
+		t.Fatalf("warnings = %v", out.Warnings)
+	}
+	if clean := svc.RunConformance(ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)}); len(clean.Warnings) != 0 {
+		t.Fatalf("no warning expected: %v", clean.Warnings)
+	}
+}
