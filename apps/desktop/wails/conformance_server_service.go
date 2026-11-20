@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
+
+const conformanceWorkspacePrefix = "clrsig-conformance-"
 
 // ConformanceServerService runs the deliberately imperfect Conformance Server.
 // Unlike the demo it opens no workspace: it only listens on a local port.
@@ -16,16 +21,24 @@ type ConformanceServerService struct {
 	server *http.Server
 	port   int
 	portFn func() int // configured port from Settings; nil or 0 = automatic
+
+	// Set while OpenWorkspace has swapped the open workspace for a temporary one.
+	ws            *WorkspaceService
+	tempDir       string
+	prevWorkspace string
+	prevEnvPath   string
 }
 
-func NewConformanceServerService() *ConformanceServerService {
-	return &ConformanceServerService{}
+func NewConformanceServerService(ws *WorkspaceService) *ConformanceServerService {
+	return &ConformanceServerService{ws: ws}
 }
 
 // ConformanceServerResult is returned to the frontend by Start.
 type ConformanceServerResult struct {
-	Port  int    `json:"port"`
-	Error string `json:"error,omitempty"`
+	Port int `json:"port"`
+	// WorkspacePath is set by OpenWorkspace: the temporary workspace that was opened.
+	WorkspacePath string `json:"workspacePath,omitempty"`
+	Error         string `json:"error,omitempty"`
 }
 
 func (c *ConformanceServerService) IsRunning() bool {
@@ -43,6 +56,10 @@ func (c *ConformanceServerService) GetPort() int {
 func (c *ConformanceServerService) Start() ConformanceServerResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.startLocked()
+}
+
+func (c *ConformanceServerService) startLocked() ConformanceServerResult {
 	if c.server != nil {
 		return ConformanceServerResult{Port: c.port}
 	}
@@ -72,13 +89,85 @@ func (c *ConformanceServerService) Start() ConformanceServerResult {
 func (c *ConformanceServerService) Stop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.server == nil {
+	if c.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		c.server.Shutdown(ctx) //nolint:errcheck
+		c.server, c.port = nil, 0
+	}
+	c.restoreWorkspaceLocked()
+}
+
+// OpenWorkspace starts the server (if it is not running) and opens a temporary workspace with its
+// spec and a local environment, so the Check Conformance page works in one click. Stop removes the
+// workspace and reopens the previous one.
+func (c *ConformanceServerService) OpenWorkspace() ConformanceServerResult {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.tempDir != "" {
+		return ConformanceServerResult{Port: c.port, WorkspacePath: c.tempDir}
+	}
+	if c.ws != nil && strings.HasPrefix(filepath.Base(c.ws.workspacePath), demoWorkspacePrefix) {
+		return ConformanceServerResult{Error: "stop the Demo Server first: its workspace is open"}
+	}
+	res := c.startLocked()
+	if res.Error != "" {
+		return res
+	}
+	dir, err := os.MkdirTemp("", conformanceWorkspacePrefix+"*")
+	if err != nil {
+		return ConformanceServerResult{Port: res.Port, Error: "could not create the workspace: " + err.Error()}
+	}
+	if err := writeConformanceWorkspace(dir, res.Port); err != nil {
+		os.RemoveAll(dir)
+		return ConformanceServerResult{Port: res.Port, Error: "could not create the workspace: " + err.Error()}
+	}
+	if c.ws != nil {
+		c.prevWorkspace, c.prevEnvPath = c.ws.workspacePath, c.ws.activeEnvPath
+		c.ws.openWorkspaceDirect(dir)
+	}
+	c.tempDir = dir
+	return ConformanceServerResult{Port: res.Port, WorkspacePath: dir}
+}
+
+func (c *ConformanceServerService) restoreWorkspaceLocked() {
+	if c.tempDir == "" {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	c.server.Shutdown(ctx) //nolint:errcheck
-	c.server, c.port = nil, 0
+	os.RemoveAll(c.tempDir)
+	c.tempDir = ""
+	if c.ws == nil {
+		return
+	}
+	c.ws.workspacePath = c.prevWorkspace
+	c.ws.activeEnvPath = c.prevEnvPath
+	c.ws.activeEnv = nil
+	if c.prevEnvPath != "" {
+		if env, err := c.ws.loadEnvFile(c.prevEnvPath); err == nil {
+			c.ws.activeEnv = env
+		}
+	}
+	c.ws.syncTitle()
+	c.prevWorkspace, c.prevEnvPath = "", ""
+}
+
+// writeConformanceWorkspace lays out the temporary workspace: the spec, and a local environment
+// that sets the base URL and the values the generated requests use as placeholders.
+func writeConformanceWorkspace(dir string, port int) error {
+	for _, sub := range []string{"specs", "environments"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			return err
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "specs", "conformance-openapi.yaml"), conformanceOpenAPIYAML, 0o644); err != nil {
+		return err
+	}
+	env := strings.Replace(string(conformanceEnvironmentYAML), "name: conformance-server", "name: local", 1) +
+		fmt.Sprintf("  - name: baseUrl\n    value: \"http://localhost:%d\"\n", port)
+	if err := os.WriteFile(filepath.Join(dir, "environments", "local.yaml"), []byte(env), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "environments", ".gitignore"), []byte("*\n"), 0o644)
 }
 
 // OpenSpecInBrowser opens the Swagger UI page; a non-empty string is an error.

@@ -93,6 +93,7 @@ import {
 import {
   Start as WailsStartConformanceServer,
   Stop as WailsStopConformanceServer,
+  OpenWorkspace as WailsOpenConformanceWorkspace,
   OpenSpecInBrowser as WailsOpenConformanceSpec,
 } from '@wailsjs/go/main/ConformanceServerService'
 import {
@@ -810,11 +811,17 @@ export async function exportConformReport(format: ConformReportFormat): Promise<
 
 export interface ConformanceServerResult {
   port: number
+  workspacePath?: string
   error?: string
 }
 
 export async function startConformanceServer(): Promise<ConformanceServerResult> {
   const result = await WailsStartConformanceServer()
+  return result as unknown as ConformanceServerResult
+}
+
+export async function openConformanceWorkspace(): Promise<ConformanceServerResult> {
+  const result = await WailsOpenConformanceWorkspace()
   return result as unknown as ConformanceServerResult
 }
 

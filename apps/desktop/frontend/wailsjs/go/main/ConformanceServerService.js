@@ -14,6 +14,10 @@ export function OpenSpecInBrowser() {
   return window['go']['main']['ConformanceServerService']['OpenSpecInBrowser']();
 }
 
+export function OpenWorkspace() {
+  return window['go']['main']['ConformanceServerService']['OpenWorkspace']();
+}
+
 export function Start() {
   return window['go']['main']['ConformanceServerService']['Start']();
 }

@@ -62,6 +62,7 @@ import {
   startConformanceServer,
   stopConformanceServer,
   openConformanceSpec,
+  openConformanceWorkspace,
   pickFile,
   quitApp,
   renameScenario,
@@ -83,7 +84,7 @@ import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
 import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
 import {serializeScenarioToYAML} from '@/components/scenario-yaml'
-import {isTabDirty, isPageTab} from '@/lib/tabState'
+import {isTabDirty, isPageTab, withoutTabsIn} from '@/lib/tabState'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
@@ -116,14 +117,31 @@ export default function App() {
   })
 
   const [conformancePort, setConformancePort] = useState(0)
+  const [conformanceWorkspace, setConformanceWorkspace] = useState('')
   async function handleStartConformanceServer() {
     const result = await startConformanceServer()
     if (result.error) { setAppError(result.error); return }
     setConformancePort(result.port)
   }
+  async function handleOpenConformanceWorkspace() {
+    const result = await openConformanceWorkspace()
+    if (result.error) { setAppError(result.error); return }
+    setConformancePort(result.port)
+    setConformanceWorkspace(result.workspacePath ?? '')
+    await workspace.refreshWorkspace()
+    switchToExplorer()
+    tabs.openConformanceTab()
+  }
   async function handleStopConformanceServer() {
+    const port = conformancePort
+    const wsPath = conformanceWorkspace
     await stopConformanceServer()
     setConformancePort(0)
+    setConformanceWorkspace('')
+    if (wsPath) {
+      tabs.setTabsState(prev => withoutTabsIn(prev, port > 0 ? `http://localhost:${port}` : null, wsPath))
+      await workspace.refreshWorkspace()
+    }
   }
 
   // Wire cross-dependency after both hooks are initialized
@@ -754,6 +772,15 @@ export default function App() {
             label: conformancePort > 0 ? 'Stop Conformance Server' : 'Start Conformance Server',
             title: 'A deliberately imperfect API (three operations break its spec) for trying Spec Conformance Testing',
             onClick: conformancePort > 0 ? handleStopConformanceServer : handleStartConformanceServer,
+          },
+          {
+            kind: 'action',
+            label: conformanceWorkspace ? 'Conformance Workspace is open' : 'Open Conformance Workspace',
+            disabled: !!conformanceWorkspace || demo.demoRunning,
+            title: demo.demoRunning
+              ? 'Stop the Demo Server first: its workspace is open'
+              : 'Start the Conformance Server and open a workspace with its spec and a local environment',
+            onClick: () => requestWorkspaceSwitch(handleOpenConformanceWorkspace),
           },
           {
             kind: 'action',

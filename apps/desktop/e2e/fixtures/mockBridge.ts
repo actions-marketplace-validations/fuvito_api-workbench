@@ -217,6 +217,7 @@ export function setupMockBridge() {
       },
       ConformanceServerService: {
         Start: () => Promise.resolve({ port: 8120, error: '' }),
+        OpenWorkspace: () => Promise.resolve({ port: 8120, workspacePath: '', error: '' }),
         Stop: noop,
         IsRunning: () => Promise.resolve(false),
         GetPort: () => Promise.resolve(0),

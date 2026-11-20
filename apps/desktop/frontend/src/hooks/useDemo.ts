@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { startDemo, stopDemo } from '@/lib/bridge'
 import type { FileNode } from '@/lib/bridge'
-import { createBlankTab } from '@/lib/tabState'
+import { withoutTabsIn } from '@/lib/tabState'
 import type { TabState } from '@/lib/tabState'
 
 type TabsStateTuple = { tabs: TabState[]; activeTabId: string }
@@ -52,29 +52,7 @@ export function useDemo(deps: {
       setDemoRunning(false)
       setDemoPort(0)
       setDemoWorkspacePath('')
-      setTabsState(prev => {
-        const urlPrefix = port > 0 ? `http://localhost:${port}` : null
-        const normWs = wsPath ? wsPath.replace(/\\/g, '/') : null
-        const isDemoTab = (t: TabState): boolean => {
-          if (urlPrefix && t.url.startsWith(urlPrefix)) return true
-          const fp = (t.filePath ?? '').replace(/\\/g, '/')
-          if (normWs && fp.startsWith(normWs)) return true
-          const sp = (t.scenarioPath ?? '').replace(/\\/g, '/')
-          if (normWs && sp.startsWith(normWs)) return true
-          return false
-        }
-        const remaining = prev.tabs.filter(t => !isDemoTab(t))
-        if (remaining.length === prev.tabs.length) return prev
-        if (remaining.length === 0) {
-          const blank = createBlankTab()
-          return { tabs: [blank], activeTabId: blank.id }
-        }
-        const activeStillOpen = remaining.some(t => t.id === prev.activeTabId)
-        return {
-          tabs: remaining,
-          activeTabId: activeStillOpen ? prev.activeTabId : remaining[remaining.length - 1].id,
-        }
-      })
+      setTabsState(prev => withoutTabsIn(prev, port > 0 ? `http://localhost:${port}` : null, wsPath))
       await refreshWorkspace()
     } catch (err) {
       console.error('demo stop error:', err)

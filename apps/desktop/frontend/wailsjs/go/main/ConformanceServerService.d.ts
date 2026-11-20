@@ -8,6 +8,8 @@ export function IsRunning():Promise<boolean>;
 
 export function OpenSpecInBrowser():Promise<string>;
 
+export function OpenWorkspace():Promise<main.ConformanceServerResult>;
+
 export function Start():Promise<main.ConformanceServerResult>;
 
 export function Stop():Promise<void>;

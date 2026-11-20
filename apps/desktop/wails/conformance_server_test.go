@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -97,7 +99,7 @@ func TestConformanceServerStartUsesTheConfiguredPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := NewConformanceServerService()
+	svc := NewConformanceServerService(nil)
 	svc.portFn = func() int { return free }
 	res := svc.Start()
 	defer svc.Stop()
@@ -105,7 +107,7 @@ func TestConformanceServerStartUsesTheConfiguredPort(t *testing.T) {
 		t.Fatalf("start: %+v, want port %d", res, free)
 	}
 
-	other := NewConformanceServerService()
+	other := NewConformanceServerService(nil)
 	other.portFn = func() int { return free }
 	if res := other.Start(); res.Error == "" || res.Port != 0 {
 		t.Fatalf("a taken configured port must fail: %+v", res)
@@ -127,5 +129,77 @@ func TestConformanceServerServesItsSpecAndEnvironment(t *testing.T) {
 		if code != 200 || !strings.Contains(body, want) {
 			t.Errorf("%s: %d, missing %q", path, code, want)
 		}
+	}
+}
+
+func TestConformanceOpenWorkspace_OpensAndRestores(t *testing.T) {
+	isolateHome(t)
+	ws := NewWorkspaceService()
+	previous := t.TempDir()
+	ws.workspacePath = previous
+	svc := NewConformanceServerService(ws)
+	svc.portFn = func() int { return 0 }
+
+	res := svc.OpenWorkspace()
+	if res.Error != "" || res.WorkspacePath == "" || res.Port == 0 {
+		t.Fatalf("open: %+v", res)
+	}
+	if ws.workspacePath != res.WorkspacePath {
+		t.Fatalf("workspace = %q, want the temporary one %q", ws.workspacePath, res.WorkspacePath)
+	}
+	spec := filepath.Join(res.WorkspacePath, "specs", "conformance-openapi.yaml")
+	if _, err := os.Stat(spec); err != nil {
+		t.Fatalf("spec missing: %v", err)
+	}
+	if ws.activeEnv == nil {
+		t.Fatal("the local environment should be active")
+	}
+	vars := map[string]string{}
+	for _, v := range ws.activeEnv.Variables {
+		vars[v.Name] = v.Value
+	}
+	if vars["id"] != "1" || vars["name"] != "Lamp" || vars["baseUrl"] != fmt.Sprintf("http://localhost:%d", res.Port) {
+		t.Fatalf("environment variables: %v", vars)
+	}
+
+	// Calling it again is harmless and keeps the same workspace.
+	if again := svc.OpenWorkspace(); again.WorkspacePath != res.WorkspacePath || again.Port != res.Port {
+		t.Fatalf("second open: %+v", again)
+	}
+
+	// The page works against it with no further setup: exactly the three known violations.
+	out := NewConformanceService(ws, NewSettingsService()).RunConformance(ConformRunInput{
+		SpecPath: spec, BaseURL: fmt.Sprintf("http://localhost:%d", res.Port),
+	})
+	if out.Error != "" || out.Failing != len(conformanceKnownViolations) || out.Passing != 2 {
+		t.Fatalf("run in the opened workspace: %+v", out)
+	}
+
+	svc.Stop()
+	if ws.workspacePath != previous {
+		t.Fatalf("workspace = %q, want the previous %q", ws.workspacePath, previous)
+	}
+	if _, err := os.Stat(res.WorkspacePath); !os.IsNotExist(err) {
+		t.Fatalf("the temporary workspace should be removed: %v", err)
+	}
+	if svc.IsRunning() {
+		t.Fatal("the server should be stopped")
+	}
+}
+
+func TestConformanceOpenWorkspace_RefusedWhileDemoWorkspaceIsOpen(t *testing.T) {
+	isolateHome(t)
+	ws := NewWorkspaceService()
+	ws.workspacePath = filepath.Join(t.TempDir(), demoWorkspacePrefix+"123")
+	svc := NewConformanceServerService(ws)
+	defer svc.Stop()
+	if res := svc.OpenWorkspace(); !strings.Contains(res.Error, "Demo Server") || svc.IsRunning() {
+		t.Fatalf("must refuse and not start: %+v", res)
+	}
+
+	ws.workspacePath = filepath.Join(t.TempDir(), conformanceWorkspacePrefix+"123")
+	demo := NewDemoService(ws)
+	if res := demo.StartDemo(); !strings.Contains(res.Error, "Conformance Server") {
+		t.Fatalf("the demo must refuse while the conformance workspace is open: %+v", res)
 	}
 }

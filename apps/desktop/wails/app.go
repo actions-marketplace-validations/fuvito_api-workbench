@@ -30,7 +30,7 @@ func NewApp() *App {
 	ss.onSave = rs.RebuildExecutor // rebuild HTTP client whenever settings are saved
 	demo := NewDemoService(ws)
 	demo.portFn = func() int { return ss.GetSettings().DemoServerPort }
-	conf := NewConformanceServerService()
+	conf := NewConformanceServerService(ws)
 	conf.portFn = func() int { return ss.GetSettings().ConformanceServerPort }
 	return &App{
 		workspaceService:  ws,

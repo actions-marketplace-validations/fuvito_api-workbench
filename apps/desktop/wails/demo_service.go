@@ -14,6 +14,9 @@ import (
 	"time"
 )
 
+// demoWorkspacePrefix names the temporary workspace the Demo Server opens.
+const demoWorkspacePrefix = "clrsig-demo-"
+
 //go:embed demo_workspace
 var demoWorkspaceFS embed.FS
 
@@ -91,6 +94,10 @@ func (d *DemoService) StartDemo() DemoResult {
 
 	if d.server != nil {
 		return DemoResult{WorkspacePath: d.tempDir, Port: d.port}
+	}
+
+	if strings.HasPrefix(filepath.Base(d.ws.workspacePath), conformanceWorkspacePrefix) {
+		return DemoResult{Error: "stop the Conformance Server first: its workspace is open"}
 	}
 
 	cleanupStaleDemoTempDirs("")
