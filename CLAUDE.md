@@ -520,3 +520,9 @@ Do not implement or stub any of these without explicit user direction.
 - **Menu:** Help → **Dev Servers** holds the Demo Server and Conformance Server entries; status bar shows a `Conformance :port` chip.
 - **Finding (not changed):** the response validator ignores a wrong `Content-Type` and missing response headers.
 - **Not yet:** the Conformance page itself (phase 2) and the `conform` extraction (phase 1.5).
+
+### 2026-11-19 — Spec conformance signal on scenario runs (phase 1 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **Core:** `scenario.StepResult.Spec` (`SpecCheck`: `matched`, `violations` or `not-checked` with a reason: validation turned off, no matching operation in the spec, step did not complete) and `openapi.Spec.HasOperation`. Failed-assertion behaviour is unchanged. Tests cover every state and the no-spec case.
+- **Desktop:** `StepResultIO` gains `specState`, `specReason`, `specViolations` (additive); the Setup row's Result tab shows `N of M responses match <spec>`, violations per step and the not-checked steps (`SpecConformance` component). No file format change.
+- **Not yet:** the conformance line in the scenario header chip, user guide text and screenshots.

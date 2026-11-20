@@ -129,6 +129,22 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 	return nil
 }
 
+// HasOperation reports whether the spec declares an operation for method and path, so a caller
+// can tell "matches the spec" apart from "nothing to check" (ValidateResponseByPath returns no
+// violations in both cases).
+func (s *Spec) HasOperation(method, path string) bool {
+	router, err := gorillamux.NewRouter(s.doc)
+	if err != nil {
+		return false
+	}
+	httpReq, err := http.NewRequest(method, path, nil)
+	if err != nil {
+		return false
+	}
+	_, _, err = router.FindRoute(httpReq)
+	return err == nil
+}
+
 // ValidateRequest checks that req conforms to the spec's declared request schema
 // for the matching operation. Returns nil if valid or if the path is not in the spec.
 func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {

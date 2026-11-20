@@ -121,6 +121,11 @@ type StepResultIO struct {
 	RequestURL     string     `json:"requestUrl,omitempty"`
 	RequestHeaders []HeaderIO `json:"requestHeaders,omitempty"`
 	RequestBody    string     `json:"requestBody,omitempty"`
+	// Spec conformance: empty when the scenario has no spec; otherwise matched, violations or
+	// not-checked (with the reason).
+	SpecState      string   `json:"specState,omitempty"`
+	SpecReason     string   `json:"specReason,omitempty"`
+	SpecViolations []string `json:"specViolations,omitempty"`
 }
 
 type CoverageIO struct {
@@ -891,6 +896,10 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		}
 		if sr.Attempts > 1 {
 			step.Attempts = sr.Attempts
+		}
+		step.SpecState, step.SpecReason = string(sr.Spec.State), sr.Spec.Reason
+		for _, v := range sr.Spec.Violations {
+			step.SpecViolations = append(step.SpecViolations, v.Error())
 		}
 		if sr.Request != nil {
 			step.RequestMethod, step.RequestURL, step.RequestHeaders, step.RequestBody = exchangeRequest(sr.Request, result.Secrets)

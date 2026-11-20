@@ -3,6 +3,7 @@ import { ScenarioMetaSection } from './ScenarioMetaSection'
 import { ScenarioVariablesSection } from './ScenarioVariablesSection'
 import { ScenarioRunInfo } from './ScenarioRunInfo'
 import { CoverageBanner } from './ScenarioCoverageBanner'
+import { SpecConformance } from './SpecConformance'
 import type { ScenarioDetail, ScenarioResult, ScenarioVariable, AccumulatedCoverage } from '@/lib/bridge'
 
 export type SetupTab = 'definition' | 'result'
@@ -75,12 +76,13 @@ export function ScenarioSetupPane({
               </div>
             )}
             {result && <ScenarioRunInfo result={result} />}
+            {result && <SpecConformance steps={result.steps} specFile={detail.specFile} />}
             <CoverageBanner
               coverage={result?.coverage}
               accumulated={accumulatedCoverage ?? undefined}
               onReset={onResetCoverage}
             />
-            {!result?.specError && !result?.error && !result?.seed && !(result?.variables ?? []).length && !hasCoverage && (
+            {!result?.specError && !result?.error && !result?.seed && !(result?.variables ?? []).length && !hasCoverage && !result?.steps.some(s => s.specState) && (
               <p className="px-4 py-3 text-xs text-[var(--color-muted-foreground)]">Nothing was generated or reported for this run.</p>
             )}
           </>

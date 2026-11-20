@@ -861,6 +861,10 @@ export interface StepResult {
   requestUrl?: string
   requestHeaders?: Array<{ name: string; value: string }>
   requestBody?: string
+  // spec conformance (absent when the scenario has no spec)
+  specState?: 'matched' | 'violations' | 'not-checked'
+  specReason?: string
+  specViolations?: string[]
 }
 
 export interface ScenarioCoverage {
