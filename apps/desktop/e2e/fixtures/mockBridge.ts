@@ -229,7 +229,13 @@ export function setupMockBridge() {
           const empty = { specTitle: '', baseUrl: input.baseUrl, writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] }
           if (!local && !input.confirmedRemote) return Promise.resolve({ ...empty, error: 'confirm the base URL ' + input.baseUrl + ' before running: it is not on this computer' })
           const op = (operationId: string, method: string, path: string, status: string, statusCode: number, violations: string[] = []) =>
-            ({ operationId, method, path, status, statusCode, durationMs: 4, violations })
+            ({
+              operationId, method, path, status, statusCode, durationMs: 4, violations,
+              findings: violations.map(v => ({
+                kind: 'wrong-type', where: 'price', summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+                why: 'The server sent text ("9.99") where the spec declares a number.', fix: 'Send a number from the server, or change the spec.', detail: v,
+              })),
+            })
           const operations = [
             op('listItems', 'GET', '/items', 'passed', 200),
             op('getItem', 'GET', '/items/{{id}}', 'failed', 200, ['Error at "/price": value must be a number']),

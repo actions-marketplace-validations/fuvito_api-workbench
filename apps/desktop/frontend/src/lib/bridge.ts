@@ -758,6 +758,17 @@ export interface ConformProbe {
   error?: string
 }
 
+export interface ConformFinding {
+  kind: 'missing-field' | 'wrong-type' | 'request' | 'no-response' | 'other'
+  where?: string
+  summary: string
+  expected?: string
+  got?: string
+  why: string
+  fix: string
+  detail?: string
+}
+
 export interface ConformOperation {
   operationId: string
   method: string
@@ -767,6 +778,8 @@ export interface ConformOperation {
   durationMs: number
   violations: string[]
   error?: string
+  // plain-language explanation of each violation (absent in older data)
+  findings?: ConformFinding[]
 }
 
 export interface ConformRunOutput {

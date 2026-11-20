@@ -123,7 +123,7 @@ Spec Conformance Testing does not need a terminal. The **Check Conformance** pag
 
 **Safe by default.** Only read requests (`GET`, `HEAD`) are sent. Writes are an explicit tick box that first says how many write requests it will send, and an address that is not on your computer needs a confirmation before anything is sent.
 
-**Same four totals as Contracts.** *Covered*, *Not covered*, *Passing* and *Failing*, then each operation with the exact field that broke the spec. Options add tag and path filters, a request timeout, negative probes, and stop-on-first-failure. **Export report** saves HTML, JUnit, JSON or Markdown, and **Get CLI command** hands you the matching `clrsig conform` line for CI.
+**Failures first, with the reason.** The four totals (*Covered*, *Not covered*, *Passing*, *Failing*, the same as Contracts) sit in a summary panel beside the report. The report opens with what broke the spec, and for each failing operation says what the spec expected, what the server sent, why that fails and what to change (for example, `"price" is text, the spec says number`). Passing operations follow, then anything that was not run. Options add tag and path filters, a request timeout, negative probes, and stop-on-first-failure. **Export report** saves HTML, JUnit, JSON or Markdown, and **Get CLI command** hands you the matching `clrsig conform` line for CI.
 
 **Scenarios report it too.** A scenario that names its spec now says how many responses matched it, and lists the violations under the step that caused them.
 

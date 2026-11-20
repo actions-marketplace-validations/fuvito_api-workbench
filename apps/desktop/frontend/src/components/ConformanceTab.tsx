@@ -5,7 +5,7 @@ import {
   getConformContext, inspectConformSpec, runConformance, cancelConformance,
   exportConformReport, saveContentToFile, openInSystemViewer,
 } from '@/lib/bridge'
-import type { ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat } from '@/lib/bridge'
+import type { ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformFinding, ConformReportFormat } from '@/lib/bridge'
 
 const inputClass =
   'w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)]'
@@ -20,13 +20,6 @@ export function isLocalUrl(raw: string): boolean {
   }
 }
 
-const STATUS_STYLE: Record<ConformOperation['status'], string> = {
-  passed: 'text-emerald-400',
-  failed: 'text-red-400',
-  error: 'text-red-400',
-  skipped: 'text-[var(--color-muted-foreground)]',
-}
-
 function Tile({ label, value, total, tone }: { label: string; value: number; total: number; tone: 'neutral' | 'good' | 'bad' | 'warn' }) {
   const active = value > 0
   const color = tone === 'neutral' || !active
@@ -34,11 +27,65 @@ function Tile({ label, value, total, tone }: { label: string; value: number; tot
     : tone === 'good' ? 'text-emerald-400' : tone === 'bad' ? 'text-red-400' : 'text-amber-400'
   const share = total > 0 ? Math.round((value / total) * 100) : 0
   return (
-    <div className="flex-1 min-w-[7rem] rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2">
+    <div className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2">
       <div className="text-[11px] text-[var(--color-muted-foreground)]">{label}</div>
       <div className={cn('text-xl font-semibold tabular-nums', color)}>{value}</div>
       <div className="text-[11px] text-[var(--color-muted-foreground)]">{share}% of {total}</div>
     </div>
+  )
+}
+
+const KIND_LABEL: Record<string, string> = {
+  'wrong-type': 'wrong type',
+  'missing-field': 'missing field',
+  'request': 'invalid request',
+  'no-response': 'no answer',
+  'other': 'other difference',
+}
+
+function isWrite(method: string): boolean {
+  const m = method.toUpperCase()
+  return m !== 'GET' && m !== 'HEAD'
+}
+
+function FindingView({ f }: { f: ConformFinding }) {
+  return (
+    <div className="rounded border border-[var(--color-border)] bg-[var(--color-background)] p-2.5">
+      <p className="text-xs font-semibold text-[var(--color-foreground)]">{f.summary}</p>
+      <dl className="mt-1.5 grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1 text-xs">
+        {f.expected && <><dt className="text-[var(--color-muted-foreground)]">Expected</dt><dd className="font-mono">{f.expected}</dd></>}
+        {f.got && <><dt className="text-[var(--color-muted-foreground)]">Got</dt><dd className="font-mono break-all">{f.got}</dd></>}
+        <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd>{f.why}</dd>
+        <dt className="text-[var(--color-muted-foreground)]">Fix</dt><dd>{f.fix}</dd>
+      </dl>
+      {f.detail && (
+        <details className="mt-1.5">
+          <summary className="cursor-pointer text-[11px] text-[var(--color-muted-foreground)]">Technical detail</summary>
+          <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--color-muted-foreground)]">{f.detail}</pre>
+        </details>
+      )}
+    </div>
+  )
+}
+
+function ProblemCard({ op }: { op: ConformOperation }) {
+  const findings = op.findings ?? []
+  return (
+    <article aria-label={`${op.method} ${op.path} fails`} className="rounded border border-red-500/40 bg-red-500/5 p-3 flex flex-col gap-2">
+      <header className="flex flex-wrap items-baseline gap-x-2 text-xs">
+        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">{op.status === 'error' ? 'NO ANSWER' : 'FAILED'}</span>
+        <span className="font-mono font-semibold">{op.method}</span>
+        <span className="font-mono">{op.path}</span>
+        {op.statusCode > 0 && <span className="text-[var(--color-muted-foreground)]">answered {op.statusCode} in {op.durationMs} ms</span>}
+      </header>
+      {findings.map((f, i) => <FindingView key={i} f={f} />)}
+      {findings.length === 0 && (
+        <ul className="list-disc pl-5 font-mono text-[11px] text-red-400">
+          {op.error && <li className="break-all">{op.error}</li>}
+          {op.violations.map((v, i) => <li key={i} className="break-all">{v}</li>)}
+        </ul>
+      )}
+    </article>
   )
 }
 
@@ -53,7 +100,7 @@ const EXPORTS: { format: ConformReportFormat; label: string; file: string }[] = 
   { format: 'markdown', label: 'Markdown', file: 'conformance.md' },
 ]
 
-function ExportMenu() {
+function ExportMenu({ disabled }: { disabled: boolean }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
 
@@ -79,12 +126,13 @@ function ExportMenu() {
       {error && <span role="alert" className="text-[11px] text-red-400 truncate max-w-[16rem]" title={error}>{error}</span>}
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+        className="flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] disabled:opacity-40 disabled:hover:bg-transparent"
       >
         <Download size={12} aria-hidden /> Export report
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[9rem] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1 text-xs">
           {EXPORTS.map(item => (
             <button key={item.format} type="button" onClick={() => run(item)} className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-muted)]">
@@ -185,7 +233,8 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5 max-w-4xl">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-y-auto p-5 flex flex-col gap-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="conf-spec" className="text-xs font-medium">Spec <span className="text-red-400">*</span></label>
@@ -309,53 +358,73 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         )}
 
         {output && !output.error && (
-          <section aria-label="Conformance results" className="flex flex-col gap-3">
-            <div className="flex items-center justify-end"><ExportMenu /></div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex gap-2 flex-1 min-w-[15rem]">
-                <Tile label="Covered" value={output.covered} total={output.total} tone="neutral" />
-                <Tile label="Not covered" value={output.notCovered} total={output.total} tone="warn" />
-              </div>
-              <div className="flex gap-2 flex-1 min-w-[15rem]">
-                <Tile label="Passing" value={output.passing} total={output.total} tone="good" />
-                <Tile label="Failing" value={output.failing} total={output.total} tone="bad" />
-              </div>
-            </div>
-            <p className="text-[11px] text-[var(--color-muted-foreground)]">
-              {output.specTitle} at {output.baseUrl} · {output.writes ? 'reads and writes' : 'read requests only'} · {output.durationMs} ms
-            </p>
+          <section aria-label="Conformance results" className="flex flex-col gap-4">
+            {(() => {
+              const problems = output.operations.filter(o => o.status === 'failed' || o.status === 'error')
+              const passed = output.operations.filter(o => o.status === 'passed')
+              const notRun = output.operations.filter(o => o.status === 'skipped')
+              const kinds = new Map<string, number>()
+              for (const op of problems) {
+                for (const kind of new Set((op.findings ?? []).map(f => f.kind))) kinds.set(kind, (kinds.get(kind) ?? 0) + 1)
+              }
+              return (
+                <>
+                  <div>
+                    <h2 data-testid="conform-headline" className={cn('text-sm font-semibold', problems.length > 0 ? 'text-red-400' : 'text-emerald-400')}>
+                      {problems.length > 0
+                        ? `${problems.length} of ${output.total} operations break the spec`
+                        : `All ${passed.length} checked operations match the spec`}
+                    </h2>
+                    {kinds.size > 0 && (
+                      <p className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+                        <span className="text-[var(--color-muted-foreground)]">Why they fail:</span>
+                        {[...kinds].map(([kind, n]) => (
+                          <span key={kind} className="rounded border border-[var(--color-border)] px-1.5 py-0.5">{KIND_LABEL[kind] ?? kind} × {n}</span>
+                        ))}
+                      </p>
+                    )}
+                  </div>
 
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="text-left text-[11px] text-[var(--color-muted-foreground)] border-b border-[var(--color-border)]">
-                  <th className="py-1 pr-2 font-medium">Operation</th>
-                  <th className="py-1 pr-2 font-medium">Result</th>
-                  <th className="py-1 pr-2 font-medium">Status</th>
-                  <th className="py-1 font-medium text-right">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {output.operations.map(op => (
-                  <tr key={`${op.method} ${op.path}`} className="border-b border-[var(--color-border)] align-top">
-                    <td className="py-1.5 pr-2">
-                      <span className="font-mono font-semibold">{op.method}</span>{' '}
-                      <span className="font-mono">{op.path}</span>
-                      {(op.violations.length > 0 || op.error) && (
-                        <ul className="mt-1 list-disc pl-5 font-mono text-[11px] text-red-400">
-                          {op.error && <li className="break-all">{op.error}</li>}
-                          {op.violations.map((v, i) => <li key={i} className="break-all">{v}</li>)}
-                        </ul>
-                      )}
-                    </td>
-                    <td className={cn('py-1.5 pr-2 font-medium', STATUS_STYLE[op.status])}>
-                      {op.status === 'skipped' ? 'skipped' : op.status}
-                    </td>
-                    <td className="py-1.5 pr-2 font-mono">{op.statusCode > 0 ? op.statusCode : '—'}</td>
-                    <td className="py-1.5 text-right font-mono">{op.status === 'skipped' ? '—' : `${op.durationMs} ms`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  {problems.length > 0 && (
+                    <div role="region" aria-label="Problems" className="flex flex-col gap-2.5">
+                      {problems.map(op => <ProblemCard key={`${op.method} ${op.path}`} op={op} />)}
+                    </div>
+                  )}
+
+                  {passed.length > 0 && (
+                    <details open role="region" aria-label="Passing operations" className="rounded border border-[var(--color-border)] px-3 py-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-emerald-400">Passing ({passed.length})</summary>
+                      <ul className="mt-2 text-xs">
+                        {passed.map(op => (
+                          <li key={`${op.method} ${op.path}`} className="flex gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
+                            <span className="font-mono font-semibold w-14 shrink-0">{op.method}</span>
+                            <span className="font-mono flex-1 min-w-0 break-all">{op.path}</span>
+                            <span className="font-mono text-[var(--color-muted-foreground)]">{op.statusCode} · {op.durationMs} ms</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+
+                  {notRun.length > 0 && (
+                    <details role="region" aria-label="Not run" className="rounded border border-[var(--color-border)] px-3 py-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-[var(--color-muted-foreground)]">Not run ({notRun.length})</summary>
+                      <ul className="mt-2 text-xs">
+                        {notRun.map(op => (
+                          <li key={`${op.method} ${op.path}`} className="flex gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
+                            <span className="font-mono font-semibold w-14 shrink-0">{op.method}</span>
+                            <span className="font-mono flex-1 min-w-0 break-all">{op.path}</span>
+                            <span className="text-[var(--color-muted-foreground)]">
+                              {isWrite(op.method) && !output.writes ? 'write request, not sent' : 'left out by the tag or path filter'}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </>
+              )
+            })()}
 
             {output.coverageNote && (
               <p data-testid="conform-coverage-note" className="text-[11px] text-[var(--color-muted-foreground)]">{output.coverageNote}</p>
@@ -384,6 +453,28 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
             )}
           </section>
         )}
+      </div>
+
+      <aside role="region" aria-label="Summary" className="w-80 shrink-0 overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-card)] p-4 flex flex-col gap-3">
+        <div className="flex justify-end"><ExportMenu disabled={!output || !!output.error} /></div>
+        {output && !output.error ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Tile label="Covered" value={output.covered} total={output.total} tone="neutral" />
+              <Tile label="Not covered" value={output.notCovered} total={output.total} tone="warn" />
+              <Tile label="Passing" value={output.passing} total={output.total} tone="good" />
+              <Tile label="Failing" value={output.failing} total={output.total} tone="bad" />
+            </div>
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              {output.specTitle} at {output.baseUrl} · {output.writes ? 'reads and writes' : 'read requests only'} · {output.durationMs} ms
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-[var(--color-muted-foreground)]">
+            After a run, the four totals appear here: how many operations were reached (Covered), how many were not (Not covered), and how many of the reached ones match the spec (Passing) or do not (Failing).
+          </p>
+        )}
+      </aside>
       </div>
     </div>
   )

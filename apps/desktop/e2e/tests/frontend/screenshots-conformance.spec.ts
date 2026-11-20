@@ -20,8 +20,29 @@ function shot(name: string) {
   return path.join(IMAGES_DIR, name)
 }
 
-const op = (operationId: string, method: string, path: string, status: string, statusCode: number, durationMs: number, violations: string[] = []) =>
-  ({ operationId, method, path, status, statusCode, durationMs, violations })
+type Finding = { kind: string; summary: string; expected?: string; got?: string; why: string; fix: string; detail: string }
+
+const op = (operationId: string, method: string, path: string, status: string, statusCode: number, durationMs: number, violations: string[] = [], findings: Finding[] = []) =>
+  ({ operationId, method, path, status, statusCode, durationMs, violations, findings })
+
+const MISSING_NAME: Finding = {
+  kind: 'missing-field', summary: '"name" is missing from the response', expected: 'the field "name"', got: 'no such field',
+  why: 'The spec marks "name" as required, but the server’s response did not include it.',
+  fix: 'Return "name" from the server, or make it optional in the spec if it is not always present.',
+  detail: 'Error at "/0/name": property "name" is missing',
+}
+const ID_AS_TEXT: Finding = {
+  kind: 'wrong-type', summary: '"[0].id" is text, the spec says integer', expected: 'integer', got: '"1"',
+  why: 'The server sent text ("1") where the spec declares an integer.',
+  fix: 'Send an integer from the server (for example without quotes for a number), or change the type in the spec if the server is right.',
+  detail: 'Error at "/0/id": value must be an integer',
+}
+const PRICE_AS_TEXT: Finding = {
+  kind: 'wrong-type', summary: '"price" is text, the spec says number', expected: 'number', got: '"49.90"',
+  why: 'The server sent text ("49.90") where the spec declares a number.',
+  fix: 'Send a number from the server (for example without quotes for a number), or change the type in the spec if the server is right.',
+  detail: 'Error at "/price": value must be a number',
+}
 
 const RESULT = {
   specTitle: 'Clear Signal Conformance Server',
@@ -34,12 +55,12 @@ const RESULT = {
   passing: 4,
   failing: 3,
   operations: [
-    op('listCategories', 'GET', '/categories', 'failed', 200, 3, ['Error at "/0/name": property "name" is missing']),
+    op('listCategories', 'GET', '/categories', 'failed', 200, 3, [MISSING_NAME.detail], [MISSING_NAME]),
     op('getHealth', 'GET', '/health', 'passed', 200, 2),
-    op('listOrders', 'GET', '/orders', 'failed', 200, 3, ['Error at "/0/id": value must be an integer']),
+    op('listOrders', 'GET', '/orders', 'failed', 200, 3, [ID_AS_TEXT.detail], [ID_AS_TEXT]),
     op('listProducts', 'GET', '/products', 'passed', 200, 2),
     op('createProduct', 'POST', '/products', 'passed', 201, 4),
-    op('getProduct', 'GET', '/products/{{id}}', 'failed', 200, 3, ['Error at "/price": value must be a number']),
+    op('getProduct', 'GET', '/products/{{id}}', 'failed', 200, 3, [PRICE_AS_TEXT.detail], [PRICE_AS_TEXT]),
     op('deleteProduct', 'DELETE', '/products/{{id}}', 'passed', 204, 2),
   ],
   probes: [],
@@ -72,7 +93,7 @@ async function openConformance(page: Page, theme: 'dark' | 'light') {
   await page.getByRole('button', { name: 'Run conformance check' }).click()
   const results = page.getByRole('region', { name: 'Conformance results' })
   await results.waitFor({ timeout: 5_000 })
-  // Put the totals and the whole operation table in view, not the form above them.
+  // Put the report in view, not the form above it; the summary panel stays at the right.
   await results.evaluate(el => el.scrollIntoView({ block: 'start' }))
 }
 

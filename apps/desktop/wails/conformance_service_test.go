@@ -76,6 +76,10 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 			continue
 		}
 		failing = append(failing, op.OperationID)
+		wantKind := map[string]string{"getProduct": "wrong-type", "listCategories": "missing-field", "listOrders": "wrong-type"}[op.OperationID]
+		if len(op.Findings) != 1 || op.Findings[0].Kind != wantKind || op.Findings[0].Why == "" || op.Findings[0].Fix == "" {
+			t.Errorf("%s findings: %+v, want one %s", op.OperationID, op.Findings, wantKind)
+		}
 		if op.StatusCode != 200 || len(op.Violations) != 1 ||
 			!strings.Contains(op.Violations[0], cause[op.OperationID]) || strings.HasPrefix(op.Violations[0], "request:") {
 			t.Errorf("%s failed for the wrong reason: status %d, %q", op.OperationID, op.StatusCode, op.Violations)

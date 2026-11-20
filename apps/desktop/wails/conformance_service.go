@@ -132,6 +132,19 @@ type ConformProbeIO struct {
 	Error       string `json:"error,omitempty"`
 }
 
+// ConformFindingIO explains one violation: where, what the spec wanted, what the server sent, why
+// that fails and what to change. Detail is the validator's own message.
+type ConformFindingIO struct {
+	Kind     string `json:"kind"`
+	Where    string `json:"where,omitempty"`
+	Summary  string `json:"summary"`
+	Expected string `json:"expected,omitempty"`
+	Got      string `json:"got,omitempty"`
+	Why      string `json:"why"`
+	Fix      string `json:"fix"`
+	Detail   string `json:"detail,omitempty"`
+}
+
 type ConformOperationIO struct {
 	OperationID string   `json:"operationId"`
 	Method      string   `json:"method"`
@@ -141,6 +154,8 @@ type ConformOperationIO struct {
 	DurationMs  int64    `json:"durationMs"`
 	Violations  []string `json:"violations"`
 	Error       string   `json:"error,omitempty"`
+	// Findings explain the failure in plain language; empty for a passing or skipped operation.
+	Findings []ConformFindingIO `json:"findings"`
 }
 
 type ConformRunOutputIO struct {
@@ -343,6 +358,13 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			OperationID: op.OperationID, Method: op.Method, Path: op.Path,
 			StatusCode: op.StatusCode, DurationMs: op.DurationMs, Error: op.Error,
 			Violations: []string{},
+			Findings:   []ConformFindingIO{},
+		}
+		for _, f := range conformance.Diagnose(op) {
+			item.Findings = append(item.Findings, ConformFindingIO{
+				Kind: f.Kind, Where: f.Where, Summary: f.Summary, Expected: f.Expected,
+				Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
+			})
 		}
 		for _, v := range op.RequestViolations {
 			item.Violations = append(item.Violations, "request: "+v.Error())

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ConformanceTab, isLocalUrl, splitList } from './ConformanceTab'
 
 const bridge = vi.hoisted(() => ({
@@ -20,7 +20,13 @@ const output = {
   covered: 5, notCovered: 2, passing: 4, failing: 1, probes: [], warnings: [],
   operations: [
     { operationId: 'a', method: 'GET', path: '/ok', status: 'passed', statusCode: 200, durationMs: 3, violations: [] },
-    { operationId: 'b', method: 'GET', path: '/bad', status: 'failed', statusCode: 200, durationMs: 4, violations: ['price: expected number'] },
+    {
+      operationId: 'b', method: 'GET', path: '/bad', status: 'failed', statusCode: 200, durationMs: 4, violations: ['price: expected number'],
+      findings: [{
+        kind: 'wrong-type', where: 'price', summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+        why: 'The server sent text ("9.99") where the spec declares a number.', fix: 'Send a number from the server.', detail: 'Error at "/price": value must be a number',
+      }],
+    },
     { operationId: 'c', method: 'DELETE', path: '/x', status: 'skipped', statusCode: 0, durationMs: 0, violations: [] },
   ],
 }
@@ -60,8 +66,55 @@ describe('ConformanceTab', () => {
       tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, recordCoverage: false,
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
-    expect(screen.getByText('price: expected number')).toBeInTheDocument()
-    expect(screen.getByText('skipped')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
+  })
+
+  it('keeps the totals and the export button in the Summary panel, not in the report', async () => {
+    await chooseSpec()
+    const summary = screen.getByRole('region', { name: 'Summary' })
+    expect(within(summary).getByRole('button', { name: /Export report/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByRole('region', { name: 'Conformance results' })
+    for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(within(summary).getByText(label)).toBeInTheDocument()
+    expect(within(summary).getByRole('button', { name: /Export report/ })).toBeEnabled()
+    const report = screen.getByRole('region', { name: 'Conformance results' })
+    expect(within(report).queryByText('Covered')).not.toBeInTheDocument()
+  })
+
+  it('lists the failures first, each with what was expected, what came back, why and how to fix it', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('1 of 7 operations break the spec')
+    const problems = screen.getByRole('region', { name: 'Problems' })
+    const card = within(problems).getByRole('article', { name: 'GET /bad fails' })
+    expect(card).toHaveTextContent('"price" is text, the spec says number')
+    expect(card).toHaveTextContent('Expected')
+    expect(card).toHaveTextContent('"9.99"')
+    expect(card).toHaveTextContent('The server sent text ("9.99") where the spec declares a number.')
+    expect(card).toHaveTextContent('Send a number from the server.')
+    expect(within(card).getByText('Technical detail')).toBeInTheDocument()
+    expect(screen.getByText(/wrong type × 1/)).toBeInTheDocument()
+
+    // The failures come before the passing operations in the page.
+    const passing = screen.getByRole('region', { name: 'Passing operations' })
+    expect(problems.compareDocumentPosition(passing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(passing).toHaveTextContent('/ok')
+    expect(passing).not.toHaveTextContent('/bad')
+  })
+
+  it('says everything matches when nothing fails and falls back to the raw message without findings', async () => {
+    bridge.runConformance.mockResolvedValueOnce({ ...output, failing: 0, operations: [output.operations[0]] })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('All 1 checked operations match the spec')
+    expect(screen.queryByRole('region', { name: 'Problems' })).not.toBeInTheDocument()
+
+    bridge.runConformance.mockResolvedValueOnce({
+      ...output,
+      operations: [{ ...output.operations[1], findings: undefined }],
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByText('price: expected number')).toBeInTheDocument()
   })
 
   it('blocks a base URL that is not on this computer until the user confirms it', async () => {

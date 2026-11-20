@@ -15,14 +15,16 @@ test.describe('Check Conformance page', () => {
     await expect(page.getByTestId('conform-send-note')).toContainText('Will send 3 read requests. 2 write operations are skipped.')
 
     await run.click()
-    const results = page.getByRole('region', { name: 'Conformance results' })
-    await expect(results).toContainText('Covered')
-    await expect(results).toContainText('Not covered')
-    await expect(results).toContainText('Passing')
-    await expect(results).toContainText('Failing')
-    await expect(results).toContainText('Error at "/price": value must be a number')
-    await expect(results.getByText('skipped')).toHaveCount(2)
-    await expect(results).toContainText('read requests only')
+    const summary = page.getByRole('region', { name: 'Summary' })
+    for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) await expect(summary).toContainText(label)
+    await expect(summary).toContainText('read requests only')
+
+    await expect(page.getByTestId('conform-headline')).toHaveText('1 of 5 operations break the spec')
+    const problem = page.getByRole('article', { name: 'GET /items/{{id}} fails' })
+    await expect(problem).toContainText('"price" is text, the spec says number')
+    await expect(problem).toContainText('Send a number from the server')
+    await expect(page.getByRole('region', { name: 'Passing operations' })).toContainText('/items')
+    await expect(page.getByRole('region', { name: 'Not run' })).toContainText('write request, not sent')
 
     const runs = await page.evaluate(() => (window as unknown as { __bridge: { conformRuns: Array<{ allowWrites: boolean }> } }).__bridge.conformRuns)
     expect(runs).toHaveLength(1)
@@ -38,9 +40,8 @@ test.describe('Check Conformance page', () => {
     await expect(page.getByTestId('conform-send-note')).toContainText('Will send 3 read and 2 write requests')
 
     await page.getByRole('button', { name: 'Run conformance check' }).click()
-    const results = page.getByRole('region', { name: 'Conformance results' })
-    await expect(results).toContainText('reads and writes')
-    await expect(results.getByText('skipped')).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Summary' })).toContainText('reads and writes')
+    await expect(page.getByRole('region', { name: 'Not run' })).toHaveCount(0)
   })
 
   test('a base URL that is not on this computer needs confirmation', async ({ page }) => {
@@ -54,7 +55,7 @@ test.describe('Check Conformance page', () => {
     await page.getByRole('checkbox', { name: /not on your computer/ }).check()
     await expect(run).toBeEnabled()
     await run.click()
-    await expect(page.getByRole('region', { name: 'Conformance results' })).toContainText('https://api.example.com')
+    await expect(page.getByRole('region', { name: 'Summary' })).toContainText('https://api.example.com')
   })
 
   test('negative probes are listed with the ones the server accepted', async ({ page }) => {
