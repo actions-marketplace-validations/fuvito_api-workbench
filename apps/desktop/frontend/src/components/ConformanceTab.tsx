@@ -362,7 +362,7 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
             )}
 
             {output.probes.length > 0 && (
-              <div aria-label="Negative probes" className="flex flex-col gap-1.5">
+              <div role="region" aria-label="Negative probes" className="flex flex-col gap-1.5">
                 <h2 className="text-xs font-semibold">Negative probes</h2>
                 <p className="text-[11px] text-[var(--color-muted-foreground)]">
                   {output.probes.filter(p => p.status === 'rejected').length} rejected as they should be,{' '}

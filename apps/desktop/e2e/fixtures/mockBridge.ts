@@ -65,6 +65,14 @@ export function setupMockBridge() {
           { code: 2, meaning: 'The run could not happen: a file could not be read or parsed.', forCI: 'The pipeline step fails: fix the command or the files first.' },
         ],
       },
+      {
+        name: 'conform', goal: 'Check an API against its OpenAPI spec', summary: 'Calls every operation in the spec and checks each response against what the spec declares.', when: 'To confirm a running API still matches its specification, locally or as a CI gate.',
+        inputs: [
+          { name: 'spec', short: '', positional: true, required: true, kind: 'path', role: 'spec', accepts: ['.yaml'], enum: [], default: '', label: 'OpenAPI spec', help: 'The spec file to check against.', example: 'specs/openapi.yaml', group: 'essential' },
+          { name: 'base-url', short: 'b', positional: false, required: false, kind: 'text', role: '', accepts: [], enum: [], default: '', label: 'Base URL', help: 'Where the API runs.', example: 'http://localhost:8120', group: 'essential' },
+        ],
+        outputs: [], exitCodes: [],
+      },
     ] as unknown[],
     cliContext: {
       workspace: '/workspace', runFrom: '/workspace',
@@ -209,9 +217,35 @@ export function setupMockBridge() {
         GetPort: () => Promise.resolve(0),
       },
       ConformanceService: {
-        GetConformContext: () => Promise.resolve({ workspace: '', specs: [], environments: [] }),
-        InspectConformSpec: () => Promise.resolve({ title: '', version: '', serverUrl: '', reads: 0, writes: 0 }),
-        RunConformance: () => Promise.resolve({ error: '', specTitle: '', baseUrl: '', writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] }),
+        GetConformContext: () => Promise.resolve({
+          workspace: '/workspace',
+          specs: [{ path: '/workspace/specs/shop.yaml', label: 'specs/shop.yaml' }],
+          environments: [{ path: '/workspace/environments/local.yaml', label: 'environments/local.yaml' }],
+        }),
+        InspectConformSpec: () => Promise.resolve({ title: 'Shop', version: '1', serverUrl: 'http://localhost:8120', reads: 3, writes: 2 }),
+        RunConformance: (input: { baseUrl: string; allowWrites: boolean; confirmedRemote: boolean; negative: boolean; tags: string[] }) => {
+          bridge['conformRuns'] = [...((bridge['conformRuns'] as unknown[]) ?? []), input]
+          const local = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(input.baseUrl)
+          const empty = { specTitle: '', baseUrl: input.baseUrl, writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] }
+          if (!local && !input.confirmedRemote) return Promise.resolve({ ...empty, error: 'confirm the base URL ' + input.baseUrl + ' before running: it is not on this computer' })
+          const op = (operationId: string, method: string, path: string, status: string, statusCode: number, violations: string[] = []) =>
+            ({ operationId, method, path, status, statusCode, durationMs: 4, violations })
+          const operations = [
+            op('listItems', 'GET', '/items', 'passed', 200),
+            op('getItem', 'GET', '/items/{{id}}', 'failed', 200, ['Error at "/price": value must be a number']),
+            op('health', 'GET', '/health', 'passed', 200),
+            input.allowWrites ? op('createItem', 'POST', '/items', 'passed', 201) : op('createItem', 'POST', '/items', 'skipped', 0),
+            input.allowWrites ? op('deleteItem', 'DELETE', '/items/{{id}}', 'passed', 204) : op('deleteItem', 'DELETE', '/items/{{id}}', 'skipped', 0),
+          ]
+          const covered = operations.filter(o => o.status === 'passed' || o.status === 'failed').length
+          const probes = input.negative
+            ? [{ operationId: 'getItem', method: 'GET', path: '/items/{{id}}', kind: 'wrong-type', description: 'id as text', status: 'accepted', statusCode: 200 }]
+            : []
+          return Promise.resolve({
+            ...empty, specTitle: 'Shop', writes: input.allowWrites, durationMs: 21, operations, total: 5, covered,
+            notCovered: 5 - covered, passing: operations.filter(o => o.status === 'passed').length, failing: 1, probes,
+          })
+        },
         CancelConformance: noop,
         ExportConformReport: () => Promise.resolve({ content: '', error: '' }),
       },
