@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Hot-reload chatter (one line per saved file) buried real warnings in the `wails dev` console.
+  logLevel: 'warn',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

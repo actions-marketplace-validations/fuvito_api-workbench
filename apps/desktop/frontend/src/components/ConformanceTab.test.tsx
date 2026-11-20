@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
-import { ConformanceTab, isLocalUrl, splitList, parseVars, cliValues, findingWhere } from './ConformanceTab'
+import { ConformanceTab } from './ConformanceTab'
+import { isLocalUrl, splitList, parseVars, cliValues, findingWhere } from '@/lib/conformHelpers'
 
 const bridge = vi.hoisted(() => ({
   getConformContext: vi.fn(),
