@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -239,8 +240,9 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	return res
 }
 
-// recordCoverage adds an unfiltered run to the Contracts coverage store, under the spec's path
-// relative to the workspace, and says what it did.
+// recordCoverage adds an unfiltered run to the Contracts coverage store and says what it did. The
+// store is keyed by the specFile string a scenario writes, so a scenario that already names this
+// spec file decides the name (one Contracts card); otherwise the workspace-relative path is used.
 func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Spec, baseURL string, out application.ConformOutput) string {
 	if len(in.Tags) > 0 || len(in.Paths) > 0 {
 		return "Not added to coverage: a run limited by tags or paths would skew the totals."
@@ -249,9 +251,12 @@ func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Sp
 	if ws == "" {
 		return "Not added to coverage: no workspace is open."
 	}
-	specName := in.SpecPath
-	if rel, err := filepath.Rel(ws, in.SpecPath); err == nil && !strings.HasPrefix(rel, "..") {
-		specName = filepath.ToSlash(rel)
+	specName := scenarioSpecRef(ws, in.SpecPath)
+	if specName == "" {
+		specName = in.SpecPath
+		if rel, err := filepath.Rel(ws, in.SpecPath); err == nil && !strings.HasPrefix(rel, "..") {
+			specName = filepath.ToSlash(rel)
+		}
 	}
 	var executed []openapi.ExecutedRequest
 	for _, op := range out.Result.Operations {
@@ -381,4 +386,38 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		}
 	}
 	return res
+}
+
+// scenarioSpecRef returns the specFile string of the first scenario in the workspace whose
+// (file path) specFile resolves to specPath, or "" when no scenario uses that file.
+func scenarioSpecRef(ws, specPath string) string {
+	target := filepath.Clean(specPath)
+	found := ""
+	_ = filepath.WalkDir(filepath.Join(ws, "scenarios"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil || found != "" || d.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".yaml", ".yml", ".json":
+		default:
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		sc, err := serialization.ParseScenarioFile(data, filepath.Base(path))
+		if err != nil || sc.SpecFile == "" || strings.Contains(sc.SpecFile, "://") {
+			return nil
+		}
+		ref := sc.SpecFile
+		if !filepath.IsAbs(ref) {
+			ref = filepath.Join(filepath.Dir(path), ref)
+		}
+		if strings.EqualFold(filepath.Clean(ref), target) {
+			found = sc.SpecFile
+		}
+		return nil
+	})
+	return found
 }

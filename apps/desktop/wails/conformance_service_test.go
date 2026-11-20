@@ -175,3 +175,24 @@ func TestConformanceService_NegativeProbesAndExport(t *testing.T) {
 		t.Fatal("unknown format must be an error")
 	}
 }
+
+func TestScenarioSpecRef_ReusesTheNameAScenarioUses(t *testing.T) {
+	ws := t.TempDir()
+	spec := filepath.Join(ws, "specs", "api.yaml")
+	dir := filepath.Join(ws, "scenarios", "shop")
+	for _, d := range []string{filepath.Dir(spec), dir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scn := "schemaVersion: \"1\"\ntitle: t\nspecFile: ../../specs/api.yaml\nsteps:\n  - label: a\n    request: {method: GET, url: \"http://x/\"}\n"
+	if err := os.WriteFile(filepath.Join(dir, "s.yaml"), []byte(scn), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := scenarioSpecRef(ws, spec); got != "../../specs/api.yaml" {
+		t.Fatalf("got %q, want the scenario's own spelling", got)
+	}
+	if got := scenarioSpecRef(ws, filepath.Join(ws, "specs", "other.yaml")); got != "" {
+		t.Fatalf("a spec no scenario uses must give \"\", got %q", got)
+	}
+}
