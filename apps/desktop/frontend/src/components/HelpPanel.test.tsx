@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 vi.mock('@/lib/bridge', () => ({
-  getUserGuide: vi.fn(), getFormatSpec: vi.fn(), getExampleScenario: vi.fn(), getAIPrompt: vi.fn(), getAIPromptInstructions: vi.fn(), saveContentToFile: vi.fn(),
+  getUserGuide: vi.fn(), getFormatSpec: vi.fn(), getWhatWeCheck: vi.fn(), getExampleScenario: vi.fn(), getAIPrompt: vi.fn(), getAIPromptInstructions: vi.fn(), saveContentToFile: vi.fn(),
 }))
 
 import * as bridge from '@/lib/bridge'
@@ -16,10 +16,17 @@ const exampleDoc = [
   '```yaml', '# file: scenarios/user-onboarding.yaml', 'schemaVersion: "1"', 'title: Onboarding', '```', '',
 ].join('\n')
 
+const catalogDoc = [
+  '# What Clear Signal checks', '',
+  '| ID | Title | State |', '|---|---|---|',
+  '| CS-RESP-001 | Undeclared response status | caught |', '',
+].join('\n')
+
 beforeEach(() => {
   vi.resetAllMocks()
   b.getUserGuide.mockResolvedValue('# Guide body')
   b.getFormatSpec.mockResolvedValue('# Spec body')
+  b.getWhatWeCheck.mockResolvedValue(catalogDoc)
   b.getExampleScenario.mockResolvedValue(exampleDoc)
   b.getAIPromptInstructions.mockResolvedValue('# Prompt instructions')
   b.saveContentToFile.mockResolvedValue('/saved/file')
@@ -152,5 +159,47 @@ describe('AI Prompt tab', () => {
     b.getAIPromptInstructions.mockRejectedValue(new Error('x'))
     render(<HelpPanel onClose={vi.fn()} initialTab="prompt" />)
     expect(await screen.findByText('Failed to load the AI prompt.')).toBeInTheDocument()
+  })
+})
+
+describe('HelpPanel: What We Check tab', () => {
+  it('loads the catalog only when its tab is opened and shows its table', async () => {
+    render(<HelpPanel onClose={vi.fn()} />)
+    await screen.findByText('Guide body')
+    expect(b.getWhatWeCheck).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('What We Check'))
+    expect(await screen.findByText('CS-RESP-001')).toBeInTheDocument()
+    expect(screen.getByText('Undeclared response status')).toBeInTheDocument()
+    // an ID is meant to be quoted, so it never wraps
+    expect(screen.getByText('CS-RESP-001').closest('td')).toHaveClass('whitespace-nowrap')
+    expect(screen.getByText('Undeclared response status').closest('td')).not.toHaveClass('whitespace-nowrap')
+    expect(b.getWhatWeCheck).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByText('User Guide'))
+    fireEvent.click(screen.getByText('What We Check'))
+    expect(b.getWhatWeCheck).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens straight on the catalog from the Help menu', async () => {
+    render(<HelpPanel onClose={vi.fn()} initialTab="check" />)
+    expect(await screen.findByText('CS-RESP-001')).toBeInTheDocument()
+  })
+
+  it('copies and downloads the catalog', async () => {
+    render(<HelpPanel onClose={vi.fn()} initialTab="check" />)
+    await screen.findByText('CS-RESP-001')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Copy/ }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(catalogDoc))
+
+    fireEvent.click(screen.getByRole('button', { name: /Download/ }))
+    await waitFor(() => expect(b.saveContentToFile).toHaveBeenCalledWith(catalogDoc, 'clear-signal-what-we-check.md'))
+  })
+
+  it('says so when the catalog cannot be loaded', async () => {
+    b.getWhatWeCheck.mockRejectedValue(new Error('boom'))
+    render(<HelpPanel onClose={vi.fn()} initialTab="check" />)
+    expect(await screen.findByText('Failed to load the list of checks.')).toBeInTheDocument()
   })
 })

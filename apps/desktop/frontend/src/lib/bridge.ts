@@ -130,6 +130,7 @@ import {
 import {
   GetUserGuide as WailsGetUserGuide,
   GetFormatSpec as WailsGetFormatSpec,
+  GetWhatWeCheck as WailsGetWhatWeCheck,
   GetExampleScenario as WailsGetExampleScenario,
   GetAIPrompt as WailsGetAIPrompt,
   GetAIPromptInstructions as WailsGetAIPromptInstructions,
@@ -1298,6 +1299,10 @@ export async function applyWorkspaceImport(zipPath: string, strategy: string): P
 
 export async function getUserGuide(): Promise<string> {
   return (await WailsGetUserGuide()) as unknown as string
+}
+
+export async function getWhatWeCheck(): Promise<string> {
+  return (await WailsGetWhatWeCheck()) as unknown as string
 }
 
 export async function getFormatSpec(): Promise<string> {

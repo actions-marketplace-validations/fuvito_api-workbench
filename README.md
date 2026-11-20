@@ -46,7 +46,7 @@ One command. No test files to write. The spec is the source of truth.
 
 **Check Conformance, without a terminal** — pick an OpenAPI spec in the desktop app, press run, and see which operations match it and which do not. Read requests only by default. [See below.](#check-conformance-from-the-desktop)
 
-**Nothing left to guess** — [what we check, and what we do not](docs/what-we-check.md): every failure Clear Signal reports, with an ID, an example and the test that proves it, and the failures it cannot catch yet.
+**Nothing left to guess** — [what we check, and what we do not](apps/desktop/wails/help/what-we-check.md): every failure Clear Signal reports, with an ID, an example and the test that proves it, and the failures it cannot catch yet.
 
 **Impact analysis** — `clrsig impact v1.yaml v2.yaml scenarios/*.yaml` tells you which of your scenarios will stop passing when a spec change ships.
 

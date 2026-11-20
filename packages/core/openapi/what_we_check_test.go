@@ -7,7 +7,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 )
 
-// These tests are the evidence behind docs/what-we-check.md. Each one pins what the response checks
+// These tests are the evidence behind apps/desktop/wails/help/what-we-check.md. Each one pins what the response checks
 // do TODAY, including the things they do not catch (marked KnownGap). If behaviour changes, a test
 // here fails and the catalog has to be updated with it.
 

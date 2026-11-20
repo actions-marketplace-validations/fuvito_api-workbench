@@ -648,3 +648,11 @@ Do not implement or stub any of these without explicit user direction.
 - **Rule (owner):** every new failure, gap, false pass or false failure we learn about is added to the catalog in the same change; fixing a gap moves its row and flips its `KnownGap` test.
 - **Found while measuring (now in the backlog):** `impact` never matches a step whose URL path contains a placeholder (B-051, a bug); a declared `application/xml` response is reported as a violation (B-052); `format: email` / `uuid` are not validated (B-053); the `schema` assertion ignores status, Content-Type, headers and `writeOnly`, and does not check an empty body.
 - `docs/contract-testing-roadmap.md` is retired with a pointer (B-030); the README and the user guide link the catalog.
+
+### 2026-11-20 — The catalog is shown in the app (Help, What We Check)
+
+- The catalog moved from `docs/what-we-check.md` to **`apps/desktop/wails/help/what-we-check.md`** (embedded files must live under the Go package, and `help/` is where every document the app serves already lives: user guide, format spec, example scenario, AI prompt). It is still the file the README links to and the one the guard tests (`what_we_check_doc_test.go`) read; the 2026-11-20 entry above that says `docs/what-we-check.md` is history.
+- **Help panel:** a fifth tab, **What We Check** (menu Help, What We Check…), loaded on demand through `HelpService.GetWhatWeCheck`, with Download and Copy; the panel is wider on that tab for the seven-column tables, and a check ID (`CS-RESP-008`) never wraps so it can be quoted.
+- Tests: Go guard tests on the new path, component tests for the tab (lazy load, table, copy and download, load failure, ID not wrapping), a Playwright flow through the Help menu.
+- Next step for B-049: turn the tab into a searchable table by ID when the catalog becomes data in Go; today it renders the Markdown.
+- **Help panel width:** the panel is now 90% of the window wide (capped at 1800 px) on every tab, instead of a fixed width, so guides, specs and the catalog's wide tables use the room there is (`help-panel.spec.ts` measures it at several window sizes).

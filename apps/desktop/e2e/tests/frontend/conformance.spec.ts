@@ -92,6 +92,25 @@ test.describe('Check Conformance page', () => {
     await expect(page.getByTestId('conform-headline')).toHaveText('1 of 5 operations break the spec')
   })
 
+  test('Help > What We Check shows the catalog of checks', async ({ page }) => {
+    await gotoApp(page)
+    await page.getByRole('menuitem', { name: 'Help' }).click()
+    await page.getByRole('menuitem', { name: 'What We Check…' }).click()
+
+    await expect(page.getByRole('button', { name: 'What We Check' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'What Clear Signal checks' })).toBeVisible()
+    const row = page.getByRole('row', { name: /CS-RESP-001/ })
+    await expect(row).toContainText('Undeclared response status')
+    await expect(row).toContainText('caught')
+    await expect(page.getByRole('row', { name: /CS-GAP-001/ })).toContainText('not caught')
+
+    // Back to the guide and forward again keeps working.
+    await page.getByRole('button', { name: 'User Guide' }).click()
+    await expect(page.getByText('A guide.')).toBeVisible()
+    await page.getByRole('button', { name: 'What We Check' }).click()
+    await expect(page.getByRole('row', { name: /CS-RESP-001/ })).toBeVisible()
+  })
+
   test('Get CLI command carries the page choices, read-only included', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Check spec conformance' }).click()

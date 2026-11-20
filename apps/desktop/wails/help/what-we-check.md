@@ -2,6 +2,8 @@
 
 This is the list of every failure, warning and "not checked" outcome Clear Signal can report, and of the failures it cannot catch. Read it instead of guessing: if a failure is not here, we either do not catch it or we have forgotten to write it down, and in both cases we want to hear about it.
 
+In the app this list is the **What We Check** tab of the Help panel (menu Help, What We Check); in the repository it is `apps/desktop/wails/help/what-we-check.md`.
+
 Two kinds of checking, with the names the product uses:
 
 - **API Contract Validation** (section 1): a response is compared with what the OpenAPI spec declares for it. It runs on every scenario step that has a spec, in `clrsig conform`, and for the `schema` assertion.

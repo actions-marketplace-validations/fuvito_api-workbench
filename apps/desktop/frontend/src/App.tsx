@@ -10,6 +10,7 @@ import {StatusBar} from '@/components/StatusBar'
 import {LandingPage} from '@/components/LandingPage'
 import {SettingsPanel} from '@/components/SettingsPanel'
 import {HelpPanel} from '@/components/HelpPanel'
+import type {HelpTab} from '@/components/HelpPanel'
 import {EnvironmentEditor} from '@/components/EnvironmentEditor'
 import {RequestEditor} from '@/components/RequestEditor'
 import {ResponseViewer} from '@/components/ResponseViewer'
@@ -217,7 +218,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [cliPreset, setCliPreset] = useState<CliBuilderPreset | null>(null)
   const cliPresetSeq = useRef(0)
-  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec' | 'example' | 'prompt'>('guide')
+  const [helpInitialTab, setHelpInitialTab] = useState<HelpTab>('guide')
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
@@ -802,6 +803,7 @@ export default function App() {
       { kind: 'action', label: 'Format Spec…', onClick: () => { setHelpInitialTab('spec');  setShowHelp(true) } },
       { kind: 'action', label: 'Example Scenario…', onClick: () => { setHelpInitialTab('example'); setShowHelp(true) } },
       { kind: 'action', label: 'AI Prompt…', onClick: () => { setHelpInitialTab('prompt'); setShowHelp(true) } },
+      { kind: 'action', label: 'What We Check…', onClick: () => { setHelpInitialTab('check'); setShowHelp(true) } },
       { kind: 'separator' },
       { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
     ],

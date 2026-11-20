@@ -272,6 +272,20 @@ export function setupMockBridge() {
         CancelConformance: noop,
         ExportConformReport: () => Promise.resolve({ content: '', error: '' }),
       },
+      HelpService: {
+        GetUserGuide: () => Promise.resolve('# User guide\n\nA guide.'),
+        GetFormatSpec: () => Promise.resolve('# Format spec'),
+        GetExampleScenario: () => Promise.resolve('# Example scenario'),
+        GetAIPromptInstructions: () => Promise.resolve('# AI prompt'),
+        GetAIPrompt: () => Promise.resolve('# AI prompt'),
+        GetWhatWeCheck: () => Promise.resolve([
+          '# What Clear Signal checks', '',
+          '## 1. API Contract Validation', '',
+          '| ID | Title | What it means | State |', '|---|---|---|---|',
+          '| CS-RESP-001 | Undeclared response status | The server answered a status the spec does not declare. | caught |',
+          '| CS-GAP-001 | Formats other than date-time | email and uuid are not validated. | not caught |', '',
+        ].join('\n')),
+      },
       ConformanceServerService: {
         Start: () => Promise.resolve({ port: 8120, error: '' }),
         OpenWorkspace: () => { bridge['workspacePath'] = '/tmp/clrsig-conformance-mock'; return Promise.resolve({ port: 8120, workspacePath: '/tmp/clrsig-conformance-mock', error: '' }) },

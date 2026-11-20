@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { X, Copy, Download, CheckCircle2 } from 'lucide-react'
-import { getUserGuide, getFormatSpec, getExampleScenario, getAIPromptInstructions, getAIPrompt, saveContentToFile } from '@/lib/bridge'
+import { getUserGuide, getFormatSpec, getWhatWeCheck, getExampleScenario, getAIPromptInstructions, getAIPrompt, saveContentToFile } from '@/lib/bridge'
 import { cn } from '@/lib/utils'
 import { extractScenarioYaml, extractScenarioFileName } from '@/lib/helpDocs'
 
-type Tab = 'guide' | 'spec' | 'example' | 'prompt'
+export type HelpTab = 'guide' | 'spec' | 'example' | 'prompt' | 'check'
+type Tab = HelpTab
 type Props = { onClose: () => void; initialTab?: Tab }
 
 function slugify(text: string): string {
@@ -92,7 +93,8 @@ function MarkdownBody({ content, onAnchorClick }: {
           </th>
         ),
         td: ({ children }) => (
-          <td className="px-3 py-1.5 border border-[var(--color-border)] text-[var(--color-foreground)]">
+          // A check ID such as CS-RESP-008 is meant to be quoted, so it never wraps.
+          <td className={cn('px-3 py-1.5 border border-[var(--color-border)] text-[var(--color-foreground)]', isCheckId(children) && 'whitespace-nowrap font-mono')}>
             {children}
           </td>
         ),
@@ -140,12 +142,17 @@ function HeaderAction({ id, done, label, doneLabel, icon, title, onClick }: {
   )
 }
 
+function isCheckId(children: React.ReactNode): boolean {
+  return typeof children === 'string' && /^CS-[A-Z]+-\d{3}$/.test(children)
+}
+
 export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [guide, setGuide] = useState<string | null>(null)
   const [spec, setSpec] = useState<string | null>(null)
   const [example, setExample] = useState<string | null>(null)
   const [promptDoc, setPromptDoc] = useState<string | null>(null)
+  const [catalog, setCatalog] = useState<string | null>(null)
   // id of the header action that just succeeded, shown briefly as "Copied!" / "Saved!"
   const [doneAction, setDoneAction] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -165,6 +172,12 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
       getExampleScenario().then(setExample).catch(() => setExample('Failed to load the example scenario.'))
     }
   }, [tab, example])
+
+  useEffect(() => {
+    if (tab === 'check' && catalog === null) {
+      getWhatWeCheck().then(setCatalog).catch(() => setCatalog('Failed to load the list of checks.'))
+    }
+  }, [tab, catalog])
 
   useEffect(() => {
     if (tab === 'prompt' && promptDoc === null) {
@@ -204,6 +217,7 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
   }
 
   const getSpecText = async () => spec ?? await getFormatSpec()
+  const getCatalogText = async () => catalog ?? await getWhatWeCheck()
   const getScenarioYaml = async () => (example ? extractScenarioYaml(example) : null)
 
   function copyAction(getText: () => Promise<string | null>) {
@@ -231,14 +245,18 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
       : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
   )
 
-  const content = tab === 'guide' ? guide : tab === 'spec' ? spec : tab === 'example' ? example : promptDoc
+  const content = tab === 'guide' ? guide : tab === 'spec' ? spec : tab === 'example' ? example : tab === 'check' ? catalog : promptDoc
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="flex flex-col w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl bg-[var(--color-background)] border border-[var(--color-border)]">
+      {/* The panel takes most of the window, so wide tables (the catalog's) and long guides use the room there is; the cap keeps it from stretching across a very large screen. */}
+      <div
+        data-testid="help-panel"
+        className="flex flex-col w-[90vw] max-w-[1800px] max-h-[90vh] rounded-xl shadow-2xl bg-[var(--color-background)] border border-[var(--color-border)]"
+      >
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-2 border-b border-[var(--color-border)] shrink-0">
@@ -255,6 +273,9 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
             <button type="button" onClick={() => setTab('prompt')} className={tabCls(tab === 'prompt')}>
               AI Prompt
             </button>
+            <button type="button" onClick={() => setTab('check')} className={tabCls(tab === 'check')}>
+              What We Check
+            </button>
           </div>
           <div className="flex items-center gap-2 pb-2">
             {tab === 'spec' && (
@@ -268,6 +289,20 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
                   id="copy-spec" done={doneAction} label="Copy Format Spec" doneLabel="Copied!" icon={<Copy size={12} />}
                   title="Copy the format specification to your clipboard"
                   onClick={() => runAction('copy-spec', copyAction(getSpecText))}
+                />
+              </>
+            )}
+            {tab === 'check' && (
+              <>
+                <HeaderAction
+                  id="download-catalog" done={doneAction} label="Download" doneLabel="Saved!" icon={<Download size={12} />}
+                  title="Save the list of checks as a Markdown file"
+                  onClick={() => runAction('download-catalog', downloadAction(getCatalogText, 'clear-signal-what-we-check.md'))}
+                />
+                <HeaderAction
+                  id="copy-catalog" done={doneAction} label="Copy" doneLabel="Copied!" icon={<Copy size={12} />}
+                  title="Copy the list of checks to your clipboard, for example to quote an ID in a bug report"
+                  onClick={() => runAction('copy-catalog', copyAction(getCatalogText))}
                 />
               </>
             )}

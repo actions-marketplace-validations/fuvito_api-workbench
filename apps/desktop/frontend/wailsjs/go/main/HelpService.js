@@ -21,3 +21,7 @@ export function GetFormatSpec() {
 export function GetUserGuide() {
   return window['go']['main']['HelpService']['GetUserGuide']();
 }
+
+export function GetWhatWeCheck() {
+  return window['go']['main']['HelpService']['GetWhatWeCheck']();
+}

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// docs/what-we-check.md is the list of what Clear Signal catches and does not catch. These checks
+// apps/desktop/wails/help/what-we-check.md (shown in the app's Help panel as What We Check) is the list of what Clear Signal catches and does not catch. These checks
 // keep it honest: it may only cite tests that exist, its IDs are unique, and every CS- ID used in
 // the documentation or in a test comment is defined there.
 
@@ -27,8 +27,8 @@ func repoRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "docs", "what-we-check.md")); err != nil {
-		t.Fatalf("docs/what-we-check.md not found from %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "apps", "desktop", "wails", "help", "what-we-check.md")); err != nil {
+		t.Fatalf("apps/desktop/wails/help/what-we-check.md not found from %s: %v", root, err)
 	}
 	return root
 }
@@ -61,7 +61,7 @@ func walkTests(t *testing.T, root string, visit func(path, text string)) {
 
 func TestCatalogCitesRealTests(t *testing.T) {
 	root := repoRoot(t)
-	doc, err := os.ReadFile(filepath.Join(root, "docs", "what-we-check.md"))
+	doc, err := os.ReadFile(filepath.Join(root, "apps", "desktop", "wails", "help", "what-we-check.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,20 +86,20 @@ func TestCatalogCitesRealTests(t *testing.T) {
 	}
 	sort.Strings(missing)
 	if len(missing) > 0 {
-		t.Errorf("docs/what-we-check.md cites tests that do not exist (renamed or deleted?): %v", missing)
+		t.Errorf("apps/desktop/wails/help/what-we-check.md cites tests that do not exist (renamed or deleted?): %v", missing)
 	}
 }
 
 func TestCatalogIDsAreUniqueAndDefined(t *testing.T) {
 	root := repoRoot(t)
-	doc, err := os.ReadFile(filepath.Join(root, "docs", "what-we-check.md"))
+	doc, err := os.ReadFile(filepath.Join(root, "apps", "desktop", "wails", "help", "what-we-check.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defined := map[string]bool{}
 	for _, m := range reDefinedID.FindAllStringSubmatch(string(doc), -1) {
 		if defined[m[1]] {
-			t.Errorf("%s is defined twice in docs/what-we-check.md", m[1])
+			t.Errorf("%s is defined twice in apps/desktop/wails/help/what-we-check.md", m[1])
 		}
 		defined[m[1]] = true
 	}
@@ -110,11 +110,11 @@ func TestCatalogIDsAreUniqueAndDefined(t *testing.T) {
 	check := func(where, text string) {
 		for _, id := range reAnyID.FindAllString(text, -1) {
 			if !defined[id] {
-				t.Errorf("%s mentions %s, which docs/what-we-check.md does not define", where, id)
+				t.Errorf("%s mentions %s, which apps/desktop/wails/help/what-we-check.md does not define", where, id)
 			}
 		}
 	}
-	check("docs/what-we-check.md", string(doc))
+	check("apps/desktop/wails/help/what-we-check.md", string(doc))
 	walkTests(t, root, func(path, text string) { check(path, text) })
 	for _, name := range []string{"README.md", filepath.Join("docs", "backlog.md")} {
 		if data, err := os.ReadFile(filepath.Join(root, name)); err == nil {
