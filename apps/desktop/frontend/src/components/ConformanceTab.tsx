@@ -3,9 +3,9 @@ import { ShieldCheck, Terminal, Play, Square, AlertTriangle, Download } from 'lu
 import { cn } from '@/lib/utils'
 import {
   getConformContext, inspectConformSpec, runConformance, cancelConformance,
-  exportConformReport, saveContentToFile, openInSystemViewer,
+  exportConformReport, saveContentToFile, openInSystemViewer, onConformanceProgress,
 } from '@/lib/bridge'
-import type { ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformFinding, ConformReportFormat } from '@/lib/bridge'
+import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformFinding, ConformReportFormat } from '@/lib/bridge'
 
 const inputClass =
   'w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)]'
@@ -87,6 +87,20 @@ function ProblemCard({ op }: { op: ConformOperation }) {
       )}
     </article>
   )
+}
+
+// One name=value per line, blank lines ignored: the page's form of `clrsig conform --var`.
+export function parseVars(text: string): { vars: string[]; bad: string[] } {
+  const vars: string[] = []
+  const bad: string[] = []
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    const eq = line.indexOf('=')
+    if (eq > 0 && line.slice(0, eq).trim() !== '') vars.push(line)
+    else bad.push(line)
+  }
+  return { vars, bad }
 }
 
 export function splitList(text: string): string[] {
@@ -180,15 +194,22 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const [tagsText, setTagsText] = useState('')
   const [pathsText, setPathsText] = useState('')
   const [timeoutText, setTimeoutText] = useState('')
+  const [varsText, setVarsText] = useState('')
   const [negative, setNegative] = useState(false)
   const [failFast, setFailFast] = useState(false)
   const [recordCoverage, setRecordCoverage] = useState(false)
   const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState<ConformProgress | null>(null)
   const [output, setOutput] = useState<ConformRunOutput | null>(null)
 
   useEffect(() => {
     getConformContext().then(setCtx).catch(e => setLoadError(String(e)))
   }, [])
+
+  useEffect(() => {
+    if (!running) return
+    return onConformanceProgress(setProgress)
+  }, [running])
 
   useEffect(() => {
     setOutput(null)
@@ -212,10 +233,12 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const filtered = splitList(tagsText).length > 0 || splitList(pathsText).length > 0
   const timeoutMs = Number.parseInt(timeoutText, 10)
   const timeoutBad = timeoutText !== '' && !(timeoutMs > 0)
-  const canRun = !timeoutBad && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
+  const parsedVars = parseVars(varsText)
+  const canRun = !timeoutBad && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
 
   async function run() {
     setRunning(true)
+    setProgress(null)
     setOutput(null)
     try {
       setOutput(await runConformance({
@@ -223,6 +246,7 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
         recordCoverage: recordCoverage && !filtered,
+        vars: parsedVars.vars,
       }))
     } catch (e) {
       setOutput({ error: String(e), specTitle: '', baseUrl, writes: allowWrites, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] })
@@ -333,6 +357,24 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
               {timeoutBad && <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>}
             </div>
           </div>
+          <div className="mt-3 flex flex-col gap-1">
+            <label htmlFor="conf-vars" className="text-xs font-medium">Variable overrides</label>
+            <textarea
+              id="conf-vars"
+              value={varsText}
+              onChange={e => setVarsText(e.target.value)}
+              rows={3}
+              placeholder={'id=1\nname=Lamp'}
+              spellCheck={false}
+              className={cn(inputClass, 'font-mono resize-y')}
+            />
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              One name=value per line. They replace or add environment variables for this run only; nothing is saved. They are not part of Get CLI command (add <span className="font-mono">--var name=value</span> yourself). Do not put secrets here.
+            </p>
+            {parsedVars.bad.length > 0 && (
+              <p role="alert" className="text-[11px] text-red-400">Each line must look like name=value: {parsedVars.bad[0]}</p>
+            )}
+          </div>
           <div className="mt-3 flex flex-col gap-2">
             <label className="flex items-start gap-2 text-xs cursor-pointer">
               <input type="checkbox" checked={negative} onChange={e => setNegative(e.target.checked)} className="mt-0.5" />
@@ -371,7 +413,19 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
               <Square size={12} aria-hidden /> Cancel
             </button>
           )}
-          {running && <span className="text-xs text-[var(--color-muted-foreground)]">Running…</span>}
+          {running && (
+            <div className="flex items-center gap-2 min-w-0 text-xs text-[var(--color-muted-foreground)]">
+              <progress
+                aria-label="Conformance run progress"
+                value={progress?.done ?? 0}
+                max={progress?.total || 1}
+                className="w-32 h-1.5 shrink-0 accent-[var(--color-accent)]"
+              />
+              <span data-testid="conform-progress" className="truncate">
+                {progress ? `${progress.done} of ${progress.total} · ${progress.operation}` : 'Starting…'}
+              </span>
+            </div>
+          )}
         </div>
 
         {output?.error && <p role="alert" className="text-xs text-red-400">{output.error}</p>}

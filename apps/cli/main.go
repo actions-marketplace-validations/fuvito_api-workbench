@@ -418,6 +418,7 @@ func conformCmd() *cobra.Command {
 	var requestTimeout int
 	var failFast bool
 	var readOnly bool
+	var explain bool
 	var vars []string
 	var reports []string
 	var showCoverage bool
@@ -535,7 +536,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				case "markdown":
 					return reporting.ConformMarkdown(result, cov, negResult), nil
 				}
-				text := reporting.ConformText(result, cov)
+				text := reporting.ConformTextExplained(result, cov, explain)
 				if negResult != nil {
 					text += reporting.NegativeText(negResult)
 				}
@@ -591,6 +592,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
+	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")

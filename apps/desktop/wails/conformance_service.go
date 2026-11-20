@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -27,13 +29,24 @@ type ConformanceService struct {
 	mu        sync.Mutex
 	cancelRun context.CancelFunc
 	last      *application.ConformOutput // the latest run, for Export
+	emit      func(event string, data ...interface{}) // nil outside the running app (tests)
 }
 
 func NewConformanceService(ws *WorkspaceService, ss *SettingsService) *ConformanceService {
 	return &ConformanceService{ctx: context.Background(), ws: ws, settings: ss}
 }
 
-func (s *ConformanceService) setContext(ctx context.Context) { s.ctx = ctx }
+func (s *ConformanceService) setContext(ctx context.Context) {
+	s.ctx = ctx
+	s.emit = func(event string, data ...interface{}) { runtime.EventsEmit(ctx, event, data...) }
+}
+
+// ConformProgressEvent is emitted as "conformance:progress" after each operation of a run.
+type ConformProgressEvent struct {
+	Done      int    `json:"done"`
+	Total     int    `json:"total"`
+	Operation string `json:"operation"` // for example "GET /products"
+}
 
 type ConformContextIO struct {
 	Workspace    string      `json:"workspace"`
@@ -122,6 +135,9 @@ type ConformRunInput struct {
 	// RecordCoverage adds the run to the Contracts coverage store. Only unfiltered runs are
 	// recorded, so a run limited by tags or paths cannot skew the accumulated totals.
 	RecordCoverage bool `json:"recordCoverage"`
+	// Vars override or add environment variables for this run only, as name=value (the same as
+	// `clrsig conform --var`). They are not saved and not part of the Get CLI command.
+	Vars []string `json:"vars"`
 }
 
 type ConformProbeIO struct {
@@ -227,6 +243,13 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		}
 	}
 
+	if len(in.Vars) > 0 {
+		var err error
+		if env, err = variables.WithOverrides(env, in.Vars); err != nil {
+			return ConformRunOutputIO{Error: "variable overrides: " + err.Error()}
+		}
+	}
+
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
 	s.cancelRun = cancel
@@ -250,6 +273,11 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		Coverage:         true,
 		Negative:         in.Negative,
 		ReadOnly:         !in.AllowWrites,
+		Progress: func(done, total int, op conformance.OperationResult) {
+			if s.emit != nil {
+				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.Path})
+			}
+		},
 	})
 	s.mu.Lock()
 	s.last = &out

@@ -30,6 +30,10 @@ type ConformInput struct {
 	RequestTimeoutMs int  // 0 means DefaultConformRequestTimeoutMs
 	ReadOnly         bool // send only GET and HEAD operations
 
+	// Progress, when set, is called after each operation with how many are done out of how many
+	// and the operation just handled.
+	Progress func(done, total int, op conformance.OperationResult)
+
 	Coverage bool // compute the coverage report
 	Negative bool // also run negative probes
 	Baseline *conformance.Baseline
@@ -70,6 +74,7 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		FailFast:         in.FailFast,
 		ReadOnly:         in.ReadOnly,
 		RequestTimeoutMs: timeout,
+		OnOperation:      in.Progress,
 	}
 
 	out := ConformOutput{}

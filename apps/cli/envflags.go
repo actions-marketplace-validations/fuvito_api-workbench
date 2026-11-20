@@ -32,29 +32,9 @@ func finishEnvironment(cmd *cobra.Command, env *domain.Environment, vars []strin
 // applyVars returns a copy of env with each name=value overriding or adding a variable. An
 // override keeps the variable's secret flag, so a secret stays redacted. A nil env is allowed.
 func applyVars(env *domain.Environment, vars []string) (*domain.Environment, error) {
-	out := &domain.Environment{SchemaVersion: domain.CurrentSchemaVersion, Name: "command line"}
-	if env != nil {
-		copied := *env
-		copied.Variables = append([]domain.EnvironmentVariable(nil), env.Variables...)
-		out = &copied
-	}
-	for _, raw := range vars {
-		name, value, ok := strings.Cut(raw, "=")
-		name = strings.TrimSpace(name)
-		if !ok || name == "" {
-			return nil, fmt.Errorf("--var %q must look like name=value", raw)
-		}
-		replaced := false
-		for i := range out.Variables {
-			if out.Variables[i].Name == name {
-				out.Variables[i].Value = value
-				replaced = true
-				break
-			}
-		}
-		if !replaced {
-			out.Variables = append(out.Variables, domain.EnvironmentVariable{Name: name, Value: value})
-		}
+	out, err := variables.WithOverrides(env, vars)
+	if err != nil {
+		return nil, fmt.Errorf("--var %w", err)
 	}
 	return out, nil
 }

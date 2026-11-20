@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { ConformanceTab, isLocalUrl, splitList, cliValues } from './ConformanceTab'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
+import { ConformanceTab, isLocalUrl, splitList, parseVars, cliValues } from './ConformanceTab'
 
 const bridge = vi.hoisted(() => ({
   getConformContext: vi.fn(),
   inspectConformSpec: vi.fn(),
   runConformance: vi.fn(),
   cancelConformance: vi.fn(),
+  onConformanceProgress: vi.fn((_cb: unknown): (() => void) => () => {}),
   exportConformReport: vi.fn(),
   saveContentToFile: vi.fn(),
   openInSystemViewer: vi.fn(),
@@ -63,7 +64,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, recordCoverage: false,
+      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -279,5 +280,68 @@ describe('ConformanceTab Get CLI command', () => {
     expect(open).toHaveBeenCalledWith({
       spec: '/ws/api.yaml', 'base-url': 'http://localhost:8120', env: '/ws/environments/local.yaml', 'read-only': 'true',
     })
+  })
+})
+
+describe('variable overrides', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(output)
+  })
+
+  it('parseVars keeps name=value lines and reports the bad ones', () => {
+    expect(parseVars('id=1\n\n  name = Lamp  \nurl=http://a?b=c')).toEqual({ vars: ['id=1', 'name = Lamp', 'url=http://a?b=c'], bad: [] })
+    expect(parseVars('novalue\n=x\nok=1')).toEqual({ vars: ['ok=1'], bad: ['novalue', '=x'] })
+    expect(parseVars('')).toEqual({ vars: [], bad: [] })
+  })
+
+  it('sends the overrides with the run', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Variable overrides'), { target: { value: 'id=1\nname=Lamp' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ vars: ['id=1', 'name=Lamp'] })))
+  })
+
+  it('blocks a run while a line is not name=value', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Variable overrides'), { target: { value: 'oops' } })
+    expect(screen.getByRole('button', { name: /Run conformance check/ })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('name=value: oops')
+  })
+})
+
+describe('run progress', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+  })
+
+  it('shows how far a running check is, and stops listening when it ends', async () => {
+    let listener: ((p: { done: number; total: number; operation: string }) => void) | undefined
+    const stop = vi.fn()
+    bridge.onConformanceProgress.mockImplementation((cb: unknown) => { listener = cb as typeof listener; return stop })
+    let finish: (v: unknown) => void = () => {}
+    bridge.runConformance.mockReturnValue(new Promise(resolve => { finish = resolve }))
+
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-progress')).toHaveTextContent('Starting…')
+    await waitFor(() => expect(listener).toBeDefined())
+
+    act(() => listener?.({ done: 3, total: 7, operation: 'GET /products' }))
+    expect(screen.getByTestId('conform-progress')).toHaveTextContent('3 of 7 · GET /products')
+    const bar = screen.getByRole('progressbar', { name: 'Conformance run progress' })
+    expect(bar).toHaveAttribute('value', '3')
+    expect(bar).toHaveAttribute('max', '7')
+
+    await act(async () => { finish(output) })
+    await screen.findByRole('region', { name: 'Conformance results' })
+    expect(screen.queryByTestId('conform-progress')).not.toBeInTheDocument()
+    expect(stop).toHaveBeenCalled()
   })
 })

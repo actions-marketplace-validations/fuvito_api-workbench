@@ -599,3 +599,11 @@ Do not implement or stub any of these without explicit user direction.
 ### 2026-11-19 — Project backlog
 
 - **`docs/backlog.md`** is the one living list of open work (checkbox, ID `B-###`, size, what it needs, source). It links to `docs/next_steps/` (point-in-time plans, never edited to stay current) and `docs/enhancements/` (one proposal per major feature) instead of copying them. Tick items there when they ship and add new ones with the next free ID.
+
+### 2026-11-19 — Backlog items B-001, B-004, B-005, B-011 (conformance)
+
+- **B-001 explanations everywhere:** `reporting` redacts and renders `conformance.Diagnose` findings: `ConformJSON` gains an additive `findings` array per operation, `ConformHTML`/`ConformMarkdown` and `ConformJUnit` add one `→ … Why: … Fix: …` line per failure (JUnit's failure `message` still counts violations). The screen output stays as it was unless `clrsig conform --explain` (new, opt-in, in the command catalog) is given: scripts and CI logs rely on it. `reporting.ConformTextExplained`; `ConformText` is unchanged.
+- **B-004 progress:** `conformance.Options.OnOperation` / `application.ConformInput.Progress` / Wails event `conformance:progress` (`ConformProgressEvent`), shown on the page as a progress bar and the current operation. Negative probes report no progress yet.
+- **B-005 variable overrides:** `variables.WithOverrides` (moved out of the CLI, which keeps `applyVars` as a wrapper with the same `--var …` error text); `ConformRunInput.Vars`; a "Variable overrides" box in the page's Options (this run only, never saved, not in Get CLI command).
+- **B-011 sample workspace content:** the Conformance workspace now has `scenarios/product-lifecycle.yaml` and four requests.
+- **Finding, not changed (B-009):** a URL with an unresolved `{{placeholder}}` is still sent and a declared 404 passes, so such an operation shows as Passing without being compared. Recorded in the backlog for a decision.

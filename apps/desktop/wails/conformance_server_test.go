@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,7 +13,10 @@ import (
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/scenario"
+	"github.com/fuvito/api-workbench/packages/core/serialization"
 )
 
 // Each operation is called once and validated against the embedded spec, the
@@ -201,5 +206,62 @@ func TestConformanceOpenWorkspace_RefusedWhileDemoWorkspaceIsOpen(t *testing.T) 
 	demo := NewDemoService(ws)
 	if res := demo.StartDemo(); !strings.Contains(res.Error, "Conformance Server") {
 		t.Fatalf("the demo must refuse while the conformance workspace is open: %+v", res)
+	}
+}
+
+// The sample scenario in the Conformance workspace must parse, name the spec, and show the two
+// documented spec violations (and the passing step) when it is run against the server.
+func TestConformanceWorkspaceSampleScenario(t *testing.T) {
+	dir := t.TempDir()
+	if err := writeConformanceWorkspace(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"requests/health.yaml", "requests/products/get-product.yaml", "requests/categories/list-categories.yaml", "requests/products/list-products.yaml"} {
+		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := serialization.ParseRequestFile(data, filepath.Base(name)); err != nil {
+			t.Errorf("%s does not parse: %v", name, err)
+		}
+	}
+
+	scnPath := filepath.Join(dir, "scenarios", "product-lifecycle.yaml")
+	data, err := os.ReadFile(scnPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, err := serialization.ParseScenarioFile(data, "product-lifecycle.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sc.SpecFile != "../specs/conformance-openapi.yaml" {
+		t.Fatalf("specFile = %q", sc.SpecFile)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(scnPath), filepath.FromSlash(sc.SpecFile))); err != nil {
+		t.Fatalf("the spec the scenario names is not in the workspace: %v", err)
+	}
+
+	srv := httptest.NewServer(newConformanceMux())
+	defer srv.Close()
+	spec, err := openapi.ParseBytes(conformanceOpenAPIYAML, "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	envData, _ := os.ReadFile(conformanceEnvFile(t))
+	env, err := serialization.ParseEnvironmentFile(envData, "env.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.Variables = append(env.Variables, domain.EnvironmentVariable{Name: "baseUrl", Value: srv.URL})
+	res := scenario.NewWithSpec(executor.New(executor.Options{}), spec).Run(context.Background(), sc, env)
+
+	var states []scenario.SpecState
+	for _, st := range res.Steps {
+		states = append(states, st.Spec.State)
+	}
+	want := []scenario.SpecState{scenario.SpecMatched, scenario.SpecViolations, scenario.SpecViolations}
+	if len(states) != 3 || states[0] != want[0] || states[1] != want[1] || states[2] != want[2] {
+		t.Fatalf("spec states = %v, want %v", states, want)
 	}
 }

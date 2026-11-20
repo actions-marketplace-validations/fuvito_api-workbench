@@ -106,3 +106,34 @@ func ResolveEnvironment(env *domain.Environment, eng *Engine) (*domain.Environme
 	}
 	return &out, r.TakeErrors()
 }
+
+// WithOverrides returns a copy of env with each name=value in vars overriding or adding a
+// variable; env itself is not modified and may be nil. An override keeps the variable's secret
+// flag, so a secret stays redacted. A malformed entry is an error naming it.
+func WithOverrides(env *domain.Environment, vars []string) (*domain.Environment, error) {
+	out := &domain.Environment{SchemaVersion: domain.CurrentSchemaVersion, Name: "command line"}
+	if env != nil {
+		copied := *env
+		copied.Variables = append([]domain.EnvironmentVariable(nil), env.Variables...)
+		out = &copied
+	}
+	for _, raw := range vars {
+		name, value, ok := strings.Cut(raw, "=")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" {
+			return nil, fmt.Errorf("%q must look like name=value", raw)
+		}
+		replaced := false
+		for i := range out.Variables {
+			if out.Variables[i].Name == name {
+				out.Variables[i].Value = value
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			out.Variables = append(out.Variables, domain.EnvironmentVariable{Name: name, Value: value})
+		}
+	}
+	return out, nil
+}

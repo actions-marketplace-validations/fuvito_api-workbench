@@ -167,7 +167,85 @@ func writeConformanceWorkspace(dir string, port int) error {
 	if err := os.WriteFile(filepath.Join(dir, "environments", "local.yaml"), []byte(env), 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "environments", ".gitignore"), []byte("*\n"), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "environments", ".gitignore"), []byte("*\n"), 0o644); err != nil {
+		return err
+	}
+	for name, content := range conformanceWorkspaceFiles {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// conformanceWorkspaceFiles are the sample requests and the scenario that make the Requests and
+// Scenarios panels useful in the Conformance workspace. The scenario names the spec, so a run
+// shows the spec conformance summary: its second and third steps hit the two operations whose
+// responses break the spec.
+var conformanceWorkspaceFiles = map[string]string{
+	"requests/health.yaml": `schemaVersion: "1"
+title: Health
+method: GET
+url: "{{baseUrl}}/health"
+`,
+	"requests/products/list-products.yaml": `schemaVersion: "1"
+title: List products
+method: GET
+url: "{{baseUrl}}/products"
+`,
+	"requests/products/get-product.yaml": `schemaVersion: "1"
+title: Get a product (price is sent as text)
+method: GET
+url: "{{baseUrl}}/products/{{id}}"
+`,
+	"requests/categories/list-categories.yaml": `schemaVersion: "1"
+title: List categories (name is missing)
+method: GET
+url: "{{baseUrl}}/categories"
+`,
+	"scenarios/product-lifecycle.yaml": `schemaVersion: "1"
+title: Product lifecycle
+description: Reads products and categories from the Conformance Server and checks every response against its spec. Steps 2 and 3 pass their own assertions but break the spec; open Setup and its Result tab to see why.
+specFile: ../specs/conformance-openapi.yaml
+
+steps:
+  - label: List products
+    notes: Conforms to the spec.
+    request:
+      method: GET
+      url: "{{baseUrl}}/products"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+    failPolicy: continue
+
+  - label: Get a product
+    notes: The server sends price as text; the spec says number.
+    request:
+      method: GET
+      url: "{{baseUrl}}/products/{{id}}"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+    failPolicy: continue
+
+  - label: List categories
+    notes: The server leaves out the required name field.
+    request:
+      method: GET
+      url: "{{baseUrl}}/categories"
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+    failPolicy: continue
+`,
 }
 
 // OpenSpecInBrowser opens the Swagger UI page; a non-empty string is an error.

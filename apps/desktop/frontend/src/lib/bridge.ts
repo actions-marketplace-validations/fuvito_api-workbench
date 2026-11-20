@@ -83,6 +83,7 @@ import {
   GetPort as WailsGetDemoPort,
   OpenSpecInBrowser as WailsOpenDemoSpec,
 } from '@wailsjs/go/main/DemoService'
+import { EventsOn } from '@wailsjs/runtime/runtime'
 import {
   GetConformContext as WailsGetConformContext,
   InspectConformSpec as WailsInspectConformSpec,
@@ -747,6 +748,7 @@ export interface ConformRunInput {
   failFast: boolean
   timeoutMs: number
   recordCoverage: boolean
+  vars: string[]
 }
 
 export interface ConformProbe {
@@ -821,6 +823,23 @@ export async function cancelConformance(): Promise<void> {
 
 export async function exportConformReport(format: ConformReportFormat): Promise<RunReport> {
   return (await WailsExportConformReport(format)) as unknown as RunReport
+}
+
+export interface ConformProgress {
+  done: number
+  total: number
+  operation: string
+}
+
+// Calls cb after each operation of a conformance run ("conformance:progress"). Returns the
+// function that stops listening. Outside the desktop app (tests, the browser mock) it does nothing.
+export function onConformanceProgress(cb: (progress: ConformProgress) => void): () => void {
+  try {
+    const off = EventsOn('conformance:progress', cb) as unknown
+    return typeof off === 'function' ? (off as () => void) : () => {}
+  } catch {
+    return () => {}
+  }
 }
 
 // ---- Conformance server ----

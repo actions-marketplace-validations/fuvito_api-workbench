@@ -87,3 +87,45 @@ func TestBuilderReadOnlyConformCommand(t *testing.T) {
 		t.Fatalf("expected the two write operations to be skipped:\n%s", out)
 	}
 }
+
+func TestConformExplainIsOptIn(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"price":"9.99"}`))
+	}))
+	defer srv.Close()
+	spec := filepath.Join(t.TempDir(), "p.yaml")
+	body := `openapi: "3.0.3"
+info: {title: p, version: "1"}
+paths:
+  /things:
+    get:
+      operationId: listThings
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {type: object, required: [price], properties: {price: {type: number}}}
+`
+	if err := os.WriteFile(spec, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	plain, _ := exec(t, "conform", "--base-url", srv.URL, spec)
+	if strings.Contains(plain, "Why:") {
+		t.Fatalf("the default output must not change:\n%s", plain)
+	}
+	explained, err := exec(t, "conform", "--base-url", srv.URL, "--explain", spec)
+	if exitCode(err) != 1 {
+		t.Fatalf("a violation still fails the run: %v", err)
+	}
+	if !strings.Contains(explained, `"price" is text, the spec says number. Why:`) || !strings.Contains(explained, "Fix:") {
+		t.Fatalf("explanation missing:\n%s", explained)
+	}
+
+	js, _ := exec(t, "conform", "--base-url", srv.URL, "--format", "json", spec)
+	if !strings.Contains(js, `"findings"`) || !strings.Contains(js, `"kind": "wrong-type"`) {
+		t.Fatalf("the JSON report always carries the findings:\n%s", js)
+	}
+}

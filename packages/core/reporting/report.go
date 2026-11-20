@@ -322,6 +322,13 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 // ConformText returns a human-readable conformance report suitable for terminal / CI output.
 // Pass a non-nil coverage to append a coverage summary section.
 func ConformText(result *conformance.ConformResult, coverage *conformance.CoverageReport) string {
+	return ConformTextExplained(result, coverage, false)
+}
+
+// ConformTextExplained is ConformText that can also explain each failure in plain language (what
+// the spec expected, what the server sent, why that fails and what to change). The explanation is
+// opt-in so the default output, which scripts and CI logs rely on, stays as it was.
+func ConformTextExplained(result *conformance.ConformResult, coverage *conformance.CoverageReport, explainFailures bool) string {
 	var b strings.Builder
 	x := newRedactor(result.Secrets, false)
 
@@ -350,6 +357,11 @@ func ConformText(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		for _, v := range op.Violations {
 			fmt.Fprintf(&b, "         ✗ %s\n", x.text(v.Error()))
+		}
+		if explainFailures {
+			for _, f := range explain(op, x) {
+				fmt.Fprintf(&b, "         → %s\n", explanationLine(f))
+			}
 		}
 	}
 
@@ -408,6 +420,20 @@ type JSONConformOp struct {
 	Error             string   `json:"error,omitempty"`
 	RequestViolations []string `json:"requestViolations,omitempty"`
 	Violations        []string `json:"violations,omitempty"`
+	// Findings explain each failure in plain language (added in addition to the fields above,
+	// which are unchanged).
+	Findings []JSONConformFinding `json:"findings,omitempty"`
+}
+
+// JSONConformFinding is the machine-readable form of conformance.Finding.
+type JSONConformFinding struct {
+	Kind     string `json:"kind"`
+	Where    string `json:"where,omitempty"`
+	Summary  string `json:"summary"`
+	Expected string `json:"expected,omitempty"`
+	Got      string `json:"got,omitempty"`
+	Why      string `json:"why"`
+	Fix      string `json:"fix"`
 }
 
 // JSONCoverage is the machine-readable coverage summary.
@@ -455,6 +481,11 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		for _, v := range op.Violations {
 			jo.Violations = append(jo.Violations, x.text(v.Error()))
+		}
+		for _, f := range explain(op, x) {
+			jo.Findings = append(jo.Findings, JSONConformFinding{
+				Kind: f.Kind, Where: f.Where, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
+			})
 		}
 		report.Operations = append(report.Operations, jo)
 	}
@@ -511,8 +542,12 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 			for _, v := range op.Violations {
 				msgs = append(msgs, "  ✗ "+x.text(v.Error()))
 			}
+			violations := len(msgs)
+			for _, f := range explain(op, x) {
+				msgs = append(msgs, "  → "+explanationLine(f))
+			}
 			tc.Failure = &jUnitFailure{
-				Message: fmt.Sprintf("%d violation(s)", len(msgs)),
+				Message: fmt.Sprintf("%d violation(s)", violations),
 				Text:    strings.Join(msgs, "\n"),
 			}
 		}

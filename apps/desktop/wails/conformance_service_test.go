@@ -247,3 +247,65 @@ func TestConformanceService_WarnsAboutUnsetEnvironmentReferences(t *testing.T) {
 		t.Fatalf("no warning expected: %v", clean.Warnings)
 	}
 }
+
+func TestConformanceService_VariableOverrides(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	envPath := filepath.Join(t.TempDir(), "env.yaml")
+	if err := os.WriteFile(envPath, []byte("schemaVersion: \"1\"\nname: e\nvariables:\n  - name: name\n    value: Lamp\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	spec := conformanceSpecFile(t)
+	op := func(out ConformRunOutputIO, id string) ConformOperationIO {
+		for _, o := range out.Operations {
+			if o.OperationID == id {
+				return o
+			}
+		}
+		t.Fatalf("no operation %s", id)
+		return ConformOperationIO{}
+	}
+
+	// Without a value for the path parameter, the request keeps its {{id}} placeholder and the
+	// server answers 404 (a declared response), so there is nothing to compare.
+	without := op(svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: envPath}), "getProduct")
+	if without.StatusCode != 404 || len(without.Findings) != 0 {
+		t.Fatalf("getProduct without id: %+v", without)
+	}
+	// An override supplies it for this run, so the real violation shows.
+	with := op(svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: envPath, Vars: []string{"id=1"}}), "getProduct")
+	if with.StatusCode != 200 || len(with.Findings) != 1 || with.Findings[0].Kind != "wrong-type" {
+		t.Fatalf("getProduct with id=1: %+v", with)
+	}
+	// The environment file itself was not changed.
+	if data, _ := os.ReadFile(envPath); strings.Contains(string(data), "id") && strings.Contains(string(data), "value: \"1\"") {
+		t.Fatal("an override must not be written to the environment file")
+	}
+
+	bad := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: envPath, Vars: []string{"oops"}})
+	if !strings.Contains(bad.Error, "variable overrides") || !strings.Contains(bad.Error, "name=value") {
+		t.Fatalf("a malformed override must be reported: %q", bad.Error)
+	}
+}
+
+func TestConformanceService_EmitsProgressEvents(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	var events []ConformProgressEvent
+	svc.emit = func(name string, data ...interface{}) {
+		if name != "conformance:progress" || len(data) != 1 {
+			t.Errorf("unexpected event %q %v", name, data)
+			return
+		}
+		events = append(events, data[0].(ConformProgressEvent))
+	}
+	out := svc.RunConformance(ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t), AllowWrites: true})
+	if out.Error != "" || len(events) != out.Total || out.Total != 7 {
+		t.Fatalf("%d events for %d operations (%v)", len(events), out.Total, out.Error)
+	}
+	for i, e := range events {
+		if e.Done != i+1 || e.Total != 7 || e.Operation == "" {
+			t.Errorf("event %d = %+v", i, e)
+		}
+	}
+}

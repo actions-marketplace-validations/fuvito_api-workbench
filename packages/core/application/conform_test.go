@@ -144,3 +144,23 @@ paths:
 		t.Fatal("without ReadOnly the DELETE operation should be sent")
 	}
 }
+
+func TestRunConformance_ReportsProgressForEveryOperation(t *testing.T) {
+	var done []int
+	var totals []int
+	var seen []string
+	out := run(t, application.ConformInput{
+		ReadOnly: false,
+		Tags:     []string{"a"}, // /bad is skipped but still counts as handled
+		Progress: func(d, total int, op conformance.OperationResult) {
+			done, totals = append(done, d), append(totals, total)
+			seen = append(seen, op.Method+" "+op.Path)
+		},
+	})
+	if out.Failed {
+		t.Fatalf("unexpected failure: %+v", out.Violations)
+	}
+	if len(done) != 2 || done[0] != 1 || done[1] != 2 || totals[0] != 2 || totals[1] != 2 {
+		t.Fatalf("progress = done %v of %v (%v)", done, totals, seen)
+	}
+}

@@ -107,6 +107,9 @@ type Options struct {
 	// ReadOnly runs only GET and HEAD operations; every other operation is reported as skipped
 	// and never sent.
 	ReadOnly bool
+	// OnOperation, when set, is called after each operation has been handled (run, skipped or
+	// failed to send) with how many are done out of how many, so a caller can show progress.
+	OnOperation func(done, total int, op OperationResult)
 }
 
 // IsReadOnlyMethod reports whether an HTTP method cannot change server state (GET, HEAD).
@@ -144,6 +147,12 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		return result
 	}
 
+	handled := func() {
+		if opts.OnOperation != nil {
+			opts.OnOperation(len(result.Operations), len(reqs), result.Operations[len(result.Operations)-1])
+		}
+	}
+
 	for _, gr := range reqs {
 		opPath := pathOf(gr.Request.URL, baseURL)
 		or := OperationResult{
@@ -158,6 +167,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			(opts.ReadOnly && !IsReadOnlyMethod(or.Method)) {
 			or.Skipped = true
 			result.Operations = append(result.Operations, or)
+			handled()
 			continue
 		}
 
@@ -177,6 +187,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		if execErr != nil {
 			or.Error = execErr.Error()
 			result.Operations = append(result.Operations, or)
+			handled()
 			if opts.FailFast {
 				break
 			}
@@ -188,6 +199,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
 
 		result.Operations = append(result.Operations, or)
+		handled()
 
 		if !or.Passed() && opts.FailFast {
 			break

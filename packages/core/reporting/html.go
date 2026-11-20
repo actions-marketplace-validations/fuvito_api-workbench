@@ -288,6 +288,9 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 		for _, v := range op.Violations {
 			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: x.text(v.Error())})
 		}
+		for _, f := range explain(op, x) {
+			row.Lines = append(row.Lines, htmlLine{Mark: "→", Text: explanationLine(f)})
+		}
 		ops.Rows = append(ops.Rows, row)
 	}
 	doc.Sections = append(doc.Sections, ops)
