@@ -217,6 +217,7 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
   }
 
   const getSpecText = async () => spec ?? await getFormatSpec()
+  const getGuideText = async () => guide ?? await getUserGuide()
   const getCatalogText = async () => catalog ?? await getWhatWeCheck()
   const getScenarioYaml = async () => (example ? extractScenarioYaml(example) : null)
 
@@ -289,6 +290,20 @@ export function HelpPanel({ onClose, initialTab = 'guide' }: Props) {
                   id="copy-spec" done={doneAction} label="Copy Format Spec" doneLabel="Copied!" icon={<Copy size={12} />}
                   title="Copy the format specification to your clipboard"
                   onClick={() => runAction('copy-spec', copyAction(getSpecText))}
+                />
+              </>
+            )}
+            {tab === 'guide' && (
+              <>
+                <HeaderAction
+                  id="download-guide" done={doneAction} label="Download" doneLabel="Saved!" icon={<Download size={12} />}
+                  title="Save the user guide as a Markdown file"
+                  onClick={() => runAction('download-guide', downloadAction(getGuideText, 'clear-signal-user-guide.md'))}
+                />
+                <HeaderAction
+                  id="copy-guide" done={doneAction} label="Copy" doneLabel="Copied!" icon={<Copy size={12} />}
+                  title="Copy the user guide to your clipboard"
+                  onClick={() => runAction('copy-guide', copyAction(getGuideText))}
                 />
               </>
             )}

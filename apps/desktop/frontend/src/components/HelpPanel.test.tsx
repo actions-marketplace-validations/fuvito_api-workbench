@@ -162,6 +162,19 @@ describe('AI Prompt tab', () => {
   })
 })
 
+describe('HelpPanel: User Guide tab', () => {
+  it('has Copy and Download like the other tabs', async () => {
+    render(<HelpPanel onClose={vi.fn()} />)
+    await screen.findByText('Guide body')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Copy/ }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('Guide body')))
+
+    fireEvent.click(screen.getByRole('button', { name: /Download/ }))
+    await waitFor(() => expect(b.saveContentToFile).toHaveBeenCalledWith(expect.stringContaining('Guide body'), 'clear-signal-user-guide.md'))
+  })
+})
+
 describe('HelpPanel: What We Check tab', () => {
   it('loads the catalog only when its tab is opened and shows its table', async () => {
     render(<HelpPanel onClose={vi.fn()} />)

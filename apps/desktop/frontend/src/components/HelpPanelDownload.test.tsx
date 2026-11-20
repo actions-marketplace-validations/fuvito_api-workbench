@@ -87,10 +87,10 @@ describe('download buttons', () => {
     expect(screen.queryByText('Saved!')).not.toBeInTheDocument()
   })
 
-  it('is not offered on the user guide tab', async () => {
+  it('is offered on the user guide tab too, like every other tab', async () => {
     render(<HelpPanel onClose={vi.fn()} />)
     await screen.findByText('Guide body')
-    expect(screen.queryByRole('button', { name: /Download/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Download/ })).toBeInTheDocument()
   })
 
   it('shows the confirmation only on the button that was used', async () => {
