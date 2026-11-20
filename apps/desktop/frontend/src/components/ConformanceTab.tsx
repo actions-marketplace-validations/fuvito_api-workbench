@@ -39,9 +39,25 @@ const KIND_LABEL: Record<string, string> = {
   'wrong-type': 'wrong type',
   'missing-field': 'missing field',
   'missing-value': 'missing value',
+  'undeclared-status': 'undeclared status',
+  'wrong-content-type': 'wrong content type',
+  'missing-header': 'missing header',
+  'bad-header': 'bad header',
   'request': 'invalid request',
   'no-response': 'no answer',
   'other': 'other difference',
+}
+
+// Where a finding is, in words: `response header "X-Total-Count"`, `response body, field price`,
+// `response status 500`. Empty when the finding names no place.
+export function findingWhere(f: Pick<ConformFinding, 'part' | 'where'>): string {
+  const part = f.part ?? ''
+  const where = f.where ?? ''
+  if (!part && !where) return ''
+  if (!where) return part
+  if (part === 'response body') return `${part}, field ${where}`
+  if (part === 'response header') return `${part} "${where}"`
+  return `${part} ${where}`.trim()
 }
 
 function isWrite(method: string): boolean {
@@ -53,9 +69,11 @@ function FindingView({ f }: { f: ConformFinding }) {
   return (
     <div className="rounded border border-[var(--color-border)] bg-[var(--color-background)] p-2.5">
       <p className="text-xs font-semibold text-[var(--color-foreground)]">{f.summary}</p>
-      <dl className="mt-1.5 grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1 text-xs">
+      <dl className="mt-1.5 grid grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1 text-xs">
         {f.expected && <><dt className="text-[var(--color-muted-foreground)]">Expected</dt><dd className="font-mono">{f.expected}</dd></>}
         {f.got && <><dt className="text-[var(--color-muted-foreground)]">Got</dt><dd className="font-mono break-all">{f.got}</dd></>}
+        {findingWhere(f) && <><dt className="text-[var(--color-muted-foreground)]">Where</dt><dd data-testid="finding-where" className="font-mono break-all">{findingWhere(f)}</dd></>}
+        {f.spec && <><dt className="text-[var(--color-muted-foreground)]">In the spec</dt><dd data-testid="finding-spec" className="font-mono break-all">{f.spec}</dd></>}
         <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd>{f.why}</dd>
         <dt className="text-[var(--color-muted-foreground)]">Fix</dt><dd>{f.fix}</dd>
       </dl>

@@ -53,8 +53,8 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 	spec := conformanceSpecFile(t)
 
 	info := svc.InspectConformSpec(spec)
-	if info.Error != "" || info.Writes != 2 || info.Reads != 5 {
-		t.Fatalf("inspect: %+v (want 5 reads, 2 writes)", info)
+	if info.Error != "" || info.Writes != 2 || info.Reads != 8 {
+		t.Fatalf("inspect: %+v (want 8 reads, 2 writes)", info)
 	}
 
 	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)})
@@ -64,25 +64,44 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 	if writes.Load() != 0 {
 		t.Fatalf("read-only run sent %d write(s)", writes.Load())
 	}
-	if out.Total != 7 || out.Covered != 5 || out.NotCovered != 2 || out.Passing != 2 || out.Failing != 3 {
+	if out.Total != 10 || out.Covered != 8 || out.NotCovered != 2 || out.Passing != 2 || out.Failing != 6 {
 		t.Fatalf("totals: %+v", out)
 	}
-	// Each known violation must fail for its own reason: a bad field in the response body, not a
-	// request that could not be built or a 404.
-	cause := map[string]string{"getProduct": "/price", "listCategories": "name", "listOrders": "/id"}
+	// Each known violation must fail for its own reason, and say what and where it is: a bad field
+	// in the body, a wrong Content-Type, a missing header, an undeclared status; never a request
+	// that could not be built.
+	known := map[string]struct {
+		kind   string
+		status int
+		inMsg  []string // the raw message names the operation and the thing that is wrong
+		where  string   // Finding.Where
+	}{
+		"getProduct":     {"wrong-type", 200, []string{"/price"}, "price"},
+		"listCategories": {"missing-field", 200, []string{"name"}, "[0].name"},
+		"listOrders":     {"wrong-type", 200, []string{"/id"}, "[0].id"},
+		"listWidgets":    {"wrong-content-type", 200, []string{"GET /widgets", `"text/plain"`, "application/json"}, "Content-Type"},
+		"getInventory":   {"missing-header", 200, []string{"GET /inventory", `"X-Total-Count"`}, "X-Total-Count"},
+		"getStatus":      {"undeclared-status", 503, []string{"GET /status", "answered 503", "200"}, "503"},
+	}
 	var failing []string
 	for _, op := range out.Operations {
 		if op.Status != "failed" {
 			continue
 		}
 		failing = append(failing, op.OperationID)
-		wantKind := map[string]string{"getProduct": "wrong-type", "listCategories": "missing-field", "listOrders": "wrong-type"}[op.OperationID]
-		if len(op.Findings) != 1 || op.Findings[0].Kind != wantKind || op.Findings[0].Why == "" || op.Findings[0].Fix == "" {
-			t.Errorf("%s findings: %+v, want one %s", op.OperationID, op.Findings, wantKind)
+		k := known[op.OperationID]
+		if len(op.Findings) != 1 || op.Findings[0].Kind != k.kind || op.Findings[0].Why == "" || op.Findings[0].Fix == "" ||
+			op.Findings[0].Part == "" || op.Findings[0].Spec == "" || op.Findings[0].Where != k.where {
+			t.Errorf("%s findings: %+v, want one %s at %q with part, spec location, why and fix", op.OperationID, op.Findings, k.kind, k.where)
 		}
-		if op.StatusCode != 200 || len(op.Violations) != 1 ||
-			!strings.Contains(op.Violations[0], cause[op.OperationID]) || strings.HasPrefix(op.Violations[0], "request:") {
+		if op.StatusCode != k.status || len(op.Violations) != 1 || strings.HasPrefix(op.Violations[0], "request:") {
 			t.Errorf("%s failed for the wrong reason: status %d, %q", op.OperationID, op.StatusCode, op.Violations)
+			continue
+		}
+		for _, want := range k.inMsg {
+			if !strings.Contains(op.Violations[0], want) {
+				t.Errorf("%s: the message should say %q:\n%s", op.OperationID, want, op.Violations[0])
+			}
 		}
 	}
 	want := append([]string(nil), conformanceKnownViolations...)
@@ -93,7 +112,7 @@ func TestConformanceService_ReadOnlyByDefaultAndKnownViolations(t *testing.T) {
 	}
 
 	withWrites := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: conformanceEnvFile(t), AllowWrites: true})
-	if writes.Load() == 0 || withWrites.NotCovered != 0 || withWrites.Passing != 4 || withWrites.Failing != 3 {
+	if writes.Load() == 0 || withWrites.NotCovered != 0 || withWrites.Passing != 4 || withWrites.Failing != 6 {
 		t.Fatalf("with AllowWrites the write operations must run: writes=%d %+v", writes.Load(), withWrites)
 	}
 }
@@ -160,7 +179,7 @@ func TestConformanceService_FiltersAndCoverageRecording(t *testing.T) {
 		t.Fatalf("note = %q", out.CoverageNote)
 	}
 	stored := coverage.Load(ws, "specs/api.yaml")
-	if stored.TotalRuns != 1 || len(stored.Exercised) != 7 || stored.FailedRuns != 1 {
+	if stored.TotalRuns != 1 || len(stored.Exercised) != 10 || stored.FailedRuns != 1 {
 		t.Fatalf("stored coverage: %+v", stored)
 	}
 }
@@ -318,11 +337,11 @@ func TestConformanceService_EmitsProgressEvents(t *testing.T) {
 		events = append(events, data[0].(ConformProgressEvent))
 	}
 	out := svc.RunConformance(ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t), AllowWrites: true})
-	if out.Error != "" || len(events) != out.Total || out.Total != 7 {
+	if out.Error != "" || len(events) != out.Total || out.Total != 10 {
 		t.Fatalf("%d events for %d operations (%v)", len(events), out.Total, out.Error)
 	}
 	for i, e := range events {
-		if e.Done != i+1 || e.Total != 7 || e.Operation == "" {
+		if e.Done != i+1 || e.Total != 10 || e.Operation == "" {
 			t.Errorf("event %d = %+v", i, e)
 		}
 	}

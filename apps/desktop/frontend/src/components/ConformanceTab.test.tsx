@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
-import { ConformanceTab, isLocalUrl, splitList, parseVars, cliValues } from './ConformanceTab'
+import { ConformanceTab, isLocalUrl, splitList, parseVars, cliValues, findingWhere } from './ConformanceTab'
 
 const bridge = vi.hoisted(() => ({
   getConformContext: vi.fn(),
@@ -417,5 +417,81 @@ describe('operations that could not be sent', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
     await screen.findByTestId('conform-headline')
     expect(screen.queryByRole('region', { name: 'Missing values' })).not.toBeInTheDocument()
+  })
+})
+
+describe('where the problem is', () => {
+  it('findingWhere says it in words', () => {
+    expect(findingWhere({})).toBe('')
+    expect(findingWhere({ part: 'response status', where: '503' })).toBe('response status 503')
+    expect(findingWhere({ part: 'response header', where: 'X-Total-Count' })).toBe('response header "X-Total-Count"')
+    expect(findingWhere({ part: 'response body', where: '[0].id' })).toBe('response body, field [0].id')
+    expect(findingWhere({ part: 'response body' })).toBe('response body')
+  })
+
+  const finding = (kind: string, over: object) => ({
+    kind, summary: 's', why: 'because', fix: 'do this', detail: 'raw', ...over,
+  })
+  const failing = (id: string, method: string, path: string, statusCode: number, f: object) => ({
+    operationId: id, method, path, status: 'failed' as const, statusCode, durationMs: 3, violations: ['raw'], findings: [f],
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+  })
+
+  it('shows what, where in the response, where in the spec, why and how to fix it', async () => {
+    bridge.runConformance.mockResolvedValue({
+      ...output, passing: 0, failing: 3, covered: 3, operations: [
+        failing('h', 'GET', '/inventory', 200, finding('missing-header', {
+          summary: 'The required header "X-Total-Count" was not sent', part: 'response header', where: 'X-Total-Count',
+          spec: 'GET /inventory → response 200 → headers → X-Total-Count', expected: 'the header X-Total-Count', got: 'not sent',
+          why: 'The spec marks it as required.', fix: 'Send it.',
+        })),
+        failing('s', 'GET', '/status', 503, finding('undeclared-status', {
+          summary: 'Status 503 is not declared for GET /status', part: 'response status', where: '503',
+          spec: 'GET /status → responses', expected: 'one of: 200', got: '503',
+        })),
+        failing('c', 'GET', '/widgets', 200, finding('wrong-content-type', {
+          summary: 'Content-Type is "text/plain", the spec says application/json', part: 'response header', where: 'Content-Type',
+          spec: 'GET /widgets → response 200 → content', expected: 'application/json', got: 'text/plain',
+        })),
+      ],
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+
+    const card = screen.getByRole('article', { name: 'GET /inventory fails' })
+    expect(within(card).getByTestId('finding-where')).toHaveTextContent('response header "X-Total-Count"')
+    expect(within(card).getByTestId('finding-spec')).toHaveTextContent('GET /inventory → response 200 → headers → X-Total-Count')
+    expect(card).toHaveTextContent('The required header "X-Total-Count" was not sent')
+    expect(card).toHaveTextContent('Expected')
+    expect(card).toHaveTextContent('not sent')
+    expect(card).toHaveTextContent('The spec marks it as required.')
+    expect(card).toHaveTextContent('Send it.')
+    expect(within(card).getByText('Technical detail')).toBeInTheDocument()
+
+    expect(within(screen.getByRole('article', { name: 'GET /status fails' })).getByTestId('finding-where')).toHaveTextContent('response status 503')
+    expect(within(screen.getByRole('article', { name: 'GET /widgets fails' })).getByTestId('finding-spec')).toHaveTextContent('GET /widgets → response 200 → content')
+
+    for (const label of ['missing header', 'undeclared status', 'wrong content type']) {
+      expect(screen.getByText(new RegExp(`${label} × 1`))).toBeInTheDocument()
+    }
+  })
+
+  it('leaves the location rows out when a finding has none (older data)', async () => {
+    bridge.runConformance.mockResolvedValue({
+      ...output,
+      operations: [{ ...output.operations[1], findings: [finding('other', { summary: 'something differs' })] }],
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    const card = screen.getByRole('article', { name: 'GET /bad fails' })
+    expect(within(card).queryByTestId('finding-where')).not.toBeInTheDocument()
+    expect(within(card).queryByTestId('finding-spec')).not.toBeInTheDocument()
   })
 })

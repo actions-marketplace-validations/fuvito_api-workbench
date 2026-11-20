@@ -763,8 +763,13 @@ export interface ConformProbe {
 }
 
 export interface ConformFinding {
-  kind: 'missing-field' | 'wrong-type' | 'missing-value' | 'request' | 'no-response' | 'other'
+  kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'request' | 'no-response' | 'other'
+  // where the problem is: the part (response body, response status, response header, request,
+  // network) and what in it (a field path, a header name, the status code)
+  part?: string
   where?: string
+  // where the expectation comes from in the spec, for example "GET /a → response 200 → headers → X-Total-Count"
+  spec?: string
   summary: string
   expected?: string
   got?: string

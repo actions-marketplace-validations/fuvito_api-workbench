@@ -20,51 +20,214 @@ function shot(name: string) {
   return path.join(IMAGES_DIR, name)
 }
 
-type Finding = { kind: string; summary: string; expected?: string; got?: string; why: string; fix: string; detail: string }
-
-const op = (operationId: string, method: string, path: string, status: string, statusCode: number, durationMs: number, violations: string[] = [], findings: Finding[] = []) =>
-  ({ operationId, method, path, status, statusCode, durationMs, violations, findings })
-
-const MISSING_NAME: Finding = {
-  kind: 'missing-field', summary: '"name" is missing from the response', expected: 'the field "name"', got: 'no such field',
-  why: 'The spec marks "name" as required, but the server’s response did not include it.',
-  fix: 'Return "name" from the server, or make it optional in the spec if it is not always present.',
-  detail: 'Error at "/0/name": property "name" is missing',
-}
-const ID_AS_TEXT: Finding = {
-  kind: 'wrong-type', summary: '"[0].id" is text, the spec says integer', expected: 'integer', got: '"1"',
-  why: 'The server sent text ("1") where the spec declares an integer.',
-  fix: 'Send an integer from the server (for example without quotes for a number), or change the type in the spec if the server is right.',
-  detail: 'Error at "/0/id": value must be an integer',
-}
-const PRICE_AS_TEXT: Finding = {
-  kind: 'wrong-type', summary: '"price" is text, the spec says number', expected: 'number', got: '"49.90"',
-  why: 'The server sent text ("49.90") where the spec declares a number.',
-  fix: 'Send a number from the server (for example without quotes for a number), or change the type in the spec if the server is right.',
-  detail: 'Error at "/price": value must be a number',
-}
-
+// Captured from a real run of the built-in Conformance Server through ConformanceService (all ten
+// operations, writes on), so the screenshot shows what the product really reports.
 const RESULT = {
-  specTitle: 'Clear Signal Conformance Server',
-  baseUrl: 'http://localhost:8120',
-  writes: true,
-  durationMs: 38,
-  total: 7,
-  covered: 7,
-  notCovered: 0,
-  passing: 4,
-  failing: 3,
-  operations: [
-    op('listCategories', 'GET', '/categories', 'failed', 200, 3, [MISSING_NAME.detail], [MISSING_NAME]),
-    op('getHealth', 'GET', '/health', 'passed', 200, 2),
-    op('listOrders', 'GET', '/orders', 'failed', 200, 3, [ID_AS_TEXT.detail], [ID_AS_TEXT]),
-    op('listProducts', 'GET', '/products', 'passed', 200, 2),
-    op('createProduct', 'POST', '/products', 'passed', 201, 4),
-    op('getProduct', 'GET', '/products/{{id}}', 'failed', 200, 3, [PRICE_AS_TEXT.detail], [PRICE_AS_TEXT]),
-    op('deleteProduct', 'DELETE', '/products/{{id}}', 'passed', 204, 2),
+  "specTitle": "Clear Signal Conformance Server",
+  "baseUrl": "http://localhost:8120",
+  "writes": true,
+  "durationMs": 41,
+  "operations": [
+    {
+      "operationId": "listCategories",
+      "method": "GET",
+      "path": "/categories",
+      "status": "failed",
+      "statusCode": 200,
+      "durationMs": 2,
+      "violations": [
+        "Error at \"/0/name\": property \"name\" is missing\nSchema:\n  {\n    \"properties\": {\n      \"id\": {\n        \"type\": \"integer\"\n      },\n      \"name\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"id\",\n      \"name\"\n    ],\n    \"type\": \"object\"\n  }\n\nValue:\n  {\n    \"id\": 1\n  }\n"
+      ],
+      "findings": [
+        {
+          "kind": "missing-field",
+          "part": "response body",
+          "where": "[0].name",
+          "spec": "GET /categories → response 200 → body schema",
+          "summary": "\"name\" is missing from the response",
+          "expected": "the field \"name\"",
+          "got": "no such field",
+          "why": "The spec marks \"name\" as required, but the server's response did not include it.",
+          "fix": "Return \"name\" from the server, or make it optional in the spec if it is not always present.",
+          "detail": "Error at \"/0/name\": property \"name\" is missing\nSchema:\n  {\n    \"properties\": {\n      \"id\": {\n        \"type\": \"integer\"\n      },\n      \"name\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"id\",\n      \"name\"\n    ],\n    \"type\": \"object\"\n  }\n\nValue:\n  {\n    \"id\": 1\n  }\n"
+        }
+      ]
+    },
+    {
+      "operationId": "getHealth",
+      "method": "GET",
+      "path": "/health",
+      "status": "passed",
+      "statusCode": 200,
+      "durationMs": 3,
+      "violations": [],
+      "findings": []
+    },
+    {
+      "operationId": "getInventory",
+      "method": "GET",
+      "path": "/inventory",
+      "status": "failed",
+      "statusCode": 200,
+      "durationMs": 4,
+      "violations": [
+        "GET /inventory 200: the response header \"X-Total-Count\" is required by the spec but was not sent"
+      ],
+      "findings": [
+        {
+          "kind": "missing-header",
+          "part": "response header",
+          "where": "X-Total-Count",
+          "spec": "GET /inventory → response 200 → headers → X-Total-Count",
+          "summary": "The required header \"X-Total-Count\" was not sent",
+          "expected": "the header X-Total-Count",
+          "got": "not sent",
+          "why": "The spec marks the \"X-Total-Count\" header of response 200 as required, but the server's response did not include it. The body was not compared with the schema.",
+          "fix": "Send \"X-Total-Count\" from the server, or make it optional (or remove it) in the spec.",
+          "detail": "GET /inventory 200: the response header \"X-Total-Count\" is required by the spec but was not sent"
+        }
+      ]
+    },
+    {
+      "operationId": "listOrders",
+      "method": "GET",
+      "path": "/orders",
+      "status": "failed",
+      "statusCode": 200,
+      "durationMs": 2,
+      "violations": [
+        "Error at \"/0/id\": value must be an integer\nSchema:\n  {\n    \"type\": \"integer\"\n  }\n\nValue:\n  \"1\"\n"
+      ],
+      "findings": [
+        {
+          "kind": "wrong-type",
+          "part": "response body",
+          "where": "[0].id",
+          "spec": "GET /orders → response 200 → body schema",
+          "summary": "\"[0].id\" is text, the spec says integer",
+          "expected": "integer",
+          "got": "\"1\"",
+          "why": "The server sent text (\"1\") where the spec declares an integer.",
+          "fix": "Send an integer from the server (for example without quotes for a number), or change the type in the spec if the server is right.",
+          "detail": "Error at \"/0/id\": value must be an integer\nSchema:\n  {\n    \"type\": \"integer\"\n  }\n\nValue:\n  \"1\"\n"
+        }
+      ]
+    },
+    {
+      "operationId": "listProducts",
+      "method": "GET",
+      "path": "/products",
+      "status": "passed",
+      "statusCode": 200,
+      "durationMs": 3,
+      "violations": [],
+      "findings": []
+    },
+    {
+      "operationId": "createProduct",
+      "method": "POST",
+      "path": "/products",
+      "status": "passed",
+      "statusCode": 201,
+      "durationMs": 4,
+      "violations": [],
+      "findings": []
+    },
+    {
+      "operationId": "getProduct",
+      "method": "GET",
+      "path": "/products/{{id}}",
+      "status": "failed",
+      "statusCode": 200,
+      "durationMs": 2,
+      "violations": [
+        "Error at \"/price\": value must be a number\nSchema:\n  {\n    \"type\": \"number\"\n  }\n\nValue:\n  \"49.90\"\n"
+      ],
+      "findings": [
+        {
+          "kind": "wrong-type",
+          "part": "response body",
+          "where": "price",
+          "spec": "GET /products/{id} → response 200 → body schema",
+          "summary": "\"price\" is text, the spec says number",
+          "expected": "number",
+          "got": "\"49.90\"",
+          "why": "The server sent text (\"49.90\") where the spec declares a number.",
+          "fix": "Send a number from the server (for example without quotes for a number), or change the type in the spec if the server is right.",
+          "detail": "Error at \"/price\": value must be a number\nSchema:\n  {\n    \"type\": \"number\"\n  }\n\nValue:\n  \"49.90\"\n"
+        }
+      ]
+    },
+    {
+      "operationId": "deleteProduct",
+      "method": "DELETE",
+      "path": "/products/{{id}}",
+      "status": "passed",
+      "statusCode": 204,
+      "durationMs": 3,
+      "violations": [],
+      "findings": []
+    },
+    {
+      "operationId": "getStatus",
+      "method": "GET",
+      "path": "/status",
+      "status": "failed",
+      "statusCode": 503,
+      "durationMs": 4,
+      "violations": [
+        "GET /status answered 503, but the spec declares only 200"
+      ],
+      "findings": [
+        {
+          "kind": "undeclared-status",
+          "part": "response status",
+          "where": "503",
+          "spec": "GET /status → responses",
+          "summary": "Status 503 is not declared for GET /status",
+          "expected": "one of: 200",
+          "got": "503",
+          "why": "The spec lists the responses GET /status may return (200) and 503 is not one of them: the server returned something the spec does not describe, or the spec is incomplete.",
+          "fix": "Make the server answer a declared status, or add 503 (or a default response) to GET /status → responses in the spec.",
+          "detail": "GET /status answered 503, but the spec declares only 200"
+        }
+      ]
+    },
+    {
+      "operationId": "listWidgets",
+      "method": "GET",
+      "path": "/widgets",
+      "status": "failed",
+      "statusCode": 200,
+      "durationMs": 2,
+      "violations": [
+        "GET /widgets 200 answered with Content-Type \"text/plain\", but the spec declares application/json for this response; the body was not checked"
+      ],
+      "findings": [
+        {
+          "kind": "wrong-content-type",
+          "part": "response header",
+          "where": "Content-Type",
+          "spec": "GET /widgets → response 200 → content",
+          "summary": "Content-Type is \"text/plain\", the spec says application/json",
+          "expected": "application/json",
+          "got": "text/plain",
+          "why": "The spec declares the 200 response body as application/json, but the server labelled it \"text/plain\", so the body was not compared with the schema: nothing about its fields was checked.",
+          "fix": "Make the server send Content-Type application/json, or declare \"text/plain\" for response 200 in the spec.",
+          "detail": "GET /widgets 200 answered with Content-Type \"text/plain\", but the spec declares application/json for this response; the body was not checked"
+        }
+      ]
+    }
   ],
-  probes: [],
-  warnings: [],
+  "total": 10,
+  "covered": 10,
+  "notCovered": 0,
+  "passing": 4,
+  "failing": 6,
+  "probes": [],
+  "missingValues": [],
+  "blockedOperations": 0,
+  "warnings": []
 }
 
 async function openConformance(page: Page, theme: 'dark' | 'light') {
@@ -80,7 +243,7 @@ async function openConformance(page: Page, theme: 'dark' | 'light') {
         specs: [{ path: '/workspace/specs/conformance-openapi.yaml', label: 'specs/conformance-openapi.yaml' }],
         environments: [{ path: '/workspace/environments/local.yaml', label: 'environments/local.yaml' }],
       })
-      svc['InspectConformSpec'] = () => Promise.resolve({ title: 'Clear Signal Conformance Server', version: '1.0.0', serverUrl: 'http://localhost:8120', reads: 5, writes: 2 })
+      svc['InspectConformSpec'] = () => Promise.resolve({ title: 'Clear Signal Conformance Server', version: '1.0.0', serverUrl: 'http://localhost:8120', reads: 8, writes: 2 })
       svc['RunConformance'] = () => Promise.resolve(result)
     },
     { theme, result: RESULT },

@@ -23,6 +23,9 @@ test.describe('Check Conformance page', () => {
     const problem = page.getByRole('article', { name: 'GET /items/{{id}} fails' })
     await expect(problem).toContainText('"price" is text, the spec says number')
     await expect(problem).toContainText('Send a number from the server')
+    // The user can find it: where in the response, and where in the spec.
+    await expect(problem.getByTestId('finding-where')).toHaveText('response body, field price')
+    await expect(problem.getByTestId('finding-spec')).toHaveText('GET /items/{id} → response 200 → body schema')
     await expect(page.getByRole('region', { name: 'Passing operations' })).toContainText('/items')
     await expect(page.getByRole('region', { name: 'Not run' })).toContainText('write request, not sent')
 

@@ -242,7 +242,7 @@ export function setupMockBridge() {
             ({
               operationId, method, path, status, statusCode, durationMs: 4, violations,
               findings: violations.map(v => ({
-                kind: 'wrong-type', where: 'price', summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+                kind: 'wrong-type', part: 'response body', where: 'price', spec: 'GET /items/{id} → response 200 → body schema', summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
                 why: 'The server sent text ("9.99") where the spec declares a number.', fix: 'Send a number from the server, or change the spec.', detail: v,
               })),
             })

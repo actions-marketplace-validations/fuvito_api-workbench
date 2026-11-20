@@ -1,6 +1,6 @@
 # Conformance accuracy: real response checks and typed request bodies
 
-**Status:** Proposed
+**Status:** Part A accepted and built (2026-11-20, all six recommendations); part B accepted, not built yet
 **Date:** 2026-11-20
 **Author:** Claude Code, for the project owner
 **Backlog:** B-002 (response checks), B-003 (generated request bodies)
@@ -145,3 +145,4 @@ User guide (what conform checks and the new violation kinds; adopting with a bas
 | Date | Decision | Who |
 |---|---|---|
 | 2026-11-20 | Proposal written after measuring the validator (all blind spots trace to dropped `ResponseError.Reason` and unforwarded headers) and the body generator | Claude Code |
+| 2026-11-20 | Owner accepted decisions 1 to 6 ("go") and added: every failure must say what, why and where so the user can locate and fix it. Part A built with a `Part`, `Where` and `Spec` location on every finding | Owner, Claude Code |

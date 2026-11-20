@@ -162,3 +162,62 @@ func TestConformReports_BlockedOperations(t *testing.T) {
 		t.Error("a run with nothing blocked must not mention it")
 	}
 }
+
+func headerFixture() *conformance.ConformResult {
+	return &conformance.ConformResult{
+		SpecTitle: "Shop", SpecVersion: "1", BaseURL: "http://x",
+		Operations: []conformance.OperationResult{{
+			OperationID: "list", Method: "GET", Path: "/items", SpecPath: "/items", StatusCode: 200,
+			Violations: []openapi.ValidationError{{
+				Kind: openapi.KindMissingHeader, Subject: "X-Total-Count",
+				Message: `GET /items 200: the response header "X-Total-Count" is required by the spec but was not sent`,
+			}},
+		}},
+	}
+}
+
+// Every failure says where it is, in the response and in the spec, in every output that explains it.
+func TestConformReports_NameWhereTheProblemIs(t *testing.T) {
+	r := headerFixture()
+	wantInLine := `Where: response header "X-Total-Count" (spec: GET /items → response 200 → headers → X-Total-Count)`
+
+	if text := ConformTextExplained(r, nil, true); !strings.Contains(text, wantInLine) || !strings.Contains(text, `✗ GET /items 200: the response header "X-Total-Count" is required by the spec but was not sent`) {
+		t.Errorf("text must show the raw message and where:\n%s", text)
+	}
+	md := string(ConformMarkdown(r, nil, nil))
+	if !strings.Contains(md, wantInLine) {
+		t.Errorf("markdown:\n%s", md)
+	}
+	html, err := ConformHTML(r, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(html), "X-Total-Count") {
+		t.Error("html must name the header")
+	}
+	junit, err := ConformJUnit(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(junit), "X-Total-Count") || !strings.Contains(string(junit), "Where:") {
+		t.Errorf("junit:\n%s", junit)
+	}
+
+	js, err := ConformJSON(r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed JSONConformReport
+	if err := json.Unmarshal(js, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	f := parsed.Operations[0].Findings
+	if len(f) != 1 || f[0].Kind != "missing-header" || f[0].Part != "response header" || f[0].Where != "X-Total-Count" ||
+		f[0].Spec != "GET /items → response 200 → headers → X-Total-Count" || f[0].Why == "" || f[0].Fix == "" {
+		t.Errorf("json finding: %+v", f)
+	}
+
+	if strings.Contains(ConformText(r, nil), "Where:") {
+		t.Error("without --explain the screen output keeps its old shape")
+	}
+}

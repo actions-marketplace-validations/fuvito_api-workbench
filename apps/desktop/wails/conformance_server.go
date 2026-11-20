@@ -16,10 +16,12 @@ var conformanceOpenAPIYAML []byte
 var conformanceEnvironmentYAML []byte
 
 // The Conformance Server is deliberately imperfect: every operation in
-// help/conformance-openapi.yaml conforms except getProduct, listCategories and
-// listOrders, which each break the spec in a different way. conformanceKnownViolations
-// is the single list that the tests and the user guide rely on.
-var conformanceKnownViolations = []string{"getProduct", "listCategories", "listOrders"}
+// help/conformance-openapi.yaml conforms except the six in conformanceKnownViolations, which each
+// break the spec in a different way: a wrong field type (getProduct, listOrders), a missing field
+// (listCategories), a wrong Content-Type (listWidgets), a missing required header (getInventory)
+// and an undeclared status (getStatus). That list is the single one the tests and the user guide
+// rely on.
+var conformanceKnownViolations = []string{"getProduct", "listCategories", "listOrders", "listWidgets", "getInventory", "getStatus"}
 
 type conformanceProduct struct {
 	ID    int     `json:"id"`
@@ -53,6 +55,9 @@ func newConformanceMux() http.Handler {
 	mux.HandleFunc("/products/", s.product)
 	mux.HandleFunc("/categories", s.categories)
 	mux.HandleFunc("/orders", s.orders)
+	mux.HandleFunc("/widgets", s.widgets)
+	mux.HandleFunc("/inventory", s.inventory)
+	mux.HandleFunc("/status", s.status)
 	return corsMiddleware(mux)
 }
 
@@ -114,4 +119,20 @@ func (s *conformanceServer) categories(w http.ResponseWriter, r *http.Request) {
 
 func (s *conformanceServer) orders(w http.ResponseWriter, r *http.Request) {
 	demoWriteJSON(w, http.StatusOK, []map[string]any{{"id": "1", "total": 19.5}})
+}
+
+// widgets answers valid JSON but labels it text/plain, which the spec does not declare.
+func (s *conformanceServer) widgets(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte(`[{"id":1}]`))
+}
+
+// inventory has a conforming body but never sends the X-Total-Count header the spec requires.
+func (s *conformanceServer) inventory(w http.ResponseWriter, r *http.Request) {
+	demoWriteJSON(w, http.StatusOK, []map[string]any{{"sku": "A-1", "count": 4}})
+}
+
+// status answers 503, a status the spec does not declare for this operation.
+func (s *conformanceServer) status(w http.ResponseWriter, r *http.Request) {
+	demoWriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "maintenance"})
 }

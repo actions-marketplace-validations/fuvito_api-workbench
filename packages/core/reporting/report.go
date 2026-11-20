@@ -406,26 +406,26 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 
 // JSONConformReport is the machine-readable structure for a conformance run.
 type JSONConformReport struct {
-	SpecTitle   string          `json:"specTitle"`
-	SpecVersion string          `json:"specVersion"`
-	BaseURL     string          `json:"baseURL"`
-	Passed      bool            `json:"passed"`
-	DurationMs  int64           `json:"durationMs"`
+	SpecTitle   string `json:"specTitle"`
+	SpecVersion string `json:"specVersion"`
+	BaseURL     string `json:"baseURL"`
+	Passed      bool   `json:"passed"`
+	DurationMs  int64  `json:"durationMs"`
 	// MissingValues lists the placeholders that kept operations from being sent (each once).
 	MissingValues []string        `json:"missingValues,omitempty"`
 	Operations    []JSONConformOp `json:"operations"`
-	Coverage    *JSONCoverage   `json:"coverage,omitempty"`
+	Coverage      *JSONCoverage   `json:"coverage,omitempty"`
 }
 
 type JSONConformOp struct {
-	OperationID       string   `json:"operationId,omitempty"`
-	Method            string   `json:"method"`
-	Path              string   `json:"path"`
-	StatusCode        int      `json:"statusCode,omitempty"`
-	DurationMs        int64    `json:"durationMs,omitempty"`
-	Passed            bool     `json:"passed"`
-	Skipped           bool     `json:"skipped,omitempty"`
-	Error             string   `json:"error,omitempty"`
+	OperationID string `json:"operationId,omitempty"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	StatusCode  int    `json:"statusCode,omitempty"`
+	DurationMs  int64  `json:"durationMs,omitempty"`
+	Passed      bool   `json:"passed"`
+	Skipped     bool   `json:"skipped,omitempty"`
+	Error       string `json:"error,omitempty"`
 	// Blocked says why the request was not sent (a missing value); Missing names the placeholders.
 	Blocked           string   `json:"blocked,omitempty"`
 	Missing           []string `json:"missing,omitempty"`
@@ -438,8 +438,12 @@ type JSONConformOp struct {
 
 // JSONConformFinding is the machine-readable form of conformance.Finding.
 type JSONConformFinding struct {
-	Kind     string `json:"kind"`
+	Kind string `json:"kind"`
+	// Part and Where say where in the response the problem is (a header name, the status, a body
+	// field); Spec says where the expectation comes from in the spec.
+	Part     string `json:"part,omitempty"`
 	Where    string `json:"where,omitempty"`
+	Spec     string `json:"spec,omitempty"`
 	Summary  string `json:"summary"`
 	Expected string `json:"expected,omitempty"`
 	Got      string `json:"got,omitempty"`
@@ -498,7 +502,7 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		for _, f := range explain(op, x) {
 			jo.Findings = append(jo.Findings, JSONConformFinding{
-				Kind: f.Kind, Where: f.Where, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
+				Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
 			})
 		}
 		report.Operations = append(report.Operations, jo)

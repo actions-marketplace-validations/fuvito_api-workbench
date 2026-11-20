@@ -73,7 +73,7 @@ func TestConformanceParity_ServiceMatchesTheCLI(t *testing.T) {
 	for _, op := range service.Operations {
 		got[op.Method+" "+op.Path] = fmt.Sprintf("%s %d", op.Status, op.StatusCode)
 	}
-	if len(got) != len(want) || len(want) != 7 {
+	if len(got) != len(want) || len(want) != 10 {
 		t.Fatalf("operations differ: service %v, CLI %v", got, want)
 	}
 	for k, v := range want {
@@ -95,7 +95,7 @@ func TestConformanceParity_ServiceMatchesTheCLI(t *testing.T) {
 	if strings.Join(failing, ",") != strings.Join(known, ",") || exit != 1 {
 		t.Fatalf("CLI failing = %v (exit %d), want %v and exit 1", failing, exit, known)
 	}
-	if service.Covered != 7 || service.Failing != 3 || service.Passing != 4 {
+	if service.Covered != 10 || service.Failing != 6 || service.Passing != 4 {
 		t.Fatalf("service totals: %+v", service)
 	}
 }

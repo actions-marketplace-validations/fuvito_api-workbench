@@ -20,6 +20,9 @@ type OperationResult struct {
 	Tags             []string
 	Method           string
 	Path             string
+	// SpecPath is the path as the spec writes it (for example /products/{id}); Path is the path of
+	// the request that was sent, with its placeholders. Findings point at SpecPath.
+	SpecPath         string
 	StatusCode       int
 	DurationMs       int64
 	RequestViolations []openapi.ValidationError
@@ -204,6 +207,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			Tags:        gr.Tags,
 			Method:      string(gr.Request.Method),
 			Path:        opPath,
+			SpecPath:    gr.Path,
 		}
 
 		if !matchesTags(gr.Tags, opts.Tags) || !matchesPathPrefix(opPath, opts.Paths) ||

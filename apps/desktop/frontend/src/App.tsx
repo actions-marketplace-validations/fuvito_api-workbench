@@ -785,7 +785,7 @@ export default function App() {
             disabled: conformanceStarting || (conformancePort === 0 && demo.demoRunning),
             title: conformancePort === 0 && demo.demoRunning
               ? 'Stop the Demo Server first: its workspace is open'
-              : 'A deliberately imperfect API (three operations break its spec). Starting it opens a workspace with its spec, a local environment and a sample scenario',
+              : 'A deliberately imperfect API (six operations break its spec). Starting it opens a workspace with its spec, a local environment and a sample scenario',
             onClick: conformancePort > 0 ? handleStopConformanceServer : () => requestWorkspaceSwitch(handleStartConformanceServer),
           },
           {

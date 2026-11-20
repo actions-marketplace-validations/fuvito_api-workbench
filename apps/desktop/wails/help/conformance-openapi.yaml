@@ -4,7 +4,7 @@ info:
   version: "1.0.0"
   description: >
     A deliberately imperfect API for trying Spec Conformance Testing. Most
-    operations match this spec; three do not, each in a different way. The
+    operations match this spec; six do not, each in a different way. The
     list of known violations is in the user guide. Requests are generated
     with {{placeholders}} for path parameters, so run the check with an
     environment that sets id (for example 1): see conformance-environment.yaml.
@@ -109,6 +109,48 @@ paths:
                   properties:
                     id: {type: integer}
                     total: {type: number}
+  /widgets:
+    get:
+      operationId: listWidgets
+      summary: List widgets (VIOLATION - served as text/plain although the spec says JSON)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: object}
+  /inventory:
+    get:
+      operationId: getInventory
+      summary: Inventory (VIOLATION - the required X-Total-Count header is never sent)
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Total-Count:
+              required: true
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: object}
+  /status:
+    get:
+      operationId: getStatus
+      summary: Service status (VIOLATION - answers 503, which the spec does not declare)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string}
 components:
   schemas:
     Product:

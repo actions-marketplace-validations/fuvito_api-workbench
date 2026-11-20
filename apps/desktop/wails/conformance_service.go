@@ -28,7 +28,7 @@ type ConformanceService struct {
 	settings  *SettingsService
 	mu        sync.Mutex
 	cancelRun context.CancelFunc
-	last      *application.ConformOutput // the latest run, for Export
+	last      *application.ConformOutput              // the latest run, for Export
 	emit      func(event string, data ...interface{}) // nil outside the running app (tests)
 }
 
@@ -154,8 +154,12 @@ type ConformProbeIO struct {
 // ConformFindingIO explains one violation: where, what the spec wanted, what the server sent, why
 // that fails and what to change. Detail is the validator's own message.
 type ConformFindingIO struct {
-	Kind     string `json:"kind"`
+	Kind string `json:"kind"`
+	// Part and Where say where in the response (or request) the problem is: the header name, the
+	// status, a body field. Spec says where the expectation comes from in the spec.
+	Part     string `json:"part,omitempty"`
 	Where    string `json:"where,omitempty"`
+	Spec     string `json:"spec,omitempty"`
 	Summary  string `json:"summary"`
 	Expected string `json:"expected,omitempty"`
 	Got      string `json:"got,omitempty"`
@@ -379,15 +383,15 @@ func (s *ConformanceService) CancelConformance() {
 func conformOutputIO(out application.ConformOutput, baseURL string, writes bool) ConformRunOutputIO {
 	r := out.Result
 	res := ConformRunOutputIO{
-		SpecTitle:  r.SpecTitle,
-		BaseURL:    baseURL,
-		Writes:     writes,
-		DurationMs: r.Duration.Milliseconds(),
-		Operations: []ConformOperationIO{},
-		Probes:     []ConformProbeIO{},
-		Warnings:   []string{},
+		SpecTitle:     r.SpecTitle,
+		BaseURL:       baseURL,
+		Writes:        writes,
+		DurationMs:    r.Duration.Milliseconds(),
+		Operations:    []ConformOperationIO{},
+		Probes:        []ConformProbeIO{},
+		Warnings:      []string{},
 		MissingValues: []string{},
-		Total:      len(r.Operations),
+		Total:         len(r.Operations),
 	}
 	for _, op := range r.Operations {
 		item := ConformOperationIO{
@@ -398,7 +402,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		}
 		for _, f := range conformance.Diagnose(op) {
 			item.Findings = append(item.Findings, ConformFindingIO{
-				Kind: f.Kind, Where: f.Where, Summary: f.Summary, Expected: f.Expected,
+				Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
 				Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
 			})
 		}

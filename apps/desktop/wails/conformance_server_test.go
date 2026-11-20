@@ -36,6 +36,9 @@ func TestConformanceServerViolationsAreExactlyTheKnownOnes(t *testing.T) {
 		{"deleteProduct", "DELETE", "/products/2", ""},
 		{"listCategories", "GET", "/categories", ""},
 		{"listOrders", "GET", "/orders", ""},
+		{"listWidgets", "GET", "/widgets", ""},
+		{"getInventory", "GET", "/inventory", ""},
+		{"getStatus", "GET", "/status", ""},
 	}
 	var failing []string
 	for _, c := range calls {
@@ -172,7 +175,7 @@ func TestConformanceOpenWorkspace_OpensAndRestores(t *testing.T) {
 		t.Fatalf("second open: %+v", again)
 	}
 
-	// The page works against it with no further setup: exactly the three known violations.
+	// The page works against it with no further setup: exactly the known violations.
 	out := NewConformanceService(ws, NewSettingsService()).RunConformance(ConformRunInput{
 		SpecPath: spec, BaseURL: fmt.Sprintf("http://localhost:%d", res.Port),
 	})
