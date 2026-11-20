@@ -595,3 +595,7 @@ Do not implement or stub any of these without explicit user direction.
 - **CLI:** `clrsig conform --read-only` sends only GET and HEAD (other operations and their negative probes are skipped and never sent). Default off, so existing commands and CI behave as before. It is in the command catalog (`clispec`, Essential group), so the CLI Command Builder offers it; `TestCatalogMatchesCobra` guards the pairing. Same `ReadOnly` option the desktop page already used.
 - **Desktop:** **Get CLI command** on the Check Conformance page now opens the builder with the page's choices filled in (`cliValues`: spec, base URL, environment, tags, paths, negative probes, fail fast, timeout, and `read-only` unless writes were ticked). "Active environment" is expressed as its file (`ConformContext.activeEnvironment`). Not carried over: "Add to Contracts coverage" (no flag; `conform` always records to history) and the page's own coverage option.
 - **Tests:** `TestConformReadOnlySendsNoWrites`, `TestBuilderReadOnlyConformCommand` (the command the builder produces for a read-only choice runs and sends no writes), `cliValues` and button tests, two Playwright tests.
+
+### 2026-11-19 — Project backlog
+
+- **`docs/backlog.md`** is the one living list of open work (checkbox, ID `B-###`, size, what it needs, source). It links to `docs/next_steps/` (point-in-time plans, never edited to stay current) and `docs/enhancements/` (one proposal per major feature) instead of copying them. Tick items there when they ship and add new ones with the next free ID.
