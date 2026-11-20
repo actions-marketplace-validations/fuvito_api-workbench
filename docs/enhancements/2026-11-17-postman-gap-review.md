@@ -2,7 +2,7 @@
 
 - **Status:** Items A–E approved and implemented (2026-11-17); see the decision log
 - **Date:** 2026-11-17
-- **Purpose:** compare Clear Signal with Postman against the current code, and list the few gaps worth closing while keeping the product lean. Supersedes the feature table in [`../clrsig-vs-postman-2026-11-15.md`](../clrsig-vs-postman-2026-11-15.md), which predates `impact`, `conform --negative`, `clrsig mcp`, `clrsig import`, dynamic values and the CLI Command Builder.
+- **Purpose:** compare Clear Signal with Postman against the current code, and list the few gaps worth closing while keeping the product lean. Supersedes the feature table in [`../clrsig-vs-postman-2026-11-15.md`](../reports/clrsig-vs-postman-2026-11-15.md), which predates `impact`, `conform --negative`, `clrsig mcp`, `clrsig import`, dynamic values and the CLI Command Builder.
 - **Method:** commit history up to `d3a2428`, plus code and documentation searches for each capability. The desktop app was **not** run, so "No" means "nothing found in the code", not "verified absent in the UI".
 
 **How an item graduates:** it gets its own dated proposal in this folder (see [README](README.md)) with the full requirement review, and is agreed before code is written. Sizes: **S** ≈ a day or less, **M** ≈ a few days, **L** ≈ a week or more.

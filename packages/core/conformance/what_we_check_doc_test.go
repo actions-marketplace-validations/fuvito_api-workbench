@@ -116,7 +116,7 @@ func TestCatalogIDsAreUniqueAndDefined(t *testing.T) {
 	}
 	check("apps/desktop/wails/help/what-we-check.md", string(doc))
 	walkTests(t, root, func(path, text string) { check(path, text) })
-	for _, name := range []string{"README.md", filepath.Join("docs", "backlog.md")} {
+	for _, name := range []string{"README.md", filepath.Join("docs", "planning", "backlog.md")} {
 		if data, err := os.ReadFile(filepath.Join(root, name)); err == nil {
 			check(name, string(data))
 		}

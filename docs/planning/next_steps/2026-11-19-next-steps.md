@@ -21,11 +21,11 @@ The app is in a good state: Phase 5 (public MVP) is complete, releases ship to f
 
 ## 1. Desktop conformance entry point + conform docs
 
-**Status today:** `clrsig conform <spec-file-or-url>` is implemented, with `--baseline` / `--write-baseline`, `--report`, and text/json/junit/html/markdown output, alongside `coverage`, `diff`, `impact` and the MCP server. `docs/contract-testing-roadmap.md` (dated 2026-11-06) predates all of this and still describes conformance as unassembled. The desktop app has no conform entry point (to be confirmed).
+**Status today:** `clrsig conform <spec-file-or-url>` is implemented, with `--baseline` / `--write-baseline`, `--report`, and text/json/junit/html/markdown output, alongside `coverage`, `diff`, `impact` and the MCP server. `docs/archive/contract-testing-roadmap.md` (dated 2026-11-06) predates all of this and still describes conformance as unassembled. The desktop app has no conform entry point (to be confirmed).
 
 **What it involves:**
 - A desktop entry point that runs generated requests against a base URL and reports per-operation conformance. This is a new UI area, so it needs a `docs/enhancements/` proposal first per `CLAUDE.md`.
-- Update or retire `docs/contract-testing-roadmap.md`.
+- Update or retire `docs/archive/contract-testing-roadmap.md`.
 - A short "conform in CI" guide using the GitHub Action.
 
 **Why first:** it is the product's headline capability (API Contract Validation and Spec Conformance Testing are the canonical terms), the CLI half is done, and it gives the videos and posts something concrete to show.
@@ -37,7 +37,7 @@ The app is in a good state: Phase 5 (public MVP) is complete, releases ship to f
 **What it involves:**
 - Deploy `examples/server` to a live host (free tier on Fly.io/Render, or a small VPS — keep `go run ./examples/server` working for local use). The hosted build must disable `/admin/reset`, cap body sizes, and reset its data on a schedule, since anyone can reach it.
 - Extend the existing `demo_workspace/` into a **kitchen-sink demo workspace** that exercises every feature: all auth types, all assertion types (status/header/jsonpath/schema), variable extraction and dynamic values, fail policies, environments — the "Demo workspace" idea, but deliberately exhaustive rather than minimal.
-- Add a step to `docs/release-process.md` §2: run the everything workspace against the live server before tagging. Keep the local-server run as the blocking gate and treat the live run as advisory, so a network outage cannot block a release.
+- Add a step to `docs/process/release-process.md` §2: run the everything workspace against the live server before tagging. Keep the local-server run as the blocking gate and treat the live run as advisory, so a network outage cannot block a release.
 - This workspace doubles as the video demo target (§4) and seeds the failure-catalog repo (§7).
 
 **Effort:** small. The server exists; the work is hosting config, hardening, extending one workspace directory, and a release-checklist line.
@@ -70,7 +70,7 @@ The app is in a good state: Phase 5 (public MVP) is complete, releases ship to f
 - Written posts: dev.to / Medium / personal site (clrsig.com) — "validate your API against its OpenAPI spec in CI" is the hook; contract-validation and breaking-change detection angles.
 - Shorts/slices of the §4 videos on YouTube.
 - Forums: r/softwaretesting, r/qualityassurance, r/api, OpenAPI community spaces. Show HN is deferred until signing lands — HN's audience punishes unsigned downloads, but Reddit/OpenAPI communities are more forgiving and better for early feedback.
-- Back every claim with evidence before posting (for example `docs/clrsig-vs-postman-2026-11-15.md`).
+- Back every claim with evidence before posting (for example `docs/reports/clrsig-vs-postman-2026-11-15.md`).
 - The failure-catalog repo (§7) is itself a traction asset — "watch clrsig catch a real contract violation in CI" is a better demo than a feature list.
 
 **Feedback loop:** every post should point at GitHub Discussions (§3). The specific things to listen for: whether the install warnings scare people off (that's the trigger to un-postpone signing), whether the conform story lands, and what evaluators trip over first.
@@ -92,7 +92,7 @@ The app is in a good state: Phase 5 (public MVP) is complete, releases ship to f
 ## 7. Remaining backlog
 
 Items that matter but don't gate the above:
-- **Failure-catalog repo** — full PRD exists at `docs/failure-showcase-repo.md`: public repo of deliberately broken APIs, green CI against released clrsig + nightly against `main`. Doubles as regression testing and marketing.
+- **Failure-catalog repo** — full PRD exists at `docs/planning/failure-showcase-repo.md`: public repo of deliberately broken APIs, green CI against released clrsig + nightly against `main`. Doubles as regression testing and marketing.
 - **Demo GIF refresh** — `docs/demo.tape` + `vhs` regenerates `docs/demo.gif`; keep it in sync with UI changes.
 - **v1.0 criteria** — decide what separates 0.x from 1.0 (likely: signed builds + desktop conform + a documented `schemaVersion` migration policy and a frozen CLI flag surface + some traction evidence).
 

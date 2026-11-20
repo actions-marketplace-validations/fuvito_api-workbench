@@ -99,7 +99,7 @@ clrsig/
 │       └── history/
 │
 ├── examples/
-├── docs/
+├── docs/                    # developer documents (see docs/README.md); documents the app serves live in apps/desktop/wails/help/
 ├── scripts/
 ├── go.work                 # Go workspace for local development
 ├── package.json
@@ -201,7 +201,7 @@ Do not implement or stub any of these without explicit user direction.
 ## 10. Changelog
 
 ### 2026-11-03
-- CLAUDE.md created from `docs/Project.md` and `docs/Product Requirements, Architecture & Implementation Roadmap.md`.
+- CLAUDE.md created from `docs/product/Project.md` and `docs/product/Product Requirements, Architecture & Implementation Roadmap.md`.
 - Project is at pre-implementation stage; no code exists yet.
 - Engineering foundation (Phase 0) is the active work target.
 - Clarified primary product identity: API contract validation and spec conformance testing platform first; full workbench second.
@@ -511,8 +511,8 @@ Do not implement or stub any of these without explicit user direction.
 
 ### 2026-11-19 — Next-steps snapshots
 
-- Created `docs/next_steps/` for point-in-time planning documents (separate from `docs/enhancements/`, which holds feature design proposals). Convention in `docs/next_steps/README.md`: `YYYY-MM-DD-next-steps.md`, new file per snapshot — do not edit old ones.
-- First snapshot `2026-11-19-next-steps.md` orders post-MVP work: (1) code signing + notarization (Azure Trusted Signing, Apple Developer Program — release.yml currently produces unsigned binaries), (2) hosted demo server + everything workspace (`examples/server` exists locally; needs hosting and a kitchen-sink workspace wired into release checks), (3) `clrsig conform` spec-conformance command (per `docs/contract-testing-roadmap.md`; needs an enhancements proposal), (4) NotebookLM video guides kept as regenerable script + screenshot artifacts, (5) traction (posts, shorts, forums), (6) backlog: failure-catalog repo, community scaffolding, JUnit output.
+- Created `docs/planning/next_steps/` for point-in-time planning documents (separate from `docs/enhancements/`, which holds feature design proposals). Convention in `docs/planning/next_steps/README.md`: `YYYY-MM-DD-next-steps.md`, new file per snapshot — do not edit old ones.
+- First snapshot `2026-11-19-next-steps.md` orders post-MVP work: (1) code signing + notarization (Azure Trusted Signing, Apple Developer Program — release.yml currently produces unsigned binaries), (2) hosted demo server + everything workspace (`examples/server` exists locally; needs hosting and a kitchen-sink workspace wired into release checks), (3) `clrsig conform` spec-conformance command (per `docs/archive/contract-testing-roadmap.md`; needs an enhancements proposal), (4) NotebookLM video guides kept as regenerable script + screenshot artifacts, (5) traction (posts, shorts, forums), (6) backlog: failure-catalog repo, community scaffolding, JUnit output.
 
 ### 2026-11-19 — Conformance Server and Dev Servers menu (phase 1.6 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
 
@@ -598,7 +598,7 @@ Do not implement or stub any of these without explicit user direction.
 
 ### 2026-11-19 — Project backlog
 
-- **`docs/backlog.md`** is the one living list of open work (checkbox, ID `B-###`, size, what it needs, source). It links to `docs/next_steps/` (point-in-time plans, never edited to stay current) and `docs/enhancements/` (one proposal per major feature) instead of copying them. Tick items there when they ship and add new ones with the next free ID.
+- **`docs/planning/backlog.md`** is the one living list of open work (checkbox, ID `B-###`, size, what it needs, source). It links to `docs/planning/next_steps/` (point-in-time plans, never edited to stay current) and `docs/enhancements/` (one proposal per major feature) instead of copying them. Tick items there when they ship and add new ones with the next free ID.
 
 ### 2026-11-19 — Backlog items B-001, B-004, B-005, B-011 (conformance)
 
@@ -647,7 +647,7 @@ Do not implement or stub any of these without explicit user direction.
 - **Evidence is enforced:** `packages/core/openapi/what_we_check_test.go` pins current behaviour including gaps (`KnownGap`), and `packages/core/conformance/what_we_check_doc_test.go` fails if the catalog cites a test that does not exist, defines an ID twice, or if the docs or any test comment mention a `CS-` ID the catalog does not define.
 - **Rule (owner):** every new failure, gap, false pass or false failure we learn about is added to the catalog in the same change; fixing a gap moves its row and flips its `KnownGap` test.
 - **Found while measuring (now in the backlog):** `impact` never matches a step whose URL path contains a placeholder (B-051, a bug); a declared `application/xml` response is reported as a violation (B-052); `format: email` / `uuid` are not validated (B-053); the `schema` assertion ignores status, Content-Type, headers and `writeOnly`, and does not check an empty body.
-- `docs/contract-testing-roadmap.md` is retired with a pointer (B-030); the README and the user guide link the catalog.
+- `docs/archive/contract-testing-roadmap.md` is retired with a pointer (B-030); the README and the user guide link the catalog.
 
 ### 2026-11-20 — The catalog is shown in the app (Help, What We Check)
 
@@ -656,3 +656,9 @@ Do not implement or stub any of these without explicit user direction.
 - Tests: Go guard tests on the new path, component tests for the tab (lazy load, table, copy and download, load failure, ID not wrapping), a Playwright flow through the Help menu.
 - Next step for B-049: turn the tab into a searchable table by ID when the catalog becomes data in Go; today it renders the Markdown.
 - **Help panel width:** the panel is now 90% of the window wide (capped at 1800 px) on every tab, instead of a fixed width, so guides, specs and the catalog's wide tables use the room there is (`help-panel.spec.ts` measures it at several window sizes).
+
+### 2026-11-20 — `docs/` reorganized (backlog B-054; map in `docs/README.md`)
+
+- **Two places.** Documents the **app serves** stay in `apps/desktop/wails/help/` (the Go embed requires it): user guide, format spec, example scenario, AI prompt, `what-we-check.md`, the sample specs. **Developer documents** live in `docs/`: `enhancements/` (design proposals, path unchanged), `planning/` (`backlog.md`, `next_steps/`, product requirement documents), `reports/` (`check-YYYY-MM-DD.md` audits, comparisons), `guides/` (CI/CD integration, authenticated conformance runs), `process/` (release process, manual steps), `product/` (founding notes, requirements and roadmap, presentation), `archive/` (retired). `docs/images/`, `docs/demo.gif` and `docs/demo.tape` stay where they are: the README, the demo workflow and the screenshot tests use those paths.
+- **Rules now:** the backlog is `docs/planning/backlog.md`; next-step snapshots go in `docs/planning/next_steps/`; audit files are `docs/reports/check-YYYY-MM-DD.md` (a new file per date, old ones kept); a user-facing reference the app should show goes in `help/` with a Help tab; `docs/README.md` says where a new document goes.
+- **Moves:** 19 files with `git mv`, the dead `docs/UserGuide.md` stub deleted, `ci-integration.md` and `cicd-integration.md` merged into one rewritten `docs/guides/ci-integration.md` (it fixes advice that was wrong: environment files use `${NAME}`, not `{{NAME}}`, for process variables; it adds the current flags, the Action's inputs, and a section on running conformance in CI). Relative links and plain-text mentions were rewritten; a link check over every markdown file finds none broken. Older changelog entries above still name the old paths; they are history.

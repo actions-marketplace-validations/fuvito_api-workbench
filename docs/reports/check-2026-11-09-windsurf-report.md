@@ -8,12 +8,12 @@ Re-review after two days of rapid iteration. The previous report ([check-2026-11
 
 ### Verified fixed since 2026-11-07
 
-- **Toolbar icon soup** — [AppToolbar.tsx](../apps/desktop/frontend/src/components/AppToolbar.tsx) now shows labeled **Save** and **New** buttons and moves Settings/Help into a `MoreHorizontal` overflow menu. Good balance.
-- **Inconsistent dialogs** — zero `window.confirm`/`window.alert` calls remain in `src/`; all confirmations route through [ConfirmDialogs.tsx](../apps/desktop/frontend/src/components/ConfirmDialogs.tsx).
-- **Tab keyboard navigation** — `Ctrl+Tab` / `Ctrl+Shift+Tab` cycling implemented in [App.tsx](../apps/desktop/frontend/src/App.tsx) (~line 271).
-- **Onboarding gap** — a "Try the demo" card now renders in the empty workspace state ([WorkspaceEmptyState.tsx](../apps/desktop/frontend/src/components/WorkspaceEmptyState.tsx)): one click starts the demo server and loads example requests. Exactly the recommended fix.
+- **Toolbar icon soup** — [AppToolbar.tsx](../../apps/desktop/frontend/src/components/AppToolbar.tsx) now shows labeled **Save** and **New** buttons and moves Settings/Help into a `MoreHorizontal` overflow menu. Good balance.
+- **Inconsistent dialogs** — zero `window.confirm`/`window.alert` calls remain in `src/`; all confirmations route through [ConfirmDialogs.tsx](../../apps/desktop/frontend/src/components/ConfirmDialogs.tsx).
+- **Tab keyboard navigation** — `Ctrl+Tab` / `Ctrl+Shift+Tab` cycling implemented in [App.tsx](../../apps/desktop/frontend/src/App.tsx) (~line 271).
+- **Onboarding gap** — a "Try the demo" card now renders in the empty workspace state ([WorkspaceEmptyState.tsx](../../apps/desktop/frontend/src/components/WorkspaceEmptyState.tsx)): one click starts the demo server and loads example requests. Exactly the recommended fix.
 - **ScenarioViewer monolith** — split from a single 73 KB file into `ScenarioViewer.tsx` (~37 KB) + `ScenarioStepEditor.tsx`, `ScenarioStepList.tsx`, `ScenarioStepResult.tsx`, and `scenario-yaml.ts`. Better, though the shell file is still the largest component — acceptable for now.
-- **History restore** — now restores method, URL, headers, and body ([useTabsState.ts](../apps/desktop/frontend/src/hooks/useTabsState.ts) `handleSelectHistory`), with sensitive headers redacted at the store layer and an honest "auth not stored" note in the UI.
+- **History restore** — now restores method, URL, headers, and body ([useTabsState.ts](../../apps/desktop/frontend/src/hooks/useTabsState.ts) `handleSelectHistory`), with sensitive headers redacted at the store layer and an honest "auth not stored" note in the UI.
 - **Multipart file fields** — `BodyEditor` multipart rows support a `text | file` type toggle with a Browse button backed by a native file picker.
 
 ### Remaining / minor

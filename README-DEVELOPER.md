@@ -584,7 +584,7 @@ api-workbench/
 │
 ├── clrsig-action/          # GitHub Action docs (the root action.yml is what users reference)
 ├── Dockerfile              # CLI image published to ghcr.io on release
-├── docs/                   # Architecture, product docs, screenshots (docs/images)
+├── docs/                   # Developer documents by folder (see docs/README.md); screenshots in docs/images
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml          # Push/PR: core tests → integration tests → CLI + desktop build

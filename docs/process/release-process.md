@@ -162,7 +162,7 @@ clrsig --version
 
 ### GitHub Actions Marketplace
 
-After the initial listing (see `docs/manual-steps.md`), subsequent releases are picked up automatically. Verify the new version tag is usable:
+After the initial listing (see `docs/process/manual-steps.md`), subsequent releases are picked up automatically. Verify the new version tag is usable:
 
 ```yaml
 # In any test workflow
@@ -187,4 +187,4 @@ After the initial listing (see `docs/manual-steps.md`), subsequent releases are 
 ## 5. After — announce (optional but high leverage)
 
 - [ ] Post a short release note in any community channels (GitHub Discussions, Discord, etc.)
-- [ ] If this is a significant release, it's a good trigger for one of the two content wedge posts in `docs/manual-steps.md`
+- [ ] If this is a significant release, it's a good trigger for one of the two content wedge posts in `docs/process/manual-steps.md`

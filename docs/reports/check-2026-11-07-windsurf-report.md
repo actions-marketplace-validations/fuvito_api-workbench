@@ -22,7 +22,7 @@ Let me quickly scan a few key components for UX/performance details.
 
 I have enough context to write the report. Let me do a couple of quick checks on remaining docs and the presentation.
 
-I have a good picture now — I reviewed the README, user guide, audit checklists ([check-2026-11-05.md](cci:7://file:///C:/dev/api-workbench/docs/check-2026-11-05.md:0:0-0:0), [check-2026-11-06.md](cci:7://file:///C:/dev/api-workbench/docs/check-2026-11-06.md:0:0-0:0)), the contract-testing roadmap, the main frontend components ([App.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/App.tsx:0:0-0:0), [ResponseViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ResponseViewer.tsx:0:0-0:0), [useWorkspace.ts](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/hooks/useWorkspace.ts:0:0-0:0)), and the screenshots. Here is my report.
+I have a good picture now — I reviewed the README, user guide, audit checklists ([check-2026-11-05.md](cci:7://file:///C:/dev/api-workbench/docs/reports/check-2026-11-05.md:0:0-0:0), [check-2026-11-06.md](cci:7://file:///C:/dev/api-workbench/docs/reports/check-2026-11-06.md:0:0-0:0)), the contract-testing roadmap, the main frontend components ([App.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/App.tsx:0:0-0:0), [ResponseViewer.tsx](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/components/ResponseViewer.tsx:0:0-0:0), [useWorkspace.ts](cci:7://file:///C:/dev/api-workbench/apps/desktop/frontend/src/hooks/useWorkspace.ts:0:0-0:0)), and the screenshots. Here is my report.
 
 # Assessment: Clear Signal (api-workbench)
 
@@ -71,7 +71,7 @@ This is a genuinely well-built MVP. The Postman-style three-pane layout is immed
 
 ### Gaps vs. the stated mission
 
-Your own [contract-testing-roadmap.md](cci:7://file:///C:/dev/api-workbench/docs/contract-testing-roadmap.md:0:0-0:0) nails it: the differentiator is **conformance**, and the gap analysis there (`conform`, `diff`, request validation, coverage, `specFile` binding) is correct and well-prioritized. I agree with its ordering — `ValidateRequest` and `specFile` binding are cheap/high-value.
+Your own [contract-testing-roadmap.md](cci:7://file:///C:/dev/api-workbench/docs/archive/contract-testing-roadmap.md:0:0-0:0) nails it: the differentiator is **conformance**, and the gap analysis there (`conform`, `diff`, request validation, coverage, `specFile` binding) is correct and well-prioritized. I agree with its ordering — `ValidateRequest` and `specFile` binding are cheap/high-value.
 
 ### Gaps vs. competitors (bigger impact than missing features)
 
