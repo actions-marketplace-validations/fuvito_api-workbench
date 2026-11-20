@@ -27,7 +27,8 @@ type ConformInput struct {
 	Tags             []string
 	Paths            []string
 	FailFast         bool
-	RequestTimeoutMs int // 0 means DefaultConformRequestTimeoutMs
+	RequestTimeoutMs int  // 0 means DefaultConformRequestTimeoutMs
+	ReadOnly         bool // send only GET and HEAD operations
 
 	Coverage bool // compute the coverage report
 	Negative bool // also run negative probes
@@ -67,6 +68,7 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		Tags:             in.Tags,
 		Paths:            in.Paths,
 		FailFast:         in.FailFast,
+		ReadOnly:         in.ReadOnly,
 		RequestTimeoutMs: timeout,
 	}
 

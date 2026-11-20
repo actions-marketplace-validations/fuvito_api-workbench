@@ -1,4 +1,4 @@
-import { FolderOpen, Play, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal } from 'lucide-react'
+import { FolderOpen, Play, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type RailTab = 'explorer' | 'scenarios' | 'coverage'
@@ -26,13 +26,14 @@ type ActivityRailProps = {
   onShowSettings: () => void
   onShowHelp: () => void
   onOpenCliBuilder?: () => void
+  onOpenConformance?: () => void
   demoRunning?: boolean
   onStopDemo?: () => void
 }
 
 export function ActivityRail({
   activeTab, sidebarOpen, expanded,
-  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, demoRunning, onStopDemo,
+  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, onOpenConformance, demoRunning, onStopDemo,
 }: ActivityRailProps) {
   return (
     <div
@@ -90,6 +91,7 @@ export function ActivityRail({
         )}
 
         {([
+          ...(onOpenConformance ? [{ icon: ShieldCheck, label: 'Conformance', title: 'Check spec conformance', onClick: onOpenConformance }] : []),
           ...(onOpenCliBuilder ? [{ icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: onOpenCliBuilder }] : []),
           { icon: Settings,   label: 'Settings', title: 'Settings', onClick: onShowSettings },
           { icon: HelpCircle, label: 'Help',     title: 'Help',     onClick: onShowHelp },

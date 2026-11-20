@@ -104,6 +104,15 @@ type Options struct {
 	FailFast bool
 	// RequestTimeoutMs overrides the per-request timeout. 0 = use executor default.
 	RequestTimeoutMs int
+	// ReadOnly runs only GET and HEAD operations; every other operation is reported as skipped
+	// and never sent.
+	ReadOnly bool
+}
+
+// IsReadOnlyMethod reports whether an HTTP method cannot change server state (GET, HEAD).
+func IsReadOnlyMethod(method string) bool {
+	m := strings.ToUpper(method)
+	return m == "GET" || m == "HEAD"
 }
 
 // Runner executes all operations in an OpenAPI spec against a live server
@@ -145,7 +154,8 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			Path:        opPath,
 		}
 
-		if !matchesTags(gr.Tags, opts.Tags) || !matchesPathPrefix(opPath, opts.Paths) {
+		if !matchesTags(gr.Tags, opts.Tags) || !matchesPathPrefix(opPath, opts.Paths) ||
+			(opts.ReadOnly && !IsReadOnlyMethod(or.Method)) {
 			or.Skipped = true
 			result.Operations = append(result.Operations, or)
 			continue

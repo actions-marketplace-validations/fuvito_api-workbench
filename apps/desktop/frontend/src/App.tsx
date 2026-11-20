@@ -16,6 +16,7 @@ import {ResponseViewer} from '@/components/ResponseViewer'
 import {ChevronLeft} from 'lucide-react'
 import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
+import {ConformanceTab} from '@/components/ConformanceTab'
 import {RunnerTab} from '@/components/RunnerTab'
 import {CliBuilderTab} from '@/components/CliBuilderTab'
 import type {CliBuilderPreset} from '@/components/CliBuilderTab'
@@ -867,7 +868,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli',
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance',
     filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
@@ -1097,6 +1098,7 @@ export default function App() {
               onShowSettings={() => settings.setShowSettings(true)}
               onShowHelp={() => setShowHelp(true)}
               onOpenCliBuilder={() => openCliBuilder()}
+              onOpenConformance={() => tabs.openConformanceTab()}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />
@@ -1284,6 +1286,17 @@ export default function App() {
                       onDismiss={() => setRunAllState(null)}
                       onRunAll={handleRunAll}
                     />
+                  </div>
+                ))}
+
+                {/* Conformance tab (single instance) */}
+                {tabList.filter(t => t.kind === 'conformance').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <ConformanceTab onOpenCliBuilder={() => openCliBuilder({ command: 'conform' })} />
                   </div>
                 ))}
 

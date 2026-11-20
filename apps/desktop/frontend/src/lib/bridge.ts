@@ -84,6 +84,12 @@ import {
   OpenSpecInBrowser as WailsOpenDemoSpec,
 } from '@wailsjs/go/main/DemoService'
 import {
+  GetConformContext as WailsGetConformContext,
+  InspectConformSpec as WailsInspectConformSpec,
+  RunConformance as WailsRunConformance,
+  CancelConformance as WailsCancelConformance,
+} from '@wailsjs/go/main/ConformanceService'
+import {
   Start as WailsStartConformanceServer,
   Stop as WailsStopConformanceServer,
   OpenSpecInBrowser as WailsOpenConformanceSpec,
@@ -703,6 +709,72 @@ export async function getDemoPort(): Promise<number> {
 export async function openDemoSpec(): Promise<string> {
   const result = await WailsOpenDemoSpec()
   return result as unknown as string
+}
+
+// ---- Check conformance ----
+
+export interface ConformContext {
+  workspace: string
+  specs: CliFile[]
+  environments: CliFile[]
+}
+
+export interface ConformSpecInfo {
+  title: string
+  version: string
+  serverUrl: string
+  reads: number
+  writes: number
+  error?: string
+}
+
+export interface ConformRunInput {
+  specPath: string
+  baseUrl: string
+  envPath: string
+  allowWrites: boolean
+  confirmedRemote: boolean
+}
+
+export interface ConformOperation {
+  operationId: string
+  method: string
+  path: string
+  status: 'passed' | 'failed' | 'error' | 'skipped'
+  statusCode: number
+  durationMs: number
+  violations: string[]
+  error?: string
+}
+
+export interface ConformRunOutput {
+  error?: string
+  specTitle: string
+  baseUrl: string
+  writes: boolean
+  durationMs: number
+  operations: ConformOperation[]
+  total: number
+  covered: number
+  notCovered: number
+  passing: number
+  failing: number
+}
+
+export async function getConformContext(): Promise<ConformContext> {
+  return (await WailsGetConformContext()) as unknown as ConformContext
+}
+
+export async function inspectConformSpec(specPath: string): Promise<ConformSpecInfo> {
+  return (await WailsInspectConformSpec(specPath)) as unknown as ConformSpecInfo
+}
+
+export async function runConformance(input: ConformRunInput): Promise<ConformRunOutput> {
+  return (await WailsRunConformance(input as never)) as unknown as ConformRunOutput
+}
+
+export async function cancelConformance(): Promise<void> {
+  await WailsCancelConformance()
 }
 
 // ---- Conformance server ----

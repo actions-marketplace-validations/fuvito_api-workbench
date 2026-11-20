@@ -104,3 +104,43 @@ func TestSplitList(t *testing.T) {
 		t.Fatal("empty input should give nil")
 	}
 }
+
+func TestRunConformance_ReadOnlySendsNoWrites(t *testing.T) {
+	var writes int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			writes++
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":1}`)
+	}))
+	defer srv.Close()
+	s, err := openapi.ParseBytes([]byte(`
+openapi: "3.0.3"
+info: {title: t, version: "1"}
+paths:
+  /x:
+    get:
+      responses: {"200": {description: ok}}
+    delete:
+      responses: {"200": {description: ok}}
+`), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := application.ConformInput{Exec: executor.New(executor.Options{}), Spec: s, BaseURL: srv.URL, Negative: true, ReadOnly: true}
+	out := application.RunConformance(context.Background(), in)
+	if writes != 0 {
+		t.Fatalf("read-only run sent %d write request(s)", writes)
+	}
+	_, _, skipped := out.Result.Counts()
+	if skipped != 1 {
+		t.Fatalf("the DELETE operation should be skipped, skipped = %d", skipped)
+	}
+
+	in.ReadOnly = false
+	application.RunConformance(context.Background(), in)
+	if writes == 0 {
+		t.Fatal("without ReadOnly the DELETE operation should be sent")
+	}
+}

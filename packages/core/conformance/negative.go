@@ -100,6 +100,12 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 			Description: probe.Description,
 		}
 
+		if opts.ReadOnly && !IsReadOnlyMethod(probe.Method) {
+			pr.Skipped = true
+			result.Probes = append(result.Probes, pr)
+			continue
+		}
+
 		resolved := resolver.InterpolateRequest(probe.Request)
 
 		// Skip probes where path parameters are still unresolved. An unresolved

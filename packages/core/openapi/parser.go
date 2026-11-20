@@ -105,6 +105,15 @@ type GeneratedRequest struct {
 	Path        string // raw path from the spec, e.g. "/user/{username}"
 }
 
+// FirstServerURL returns the spec's first server URL without a trailing slash, or "" when the
+// spec declares none.
+func (s *Spec) FirstServerURL() string {
+	if len(s.doc.Servers) == 0 {
+		return ""
+	}
+	return strings.TrimRight(s.doc.Servers[0].URL, "/")
+}
+
 // GenerateRequests creates one domain.Request per operation in the spec.
 // baseURL overrides the first server URL when non-empty.
 func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {

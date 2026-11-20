@@ -19,6 +19,7 @@ type App struct {
 	scenarioService   *ScenarioService
 	helpService       *HelpService
 	cliBuilder        *CliBuilderService
+	conformance       *ConformanceService
 	hasDirtyTabs      bool
 }
 
@@ -39,6 +40,7 @@ func NewApp() *App {
 		scenarioService:   NewScenarioService(ws, ss),
 		helpService:       NewHelpService(),
 		cliBuilder:        NewCliBuilderService(ws),
+		conformance:       NewConformanceService(ws, ss),
 	}
 }
 
@@ -53,6 +55,7 @@ func (a *App) startup(ctx context.Context) {
 	a.demoService.setContext(ctx)
 	a.scenarioService.setContext(ctx)
 	a.cliBuilder.setContext(ctx)
+	a.conformance.setContext(ctx)
 	// Set title now that Wails context is live (workspace may already be set from config).
 	a.workspaceService.syncTitle()
 }
