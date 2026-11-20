@@ -68,10 +68,33 @@ test.describe('Check Conformance page', () => {
     await expect(page.getByRole('region', { name: 'Negative probes' })).toContainText('1 accepted by the server')
   })
 
-  test('Get CLI command opens the CLI builder for conform', async ({ page }) => {
+  test('Get CLI command carries the page choices, read-only included', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
+    await page.getByText('Options', { exact: true }).click()
+    await page.getByLabel('Tags').fill('items, orders')
+    await page.getByLabel(/Also run negative probes/).check()
     await page.getByRole('button', { name: 'Get CLI command' }).click()
+
     await expect(page.getByRole('heading', { name: 'CLI Command Builder' })).toBeVisible()
+    const command = page.getByTestId('cli-command')
+    await expect(command).toContainText('clrsig conform specs/shop.yaml')
+    await expect(command).toContainText('--base-url http://localhost:8120')
+    await expect(command).toContainText('--env environments/local.yaml')
+    await expect(command).toContainText('--tags items,orders')
+    await expect(command).toContainText('--negative')
+    await expect(command).toContainText('--read-only')
+  })
+
+  test('with writes ticked the command has no --read-only', async ({ page }) => {
+    await gotoApp(page)
+    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
+    await page.getByLabel(/Also send write requests/).check()
+    await page.getByRole('button', { name: 'Get CLI command' }).click()
+    const command = page.getByTestId('cli-command')
+    await expect(command).toContainText('clrsig conform specs/shop.yaml')
+    await expect(command).not.toContainText('--read-only')
   })
 })

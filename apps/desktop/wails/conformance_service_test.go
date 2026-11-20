@@ -220,6 +220,17 @@ func TestScenarioSpecRef_ReusesTheNameAScenarioUses(t *testing.T) {
 	}
 }
 
+func TestConformanceService_ContextNamesTheActiveEnvironment(t *testing.T) {
+	svc := newTestConformanceService(t)
+	if got := svc.GetConformContext().ActiveEnvironment; got != "" {
+		t.Fatalf("no environment selected, got %q", got)
+	}
+	svc.ws.activeEnvPath = "/ws/environments/local.yaml"
+	if got := svc.GetConformContext().ActiveEnvironment; got != "/ws/environments/local.yaml" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestConformanceService_WarnsAboutUnsetEnvironmentReferences(t *testing.T) {
 	srv := localConformanceServer(t)
 	svc := newTestConformanceService(t)

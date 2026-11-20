@@ -39,12 +39,15 @@ type ConformContextIO struct {
 	Workspace    string      `json:"workspace"`
 	Specs        []CliFileIO `json:"specs"`
 	Environments []CliFileIO `json:"environments"`
+	// ActiveEnvironment is the file "Active environment" refers to ("" when none is selected), so
+	// the page can put it in a command line.
+	ActiveEnvironment string `json:"activeEnvironment"`
 }
 
 // GetConformContext lists the workspace files the page offers.
 func (s *ConformanceService) GetConformContext() ConformContextIO {
 	ws := s.ws.GetWorkspacePath()
-	out := ConformContextIO{Workspace: ws, Specs: []CliFileIO{}, Environments: []CliFileIO{}}
+	out := ConformContextIO{Workspace: ws, Specs: []CliFileIO{}, Environments: []CliFileIO{}, ActiveEnvironment: s.ws.activeEnvPath}
 	if ws != "" {
 		out.Specs = findSpecs(ws)
 		out.Environments = listFiles(ws, "environments")

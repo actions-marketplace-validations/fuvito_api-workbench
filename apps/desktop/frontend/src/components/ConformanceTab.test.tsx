@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { ConformanceTab, isLocalUrl, splitList } from './ConformanceTab'
+import { ConformanceTab, isLocalUrl, splitList, cliValues } from './ConformanceTab'
 
 const bridge = vi.hoisted(() => ({
   getConformContext: vi.fn(),
@@ -232,5 +232,52 @@ describe('isLocalUrl', () => {
     expect(isLocalUrl('https://api.example.com')).toBe(false)
     expect(isLocalUrl('http://localhost.evil.com')).toBe(false)
     expect(isLocalUrl('nonsense')).toBe(false)
+  })
+})
+
+describe('cliValues', () => {
+  const base = {
+    specPath: '/ws/api.yaml', baseUrl: ' http://localhost:8120 ', envPath: '', activeEnvironment: '',
+    tags: [] as string[], paths: [] as string[], negative: false, failFast: false, timeoutText: '', allowWrites: false,
+  }
+
+  it('is read-only unless writes are allowed, and leaves unset choices out', () => {
+    expect(cliValues(base)).toEqual({ spec: '/ws/api.yaml', 'base-url': 'http://localhost:8120', 'read-only': 'true' })
+    expect(cliValues({ ...base, allowWrites: true })).not.toHaveProperty('read-only')
+  })
+
+  it('carries every option', () => {
+    expect(cliValues({
+      ...base, envPath: '/ws/environments/ci.yaml', activeEnvironment: '/ws/environments/local.yaml',
+      tags: ['users', 'orders'], paths: ['/users'], negative: true, failFast: true, timeoutText: '3000', allowWrites: true,
+    })).toEqual({
+      spec: '/ws/api.yaml', 'base-url': 'http://localhost:8120', env: '/ws/environments/ci.yaml',
+      tags: 'users,orders', paths: '/users', negative: 'true', 'fail-fast': 'true', 'request-timeout': '3000',
+    })
+  })
+
+  it('uses the active environment when none is chosen, and ignores a bad timeout', () => {
+    const v = cliValues({ ...base, activeEnvironment: '/ws/environments/local.yaml', timeoutText: 'abc', allowWrites: true })
+    expect(v['env']).toBe('/ws/environments/local.yaml')
+    expect(v).not.toHaveProperty('request-timeout')
+  })
+})
+
+describe('ConformanceTab Get CLI command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue({ ...ctx, activeEnvironment: '/ws/environments/local.yaml' })
+    bridge.inspectConformSpec.mockResolvedValue(info)
+  })
+
+  it('hands the current choices to the builder', async () => {
+    const open = vi.fn()
+    render(<ConformanceTab onOpenCliBuilder={open} />)
+    fireEvent.change(await screen.findByLabelText(/Spec/), { target: { value: '/ws/api.yaml' } })
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:8120'))
+    fireEvent.click(screen.getByRole('button', { name: /Get CLI command/ }))
+    expect(open).toHaveBeenCalledWith({
+      spec: '/ws/api.yaml', 'base-url': 'http://localhost:8120', env: '/ws/environments/local.yaml', 'read-only': 'true',
+    })
   })
 })

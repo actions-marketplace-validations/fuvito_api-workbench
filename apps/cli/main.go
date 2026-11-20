@@ -417,6 +417,7 @@ func conformCmd() *cobra.Command {
 	var outputFile string
 	var requestTimeout int
 	var failFast bool
+	var readOnly bool
 	var vars []string
 	var reports []string
 	var showCoverage bool
@@ -496,6 +497,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				Tags:             application.SplitList(tagsCSV),
 				Paths:            application.SplitList(pathsCSV),
 				FailFast:         failFast,
+				ReadOnly:         readOnly,
 				RequestTimeoutMs: requestTimeout,
 				Coverage:         showCoverage,
 				Negative:         runNegative,
@@ -589,6 +591,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
+	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")
 	cmd.Flags().StringVar(&writeBaseline, "write-baseline", "", "Record the current violations in this file (YAML or JSON by extension) and exit 0")

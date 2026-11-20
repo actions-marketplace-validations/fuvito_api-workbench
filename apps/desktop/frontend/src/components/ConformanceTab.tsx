@@ -145,7 +145,28 @@ function ExportMenu({ disabled }: { disabled: boolean }) {
   )
 }
 
-type Props = { onOpenCliBuilder?: () => void }
+// The values of the page's current choices, as the CLI Command Builder takes them for `clrsig
+// conform`. Read-only is on unless writes were ticked, so the command does what the page does.
+export function cliValues(p: {
+  specPath: string; baseUrl: string; envPath: string; activeEnvironment: string
+  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; timeoutText: string; allowWrites: boolean
+}): Record<string, string> {
+  const v: Record<string, string> = {}
+  if (p.specPath) v['spec'] = p.specPath
+  if (p.baseUrl.trim()) v['base-url'] = p.baseUrl.trim()
+  const env = p.envPath || p.activeEnvironment
+  if (env) v['env'] = env
+  if (p.tags.length) v['tags'] = p.tags.join(',')
+  if (p.paths.length) v['paths'] = p.paths.join(',')
+  if (p.negative) v['negative'] = 'true'
+  if (p.failFast) v['fail-fast'] = 'true'
+  const timeout = Number.parseInt(p.timeoutText, 10)
+  if (timeout > 0) v['request-timeout'] = String(timeout)
+  if (!p.allowWrites) v['read-only'] = 'true'
+  return v
+}
+
+type Props = { onOpenCliBuilder?: (values: Record<string, string>) => void }
 
 export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const [ctx, setCtx] = useState<ConformContext | null>(null)
@@ -225,7 +246,11 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         {onOpenCliBuilder && (
           <button
             type="button"
-            onClick={onOpenCliBuilder}
+            onClick={() => onOpenCliBuilder(cliValues({
+              specPath, baseUrl, envPath, activeEnvironment: ctx.activeEnvironment ?? '',
+              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, allowWrites,
+            }))}
+            title="Open the CLI Command Builder with the choices on this page"
             className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
           >
             <Terminal size={12} aria-hidden /> Get CLI command

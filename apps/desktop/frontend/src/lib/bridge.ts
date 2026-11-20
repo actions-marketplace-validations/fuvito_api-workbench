@@ -722,6 +722,8 @@ export interface ConformContext {
   workspace: string
   specs: CliFile[]
   environments: CliFile[]
+  // the file "Active environment" means; empty when none is selected
+  activeEnvironment?: string
 }
 
 export interface ConformSpecInfo {

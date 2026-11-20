@@ -195,6 +195,13 @@ var catalog = []Command{
 				Group: GroupAdvanced,
 			},
 			{
+				Name: "read-only", Kind: KindBool, Default: "false",
+				Label: "Read requests only",
+				Help: "Send only GET and HEAD requests. POST, PUT, PATCH and DELETE operations are skipped and never sent, " +
+					"so the check cannot create, change or delete data. Use it against a shared or production-like server.",
+				Group: GroupEssential,
+			},
+			{
 				Name: "baseline", Kind: KindString,
 				Label:   "Accept recorded violations",
 				Help:    "Violations already listed in this baseline file are accepted; only new ones fail the run, and fixed ones are reported.",

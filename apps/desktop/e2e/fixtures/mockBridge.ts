@@ -70,6 +70,13 @@ export function setupMockBridge() {
         inputs: [
           { name: 'spec', short: '', positional: true, required: true, kind: 'path', role: 'spec', accepts: ['.yaml'], enum: [], default: '', label: 'OpenAPI spec', help: 'The spec file to check against.', example: 'specs/openapi.yaml', group: 'essential' },
           { name: 'base-url', short: 'b', positional: false, required: false, kind: 'text', role: '', accepts: [], enum: [], default: '', label: 'Base URL', help: 'Where the API runs.', example: 'http://localhost:8120', group: 'essential' },
+          { name: 'env', short: 'e', positional: false, required: false, kind: 'file', role: 'environment', accepts: ['.yaml'], enum: [], default: '', label: 'Environment', help: 'Variables used by the requests.', example: 'environments/ci.yaml', group: 'essential' },
+          { name: 'read-only', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Read requests only', help: 'Send only GET and HEAD requests.', example: '', group: 'essential' },
+          { name: 'negative', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Negative probes', help: 'Also send wrong requests.', example: '', group: 'advanced' },
+          { name: 'fail-fast', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Stop at the first failure', help: 'Stop early.', example: '', group: 'advanced' },
+          { name: 'tags', short: '', positional: false, required: false, kind: 'string', role: '', accepts: [], enum: [], default: '', label: 'Only these tags', help: 'Tags.', example: 'users', group: 'advanced' },
+          { name: 'paths', short: '', positional: false, required: false, kind: 'string', role: '', accepts: [], enum: [], default: '', label: 'Only these path prefixes', help: 'Prefixes.', example: '/users', group: 'advanced' },
+          { name: 'request-timeout', short: '', positional: false, required: false, kind: 'int', role: '', accepts: [], enum: [], default: '10000', label: 'Request timeout (ms)', help: 'Timeout.', example: '10000', group: 'advanced' },
         ],
         outputs: [], exitCodes: [],
       },
@@ -219,6 +226,7 @@ export function setupMockBridge() {
       ConformanceService: {
         GetConformContext: () => Promise.resolve({
           workspace: '/workspace',
+          activeEnvironment: '/workspace/environments/local.yaml',
           specs: [{ path: '/workspace/specs/shop.yaml', label: 'specs/shop.yaml' }],
           environments: [{ path: '/workspace/environments/local.yaml', label: 'environments/local.yaml' }],
         }),

@@ -1324,7 +1324,7 @@ export default function App() {
                     className="absolute inset-0 overflow-hidden"
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
-                    <ConformanceTab onOpenCliBuilder={() => openCliBuilder({ command: 'conform' })} />
+                    <ConformanceTab onOpenCliBuilder={values => openCliBuilder({ command: 'conform', values })} />
                   </div>
                 ))}
 
