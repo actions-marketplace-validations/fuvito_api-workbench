@@ -208,6 +208,13 @@ export function setupMockBridge() {
         IsRunning: () => Promise.resolve(false),
         GetPort: () => Promise.resolve(0),
       },
+      ConformanceServerService: {
+        Start: () => Promise.resolve({ port: 8120, error: '' }),
+        Stop: noop,
+        IsRunning: () => Promise.resolve(false),
+        GetPort: () => Promise.resolve(0),
+        OpenSpecInBrowser: () => Promise.resolve(''),
+      },
       OpenAPIService: {
         ImportOpenAPISpec: () => Promise.resolve({ count: 0, error: '' }),
         ImportOpenAPISpecFromPath: () => Promise.resolve({ count: 0, error: '' }),

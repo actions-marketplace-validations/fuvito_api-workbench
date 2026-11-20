@@ -513,3 +513,10 @@ Do not implement or stub any of these without explicit user direction.
 
 - Created `docs/next_steps/` for point-in-time planning documents (separate from `docs/enhancements/`, which holds feature design proposals). Convention in `docs/next_steps/README.md`: `YYYY-MM-DD-next-steps.md`, new file per snapshot — do not edit old ones.
 - First snapshot `2026-11-19-next-steps.md` orders post-MVP work: (1) code signing + notarization (Azure Trusted Signing, Apple Developer Program — release.yml currently produces unsigned binaries), (2) hosted demo server + everything workspace (`examples/server` exists locally; needs hosting and a kitchen-sink workspace wired into release checks), (3) `clrsig conform` spec-conformance command (per `docs/contract-testing-roadmap.md`; needs an enhancements proposal), (4) NotebookLM video guides kept as regenerable script + screenshot artifacts, (5) traction (posts, shorts, forums), (6) backlog: failure-catalog repo, community scaffolding, JUnit output.
+
+### 2026-11-19 — Conformance Server and Dev Servers menu (phase 1.6 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **Conformance Server:** `conformance_server.go`, `ConformanceServerService` (Start, Stop, IsRunning, GetPort, OpenSpecInBrowser), embedded `help/conformance-openapi.yaml`. Four operations conform, three break the spec (`getProduct`, `listCategories`, `listOrders`); `TestConformanceServerViolationsAreExactlyTheKnownOnes` pins the set. No workspace is opened; port from 8120; stopped on app shutdown.
+- **Menu:** Help → **Dev Servers** holds the Demo Server and Conformance Server entries; status bar shows a `Conformance :port` chip.
+- **Finding (not changed):** the response validator ignores a wrong `Content-Type` and missing response headers.
+- **Not yet:** the Conformance page itself (phase 2) and the `conform` extraction (phase 1.5).

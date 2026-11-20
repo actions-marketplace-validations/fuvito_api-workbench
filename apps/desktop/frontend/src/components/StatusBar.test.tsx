@@ -16,6 +16,19 @@ describe('StatusBar', () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } })
   })
 
+  it('shows a stoppable conformance server chip only while it runs', () => {
+    const onStopConformance = vi.fn()
+    renderBar({ conformancePort: 8120, onStopConformance })
+    expect(screen.getByText('Conformance :8120')).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Stop conformance server'))
+    expect(onStopConformance).toHaveBeenCalled()
+  })
+
+  it('shows no conformance chip by default', () => {
+    renderBar()
+    expect(screen.queryByText(/Conformance :/)).not.toBeInTheDocument()
+  })
+
   it('shows only the footer shell without a workspace', () => {
     renderBar({ workspacePath: '' })
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()

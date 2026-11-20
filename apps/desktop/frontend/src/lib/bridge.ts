@@ -84,6 +84,11 @@ import {
   OpenSpecInBrowser as WailsOpenDemoSpec,
 } from '@wailsjs/go/main/DemoService'
 import {
+  Start as WailsStartConformanceServer,
+  Stop as WailsStopConformanceServer,
+  OpenSpecInBrowser as WailsOpenConformanceSpec,
+} from '@wailsjs/go/main/ConformanceServerService'
+import {
   ListScenarios as WailsListScenarios,
   LoadScenario as WailsLoadScenario,
   RunScenario as WailsRunScenario,
@@ -697,6 +702,27 @@ export async function getDemoPort(): Promise<number> {
 
 export async function openDemoSpec(): Promise<string> {
   const result = await WailsOpenDemoSpec()
+  return result as unknown as string
+}
+
+// ---- Conformance server ----
+
+export interface ConformanceServerResult {
+  port: number
+  error?: string
+}
+
+export async function startConformanceServer(): Promise<ConformanceServerResult> {
+  const result = await WailsStartConformanceServer()
+  return result as unknown as ConformanceServerResult
+}
+
+export async function stopConformanceServer(): Promise<void> {
+  await WailsStopConformanceServer()
+}
+
+export async function openConformanceSpec(): Promise<string> {
+  const result = await WailsOpenConformanceSpec()
   return result as unknown as string
 }
 

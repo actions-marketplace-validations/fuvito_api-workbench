@@ -7,18 +7,19 @@ import (
 )
 
 type App struct {
-	ctx              context.Context
-	workspaceService *WorkspaceService
-	requestService   *RequestService
-	openapiService   *OpenAPIService
-	importService    *ImportService
-	bundleService    *BundleService
-	settingsService  *SettingsService
-	demoService      *DemoService
-	scenarioService  *ScenarioService
-	helpService      *HelpService
-	cliBuilder       *CliBuilderService
-	hasDirtyTabs     bool
+	ctx               context.Context
+	workspaceService  *WorkspaceService
+	requestService    *RequestService
+	openapiService    *OpenAPIService
+	importService     *ImportService
+	bundleService     *BundleService
+	settingsService   *SettingsService
+	demoService       *DemoService
+	conformanceServer *ConformanceServerService
+	scenarioService   *ScenarioService
+	helpService       *HelpService
+	cliBuilder        *CliBuilderService
+	hasDirtyTabs      bool
 }
 
 func NewApp() *App {
@@ -27,16 +28,17 @@ func NewApp() *App {
 	rs := NewRequestService(ws, ss)
 	ss.onSave = rs.RebuildExecutor // rebuild HTTP client whenever settings are saved
 	return &App{
-		workspaceService: ws,
-		requestService:   rs,
-		openapiService:   NewOpenAPIService(ws),
-		importService:    NewImportService(ws),
-		bundleService:    NewBundleService(ws),
-		settingsService:  ss,
-		demoService:      NewDemoService(ws),
-		scenarioService:  NewScenarioService(ws, ss),
-		helpService:      NewHelpService(),
-		cliBuilder:       NewCliBuilderService(ws),
+		workspaceService:  ws,
+		requestService:    rs,
+		openapiService:    NewOpenAPIService(ws),
+		importService:     NewImportService(ws),
+		bundleService:     NewBundleService(ws),
+		settingsService:   ss,
+		demoService:       NewDemoService(ws),
+		conformanceServer: NewConformanceServerService(),
+		scenarioService:   NewScenarioService(ws, ss),
+		helpService:       NewHelpService(),
+		cliBuilder:        NewCliBuilderService(ws),
 	}
 }
 
@@ -58,6 +60,7 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(_ context.Context) {
 	a.requestService.close()
 	a.demoService.StopDemo()
+	a.conformanceServer.Stop()
 }
 
 // SetHasDirtyTabs is called by the frontend whenever the overall dirty state changes.

@@ -58,6 +58,9 @@ import {
   moveRequest,
   moveScenario,
   openDemoSpec,
+  startConformanceServer,
+  stopConformanceServer,
+  openConformanceSpec,
   pickFile,
   quitApp,
   renameScenario,
@@ -109,6 +112,17 @@ export default function App() {
     openFirstFileInTree: workspace.openFirstFileInTree,
     onWorkspaceOpened: switchToExplorer,
   })
+
+  const [conformancePort, setConformancePort] = useState(0)
+  async function handleStartConformanceServer() {
+    const result = await startConformanceServer()
+    if (result.error) { setAppError(result.error); return }
+    setConformancePort(result.port)
+  }
+  async function handleStopConformanceServer() {
+    await stopConformanceServer()
+    setConformancePort(0)
+  }
 
   // Wire cross-dependency after both hooks are initialized
   // eslint-disable-next-line react/refs
@@ -717,7 +731,7 @@ export default function App() {
     items: [
       {
         kind: 'submenu',
-        label: 'Demo Server',
+        label: 'Dev Servers',
         items: [
           {
             kind: 'action',
@@ -725,13 +739,26 @@ export default function App() {
             onClick: demo.demoRunning ? demo.handleStopDemo : () => requestWorkspaceSwitch(demo.handleStartDemo),
             disabled: demo.demoStarting,
           },
-          { kind: 'separator' },
           {
             kind: 'action',
-            label: 'View API Spec',
+            label: 'Demo Server API Spec',
             disabled: !demo.demoRunning,
             title: demo.demoRunning ? 'Open the Swagger UI for the demo server in your browser' : 'Start the demo server first',
             onClick: () => openDemoSpec(),
+          },
+          { kind: 'separator' },
+          {
+            kind: 'action',
+            label: conformancePort > 0 ? 'Stop Conformance Server' : 'Start Conformance Server',
+            title: 'A deliberately imperfect API (three operations break its spec) for trying Spec Conformance Testing',
+            onClick: conformancePort > 0 ? handleStopConformanceServer : handleStartConformanceServer,
+          },
+          {
+            kind: 'action',
+            label: 'Conformance Server API Spec',
+            disabled: conformancePort === 0,
+            title: conformancePort > 0 ? 'Open the Swagger UI for the conformance server in your browser' : 'Start the conformance server first',
+            onClick: () => openConformanceSpec(),
           },
         ],
       },
@@ -1388,6 +1415,8 @@ export default function App() {
             }
             demoRunning={demo.demoRunning}
             demoPort={demo.demoPort}
+            conformancePort={conformancePort}
+            onStopConformance={handleStopConformanceServer}
             onEnvChange={workspace.handleEnvChange}
             onEditEnv={() => { setEditingEnvPath(workspace.activeEnv?.path ?? null); setShowEnvEditor(true) }}
             onStopDemo={demo.handleStopDemo}

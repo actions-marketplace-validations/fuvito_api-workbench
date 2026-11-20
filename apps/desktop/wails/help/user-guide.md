@@ -1064,6 +1064,7 @@ The Help panel (the `?` icon at the bottom of the Activity Rail, or the **Help**
 |---|---|
 | **User Guide** | This guide. |
 | **Format Spec** | The complete file format specification, including the bundle format. **Copy Format Spec** and **Download** put it on your clipboard or save it as a Markdown file. |
+| **Dev Servers** (Help menu) | **Demo Server** is a well-behaved sample API. **Conformance Server** is a deliberately imperfect one for trying Spec Conformance Testing: its spec (`View API Spec`) is correct, but three operations break it (`GET /products/{id}` returns `price` as a string, `GET /categories` omits the required `name`, `GET /orders` returns `id` as a string). Run `clrsig conform` or a scenario with its spec against the port shown in the status bar and exactly those three fail. |
 | **Example Scenario** | A complete, runnable scenario that uses every feature of the format, with its environment and a reusable request. It runs against the built-in Demo Server. **Copy scenario** and **Download** give you just the scenario YAML. |
 | **AI Prompt** | Instructions for an AI assistant that turns an OpenAPI or Swagger document into a ready-to-import bundle. **Copy AI Prompt** and **Download** give you the complete prompt (instructions + format spec + example scenario). |
 
