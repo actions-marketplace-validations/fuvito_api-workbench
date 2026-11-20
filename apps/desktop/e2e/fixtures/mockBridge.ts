@@ -211,8 +211,9 @@ export function setupMockBridge() {
       ConformanceService: {
         GetConformContext: () => Promise.resolve({ workspace: '', specs: [], environments: [] }),
         InspectConformSpec: () => Promise.resolve({ title: '', version: '', serverUrl: '', reads: 0, writes: 0 }),
-        RunConformance: () => Promise.resolve({ error: '', specTitle: '', baseUrl: '', writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0 }),
+        RunConformance: () => Promise.resolve({ error: '', specTitle: '', baseUrl: '', writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [] }),
         CancelConformance: noop,
+        ExportConformReport: () => Promise.resolve({ content: '', error: '' }),
       },
       ConformanceServerService: {
         Start: () => Promise.resolve({ port: 8120, error: '' }),

@@ -6,6 +6,10 @@ export function CancelConformance() {
   return window['go']['main']['ConformanceService']['CancelConformance']();
 }
 
+export function ExportConformReport(arg1) {
+  return window['go']['main']['ConformanceService']['ExportConformReport'](arg1);
+}
+
 export function GetConformContext() {
   return window['go']['main']['ConformanceService']['GetConformContext']();
 }

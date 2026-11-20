@@ -1,6 +1,6 @@
 # Spec Conformance Testing in the desktop app
 
-**Status:** Proposed
+**Status:** Phases 1, 1.5, 1.6, 2a and 2b built (2026-11-19); phase 3 (baselines) deferred
 **Date:** 2026-11-19
 **Author:** Claude Code, for the project owner
 

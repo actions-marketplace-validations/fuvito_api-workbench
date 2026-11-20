@@ -88,6 +88,7 @@ import {
   InspectConformSpec as WailsInspectConformSpec,
   RunConformance as WailsRunConformance,
   CancelConformance as WailsCancelConformance,
+  ExportConformReport as WailsExportConformReport,
 } from '@wailsjs/go/main/ConformanceService'
 import {
   Start as WailsStartConformanceServer,
@@ -734,6 +735,23 @@ export interface ConformRunInput {
   envPath: string
   allowWrites: boolean
   confirmedRemote: boolean
+  tags: string[]
+  paths: string[]
+  negative: boolean
+  failFast: boolean
+  timeoutMs: number
+  recordCoverage: boolean
+}
+
+export interface ConformProbe {
+  operationId: string
+  method: string
+  path: string
+  kind: string
+  description: string
+  status: 'rejected' | 'accepted' | 'error' | 'skipped'
+  statusCode: number
+  error?: string
 }
 
 export interface ConformOperation {
@@ -759,7 +777,11 @@ export interface ConformRunOutput {
   notCovered: number
   passing: number
   failing: number
+  probes: ConformProbe[]
+  coverageNote?: string
 }
+
+export type ConformReportFormat = 'html' | 'junit' | 'json' | 'markdown'
 
 export async function getConformContext(): Promise<ConformContext> {
   return (await WailsGetConformContext()) as unknown as ConformContext
@@ -775,6 +797,10 @@ export async function runConformance(input: ConformRunInput): Promise<ConformRun
 
 export async function cancelConformance(): Promise<void> {
   await WailsCancelConformance()
+}
+
+export async function exportConformReport(format: ConformReportFormat): Promise<RunReport> {
+  return (await WailsExportConformReport(format)) as unknown as RunReport
 }
 
 // ---- Conformance server ----

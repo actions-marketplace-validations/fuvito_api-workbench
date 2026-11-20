@@ -181,3 +181,40 @@ func reportToIO(r coverage.Report) AccumulatedCoverageIO {
 		OperationResults: opResults,
 	}
 }
+
+// accumulateCoverage merges one run's coverage into the workspace store for specFile and returns
+// the new accumulated view. Scenario runs and conformance runs share it, so the Contracts page
+// counts both the same way.
+func accumulateCoverage(wsPath, specFile string, spec *openapi.Spec, cr *openapi.ScenarioCoverageResult, runPassed bool) (AccumulatedCoverageIO, bool) {
+	exercised := make([]string, 0, len(cr.Exercised))
+	for _, op := range cr.Exercised {
+		exercised = append(exercised, op.String())
+	}
+	stored := loadStoredCoverage(wsPath, specFile)
+	stored.TotalRuns++
+	stored.LastRunAt = time.Now()
+	if runPassed {
+		stored.PassedRuns++
+	} else {
+		stored.FailedRuns++
+	}
+	stored.Exercised = mergeExercised(stored.Exercised, exercised)
+	stored.TotalOps = cr.Total
+	now := time.Now()
+	if stored.OperationResults == nil {
+		stored.OperationResults = make(map[string]coverage.OperationResult)
+	}
+	for _, er := range cr.ExercisedResults {
+		prev := stored.OperationResults[er.String()]
+		stored.OperationResults[er.String()] = coverage.OperationResult{
+			LastPassed:  er.Passed,
+			LastRunAt:   now,
+			StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
+			HadAuth:     prev.HadAuth || er.HadAuth,
+		}
+	}
+	if err := saveStoredCoverage(wsPath, stored); err != nil {
+		return AccumulatedCoverageIO{}, false
+	}
+	return buildAccumulatedCoverageIO(stored, spec), true
+}

@@ -4,6 +4,8 @@ import {main} from '../models';
 
 export function CancelConformance():Promise<void>;
 
+export function ExportConformReport(arg1:string):Promise<main.RunReportIO>;
+
 export function GetConformContext():Promise<main.ConformContextIO>;
 
 export function InspectConformSpec(arg1:string):Promise<main.ConformSpecInfoIO>;

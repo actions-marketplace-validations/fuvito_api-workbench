@@ -12,6 +12,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 )
 
@@ -23,6 +24,7 @@ type ConformanceService struct {
 	settings  *SettingsService
 	mu        sync.Mutex
 	cancelRun context.CancelFunc
+	last      *application.ConformOutput // the latest run, for Export
 }
 
 func NewConformanceService(ws *WorkspaceService, ss *SettingsService) *ConformanceService {
@@ -103,6 +105,29 @@ type ConformRunInput struct {
 	AllowWrites bool `json:"allowWrites"`
 	// ConfirmedRemote must be true to run against a base URL that is not on this computer.
 	ConfirmedRemote bool `json:"confirmedRemote"`
+
+	// Filters: operations outside them are skipped. Comma lists are split by the caller.
+	Tags  []string `json:"tags"`
+	Paths []string `json:"paths"`
+	// Negative adds negative probes (malformed or unauthorized requests that should be rejected).
+	Negative bool `json:"negative"`
+	FailFast bool `json:"failFast"`
+	// TimeoutMs is the per-request timeout; 0 uses the shared default.
+	TimeoutMs int `json:"timeoutMs"`
+	// RecordCoverage adds the run to the Contracts coverage store. Only unfiltered runs are
+	// recorded, so a run limited by tags or paths cannot skew the accumulated totals.
+	RecordCoverage bool `json:"recordCoverage"`
+}
+
+type ConformProbeIO struct {
+	OperationID string `json:"operationId"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	Kind        string `json:"kind"`
+	Description string `json:"description"`
+	Status      string `json:"status"` // rejected, accepted, error, skipped
+	StatusCode  int    `json:"statusCode"`
+	Error       string `json:"error,omitempty"`
 }
 
 type ConformOperationIO struct {
@@ -129,6 +154,11 @@ type ConformRunOutputIO struct {
 	NotCovered int `json:"notCovered"`
 	Passing    int `json:"passing"`
 	Failing    int `json:"failing"`
+	// Probes is empty unless negative probes were requested. An accepted probe means the server
+	// took a request it should have rejected.
+	Probes []ConformProbeIO `json:"probes"`
+	// CoverageNote says what happened to RecordCoverage: recorded under which spec name, or why not.
+	CoverageNote string `json:"coverageNote,omitempty"`
 }
 
 // IsLocalBaseURL reports whether the URL points at this computer.
@@ -186,14 +216,93 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	}()
 
 	out := application.RunConformance(ctx, application.ConformInput{
-		Exec:     buildExecutor(s.settings),
-		Spec:     spec,
-		BaseURL:  baseURL,
-		Env:      env,
-		Coverage: true,
-		ReadOnly: !in.AllowWrites,
+		Exec:             buildExecutor(s.settings),
+		Spec:             spec,
+		BaseURL:          baseURL,
+		Env:              env,
+		Tags:             in.Tags,
+		Paths:            in.Paths,
+		FailFast:         in.FailFast,
+		RequestTimeoutMs: in.TimeoutMs,
+		Coverage:         true,
+		Negative:         in.Negative,
+		ReadOnly:         !in.AllowWrites,
 	})
-	return conformOutputIO(out, baseURL, in.AllowWrites)
+	s.mu.Lock()
+	s.last = &out
+	s.mu.Unlock()
+
+	res := conformOutputIO(out, baseURL, in.AllowWrites)
+	if in.RecordCoverage {
+		res.CoverageNote = s.recordCoverage(in, spec, baseURL, out)
+	}
+	return res
+}
+
+// recordCoverage adds an unfiltered run to the Contracts coverage store, under the spec's path
+// relative to the workspace, and says what it did.
+func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Spec, baseURL string, out application.ConformOutput) string {
+	if len(in.Tags) > 0 || len(in.Paths) > 0 {
+		return "Not added to coverage: a run limited by tags or paths would skew the totals."
+	}
+	ws := s.ws.GetWorkspacePath()
+	if ws == "" {
+		return "Not added to coverage: no workspace is open."
+	}
+	specName := in.SpecPath
+	if rel, err := filepath.Rel(ws, in.SpecPath); err == nil && !strings.HasPrefix(rel, "..") {
+		specName = filepath.ToSlash(rel)
+	}
+	var executed []openapi.ExecutedRequest
+	for _, op := range out.Result.Operations {
+		if op.Skipped || op.StatusCode == 0 {
+			continue
+		}
+		executed = append(executed, openapi.ExecutedRequest{
+			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: op.Passed(),
+		})
+	}
+	cr := spec.ScenarioCoverage(executed)
+	if cr == nil {
+		return "Not added to coverage: the spec could not be matched."
+	}
+	if _, ok := accumulateCoverage(ws, specName, spec, cr, !out.Failed); !ok {
+		return "Not added to coverage: the coverage store could not be written."
+	}
+	return "Added to coverage as " + specName + ". Operations that were skipped or got no response were not counted."
+}
+
+// ExportConformReport renders the latest run with the same renderers as the CLI.
+func (s *ConformanceService) ExportConformReport(format string) RunReportIO {
+	s.mu.Lock()
+	last := s.last
+	s.mu.Unlock()
+	if last == nil {
+		return RunReportIO{Error: "there is no result to export; run the check first"}
+	}
+	switch format {
+	case "html":
+		b, err := reporting.ConformHTML(last.Result, last.Coverage, last.Negative)
+		if err != nil {
+			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
+		}
+		return RunReportIO{Content: string(b)}
+	case "junit":
+		b, err := reporting.ConformJUnit(last.Result)
+		if err != nil {
+			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
+		}
+		return RunReportIO{Content: string(b)}
+	case "json":
+		b, err := reporting.ConformJSON(last.Result, last.Coverage)
+		if err != nil {
+			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
+		}
+		return RunReportIO{Content: string(b) + "\n"}
+	case "markdown":
+		return RunReportIO{Content: string(reporting.ConformMarkdown(last.Result, last.Coverage, last.Negative))}
+	}
+	return RunReportIO{Error: fmt.Sprintf("unknown report format %q (use html, junit, json or markdown)", format)}
 }
 
 // CancelConformance stops a run in progress.
@@ -213,6 +322,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		Writes:     writes,
 		DurationMs: r.Duration.Milliseconds(),
 		Operations: []ConformOperationIO{},
+		Probes:     []ConformProbeIO{},
 		Total:      len(r.Operations),
 	}
 	for _, op := range r.Operations {
@@ -250,6 +360,25 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			res.NotCovered++
 		}
 		res.Operations = append(res.Operations, item)
+	}
+	if out.Negative != nil {
+		for _, p := range out.Negative.Probes {
+			item := ConformProbeIO{
+				OperationID: p.OperationID, Method: p.Method, Path: p.Path,
+				Kind: string(p.Kind), Description: p.Description, StatusCode: p.StatusCode, Error: p.Error,
+			}
+			switch {
+			case p.Skipped:
+				item.Status = "skipped"
+			case p.Error != "":
+				item.Status = "error"
+			case p.Passed():
+				item.Status = "rejected"
+			default:
+				item.Status = "accepted"
+			}
+			res.Probes = append(res.Probes, item)
+		}
 	}
 	return res
 }

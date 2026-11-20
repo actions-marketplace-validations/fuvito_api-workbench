@@ -963,31 +963,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 
 			// Accumulate into the workspace coverage store.
 			if s.workspace.workspacePath != "" {
-				stored := loadStoredCoverage(s.workspace.workspacePath, sc.SpecFile)
-				stored.TotalRuns++
-				stored.LastRunAt = time.Now()
-				if result.Passed {
-					stored.PassedRuns++
-				} else {
-					stored.FailedRuns++
-				}
-				stored.Exercised = mergeExercised(stored.Exercised, cov.Exercised)
-				stored.TotalOps = cr.Total
-				now := time.Now()
-				if stored.OperationResults == nil {
-					stored.OperationResults = make(map[string]coverage.OperationResult)
-				}
-				for _, er := range cr.ExercisedResults {
-					prev := stored.OperationResults[er.String()]
-					stored.OperationResults[er.String()] = coverage.OperationResult{
-						LastPassed:  er.Passed,
-						LastRunAt:   now,
-						StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
-						HadAuth:     prev.HadAuth || er.HadAuth,
-					}
-				}
-				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
-					acc := buildAccumulatedCoverageIO(stored, loadedSpec)
+				if acc, ok := accumulateCoverage(s.workspace.workspacePath, sc.SpecFile, loadedSpec, cr, result.Passed); ok {
 					out.AccumulatedCoverage = &acc
 				}
 			}

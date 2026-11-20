@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { ShieldCheck, Terminal, Play, Square, AlertTriangle } from 'lucide-react'
+import { ShieldCheck, Terminal, Play, Square, AlertTriangle, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getConformContext, inspectConformSpec, runConformance, cancelConformance } from '@/lib/bridge'
-import type { ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation } from '@/lib/bridge'
+import {
+  getConformContext, inspectConformSpec, runConformance, cancelConformance,
+  exportConformReport, saveContentToFile, openInSystemViewer,
+} from '@/lib/bridge'
+import type { ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat } from '@/lib/bridge'
 
 const inputClass =
   'w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)]'
@@ -39,6 +42,61 @@ function Tile({ label, value, total, tone }: { label: string; value: number; tot
   )
 }
 
+export function splitList(text: string): string[] {
+  return text.split(',').map(t => t.trim()).filter(Boolean)
+}
+
+const EXPORTS: { format: ConformReportFormat; label: string; file: string }[] = [
+  { format: 'html', label: 'HTML report', file: '' },
+  { format: 'junit', label: 'JUnit XML', file: 'conformance.xml' },
+  { format: 'json', label: 'JSON', file: 'conformance.json' },
+  { format: 'markdown', label: 'Markdown', file: 'conformance.md' },
+]
+
+function ExportMenu() {
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState('')
+
+  async function run(item: (typeof EXPORTS)[number]) {
+    setOpen(false)
+    setError('')
+    try {
+      const res = await exportConformReport(item.format)
+      if (res.error) { setError(res.error); return }
+      if (item.format === 'html') {
+        const err = await openInSystemViewer(res.content, 'html')
+        if (err) setError(err)
+      } else {
+        await saveContentToFile(res.content, item.file)
+      }
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  return (
+    <div className="relative flex items-center gap-2">
+      {error && <span role="alert" className="text-[11px] text-red-400 truncate max-w-[16rem]" title={error}>{error}</span>}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
+      >
+        <Download size={12} aria-hidden /> Export report
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[9rem] rounded border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg py-1 text-xs">
+          {EXPORTS.map(item => (
+            <button key={item.format} type="button" onClick={() => run(item)} className="w-full text-left px-3 py-1.5 hover:bg-[var(--color-muted)]">
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type Props = { onOpenCliBuilder?: () => void }
 
 export function ConformanceTab({ onOpenCliBuilder }: Props) {
@@ -50,6 +108,12 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const [envPath, setEnvPath] = useState('')
   const [allowWrites, setAllowWrites] = useState(false)
   const [confirmedRemote, setConfirmedRemote] = useState(false)
+  const [tagsText, setTagsText] = useState('')
+  const [pathsText, setPathsText] = useState('')
+  const [timeoutText, setTimeoutText] = useState('')
+  const [negative, setNegative] = useState(false)
+  const [failFast, setFailFast] = useState(false)
+  const [recordCoverage, setRecordCoverage] = useState(false)
   const [running, setRunning] = useState(false)
   const [output, setOutput] = useState<ConformRunOutput | null>(null)
 
@@ -76,15 +140,23 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const remote = baseUrl !== '' && !isLocalUrl(baseUrl)
   const writes = info?.writes ?? 0
   const reads = info?.reads ?? 0
-  const canRun = !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
+  const filtered = splitList(tagsText).length > 0 || splitList(pathsText).length > 0
+  const timeoutMs = Number.parseInt(timeoutText, 10)
+  const timeoutBad = timeoutText !== '' && !(timeoutMs > 0)
+  const canRun = !timeoutBad && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
 
   async function run() {
     setRunning(true)
     setOutput(null)
     try {
-      setOutput(await runConformance({ specPath, baseUrl, envPath, allowWrites, confirmedRemote }))
+      setOutput(await runConformance({
+        specPath, baseUrl, envPath, allowWrites, confirmedRemote,
+        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
+        timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
+        recordCoverage: recordCoverage && !filtered,
+      }))
     } catch (e) {
-      setOutput({ error: String(e), specTitle: '', baseUrl, writes: allowWrites, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0 })
+      setOutput({ error: String(e), specTitle: '', baseUrl, writes: allowWrites, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [] })
     } finally {
       setRunning(false)
     }
@@ -168,6 +240,44 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
           </p>
         </div>
 
+        <details className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2">
+          <summary className="cursor-pointer text-xs font-medium">Options</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="conf-tags" className="text-xs font-medium">Tags</label>
+              <input id="conf-tags" value={tagsText} onChange={e => setTagsText(e.target.value)} placeholder="users, orders" className={inputClass} />
+              <p className="text-[11px] text-[var(--color-muted-foreground)]">Only operations with one of these OpenAPI tags.</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="conf-paths" className="text-xs font-medium">Path prefixes</label>
+              <input id="conf-paths" value={pathsText} onChange={e => setPathsText(e.target.value)} placeholder="/users, /orders" className={cn(inputClass, 'font-mono')} />
+              <p className="text-[11px] text-[var(--color-muted-foreground)]">Only paths that start with one of these.</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="conf-timeout" className="text-xs font-medium">Request timeout (ms)</label>
+              <input id="conf-timeout" value={timeoutText} onChange={e => setTimeoutText(e.target.value)} placeholder="10000" inputMode="numeric" className={cn(inputClass, 'font-mono')} />
+              {timeoutBad && <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={negative} onChange={e => setNegative(e.target.checked)} className="mt-0.5" />
+              <span><span className="font-medium">Also run negative probes</span> — send malformed or unauthorized requests that the server should reject.</span>
+            </label>
+            <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={failFast} onChange={e => setFailFast(e.target.checked)} />
+              <span className="font-medium">Stop after the first failure</span>
+            </label>
+            <label className={cn('flex items-start gap-2 text-xs', filtered ? 'opacity-50' : 'cursor-pointer')}>
+              <input type="checkbox" checked={recordCoverage && !filtered} disabled={filtered} onChange={e => setRecordCoverage(e.target.checked)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Add this run to Contracts coverage</span> — operations that got a response are counted.
+                {filtered && ' Not available while tags or path prefixes are set.'}
+              </span>
+            </label>
+          </div>
+        </details>
+
         <div className="flex items-center gap-2">
           {!running ? (
             <button
@@ -194,6 +304,7 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
 
         {output && !output.error && (
           <section aria-label="Conformance results" className="flex flex-col gap-3">
+            <div className="flex items-center justify-end"><ExportMenu /></div>
             <div className="flex flex-wrap gap-2">
               <div className="flex gap-2 flex-1 min-w-[15rem]">
                 <Tile label="Covered" value={output.covered} total={output.total} tone="neutral" />
@@ -239,6 +350,32 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
                 ))}
               </tbody>
             </table>
+
+            {output.coverageNote && (
+              <p data-testid="conform-coverage-note" className="text-[11px] text-[var(--color-muted-foreground)]">{output.coverageNote}</p>
+            )}
+
+            {output.probes.length > 0 && (
+              <div aria-label="Negative probes" className="flex flex-col gap-1.5">
+                <h2 className="text-xs font-semibold">Negative probes</h2>
+                <p className="text-[11px] text-[var(--color-muted-foreground)]">
+                  {output.probes.filter(p => p.status === 'rejected').length} rejected as they should be,{' '}
+                  <span className={output.probes.some(p => p.status === 'accepted') ? 'text-red-400' : ''}>
+                    {output.probes.filter(p => p.status === 'accepted').length} accepted by the server
+                  </span>{' '}
+                  (it should have refused them).
+                </p>
+                <ul className="text-xs">
+                  {output.probes.map((p, i) => (
+                    <li key={i} className="flex gap-2 border-b border-[var(--color-border)] py-1">
+                      <span className={cn('w-16 shrink-0 font-medium', p.status === 'accepted' || p.status === 'error' ? 'text-red-400' : p.status === 'rejected' ? 'text-emerald-400' : 'text-[var(--color-muted-foreground)]')}>{p.status}</span>
+                      <span className="font-mono shrink-0">{p.method} {p.path}</span>
+                      <span className="text-[var(--color-muted-foreground)] min-w-0">{p.description}{p.statusCode > 0 ? ` (${p.statusCode})` : ''}{p.error ? `: ${p.error}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
       </div>

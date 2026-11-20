@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/fuvito/api-workbench/packages/core/coverage"
 )
 
 func newTestConformanceService(t *testing.T) *ConformanceService {
@@ -94,5 +96,82 @@ func TestIsLocalBaseURL(t *testing.T) {
 		if got := IsLocalBaseURL(url); got != want {
 			t.Errorf("IsLocalBaseURL(%q) = %v, want %v", url, got, want)
 		}
+	}
+}
+
+func localConformanceServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(newConformanceMux())
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestConformanceService_FiltersAndCoverageRecording(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	ws := t.TempDir()
+	svc.ws.workspacePath = ws
+	spec := filepath.Join(ws, "specs", "api.yaml")
+	if err := os.MkdirAll(filepath.Dir(spec), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(spec, conformanceOpenAPIYAML, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	filtered := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, Tags: []string{"nothing"}, RecordCoverage: true})
+	if filtered.Covered != 0 || !strings.Contains(filtered.CoverageNote, "would skew") {
+		t.Fatalf("a filtered run must not be recorded: %+v", filtered)
+	}
+	if got := coverage.Load(ws, "specs/api.yaml"); got.TotalRuns != 0 {
+		t.Fatalf("filtered run was recorded: %+v", got)
+	}
+
+	notAsked := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true})
+	if notAsked.CoverageNote != "" || coverage.Load(ws, "specs/api.yaml").TotalRuns != 0 {
+		t.Fatal("coverage must be recorded only when asked")
+	}
+
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, AllowWrites: true, RecordCoverage: true})
+	if !strings.HasPrefix(out.CoverageNote, "Added to coverage as specs/api.yaml") {
+		t.Fatalf("note = %q", out.CoverageNote)
+	}
+	stored := coverage.Load(ws, "specs/api.yaml")
+	if stored.TotalRuns != 1 || len(stored.Exercised) != 7 || stored.FailedRuns != 1 {
+		t.Fatalf("stored coverage: %+v", stored)
+	}
+}
+
+func TestConformanceService_NegativeProbesAndExport(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	spec := conformanceSpecFile(t)
+
+	if r := svc.ExportConformReport("html"); r.Error == "" {
+		t.Fatal("export before any run must fail")
+	}
+
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, Negative: true, FailFast: true, TimeoutMs: 5000})
+	if out.Error != "" {
+		t.Fatal(out.Error)
+	}
+	if len(out.Probes) == 0 {
+		t.Fatal("negative probes were requested")
+	}
+	for _, p := range out.Probes {
+		switch p.Status {
+		case "rejected", "accepted", "error", "skipped":
+		default:
+			t.Fatalf("probe status %q", p.Status)
+		}
+	}
+
+	for _, format := range []string{"html", "junit", "json", "markdown"} {
+		if r := svc.ExportConformReport(format); r.Error != "" || r.Content == "" {
+			t.Errorf("export %s: %+v", format, r.Error)
+		}
+	}
+	if r := svc.ExportConformReport("pdf"); r.Error == "" {
+		t.Fatal("unknown format must be an error")
 	}
 }
