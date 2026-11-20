@@ -298,11 +298,10 @@ func TestParseSwagger2Bytes_BodyStub_Ref(t *testing.T) {
 			if r.Request.Body == nil || r.Request.Body.Type != domain.BodyJSON {
 				t.Error("expected JSON body for createUser")
 			}
-			// User definition has id, username, email — all should appear as placeholders
-			for _, field := range []string{`"id"`, `"username"`, `"email"`} {
-				if !strings.Contains(r.Request.Body.Content, field) {
-					t.Errorf("body stub missing field %s: %s", field, r.Request.Body.Content)
-				}
+			// The User definition (resolved through $ref) declares id, username and email but marks none
+			// of them required, so the generated body asks for no values at all.
+			if got := strings.TrimSpace(r.Request.Body.Content); got != "{}" {
+				t.Errorf("a $ref'd schema without required properties should give {}, got %s", got)
 			}
 			return
 		}

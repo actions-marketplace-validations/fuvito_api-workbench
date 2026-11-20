@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
+	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 )
@@ -159,5 +160,72 @@ func TestFinding_WhereText(t *testing.T) {
 		if got := f.WhereText(); got != want {
 			t.Errorf("%+v: %q, want %q", f, got, want)
 		}
+	}
+}
+
+const requestFindingsSpec = `openapi: "3.0.3"
+info: {title: r, version: "1"}
+paths:
+  /items/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+    post:
+      operationId: createItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [price, title], properties: {price: {type: number}, title: {type: string}}}
+      responses: {"201": {description: ok}}
+`
+
+// When the environment gives a value of the wrong type, the report says which field or parameter,
+// what it should have been, and which environment value to change.
+func TestFindings_RequestProblemsSayWhatWhereWhyAndHowToFix(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusCreated) }))
+	defer srv.Close()
+	spec, err := openapi.ParseBytes([]byte(requestFindingsSpec), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := func(id, price string) conformance.OperationResult {
+		env := &domain.Environment{Name: "e", Variables: []domain.EnvironmentVariable{
+			{Name: "id", Value: id}, {Name: "price", Value: price}, {Name: "title", Value: "Desk"},
+		}}
+		return conformance.New(executor.New(executor.Options{})).Run(context.Background(), spec, srv.URL, env, conformance.Options{}).Operations[0]
+	}
+	only := func(op conformance.OperationResult) conformance.Finding {
+		t.Helper()
+		f := conformance.Diagnose(op)
+		if op.Passed() || len(op.RequestViolations) != 1 || len(f) != 1 {
+			t.Fatalf("expected one request violation (the first problem found): %+v", op)
+		}
+		return f[0]
+	}
+
+	// First problem: the path value is not an integer.
+	param := only(run("abc", `"cheap"`))
+	if param.Kind != conformance.FindingRequest || param.Part != "request path parameter" || param.Where != "id" ||
+		param.Spec != "POST /items/{id} → parameters → id (in path)" {
+		t.Fatalf("parameter finding: %+v", param)
+	}
+	if !strings.Contains(param.Summary, `"id"`) || !strings.Contains(param.Got, "abc") || !strings.Contains(param.Fix, "id=…") ||
+		!strings.Contains(param.Why, "environment") && !strings.Contains(param.Why, "declared type") || param.Detail == "" {
+		t.Errorf("the parameter finding must name the parameter, the value and the fix: %+v", param)
+	}
+
+	// With that fixed, the next one shows: a text where a number is needed.
+	body := only(run("1", `"cheap"`))
+	if body.Kind != conformance.FindingRequest || body.Part != "request body" || body.Where != "price" || body.Spec != "POST /items/{id} → request body" {
+		t.Fatalf("body finding: %+v", body)
+	}
+	if body.Summary != `The request sends "price" as text, the spec says number` || body.Expected != "number" ||
+		!strings.Contains(body.Fix, "Set price to a number in the environment") || !strings.Contains(body.Why, "environment") {
+		t.Errorf("the body finding must say what, why and how to fix it: %+v", body)
+	}
+
+	// And with both right, the operation passes.
+	if op := run("1", "9.99"); !op.Passed() {
+		t.Fatalf("a valid request must pass: %+v", op)
 	}
 }

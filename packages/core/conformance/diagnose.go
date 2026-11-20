@@ -88,9 +88,7 @@ func Diagnose(op OperationResult) []Finding {
 		})
 	}
 	for _, v := range op.RequestViolations {
-		f := diagnoseRequest(v.Error())
-		f.Spec = specLocation(op, "request")
-		out = append(out, f)
+		out = append(out, diagnoseRequest(op, v))
 	}
 	for _, v := range op.Violations {
 		out = append(out, diagnoseViolation(op, v))
@@ -178,16 +176,77 @@ func diagnoseViolation(op OperationResult, v openapi.ValidationError) Finding {
 	return f
 }
 
-func diagnoseRequest(msg string) Finding {
+// diagnoseRequest explains a problem in the request clrsig built from the spec. The request is
+// made of the spec's own path, parameters and body with {{placeholders}} filled from the
+// environment, so the fix is nearly always a value in the environment (or an override).
+func diagnoseRequest(op OperationResult, v openapi.ValidationError) Finding {
+	msg := v.Error()
+	body := specLocation(op, "request body")
+	if v.Kind == openapi.KindRequestParameter {
+		detail := msg
+		if i := strings.Index(msg, "does not fit the spec: "); i >= 0 {
+			detail = msg[i+len("does not fit the spec: "):]
+		}
+		return Finding{
+			Kind: FindingRequest, Part: "request " + v.In + " parameter", Where: v.Subject,
+			Spec:     specLocation(op, "parameters → "+v.Subject+" (in "+v.In+")"),
+			Summary:  fmt.Sprintf("The %s parameter %q does not fit the spec", v.In, v.Subject),
+			Expected: "a value of the declared type", Got: detail,
+			Why:    fmt.Sprintf("The request clrsig built from the spec has a %s value for %q that does not match the parameter's declared type, so the server was not tested with a valid request.", v.In, v.Subject),
+			Fix:    fmt.Sprintf("Give %q a value of the declared type in the environment, or with an override (for example %s=…).", v.Subject, v.Subject),
+			Detail: msg,
+		}
+	}
+	if m := reMissing.FindStringSubmatch(msg); m != nil {
+		return Finding{
+			Kind: FindingRequest, Part: "request body", Where: displayPath(m[1]), Spec: body,
+			Summary:  fmt.Sprintf("The request body is missing the required field %q", m[2]),
+			Expected: fmt.Sprintf("the field %q", m[2]), Got: "no such field",
+			Why:    fmt.Sprintf("The spec requires %q in the request body, but the request clrsig built did not include it, so the server was not tested with a valid request.", m[2]),
+			Fix:    fmt.Sprintf("Check how %q is declared in the spec; if it is a composed schema, make sure the field is listed as required there.", m[2]),
+			Detail: msg,
+		}
+	}
+	if m := reWrongType.FindStringSubmatch(msg); m != nil {
+		field := displayPath(m[1])
+		want := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(m[2], "an "), "a "))
+		got, gotType := "", ""
+		if g := reGotValue.FindStringSubmatch(msg); g != nil {
+			got, gotType = g[1], jsonTypeOf(g[1])
+		}
+		name := field
+		if name == "" {
+			name = "body"
+		}
+		summary := fmt.Sprintf("The request sends %s as %s, the spec says %s", quoteField(name), describeGot(gotType, ""), want)
+		if gotType == "" {
+			summary = fmt.Sprintf("The request body field %s should be %s", quoteField(name), indefinite(want))
+		}
+		return Finding{
+			Kind: FindingRequest, Part: "request body", Where: field, Spec: body,
+			Summary: summary, Expected: want, Got: got,
+			Why: fmt.Sprintf("The request clrsig built from the spec sends %s for %s, but the spec declares %s, so the server was not tested with a valid request. This usually means the value taken from the environment is not %s.",
+				describeGot(gotType, got), quoteField(name), indefinite(want), indefinite(want)),
+			Fix:    fmt.Sprintf("Set %s to %s in the environment, or with an override (for example %s=…).", leafName(field), indefinite(want), leafName(field)),
+			Detail: msg,
+		}
+	}
 	return Finding{
-		Kind:    FindingRequest,
-		Part:    "request",
+		Kind: FindingRequest, Part: "request", Spec: specLocation(op, "request"),
 		Summary: "The request built from the spec was not valid",
 		Got:     firstLine(msg),
 		Why:     "The values clrsig put in the request (path parameters, body fields) do not fit the spec, so the server was not tested fairly.",
 		Fix:     "Give the missing values in the environment, for example the path parameter used as {{id}}.",
 		Detail:  msg,
 	}
+}
+
+// leafName is the last part of a field path: [0].price becomes price.
+func leafName(field string) string {
+	if i := strings.LastIndex(field, "."); i >= 0 {
+		return field[i+1:]
+	}
+	return strings.TrimLeft(field, "[]0123456789")
 }
 
 func diagnoseResponse(msg string) Finding {

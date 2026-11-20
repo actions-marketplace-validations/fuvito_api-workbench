@@ -28,6 +28,8 @@ const (
 	KindContentType      = "wrong-content-type" // the response Content-Type is not one the spec declares
 	KindMissingHeader    = "missing-header"     // a header the spec requires was not sent
 	KindBadHeader        = "bad-header"         // a declared header has a value of the wrong type
+	KindRequestParameter = "request-parameter"  // a path, query or header value in the request does not fit its parameter
+	KindRequestBody      = "request-body"       // the request body does not fit the spec
 )
 
 // ValidationError is a single violation.
@@ -37,8 +39,10 @@ type ValidationError struct {
 	// Kind classifies the violation (one of the Kind constants, or empty).
 	Kind string
 	// Subject is what the violation is about when Kind says so: the status code, the Content-Type
-	// that was sent, or the header name.
+	// that was sent, or the header or parameter name.
 	Subject string
+	// In is where a request parameter lives: "path", "query", "header" or "cookie".
+	In string
 }
 
 func (e ValidationError) Error() string {
@@ -319,11 +323,44 @@ func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
 
 	if err := openapi3filter.ValidateRequest(context.Background(), input); err != nil {
 		if re, ok := err.(*openapi3filter.RequestError); ok {
-			return parseSchemaErrors(re.Err)
+			return requestViolations(route, re)
 		}
 		return []ValidationError{{Message: err.Error()}}
 	}
 	return nil
+}
+
+// requestViolations turns the library's RequestError into violations that say which parameter or
+// part of the body is wrong. The parameter, the "request body" context and the Reason used to be
+// dropped, and a RequestError without an inner error produced no violation at all.
+func requestViolations(route *routers.Route, re *openapi3filter.RequestError) []ValidationError {
+	where := fmt.Sprintf("%s %s", route.Method, route.Path)
+	reason := re.Reason
+	if re.Err != nil {
+		if reason == "" || reason == re.Err.Error() {
+			reason = re.Err.Error()
+		} else {
+			reason += ": " + re.Err.Error()
+		}
+	}
+	switch {
+	case re.Parameter != nil:
+		return []ValidationError{{
+			Kind: KindRequestParameter, Subject: re.Parameter.Name, In: re.Parameter.In,
+			Message: fmt.Sprintf("%s: the request %s parameter %q does not fit the spec: %s", where, re.Parameter.In, re.Parameter.Name, strings.SplitN(reason, "\n", 2)[0]),
+		}}
+	case re.RequestBody != nil:
+		if re.Err != nil {
+			errs := parseSchemaErrors(re.Err)
+			for i := range errs {
+				errs[i].Kind = KindRequestBody
+				errs[i].Message = where + ": the request body does not fit the spec: " + errs[i].Message
+			}
+			return errs
+		}
+		return []ValidationError{{Kind: KindRequestBody, Message: where + ": the request body does not fit the spec: " + reason}}
+	}
+	return []ValidationError{{Message: where + ": " + reason}}
 }
 
 func bodyContentType(t domain.BodyType) string {

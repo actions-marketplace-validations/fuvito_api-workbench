@@ -1,6 +1,6 @@
 # Conformance accuracy: real response checks and typed request bodies
 
-**Status:** Part A accepted and built (2026-11-20, all six recommendations); part B accepted, not built yet
+**Status:** Done (2026-11-20): part A and part B accepted (all six recommendations) and built
 **Date:** 2026-11-20
 **Author:** Claude Code, for the project owner
 **Backlog:** B-002 (response checks), B-003 (generated request bodies)
@@ -145,4 +145,5 @@ User guide (what conform checks and the new violation kinds; adopting with a bas
 | Date | Decision | Who |
 |---|---|---|
 | 2026-11-20 | Proposal written after measuring the validator (all blind spots trace to dropped `ResponseError.Reason` and unforwarded headers) and the body generator | Claude Code |
+| 2026-11-20 | Part B built as designed. Differences: the request-side validator got the same fix as the response side (parameter name and body context were dropped); `readOnly` properties are also left out; Format JSON understands placeholders; the typed end-to-end test is a CLI test instead of a new Conformance Server operation (it would have changed every count again for no new coverage) | Claude Code |
 | 2026-11-20 | Owner accepted decisions 1 to 6 ("go") and added: every failure must say what, why and where so the user can locate and fix it. Part A built with a `Part`, `Where` and `Spec` location on every finding | Owner, Claude Code |

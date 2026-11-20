@@ -10,50 +10,6 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 )
 
-// buildBodyStub generates a JSON body stub from a request body media type.
-// Each schema property becomes a "{{fieldName}}" placeholder so env variables
-// are automatically substituted during execution.
-func buildBodyStub(mt *openapi3.MediaType) string {
-	if mt == nil || mt.Schema == nil || mt.Schema.Value == nil {
-		return "{}"
-	}
-	props := mt.Schema.Value.Properties
-	if len(props) == 0 {
-		return "{}"
-	}
-
-	required := make(map[string]bool, len(mt.Schema.Value.Required))
-	for _, r := range mt.Schema.Value.Required {
-		required[r] = true
-	}
-
-	// Required fields first (preserving spec order), then optional sorted.
-	var reqFields, optFields []string
-	for _, r := range mt.Schema.Value.Required {
-		if _, ok := props[r]; ok {
-			reqFields = append(reqFields, r)
-		}
-	}
-	for name := range props {
-		if !required[name] {
-			optFields = append(optFields, name)
-		}
-	}
-	sort.Strings(optFields)
-
-	fields := append(reqFields, optFields...)
-	var sb strings.Builder
-	sb.WriteString("{\n")
-	for i, name := range fields {
-		if i > 0 {
-			sb.WriteString(",\n")
-		}
-		sb.WriteString(`  "` + name + `": "{{` + name + `}}"`)
-	}
-	sb.WriteString("\n}")
-	return sb.String()
-}
-
 // Spec wraps a loaded OpenAPI document.
 type Spec struct {
 	doc     *openapi3.T

@@ -120,3 +120,61 @@ func TestResponseChecks_SubjectNamesWhatIsWrong(t *testing.T) {
 		t.Errorf("content type subject = %q", v[0].Subject)
 	}
 }
+
+const requestChecksSpec = `
+openapi: "3.0.3"
+info: {title: s, version: "1"}
+paths:
+  /items/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+      - {name: limit, in: query, required: true, schema: {type: integer}}
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [price], properties: {price: {type: number}}}
+      responses: {"201": {description: ok}}
+`
+
+// A request that does not fit the spec says which parameter or which part of the body, not only
+// that "a value is invalid".
+func TestRequestChecks_NameTheParameterOrTheBody(t *testing.T) {
+	spec, err := openapi.ParseBytes([]byte(requestChecksSpec), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	do := func(url, limit, body string) []openapi.ValidationError {
+		return openapi.ValidateRequest(spec, &domain.Request{
+			Method: "POST", URL: url, QueryParams: []domain.QueryParam{{Name: "limit", Value: limit}},
+			Body: &domain.RequestBody{Type: domain.BodyJSON, Content: body},
+		})
+	}
+	if v := do("http://x/items/1", "5", `{"price":1.5}`); len(v) != 0 {
+		t.Fatalf("a valid request has no violation: %v", v)
+	}
+
+	for _, c := range []struct {
+		name         string
+		got          []openapi.ValidationError
+		kind, in, on string
+		mention      []string
+	}{
+		{"bad path value", do("http://x/items/abc", "5", `{"price":1}`), openapi.KindRequestParameter, "path", "id", []string{"POST /items/{id}", `path parameter "id"`, "abc"}},
+		{"bad query value", do("http://x/items/1", "many", `{"price":1}`), openapi.KindRequestParameter, "query", "limit", []string{"POST /items/{id}", `query parameter "limit"`, "many"}},
+		{"body field of the wrong type", do("http://x/items/1", "5", `{"price":"abc"}`), openapi.KindRequestBody, "", "", []string{"POST /items/{id}", "request body", "/price"}},
+		{"body that is not JSON", do("http://x/items/1", "5", `{"price":abc}`), openapi.KindRequestBody, "", "", []string{"POST /items/{id}", "request body"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if len(c.got) != 1 || c.got[0].Kind != c.kind || c.got[0].In != c.in || c.got[0].Subject != c.on {
+				t.Fatalf("got %+v, want one %s (in=%q, subject=%q)", c.got, c.kind, c.in, c.on)
+			}
+			for _, want := range c.mention {
+				if !strings.Contains(c.got[0].Error(), want) {
+					t.Errorf("the message must say %q:\n%s", want, c.got[0].Error())
+				}
+			}
+		})
+	}
+}

@@ -233,7 +233,16 @@ Network errors (DNS failure, connection refused, TLS errors, timeout) are record
 3. Select a `.yaml` or `.json` OpenAPI 3.0 or 3.1 file.
 4. Clear Signal generates one request file per operation, placed in `requests/{spec-title}/`.
 
-Path parameters become `{{paramName}}` placeholders. POST/PUT/PATCH operations get a JSON body stub based on the request schema. Operations with security requirements get an `Authorization: Bearer {{token}}` header hint.
+Path parameters become `{{paramName}}` placeholders. Operations with security requirements get an `Authorization: Bearer {{token}}` header hint.
+
+POST/PUT/PATCH operations get a JSON body template built from the request schema (the same template `clrsig conform` sends):
+
+- Only the **required** properties are included, plus optional ones that have an `example` or a `default`. Properties marked `readOnly` are left out (the server assigns them). A schema that marks nothing as required gives `{}`.
+- A property with an `example`, a `default` or an `enum` uses that value as written (the first enum value).
+- Any other property becomes a `{{placeholder}}` named after it, **typed**: `"{{title}}"` for a string, and a bare `{{price}}` for a number, boolean, array or object, so that setting `price` to `9.99`, `inStock` to `true` or `tags` to `["a","b"]` in the environment produces valid JSON. Because a bare placeholder is not valid JSON until it is filled in, the **Format** button understands them.
+- `allOf` schemas are merged (properties and required lists); for `oneOf` and `anyOf` the first branch is used; an array body becomes an array of the item template; nested objects and arrays stay one placeholder holding a JSON value.
+
+If a placeholder has no value when a request runs, it is not sent (see "Operations that cannot be sent" under `conform`).
 
 After import, the workspace panel refreshes and you can open any generated request by clicking it in the tree.
 
