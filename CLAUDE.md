@@ -526,3 +526,9 @@ Do not implement or stub any of these without explicit user direction.
 - **Core:** `scenario.StepResult.Spec` (`SpecCheck`: `matched`, `violations` or `not-checked` with a reason: validation turned off, no matching operation in the spec, step did not complete) and `openapi.Spec.HasOperation`. Failed-assertion behaviour is unchanged. Tests cover every state and the no-spec case.
 - **Desktop:** `StepResultIO` gains `specState`, `specReason`, `specViolations` (additive); the Setup row's Result tab shows `N of M responses match <spec>`, violations per step and the not-checked steps (`SpecConformance` component). No file format change.
 - **Not yet:** the conformance line in the scenario header chip, user guide text and screenshots.
+
+### 2026-11-19 — `conform` orchestration extracted (phase 1.5 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **`packages/core/application`:** `RunConformance(ctx, ConformInput) ConformOutput` runs the conformance runner, optional negative probes and coverage, collects the violations and compares them with a baseline (`Failed` already accounts for it); `SplitList`; `DefaultConformRequestTimeoutMs` (10000). The CLI `conform` command and the MCP `conform` tool both call it; reading the spec and environment, the executor, history, rendering, `--write-baseline` and telemetry stay with the caller.
+- **One behaviour change:** the MCP `conform` tool used the executor default timeout (30 s); it now uses the shared 10 s default like the CLI. A CLI `--request-timeout 0` now means the shared default instead of the executor default.
+- Tests: new `application` tests (violation fails, tag filter, negative probes, baseline known and new); all existing CLI tests pass unchanged.

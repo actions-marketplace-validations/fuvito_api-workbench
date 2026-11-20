@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -486,28 +487,21 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				return err
 			}
 
-			opts := conformance.Options{
+			exec := newExecutor()
+			out := application.RunConformance(context.Background(), application.ConformInput{
+				Exec:             exec,
+				Spec:             spec,
+				BaseURL:          baseURL,
+				Env:              env,
+				Tags:             application.SplitList(tagsCSV),
+				Paths:            application.SplitList(pathsCSV),
 				FailFast:         failFast,
 				RequestTimeoutMs: requestTimeout,
-			}
-			if tagsCSV != "" {
-				for _, t := range strings.Split(tagsCSV, ",") {
-					if t = strings.TrimSpace(t); t != "" {
-						opts.Tags = append(opts.Tags, t)
-					}
-				}
-			}
-			if pathsCSV != "" {
-				for _, p := range strings.Split(pathsCSV, ",") {
-					if p = strings.TrimSpace(p); p != "" {
-						opts.Paths = append(opts.Paths, p)
-					}
-				}
-			}
-
-			exec := newExecutor()
-			runner := conformance.New(exec)
-			result := runner.Run(context.Background(), spec, baseURL, env, opts)
+				Coverage:         showCoverage,
+				Negative:         runNegative,
+				Baseline:         base,
+			})
+			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
 			// Hash the spec bytes to group runs of the same spec in history.
 			rawHash := sha256.Sum256(data)
@@ -515,17 +509,6 @@ only new ones fail the run; --write-baseline records the current violations.`,
 
 			// Record this run to history (silently — a broken db never blocks conformance).
 			recordConformRun(src, specHash, result)
-
-			var cov *conformance.CoverageReport
-			if showCoverage {
-				cov = conformance.ComputeCoverage(result)
-			}
-
-			var negResult *conformance.NegativeResult
-			if runNegative {
-				negRunner := conformance.NewNegative(exec)
-				negResult = negRunner.Run(context.Background(), spec, baseURL, env, opts)
-			}
 
 			render := func(f string) ([]byte, error) {
 				switch f {
@@ -566,24 +549,16 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				printCumulativeCoverage(cmd, specHash)
 			}
 
-			_, failed, _ := result.Counts()
-			negFailed := 0
-			if negResult != nil {
-				_, negFailed, _, _ = negResult.Counts()
-			}
-			runFailed := failed > 0 || negFailed > 0
-			current := conformance.Violations(result, negResult)
+			runFailed := out.Failed
 			if writeBaseline != "" {
-				if err := conformance.WriteBaselineFile(writeBaseline, conformance.NewBaseline(current)); err != nil {
+				if err := conformance.WriteBaselineFile(writeBaseline, conformance.NewBaseline(out.Violations)); err != nil {
 					return fmt.Errorf("writing baseline: %w", err)
 				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Baseline written: %d violation%s recorded in %s\n", len(current), plural(len(current)), writeBaseline)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Baseline written: %d violation%s recorded in %s\n", len(out.Violations), plural(len(out.Violations)), writeBaseline)
 				runFailed = false // recording the current state accepts it
 			}
-			if base != nil {
-				diff := conformance.Compare(current, base)
-				fmt.Fprint(cmd.ErrOrStderr(), diff.Text())
-				runFailed = len(diff.New) > 0
+			if out.Diff != nil {
+				fmt.Fprint(cmd.ErrOrStderr(), out.Diff.Text())
 			}
 			tel := newTelemetryClient()
 			telResult := "pass"
@@ -612,7 +587,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
-	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
+	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")

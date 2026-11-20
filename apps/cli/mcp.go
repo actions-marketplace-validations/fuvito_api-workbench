@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fuvito/api-workbench/packages/core/conformance"
+	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -247,10 +247,13 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 
-	exec := newExecutor()
-	runner := conformance.New(exec)
-	result := runner.Run(context.Background(), spec, args.BaseURL, env, conformance.Options{})
-	return reporting.ConformText(result, nil), nil
+	out := application.RunConformance(context.Background(), application.ConformInput{
+		Exec:    newExecutor(),
+		Spec:    spec,
+		BaseURL: args.BaseURL,
+		Env:     env,
+	})
+	return reporting.ConformText(out.Result, nil), nil
 }
 
 func mcpRunScenario(raw json.RawMessage) (string, error) {
