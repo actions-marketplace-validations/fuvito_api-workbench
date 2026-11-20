@@ -98,14 +98,15 @@ func TestSettingsService_LoadFillsZeroValuesAndIgnoresCorruptFile(t *testing.T) 
 	}
 }
 
-func TestWorkspaceConfig_PersistsAcrossRestart(t *testing.T) {
+func TestWorkspaceConfig_StartsOnLandingPage(t *testing.T) {
 	isolateHome(t)
 	dir := t.TempDir()
-	envDir := filepath.Join(dir, "environments")
-	os.MkdirAll(envDir, 0o755)
+	os.MkdirAll(filepath.Join(dir, "environments"), 0o755)
 
 	ws := NewWorkspaceService()
-	ws.workspacePath = dir
+	if _, err := ws.OpenWorkspaceByPath(dir); err != nil {
+		t.Fatal(err)
+	}
 	info, err := ws.SaveEnvironment(EnvironmentIO{Name: "Local Dev", Variables: []EnvironmentVariableIO{{Name: "host", Value: "x"}}})
 	if err != nil {
 		t.Fatal(err)
@@ -115,20 +116,40 @@ func TestWorkspaceConfig_PersistsAcrossRestart(t *testing.T) {
 	}
 
 	restarted := NewWorkspaceService()
-	if restarted.GetWorkspacePath() != dir {
-		t.Errorf("workspace path lost: %q", restarted.GetWorkspacePath())
+	if restarted.GetWorkspacePath() != "" || restarted.GetActiveEnvironment() != nil || restarted.ActiveEnvironment() != nil {
+		t.Errorf("the app must start with no workspace, got %q", restarted.GetWorkspacePath())
 	}
-	if env := restarted.GetActiveEnvironment(); env == nil || env.Name != "Local Dev" || env.Path != info.Path {
-		t.Errorf("active environment lost: %+v", env)
+	recent := restarted.GetRecentWorkspaces()
+	if len(recent) != 1 || recent[0] != dir {
+		t.Errorf("the last workspace should stay in the recent list: %v", recent)
 	}
-	if restarted.ActiveEnvironment() == nil {
-		t.Error("domain environment should be loaded for interpolation")
+}
+
+func TestWorkspaceConfig_TempWorkspacesLeaveNoResidue(t *testing.T) {
+	isolateHome(t)
+	tmp := t.TempDir()
+	t.Setenv("TMP", tmp)
+	t.Setenv("TEMP", tmp)
+	stale := filepath.Join(tmp, demoWorkspacePrefix+"123")
+	stale2 := filepath.Join(tmp, conformanceWorkspacePrefix+"456")
+	for _, d := range []string{stale, stale2} {
+		os.MkdirAll(d, 0o755)
+	}
+	saveConfig(workspaceConfig{RecentWorkspaces: []string{stale, filepath.Join(tmp, "gone"), stale2}})
+
+	ws := NewWorkspaceService()
+	if got := ws.GetRecentWorkspaces(); len(got) != 0 {
+		t.Errorf("temp and missing workspaces must not be listed: %v", got)
+	}
+	for _, d := range []string{stale, stale2} {
+		if _, err := os.Stat(d); err == nil {
+			t.Errorf("stale temp workspace %s was not removed", d)
+		}
 	}
 
-	restarted.CloseWorkspace()
-	again := NewWorkspaceService()
-	if again.GetWorkspacePath() != "" || again.GetActiveEnvironment() != nil {
-		t.Error("CloseWorkspace should clear persisted state")
+	ws.addRecentWorkspace(filepath.Join(tmp, demoWorkspacePrefix+"789"))
+	if len(ws.GetRecentWorkspaces()) != 0 {
+		t.Error("a temp workspace must never be recorded as recent")
 	}
 }
 

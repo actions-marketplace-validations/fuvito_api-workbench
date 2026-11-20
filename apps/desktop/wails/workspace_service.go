@@ -124,18 +124,51 @@ type WorkspaceService struct {
 
 func NewWorkspaceService() *WorkspaceService {
 	cfg := loadConfig()
+	cleanupStaleTempWorkspaces()
+	// The app always starts on the landing page: the last workspace is only
+	// offered in the recent list, never reopened.
 	ws := &WorkspaceService{
 		ctx:              context.Background(),
-		workspacePath:    cfg.WorkspacePath,
-		activeEnvPath:    cfg.ActiveEnvPath,
-		recentWorkspaces: cfg.RecentWorkspaces,
+		recentWorkspaces: prunedRecentWorkspaces(cfg.RecentWorkspaces),
 	}
-	if cfg.ActiveEnvPath != "" {
-		if env, err := ws.loadEnvFile(cfg.ActiveEnvPath); err == nil {
-			ws.activeEnv = env
+	ws.persistConfig()
+	return ws
+}
+
+func isTempWorkspace(path string) bool {
+	base := filepath.Base(path)
+	return strings.HasPrefix(base, demoWorkspacePrefix) || strings.HasPrefix(base, conformanceWorkspacePrefix)
+}
+
+// prunedRecentWorkspaces drops temporary demo/conformance workspaces and
+// folders that no longer exist.
+func prunedRecentWorkspaces(in []string) []string {
+	var out []string
+	for _, p := range in {
+		if p == "" || isTempWorkspace(p) {
+			continue
+		}
+		if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// cleanupStaleTempWorkspaces removes demo and conformance temp workspaces left
+// behind by a session that ended without stopping its server.
+func cleanupStaleTempWorkspaces() {
+	base := os.TempDir()
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() && isTempWorkspace(e.Name()) {
+			os.RemoveAll(filepath.Join(base, e.Name())) //nolint:errcheck
 		}
 	}
-	return ws
 }
 
 func (w *WorkspaceService) setContext(ctx context.Context) {
@@ -735,7 +768,7 @@ func (w *WorkspaceService) persistConfig() {
 }
 
 func (w *WorkspaceService) addRecentWorkspace(path string) {
-	if path == "" {
+	if path == "" || isTempWorkspace(path) {
 		return
 	}
 	seen := make(map[string]bool)
