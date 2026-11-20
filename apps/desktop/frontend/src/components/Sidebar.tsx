@@ -87,6 +87,7 @@ export type SidebarProps = {
   onRunScenarioFolder?: (folderPath: string) => void
   folderRunState?: FolderRunState | null
   onDismissFolderRun?: () => void
+  onCancelFolderRun?: () => void
   selectedCoverageSpecFile?: string | null
   onSelectCoverageSpec?: (specFile: string) => void
   clipboard?: FileClipboard | null
@@ -113,7 +114,7 @@ export function Sidebar({
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewScenarioFolder, onDeleteScenarioFolder, onRenameScenarioFolder,
   runAllState, onRunAllScenarios, scenarioError, runLogTrigger, activeScenarioPath, dirtyScenarioPaths,
-  onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun,
+  onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun, onCancelFolderRun,
   selectedCoverageSpecFile, onSelectCoverageSpec,
   clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
   onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
@@ -177,6 +178,7 @@ export function Sidebar({
           onRunFolder={onRunFolder}
           folderRunState={folderRunState}
           onDismissFolderRun={onDismissFolderRun}
+          onCancelFolderRun={onCancelFolderRun}
           clipboard={clipboard}
           onCopyFile={onCopyFile}
           onCutFile={onCutFile}

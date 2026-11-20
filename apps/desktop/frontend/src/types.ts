@@ -26,6 +26,8 @@ export interface FolderRunState {
   folderPath: string
   folderName: string
   running: boolean
+  // true when the user pressed Stop: the results are the requests finished before that
+  stopped?: boolean
   results: FolderRunItem[]
 }
 

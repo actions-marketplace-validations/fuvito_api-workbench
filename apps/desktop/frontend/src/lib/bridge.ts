@@ -101,6 +101,7 @@ import {
   LoadScenario as WailsLoadScenario,
   RunScenario as WailsRunScenario,
   RunFolder as WailsRunFolder,
+  CancelFolderRun as WailsCancelFolderRun,
   LoadScenarioRaw as WailsLoadScenarioRaw,
   SaveScenarioRaw as WailsSaveScenarioRaw,
   ValidateScenarioYAML as WailsValidateScenarioYAML,
@@ -1242,6 +1243,10 @@ export interface FolderRunItem {
   durationMs: number
   error?: string
   passed: boolean
+}
+
+export async function cancelFolderRun(): Promise<void> {
+  await WailsCancelFolderRun()
 }
 
 export async function runFolder(folderPath: string): Promise<FolderRunItem[]> {

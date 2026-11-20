@@ -182,6 +182,8 @@ type ScenarioService struct {
 	settings  *SettingsService
 	mu        sync.Mutex
 	cancelRun context.CancelFunc
+	// cancelFolder stops the request-folder run in progress (RunFolder), if any.
+	cancelFolder context.CancelFunc
 	// runs keeps the latest result of each scenario that was run, so a run report can be
 	// exported from the Go reporting package after a Run All or a folder run.
 	runs map[string]*scenario.Result
@@ -717,17 +719,33 @@ type FolderRunItemIO struct {
 
 // RunFolder executes every request file directly under folderPath (non-recursive)
 // using the active workspace environment. Results are returned in directory order.
+// CancelFolderRun stops it: the request in flight is abandoned (not reported) and the results so
+// far are returned.
 func (s *ScenarioService) RunFolder(folderPath string) []FolderRunItemIO {
 	entries, err := os.ReadDir(folderPath)
 	if err != nil {
 		return []FolderRunItemIO{{Error: err.Error()}}
 	}
 
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.mu.Lock()
+	s.cancelFolder = cancel
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		s.mu.Lock()
+		s.cancelFolder = nil
+		s.mu.Unlock()
+	}()
+
 	env := s.workspace.ActiveEnvironment()
 	exec := buildExecutor(s.settings)
 
 	var results []FolderRunItemIO
 	for _, e := range entries {
+		if ctx.Err() != nil {
+			break
+		}
 		if e.IsDir() || !isDataFile(e.Name()) {
 			continue
 		}
@@ -752,7 +770,10 @@ func (s *ScenarioService) RunFolder(folderPath string) []FolderRunItemIO {
 		resolver := variables.NewResolver(env)
 		resolved := resolver.InterpolateRequest(req)
 
-		resp, execErr := exec.Execute(s.ctx, resolved)
+		resp, execErr := exec.Execute(ctx, resolved)
+		if ctx.Err() != nil {
+			break // cancelled while this request was in flight: it is not a result
+		}
 		if execErr != nil {
 			results = append(results, FolderRunItemIO{
 				Name:   name,
@@ -974,6 +995,15 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	s.recordScenarioRun(path, out)
 
 	return out
+}
+
+// CancelFolderRun stops the RunFolder call in progress, if any.
+func (s *ScenarioService) CancelFolderRun() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelFolder != nil {
+		s.cancelFolder()
+	}
 }
 
 // CancelScenario aborts the currently in-flight RunScenario call, if any.

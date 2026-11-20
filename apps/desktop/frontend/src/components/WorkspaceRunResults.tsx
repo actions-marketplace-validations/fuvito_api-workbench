@@ -2,10 +2,11 @@ import { X, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import type { FolderRunState, RunAllState } from '@/types'
 import { MethodBadge } from './WorkspaceFileTree'
 
-export function FolderRunResults({ state, onSelectFile, onDismiss }: {
+export function FolderRunResults({ state, onSelectFile, onDismiss, onCancel }: {
   state: FolderRunState
   onSelectFile: (path: string) => void
   onDismiss?: () => void
+  onCancel?: () => void
 }) {
   return (
     <div className="mx-2 mt-2 mb-1 rounded border border-[var(--color-border)] bg-[var(--color-muted)] text-xs overflow-hidden">
@@ -13,8 +14,11 @@ export function FolderRunResults({ state, onSelectFile, onDismiss }: {
         <span className="font-semibold text-[var(--color-foreground)] truncate flex-1 min-w-0 mr-2" title={state.folderName}>
           {state.running
             ? <span className="flex items-center gap-1.5"><Loader2 size={10} className="animate-spin" /> Running {state.folderName}…</span>
-            : <span className="flex items-center gap-1"><span className="truncate">{state.folderName}</span> <span className="shrink-0 text-[var(--color-muted-foreground)]">— {state.results.filter(r => r.passed).length}/{state.results.length} ok</span></span>}
+            : <span className="flex items-center gap-1"><span className="truncate">{state.folderName}</span> <span className="shrink-0 text-[var(--color-muted-foreground)]">— {state.results.filter(r => r.passed).length}/{state.results.length} ok{state.stopped ? ', stopped' : ''}</span></span>}
         </span>
+        {state.running && onCancel && (
+          <button type="button" onClick={onCancel} className="shrink-0 text-amber-400 hover:text-amber-300 text-[10px] font-medium transition-colors">Stop</button>
+        )}
         {!state.running && onDismiss && (
           <button type="button" onClick={onDismiss} className="shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
             <X size={10} />

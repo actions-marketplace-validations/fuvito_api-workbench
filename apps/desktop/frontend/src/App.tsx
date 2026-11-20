@@ -67,6 +67,7 @@ import {
   renameScenario,
   renameScenarioFolder,
   runFolder,
+  cancelFolderRun,
   runScenario,
   saveContentToFile,
   saveResponseCache,
@@ -322,12 +323,20 @@ export default function App() {
   // Run all requests in a folder
   const [folderRunState, setFolderRunState] = useState<FolderRunState | null>(null)
 
+  const folderRunStoppedRef = useRef(false)
+
+  function handleCancelFolderRun() {
+    folderRunStoppedRef.current = true
+    cancelFolderRun().catch(() => {})
+  }
+
   async function handleRunFolder(folderPath: string) {
     const folderName = folderPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? folderPath
+    folderRunStoppedRef.current = false
     setFolderRunState({ folderPath, folderName, running: true, results: [] })
     try {
       const results = await runFolder(folderPath)
-      setFolderRunState({ folderPath, folderName, running: false, results })
+      setFolderRunState({ folderPath, folderName, running: false, stopped: folderRunStoppedRef.current, results })
     } catch (e) {
       setFolderRunState({ folderPath, folderName, running: false, results: [{ name: 'Error', path: '', method: '', statusCode: 0, durationMs: 0, error: String(e), passed: false }] })
     }
@@ -1175,6 +1184,7 @@ export default function App() {
                     onRunScenarioFolder={handleRunScenarioFolder}
                     folderRunState={folderRunState}
                     onDismissFolderRun={() => setFolderRunState(null)}
+                    onCancelFolderRun={handleCancelFolderRun}
                     selectedCoverageSpecFile={selectedCoverageSpecFile}
                     onSelectCoverageSpec={specFile => {
                       setSelectedCoverageSpecFile(specFile)

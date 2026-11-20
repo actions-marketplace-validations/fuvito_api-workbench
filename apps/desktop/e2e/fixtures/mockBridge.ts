@@ -293,6 +293,7 @@ export function setupMockBridge() {
         ListScenarios: () => Promise.resolve(bridge['scenarios']),
         ListTemplates: () => Promise.resolve([]),
         RunFolder: () => Promise.resolve([]),
+        CancelFolderRun: noop,
         CreateFromTemplate: (templateId: string) => {
           const path = `/workspace/scenarios/${templateId}.yaml`
           return Promise.resolve({ path, error: '' })
