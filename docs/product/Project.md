@@ -1,6 +1,6 @@
 # Clear Signal — Architectural Planning Notes
 
-> **Historical document.** This is an edited transcript of the AI-assisted architectural planning session that established the technical baseline for Clear Signal. For the current authoritative project specification, see `CLAUDE.md` and `docs/Product Requirements, Architecture & Implementation Roadmap.md`.
+> **Historical document.** This is an edited transcript of the AI-assisted architectural planning session that established the technical baseline for Clear Signal. For the current authoritative project specification, see `CLAUDE.md` and `docs/product/Product Requirements, Architecture & Implementation Roadmap.md`.
 
 ---
 

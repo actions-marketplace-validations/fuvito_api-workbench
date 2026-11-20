@@ -10,12 +10,14 @@ import {StatusBar} from '@/components/StatusBar'
 import {LandingPage} from '@/components/LandingPage'
 import {SettingsPanel} from '@/components/SettingsPanel'
 import {HelpPanel} from '@/components/HelpPanel'
+import type {HelpTab} from '@/components/HelpPanel'
 import {EnvironmentEditor} from '@/components/EnvironmentEditor'
 import {RequestEditor} from '@/components/RequestEditor'
 import {ResponseViewer} from '@/components/ResponseViewer'
 import {ChevronLeft} from 'lucide-react'
 import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
+import {ConformanceTab} from '@/components/ConformanceTab'
 import {RunnerTab} from '@/components/RunnerTab'
 import {CliBuilderTab} from '@/components/CliBuilderTab'
 import type {CliBuilderPreset} from '@/components/CliBuilderTab'
@@ -58,11 +60,15 @@ import {
   moveRequest,
   moveScenario,
   openDemoSpec,
+  stopConformanceServer,
+  openConformanceSpec,
+  openConformanceWorkspace,
   pickFile,
   quitApp,
   renameScenario,
   renameScenarioFolder,
   runFolder,
+  cancelFolderRun,
   runScenario,
   saveContentToFile,
   saveResponseCache,
@@ -79,7 +85,7 @@ import type {FileClipboard, FolderRunState, KVPair, RunAllState} from '@/types'
 import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
 import {serializeScenarioToYAML} from '@/components/scenario-yaml'
-import {isTabDirty, isPageTab} from '@/lib/tabState'
+import {isTabDirty, isPageTab, withoutTabsIn} from '@/lib/tabState'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
@@ -108,7 +114,40 @@ export default function App() {
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
     onWorkspaceOpened: switchToExplorer,
+    onError: message => setAppError(message),
   })
+
+  const [conformancePort, setConformancePort] = useState(0)
+  const [conformanceWorkspace, setConformanceWorkspace] = useState('')
+  const [conformanceStarting, setConformanceStarting] = useState(false)
+  // Like the Demo Server: starting it opens its temporary workspace (the spec, a local environment,
+  // a sample scenario and requests) and stopping it closes that workspace again.
+  async function handleStartConformanceServer() {
+    if (conformanceStarting) return
+    setConformanceStarting(true)
+    try {
+      const result = await openConformanceWorkspace()
+      if (result.error) { setAppError(result.error); return }
+      setConformancePort(result.port)
+      setConformanceWorkspace(result.workspacePath ?? '')
+      await workspace.refreshWorkspace()
+      switchToExplorer()
+      tabs.openConformanceTab()
+    } finally {
+      setConformanceStarting(false)
+    }
+  }
+  async function handleStopConformanceServer() {
+    const port = conformancePort
+    const wsPath = conformanceWorkspace
+    await stopConformanceServer()
+    setConformancePort(0)
+    setConformanceWorkspace('')
+    if (wsPath) {
+      tabs.setTabsState(prev => withoutTabsIn(prev, port > 0 ? `http://localhost:${port}` : null, wsPath))
+      await workspace.refreshWorkspace()
+    }
+  }
 
   // Wire cross-dependency after both hooks are initialized
   // eslint-disable-next-line react/refs
@@ -179,7 +218,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [cliPreset, setCliPreset] = useState<CliBuilderPreset | null>(null)
   const cliPresetSeq = useRef(0)
-  const [helpInitialTab, setHelpInitialTab] = useState<'guide' | 'spec' | 'example' | 'prompt'>('guide')
+  const [helpInitialTab, setHelpInitialTab] = useState<HelpTab>('guide')
   const [showEnvEditor, setShowEnvEditor] = useState(false)
   const [editingEnvPath, setEditingEnvPath] = useState<string | null>(null)
   const [deletingScenario, setDeletingScenario] = useState<{ path: string; name: string; isDirty: boolean } | null>(null)
@@ -285,12 +324,20 @@ export default function App() {
   // Run all requests in a folder
   const [folderRunState, setFolderRunState] = useState<FolderRunState | null>(null)
 
+  const folderRunStoppedRef = useRef(false)
+
+  function handleCancelFolderRun() {
+    folderRunStoppedRef.current = true
+    cancelFolderRun().catch(() => {})
+  }
+
   async function handleRunFolder(folderPath: string) {
     const folderName = folderPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? folderPath
+    folderRunStoppedRef.current = false
     setFolderRunState({ folderPath, folderName, running: true, results: [] })
     try {
       const results = await runFolder(folderPath)
-      setFolderRunState({ folderPath, folderName, running: false, results })
+      setFolderRunState({ folderPath, folderName, running: false, stopped: folderRunStoppedRef.current, results })
     } catch (e) {
       setFolderRunState({ folderPath, folderName, running: false, results: [{ name: 'Error', path: '', method: '', statusCode: 0, durationMs: 0, error: String(e), passed: false }] })
     }
@@ -717,7 +764,7 @@ export default function App() {
     items: [
       {
         kind: 'submenu',
-        label: 'Demo Server',
+        label: 'Dev Servers',
         items: [
           {
             kind: 'action',
@@ -725,13 +772,29 @@ export default function App() {
             onClick: demo.demoRunning ? demo.handleStopDemo : () => requestWorkspaceSwitch(demo.handleStartDemo),
             disabled: demo.demoStarting,
           },
-          { kind: 'separator' },
           {
             kind: 'action',
-            label: 'View API Spec',
+            label: 'Demo Server API Spec',
             disabled: !demo.demoRunning,
             title: demo.demoRunning ? 'Open the Swagger UI for the demo server in your browser' : 'Start the demo server first',
             onClick: () => openDemoSpec(),
+          },
+          { kind: 'separator' },
+          {
+            kind: 'action',
+            label: conformanceStarting ? 'Starting…' : conformancePort > 0 ? 'Stop Conformance Server' : 'Start Conformance Server',
+            disabled: conformanceStarting || (conformancePort === 0 && demo.demoRunning),
+            title: conformancePort === 0 && demo.demoRunning
+              ? 'Stop the Demo Server first: its workspace is open'
+              : 'A deliberately imperfect API (six operations break its spec). Starting it opens a workspace with its spec, a local environment and a sample scenario',
+            onClick: conformancePort > 0 ? handleStopConformanceServer : () => requestWorkspaceSwitch(handleStartConformanceServer),
+          },
+          {
+            kind: 'action',
+            label: 'Conformance Server API Spec',
+            disabled: conformancePort === 0,
+            title: conformancePort > 0 ? 'Open the Swagger UI for the conformance server in your browser' : 'Start the conformance server first',
+            onClick: () => openConformanceSpec(),
           },
         ],
       },
@@ -740,6 +803,7 @@ export default function App() {
       { kind: 'action', label: 'Format Spec…', onClick: () => { setHelpInitialTab('spec');  setShowHelp(true) } },
       { kind: 'action', label: 'Example Scenario…', onClick: () => { setHelpInitialTab('example'); setShowHelp(true) } },
       { kind: 'action', label: 'AI Prompt…', onClick: () => { setHelpInitialTab('prompt'); setShowHelp(true) } },
+      { kind: 'action', label: 'What We Check…', onClick: () => { setHelpInitialTab('check'); setShowHelp(true) } },
       { kind: 'separator' },
       { kind: 'action', label: 'About Clear Signal', onClick: () => setShowAbout(true) },
     ],
@@ -840,7 +904,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli',
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance',
     filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
@@ -1070,6 +1134,7 @@ export default function App() {
               onShowSettings={() => settings.setShowSettings(true)}
               onShowHelp={() => setShowHelp(true)}
               onOpenCliBuilder={() => openCliBuilder()}
+              onOpenConformance={() => tabs.openConformanceTab()}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />
@@ -1115,10 +1180,13 @@ export default function App() {
                     runAllState={runAllState ?? undefined}
                     onRunAllScenarios={handleRunAll}
                     runLogTrigger={runLogTrigger}
+                    activeScenarioPath={activeTab.kind === 'scenario' ? activeTab.scenarioPath : null}
+                    dirtyScenarioPaths={new Set(tabs.tabs.filter(t => t.kind === 'scenario' && t.scenarioDirty && t.scenarioPath).map(t => t.scenarioPath!))}
                     onRunFolder={handleRunFolder}
                     onRunScenarioFolder={handleRunScenarioFolder}
                     folderRunState={folderRunState}
                     onDismissFolderRun={() => setFolderRunState(null)}
+                    onCancelFolderRun={handleCancelFolderRun}
                     selectedCoverageSpecFile={selectedCoverageSpecFile}
                     onSelectCoverageSpec={specFile => {
                       setSelectedCoverageSpecFile(specFile)
@@ -1258,6 +1326,17 @@ export default function App() {
                   </div>
                 ))}
 
+                {/* Conformance tab (single instance) */}
+                {tabList.filter(t => t.kind === 'conformance').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <ConformanceTab onOpenCliBuilder={values => openCliBuilder({ command: 'conform', values })} />
+                  </div>
+                ))}
+
                 {/* CLI Builder tab (single instance) */}
                 {tabList.filter(t => t.kind === 'cli').map(t => (
                   <div
@@ -1386,6 +1465,8 @@ export default function App() {
             }
             demoRunning={demo.demoRunning}
             demoPort={demo.demoPort}
+            conformancePort={conformancePort}
+            onStopConformance={handleStopConformanceServer}
             onEnvChange={workspace.handleEnvChange}
             onEditEnv={() => { setEditingEnvPath(workspace.activeEnv?.path ?? null); setShowEnvEditor(true) }}
             onStopDemo={demo.handleStopDemo}

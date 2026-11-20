@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fuvito/api-workbench/packages/core/conformance"
+	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -247,10 +247,13 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 
-	exec := newExecutor()
-	runner := conformance.New(exec)
-	result := runner.Run(context.Background(), spec, args.BaseURL, env, conformance.Options{})
-	return reporting.ConformText(result, nil), nil
+	out := application.RunConformance(context.Background(), application.ConformInput{
+		Exec:    newExecutor(),
+		Spec:    spec,
+		BaseURL: args.BaseURL,
+		Env:     env,
+	})
+	return reporting.ConformText(out.Result, nil), nil
 }
 
 func mcpRunScenario(raw json.RawMessage) (string, error) {
@@ -396,9 +399,8 @@ func mcpCoverage(raw json.RawMessage) (string, error) {
 
 	var sb strings.Builder
 	for _, r := range reports {
-		bar := coverageBar(r.Percent, 20)
-		fmt.Fprintf(&sb, "%s\n  %s  %d/%d (%.1f%%)  %d run(s)\n\n",
-			r.SpecFile, bar, r.Covered, r.Total, r.Percent, r.TotalRuns)
+		fmt.Fprintf(&sb, "%s\n  %s\n  scenario runs: %d run(s) · %d passed · %d failed\n\n",
+			r.SpecFile, reporting.OutcomesLine(r.Outcomes()), r.TotalRuns, r.PassedRuns, r.FailedRuns)
 	}
 	return sb.String(), nil
 }

@@ -99,7 +99,7 @@ clrsig/
 │       └── history/
 │
 ├── examples/
-├── docs/
+├── docs/                    # developer documents (see docs/README.md); documents the app serves live in apps/desktop/wails/help/
 ├── scripts/
 ├── go.work                 # Go workspace for local development
 ├── package.json
@@ -201,7 +201,7 @@ Do not implement or stub any of these without explicit user direction.
 ## 10. Changelog
 
 ### 2026-11-03
-- CLAUDE.md created from `docs/Project.md` and `docs/Product Requirements, Architecture & Implementation Roadmap.md`.
+- CLAUDE.md created from `docs/product/Project.md` and `docs/product/Product Requirements, Architecture & Implementation Roadmap.md`.
 - Project is at pre-implementation stage; no code exists yet.
 - Engineering foundation (Phase 0) is the active work target.
 - Clarified primary product identity: API contract validation and spec conformance testing platform first; full workbench second.
@@ -494,3 +494,180 @@ Do not implement or stub any of these without explicit user direction.
 - Contracts screenshots (`10`-`12`, dark and light) regenerated. **Not changed:** the per-spec cards in the Contracts sidebar still show a coloured coverage bar.
 - The fourth tile is called **Not covered**, not "Never tested": that wording clashed with the quality signal "Secured — never tested with auth" (an operation can be called, so covered, and still never have been tested with credentials).
 - **Order and names of the tiles:** **Covered | Not covered | Passing | Failing**, grouped as two pairs with a gap between them. Covered + Not covered = all operations, Passing + Failing = Covered. "Coverage" became **Covered** so it reads as a count beside "Not covered" and matches the table's sections. Each tile still shows its share of all operations.
+
+### 2026-11-18 — Contracts exports and CLI carry the same four totals
+
+- **One definition:** `coverage.Report.Outcomes()` and `coverage.Share` (`packages/core/coverage/outcomes.go`) classify the operations (Covered + Not covered = Total; Passing + Failing = Covered; `NoResult` for covered operations with no recorded result). The Contracts page (`operationOutcomes`, which now also uses the report's own `covered` count), every export and the CLI use it, so they agree.
+- **Exports (`reporting/contracts.go`, shared by the desktop Export menu and `clrsig coverage ... --format csv|markdown|html`):** the single-spec Markdown and HTML open with the four totals (the HTML as four equal tiles in the same two pairs, muted at zero; the big percentage and bar are gone) and a separate "Scenario runs" section; the per-operation CSV gets a trailing `Status` column (existing columns and their values unchanged); the per-spec list CSV gets trailing `Not Covered,Passing,Failing` columns; the per-spec Markdown and HTML tables show all four with their shares.
+- **CLI:** `coverage list` and `coverage quality` text show one line `Covered 10 (71%) · Not covered 4 (29%) · Passing 9 (64%) · Failing 1 (7%) · of 14 operations` (`reporting.OutcomesLine`, plus `No result` when present) instead of the ASCII bar, which is removed; JSON gains additive fields (`notCovered`, `passing`, `failing`, `noResult` per spec in `list`; a `totals` object in `quality`); the MCP `coverage` tool prints the same line.
+- **Left as is:** the single-run coverage in run reports and the scenario coverage banner (that is one run, not the accumulated tiles), `printCumulativeCoverage` (conform history), and the Contracts sidebar cards.
+
+### 2026-11-18 — Requests and Scenarios trees made alike
+
+- **Compared in the browser, not by eye:** folder names are weight 400, 13px and the same colour in both trees (the scenario folder names had `font-medium`, which made them look bold); the gap between a folder's chevron, icon and name is the same (`gap-1.5`); folder hover actions are in the same order (new item, new subfolder, then delete; scenarios keep their extra "run folder" first).
+- **Scenarios gained what requests already had:** the scenario open in the active tab is highlighted (muted background and an accent left border, like the active request file) and a scenario with unsaved edits shows the amber dot. `Sidebar` takes `activeScenarioPath` and `dirtyScenarioPaths`, computed in `App` from the tabs.
+- **Requests gained what scenarios already had:** a request folder row now toggles when you click anywhere on it (name or empty space), not only the chevron and folder icon.
+- **Not changed:** requests show a method badge and scenarios a step count and play icon (different data); the Delete folder button shows only for empty request folders but always for scenario folders; scenario folder rows are 22px tall and request folder rows 21px.
+
+### 2026-11-19 — Next-steps snapshots
+
+- Created `docs/planning/next_steps/` for point-in-time planning documents (separate from `docs/enhancements/`, which holds feature design proposals). Convention in `docs/planning/next_steps/README.md`: `YYYY-MM-DD-next-steps.md`, new file per snapshot — do not edit old ones.
+- First snapshot `2026-11-19-next-steps.md` orders post-MVP work: (1) code signing + notarization (Azure Trusted Signing, Apple Developer Program — release.yml currently produces unsigned binaries), (2) hosted demo server + everything workspace (`examples/server` exists locally; needs hosting and a kitchen-sink workspace wired into release checks), (3) `clrsig conform` spec-conformance command (per `docs/archive/contract-testing-roadmap.md`; needs an enhancements proposal), (4) NotebookLM video guides kept as regenerable script + screenshot artifacts, (5) traction (posts, shorts, forums), (6) backlog: failure-catalog repo, community scaffolding, JUnit output.
+
+### 2026-11-19 — Conformance Server and Dev Servers menu (phase 1.6 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **Conformance Server:** `conformance_server.go`, `ConformanceServerService` (Start, Stop, IsRunning, GetPort, OpenSpecInBrowser), embedded `help/conformance-openapi.yaml`. Four operations conform, three break the spec (`getProduct`, `listCategories`, `listOrders`); `TestConformanceServerViolationsAreExactlyTheKnownOnes` pins the set. No workspace is opened; port from 8120; stopped on app shutdown.
+- **Menu:** Help → **Dev Servers** holds the Demo Server and Conformance Server entries; status bar shows a `Conformance :port` chip.
+- **Finding (not changed):** the response validator ignores a wrong `Content-Type` and missing response headers.
+- **Not yet:** the Conformance page itself (phase 2) and the `conform` extraction (phase 1.5).
+
+### 2026-11-19 — Spec conformance signal on scenario runs (phase 1 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **Core:** `scenario.StepResult.Spec` (`SpecCheck`: `matched`, `violations` or `not-checked` with a reason: validation turned off, no matching operation in the spec, step did not complete) and `openapi.Spec.HasOperation`. Failed-assertion behaviour is unchanged. Tests cover every state and the no-spec case.
+- **Desktop:** `StepResultIO` gains `specState`, `specReason`, `specViolations` (additive); the Setup row's Result tab shows `N of M responses match <spec>`, violations per step and the not-checked steps (`SpecConformance` component). No file format change.
+- **Not yet:** the conformance line in the scenario header chip, user guide text and screenshots.
+
+### 2026-11-19 — `conform` orchestration extracted (phase 1.5 of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **`packages/core/application`:** `RunConformance(ctx, ConformInput) ConformOutput` runs the conformance runner, optional negative probes and coverage, collects the violations and compares them with a baseline (`Failed` already accounts for it); `SplitList`; `DefaultConformRequestTimeoutMs` (10000). The CLI `conform` command and the MCP `conform` tool both call it; reading the spec and environment, the executor, history, rendering, `--write-baseline` and telemetry stay with the caller.
+- **One behaviour change:** the MCP `conform` tool used the executor default timeout (30 s); it now uses the shared 10 s default like the CLI. A CLI `--request-timeout 0` now means the shared default instead of the executor default.
+- Tests: new `application` tests (violation fails, tag filter, negative probes, baseline known and new); all existing CLI tests pass unchanged.
+
+### 2026-11-19 — Check Conformance page (phase 2a of `docs/enhancements/2026-11-19-desktop-conformance.md`)
+
+- **Core:** `conformance.Options.ReadOnly` and `conformance.IsReadOnlyMethod` (GET/HEAD only; other operations and negative probes are skipped and never sent); `application.ConformInput.ReadOnly`; `openapi.Spec.FirstServerURL`.
+- **Desktop:** `ConformanceService` (`GetConformContext`, `InspectConformSpec`, `RunConformance`, `CancelConformance`), a thin wrapper over `application.RunConformance`. Read-only unless `AllowWrites`; a non-local base URL (including one taken from the spec's servers) is refused unless `ConfirmedRemote`, checked in Go as well as in the page. Singleton page tab `conformance` (`ConformanceTab`, Activity Rail shield button) with spec, environment, base URL, write opt-in with the write count, run/cancel, four totals (Covered + Not covered = all operations; Passing + Failing = Covered; skipped and unreachable operations are Not covered), per-operation results with violations, and Get CLI command.
+- **Not yet (phase 2b):** options (tags, path prefixes, negative probes, fail fast, timeout), export, coverage accumulation into the Contracts store, progress events, screenshots and README line.
+
+### 2026-11-19 — Check Conformance page, phase 2b
+
+- **Options:** tags, path prefixes, request timeout (empty = shared 10 s default), negative probes (probe list with rejected / accepted / error / skipped), stop after the first failure. Read-only still applies to probes.
+- **Export:** `ConformanceService.ExportConformReport` renders the latest run with `reporting.ConformHTML/JUnit/JSON/Markdown`, the CLI's renderers; the page saves or opens it like the Run Results export.
+- **Coverage recording (opt-in, off by default):** adds the run to the Contracts store only when no tag or path filter is set (also enforced in Go); the spec is recorded under its workspace-relative path and the page says so. Scenario and conformance runs share `accumulateCoverage` (`coverage_store.go`). Operations skipped or without a response are not counted. If scenarios name the same spec with a different path string, Contracts shows a separate card for it (the store is keyed by that string).
+- **Not done:** progress events during long runs, environment `{{$function}}` generation for these runs (CLI parity), screenshots and a README line, Playwright test for the page, phase 3 baselines (deferred in the proposal).
+
+### 2026-11-19 — Conformance coverage uses the scenarios' spec name
+
+- Scenarios write `specFile` as a path relative to their folder (or a URL), and the Contracts store is keyed by that exact string. Recording from the Check Conformance page now looks through the workspace's scenarios for one whose file-path `specFile` resolves to the chosen spec and reuses its spelling, so both feed one Contracts card; with no match it falls back to the workspace-relative path. URL specs (such as the demo's) cannot be matched from a file chosen in the page; the page names the entry it wrote. Test: `TestScenarioSpecRef_ReusesTheNameAScenarioUses`.
+
+### 2026-11-19 — Conformance Server verified live; path-level parameters; configurable Dev Server ports
+
+- **Live check:** `clrsig conform` against the running Conformance Server with its environment reports exactly three failures, each for its intended reason (`/categories` missing `name`, `/orders` `id` as a string, `/products/{id}` `price` as a string). The first live run showed 5 failures and exposed two problems, below.
+- **Fix — path-level parameters were ignored:** `openapi.GenerateRequests` and the negative probes read only operation-level `parameters`, so a parameter declared once on the path item (the usual place for `{id}`) was never turned into a `{{id}}` placeholder: the request went out with a literal `{id}`. `withPathParameters` merges them (an operation's own parameter replaces a shared one with the same name and location). This also changes generated and imported requests for specs written that way (they now carry the placeholder). Reports show such operations with the placeholder path, so a conformance baseline recorded before this fix for such a spec will list them under the old path.
+- **Conformance Server:** the spec's POST body now requires only `name` (the generated body stub makes every field a string placeholder, which cannot satisfy a numeric field); DELETE declares 404; `help/conformance-environment.yaml` (`id`, `name`) is shipped, and the server serves `/openapi.yaml` and `/environment.yaml`. The service test now asserts the cause of each violation, not only which operations fail (it had passed partly by accident).
+- **Ports:** Settings → **Dev servers** sets a fixed port for the Demo Server and the Conformance Server (`demoServerPort`, `conformanceServerPort`; 0 = first free port from 8090 / 8120, valid range 1024-65535, the two must differ). A fixed port that is in use is an error shown in the app, never silently replaced. `choosePort`, `sanitizePort`; the Demo Server start error is now shown too.
+- **Not done:** the Check Conformance page cannot pick the Conformance Server's spec until the user saves it into the workspace (the guide says how); a one-click "open it in a workspace" like the Demo Server's is not built.
+
+### 2026-11-19 — Open Conformance Workspace
+
+- **Help → Dev Servers → Open Conformance Workspace** (`ConformanceServerService.OpenWorkspace`) starts the server and opens a temporary workspace (`clrsig-conformance-*`) with `specs/conformance-openapi.yaml` and an active `environments/local.yaml` (`id`, `name`, `baseUrl`), so the Check Conformance page runs with no setup; the Go test runs the page's service inside it and gets exactly the three known violations. Stopping the server (menu or status chip) removes the workspace, reopens the previous one and closes the tabs that belonged to it.
+- **Guard:** only one temporary workspace at a time; each of the two Dev Servers refuses to open its workspace while the other's is open (the swap and restore are not nestable). The plain Start/Stop of the Conformance Server still opens no workspace.
+- `lib/tabState.withoutTabsIn` is the shared "close the tabs of a temporary workspace" helper, now used by the Demo Server stop as well.
+
+### 2026-11-19 — Check Conformance: unset `${NAME}` warnings
+
+- **Correction:** the earlier note that the page lacked CLI parity for environment functions was wrong for `conform`: the CLI does not pre-generate environment functions for it (only scenario runs do, via `ResolveEnvironment`); `conform` applies `--var` overrides and warns about unset `${NAME}` references. The page already behaves the same for functions (the resolver generates them at each use).
+- **The real gap, now closed:** the page left an unset `${NAME}` as written without saying so, so requests failed for the wrong reason. `variables.EnvRef.Message()` (shared with the CLI's warning text, unchanged) feeds `ConformRunOutputIO.Warnings`, shown above the results. Test: `TestConformanceService_WarnsAboutUnsetEnvironmentReferences`; the CLI warning tests pass unchanged.
+- **Still not offered on the page:** `--var` overrides.
+
+### 2026-11-19 — Conformance test gaps closed
+
+- **Parity:** `TestConformanceParity_ServiceMatchesTheCLI` builds the real CLI and compares `clrsig conform --format json` with `ConformanceService` operation by operation (method, path, outcome, status), each against its own fresh server (the Conformance Server keeps state: its DELETE removes product 1). It also pins the CLI-level claim: exactly `listCategories`, `listOrders`, `getProduct` fail and the exit code is 1. Skipped with `go test -short`.
+- **Cancel:** `TestConformanceService_CancelStopsARunInProgress` (a run waiting on a slow server stops at once on `CancelConformance`, counts nothing as covered, and the service runs again afterwards).
+- **Playwright (170 tests, all pass):** `conformance.spec.ts` (read-only run with totals and violations; write opt-in and write count; remote base URL confirmation; negative probes; Get CLI command) and two scenario tests (the spec conformance summary with violations; no section without a spec). The mock bridge's `ConformanceService` now behaves like the real one (read-only skips writes, remote needs confirmation) and its CLI catalog has `conform`. The negative probe list is now a labelled `region`.
+- **Still untested:** the UI in a running desktop app (`wails dev`), and the 5 `smoke` tests need that server.
+
+### 2026-11-19 — README and screenshots for conformance
+
+- **README:** a "Check conformance from the desktop" section (safe-by-default reads, the four totals, options and export, scenario spec conformance, the Conformance Server), a feature bullet and two gallery entries. Product pitch only; developer detail stays in the guide and this file.
+- **Screenshots:** `15-conformance-results` and `16-scenario-spec-conformance` (dark and light), generated by `screenshots-conformance.spec.ts` (`pnpm test -- --grep @screenshot-conformance`) from data that mirrors the Conformance Server. The other existing screenshots were not regenerated, so they do not show the new shield button in the rail.
+
+### 2026-11-19 — Check Conformance: summary panel and failure-first report (desktop page only)
+
+- **Layout:** two columns. The right-hand **Summary** panel holds **Export report** (disabled until a run) and the four totals as a 2×2 grid; the left holds the form and the report.
+- **Report:** a headline (`3 of 7 operations break the spec`) with chips for why they fail, then **Problems** (a card per failing operation: expected, got, why, fix, and the validator's message under *Technical detail*), **Passing** (open) and **Not run** (collapsed, with the reason). Without findings (older data) a card falls back to the raw messages.
+- **Core:** `conformance.Diagnose(OperationResult) []Finding` classifies the validator's free-text messages (missing field, wrong type, invalid generated request, no answer, other; JSON pointers shown as `[0].id`). Unrecognised messages become `other` with the raw text, so a validator wording change degrades to less explanation, not to a failure. `ConformanceService` exposes them as `findings` on each operation.
+- **Scope:** only the desktop page uses `Diagnose`. The CLI text output and the exported HTML, JUnit, JSON and Markdown reports are unchanged.
+- **Known gap:** the page's **Get CLI command** opens the builder with `conform` selected but does not carry the page's choices over, and `clrsig conform` has no read-only option, so a read-only page run cannot be reproduced by a command today.
+
+### 2026-11-19 — `clrsig conform --read-only`; Get CLI command carries the page's choices
+
+- **CLI:** `clrsig conform --read-only` sends only GET and HEAD (other operations and their negative probes are skipped and never sent). Default off, so existing commands and CI behave as before. It is in the command catalog (`clispec`, Essential group), so the CLI Command Builder offers it; `TestCatalogMatchesCobra` guards the pairing. Same `ReadOnly` option the desktop page already used.
+- **Desktop:** **Get CLI command** on the Check Conformance page now opens the builder with the page's choices filled in (`cliValues`: spec, base URL, environment, tags, paths, negative probes, fail fast, timeout, and `read-only` unless writes were ticked). "Active environment" is expressed as its file (`ConformContext.activeEnvironment`). Not carried over: "Add to Contracts coverage" (no flag; `conform` always records to history) and the page's own coverage option.
+- **Tests:** `TestConformReadOnlySendsNoWrites`, `TestBuilderReadOnlyConformCommand` (the command the builder produces for a read-only choice runs and sends no writes), `cliValues` and button tests, two Playwright tests.
+
+### 2026-11-19 — Project backlog
+
+- **`docs/planning/backlog.md`** is the one living list of open work (checkbox, ID `B-###`, size, what it needs, source). It links to `docs/planning/next_steps/` (point-in-time plans, never edited to stay current) and `docs/enhancements/` (one proposal per major feature) instead of copying them. Tick items there when they ship and add new ones with the next free ID.
+
+### 2026-11-19 — Backlog items B-001, B-004, B-005, B-011 (conformance)
+
+- **B-001 explanations everywhere:** `reporting` redacts and renders `conformance.Diagnose` findings: `ConformJSON` gains an additive `findings` array per operation, `ConformHTML`/`ConformMarkdown` and `ConformJUnit` add one `→ … Why: … Fix: …` line per failure (JUnit's failure `message` still counts violations). The screen output stays as it was unless `clrsig conform --explain` (new, opt-in, in the command catalog) is given: scripts and CI logs rely on it. `reporting.ConformTextExplained`; `ConformText` is unchanged.
+- **B-004 progress:** `conformance.Options.OnOperation` / `application.ConformInput.Progress` / Wails event `conformance:progress` (`ConformProgressEvent`), shown on the page as a progress bar and the current operation. Negative probes report no progress yet.
+- **B-005 variable overrides:** `variables.WithOverrides` (moved out of the CLI, which keeps `applyVars` as a wrapper with the same `--var …` error text); `ConformRunInput.Vars`; a "Variable overrides" box in the page's Options (this run only, never saved, not in Get CLI command).
+- **B-011 sample workspace content:** the Conformance workspace now has `scenarios/product-lifecycle.yaml` and four requests.
+- **Finding, not changed (B-009):** a URL with an unresolved `{{placeholder}}` is still sent and a declared 404 passes, so such an operation shows as Passing without being compared. Recorded in the backlog for a decision.
+
+### 2026-11-20 — Conformance Server starts like the Demo Server
+
+- Help → Dev Servers → **Start Conformance Server** is now the single entry: it starts the server and opens its temporary workspace (spec, local environment, sample scenario and requests), exactly as **Start Demo Server** does; the same item becomes **Stop Conformance Server** (the status-bar chip stops it too), and stopping closes the workspace and reopens the previous one. The separate "Open Conformance Workspace" item is gone; there was never a product reason for two (it was added after a plain start-only item). It is disabled, with the reason, while the Demo Server's workspace is open, and `requestWorkspaceSwitch` asks about unsaved tabs first, as for the demo.
+- `ConformanceServerService.Start` (server only) is still there for tests and API users but the app no longer calls it; `startConformanceServer` was removed from `bridge.ts`.
+- Test: a Playwright test drives Help → Dev Servers → Start Conformance Server (page opens, status chip, Stop entry).
+
+### 2026-11-20 — B-009: operations with a missing placeholder value are not sent
+
+- **Behaviour change (CLI and desktop):** `conformance.Runner` no longer sends a request that still contains a `{{placeholder}}` after variables were filled in (URL, query, headers, auth, body), or whose dynamic value failed. The operation gets `Blocked` (reason, `not sent: no value for {{id}}`) and `Missing` (names); `Passed()` is false and `Counts()` counts it as failed, so the run exits 1 and it can never show as passing; coverage treats it as not covered. Before, `/items/{{id}}` was sent literally and a declared 404 counted as a match.
+- **Unused variables:** a variable that is defined but never used is ignored and not reported (environments are shared by many operations; the existing warning for an unset `${NAME}` reference stays). Only a *used and missing* value blocks.
+- **Reporting:** one aggregated line under the report names every missing value once (`conformance.MissingValuesAdvice`, `ConformResult.BlockedSummary`); JSON gains `blocked`/`missing` per operation and `missingValues`; `Diagnose` gives a `missing-value` finding. The desktop page shows NOT SENT cards, a headline that separates "break the spec" from "could not be checked", and a **Missing values** box whose button adds the names to Variable overrides.
+- **Risk:** CI that ran `conform` without supplying every value now fails (the repo's own `examples/environments/demo-conform.yaml` supplies them all, and the example-server CI step still passes). Secured operations need `token`; generated bodies need a value per property (see backlog B-003).
+
+### 2026-11-20 — B-019: Run folder (requests) can be stopped
+
+- Every run in the desktop can now be stopped: a request (Cancel), a scenario (Cancel), Run All / Run folder for scenarios (Stop on the Run Results tab), the Check Conformance page (Cancel) and now **Run all requests in a folder**: `ScenarioService.CancelFolderRun` cancels the context of `RunFolder`, the request in flight is dropped (it is not a result), later requests never start, and the finished results are returned; the folder results show **Stop** while running and "stopped" after. `FolderRunState.stopped`; `cancelFolderRun` in `bridge.ts`.
+
+### 2026-11-20 — Conformance accuracy, part A (B-002; `docs/enhancements/2026-11-20-conformance-accuracy.md`)
+
+- **Bug fixed (behaviour change, CLI, scenarios and desktop):** `openapi.ValidateResponseByPath` forwarded only `Content-Type` to kin-openapi and dropped `ResponseError.Reason` when `Err` was nil. So a response whose operation declared *any* response header never had its body checked, and an undeclared status, a wrong Content-Type or a missing required header passed silently. Now every real response header is forwarded and every `Reason` is reported. New violation kinds on `openapi.ValidationError.Kind` (`undeclared-status`, `wrong-content-type`, `missing-header`, `bad-header`, plus `body`), with `Subject` (status, content type or header name). A `default` response counts as declared; `validateSpec: false` per step still skips. Only the first problem is reported (header problems come before body problems). The `type: schema` assertion by operationId (`ValidateResponse`) is unchanged.
+- **What / why / where / how to fix (owner rule, saved as a memory note):** every message names the operation, status and thing that is wrong (`GET /a 200: the response header "X-Total-Count" is required by the spec but was not sent`), and `conformance.Finding` gained `Part` (response body, response status, response header, request, network), `Where` (field path, header name, status) and `Spec` (the place in the spec, for example `GET /a → response 200 → headers → X-Total-Count`) next to summary, expected, got, why, fix and the raw detail. `OperationResult.SpecPath` carries the spec's own path template. The explanation line in the text (`--explain`), HTML, Markdown and JUnit reports now reads `Summary. Why: … Where: … (spec: …). Fix: …`; JSON findings gain `part` and `spec`; the page shows Where and In the spec rows.
+- **Conformance Server:** three more deliberate defects, six in all (`GET /widgets` text/plain, `GET /inventory` missing `X-Total-Count`, `GET /status` answers 503), ten operations (8 reads, 2 writes). Tests, the CLI parity test, docs and the screenshot data (captured from a real run) updated.
+- **Risk:** CI that was silently green because of the bug can turn red. Adopt gradually with `clrsig conform --write-baseline` / `--baseline`. The repo's own CI steps (`conform` and `run` against the example server, with and without `--spec`) still pass.
+- **Part B (generated request bodies, B-003) is accepted but not built.**
+
+### 2026-11-20 — Conformance accuracy, part B (B-003; `docs/enhancements/2026-11-20-conformance-accuracy.md`)
+
+- **One shared request body generator** (`packages/core/openapi/bodystub.go`, replacing the OpenAPI 3.x and Swagger 2.0 ones): only **required** properties (plus optional ones with an `example` or `default`), `readOnly` properties left out, a property with an example, default or enum uses that value, any other property is a **typed** placeholder (`"{{title}}"` for a string, bare `{{price}}` for number, boolean, array and object so a filled-in value is valid JSON), `allOf` merged (also through `$ref` in Swagger 2.0), first `oneOf`/`anyOf` branch, array bodies as an array of the item template, nested structures one placeholder. Negative probes are unchanged (they build their own typed bodies).
+- **Consequence for imports:** imported request files now contain fewer fields (a schema with nothing required imports as `{}`); the optional fields are no longer visible as a scaffold. Backlog B-047 tracks offering a full scaffold at import time.
+- **Request-side validator fixed like the response side:** `ValidateRequest` dropped the parameter name, the "request body" context and the `Reason` (and reported nothing for a `RequestError` without an inner error). New kinds `request-parameter` (with `Subject` and `In`) and `request-body`; messages name the operation, the parameter and where. `conformance.Diagnose` explains request problems with what / expected / got / where / spec location / why / fix and names the environment value to set.
+- **Format JSON** (request body editor and scenario step editor) understands bare `{{placeholders}}` (`lib/jsonFormat.ts`) and now says when the body is not JSON instead of silently doing nothing.
+- **Tests:** the generator (each type, required-only, literals, allOf, oneOf, arrays, Swagger 2.0), "a filled-in generated request passes `ValidateRequest`", request findings end to end, a CLI end-to-end test where the server decodes real numbers, booleans and arrays, and the Format JSON helper. Three older stub tests were updated to the new rules.
+
+### 2026-11-20 — Catalog of what we check (B-048; `docs/what-we-check.md`)
+
+- **`docs/what-we-check.md`** lists every failure, warning and "not checked" outcome with a provisional ID (`CS-RESP`, `CS-REQ`, `CS-RUN`, `CS-PROBE`, `CS-COV`, `CS-DIFF`, `CS-IMP`, `CS-NC`, `CS-GAP`), title, description, example, state (caught / partly / not caught / not checked), severity today and evidence, and the known gaps with the reason. The response checks are listed for the two checkers separately (A: step spec check and `conform`; B: the `schema` assertion, which only compares the body). Terms: API Contract Validation (section 1) and Spec Conformance Testing (section 2).
+- **Evidence is enforced:** `packages/core/openapi/what_we_check_test.go` pins current behaviour including gaps (`KnownGap`), and `packages/core/conformance/what_we_check_doc_test.go` fails if the catalog cites a test that does not exist, defines an ID twice, or if the docs or any test comment mention a `CS-` ID the catalog does not define.
+- **Rule (owner):** every new failure, gap, false pass or false failure we learn about is added to the catalog in the same change; fixing a gap moves its row and flips its `KnownGap` test.
+- **Found while measuring (now in the backlog):** `impact` never matches a step whose URL path contains a placeholder (B-051, a bug); a declared `application/xml` response is reported as a violation (B-052); `format: email` / `uuid` are not validated (B-053); the `schema` assertion ignores status, Content-Type, headers and `writeOnly`, and does not check an empty body.
+- `docs/archive/contract-testing-roadmap.md` is retired with a pointer (B-030); the README and the user guide link the catalog.
+
+### 2026-11-20 — The catalog is shown in the app (Help, What We Check)
+
+- The catalog moved from `docs/what-we-check.md` to **`apps/desktop/wails/help/what-we-check.md`** (embedded files must live under the Go package, and `help/` is where every document the app serves already lives: user guide, format spec, example scenario, AI prompt). It is still the file the README links to and the one the guard tests (`what_we_check_doc_test.go`) read; the 2026-11-20 entry above that says `docs/what-we-check.md` is history.
+- **Help panel:** a fifth tab, **What We Check** (menu Help, What We Check…), loaded on demand through `HelpService.GetWhatWeCheck`, with Download and Copy; the panel is wider on that tab for the seven-column tables, and a check ID (`CS-RESP-008`) never wraps so it can be quoted.
+- Tests: Go guard tests on the new path, component tests for the tab (lazy load, table, copy and download, load failure, ID not wrapping), a Playwright flow through the Help menu.
+- Next step for B-049: turn the tab into a searchable table by ID when the catalog becomes data in Go; today it renders the Markdown.
+- **Help panel width:** the panel is now 90% of the window wide (capped at 1800 px) on every tab, instead of a fixed width, so guides, specs and the catalog's wide tables use the room there is (`help-panel.spec.ts` measures it at several window sizes).
+
+### 2026-11-20 — `docs/` reorganized (backlog B-054; map in `docs/README.md`)
+
+- **Two places.** Documents the **app serves** stay in `apps/desktop/wails/help/` (the Go embed requires it): user guide, format spec, example scenario, AI prompt, `what-we-check.md`, the sample specs. **Developer documents** live in `docs/`: `enhancements/` (design proposals, path unchanged), `planning/` (`backlog.md`, `next_steps/`, product requirement documents), `reports/` (`check-YYYY-MM-DD.md` audits, comparisons), `guides/` (CI/CD integration, authenticated conformance runs), `process/` (release process, manual steps), `product/` (founding notes, requirements and roadmap, presentation), `archive/` (retired). `docs/images/`, `docs/demo.gif` and `docs/demo.tape` stay where they are: the README, the demo workflow and the screenshot tests use those paths.
+- **Rules now:** the backlog is `docs/planning/backlog.md`; next-step snapshots go in `docs/planning/next_steps/`; audit files are `docs/reports/check-YYYY-MM-DD.md` (a new file per date, old ones kept); a user-facing reference the app should show goes in `help/` with a Help tab; `docs/README.md` says where a new document goes.
+- **Moves:** 19 files with `git mv`, the dead `docs/UserGuide.md` stub deleted, `ci-integration.md` and `cicd-integration.md` merged into one rewritten `docs/guides/ci-integration.md` (it fixes advice that was wrong: environment files use `${NAME}`, not `{{NAME}}`, for process variables; it adds the current flags, the Action's inputs, and a section on running conformance in CI). Relative links and plain-text mentions were rewritten; a link check over every markdown file finds none broken. Older changelog entries above still name the old paths; they are history.
+
+### 2026-11-20 — Always start on the landing page
+
+- **Behaviour change (owner request):** the app no longer reopens the last workspace or active environment on start or restart; it opens on the landing page. The last workspaces stay in the Recent list only.
+- **No residue:** at startup stale `clrsig-demo-*` and `clrsig-conformance-*` temp workspaces (left by a crash or kill) are deleted; temp workspaces are never added to the Recent list, and Recent entries for folders that no longer exist are dropped. Tests: `TestWorkspaceConfig_StartsOnLandingPage`, `TestWorkspaceConfig_TempWorkspacesLeaveNoResidue`.
+
+### 2026-11-20 — Environment remembered per workspace
+
+- The selected environment is stored per workspace (`workspaceEnvs` in `~/.clrsig/config.json`, path relative to the workspace, including "no environment") and restored when that workspace is opened (`enterWorkspace`); a workspace no longer inherits the previous one's environment. Temporary demo and conformance workspaces are not remembered. File → Close Workspace (already present) returns to the landing page. Test: `TestWorkspaceEnvironment_RememberedPerWorkspace`. Dashboard and open/close reminders: backlog B-055.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeStateKey, createBlankTab, isTabDirty, isBlankTab, isPageTab } from './tabState'
+import { computeStateKey, createBlankTab, isTabDirty, isBlankTab, isPageTab, withoutTabsIn } from './tabState'
 import type { TabState } from './tabState'
 
 const BLANK_KEY = computeStateKey('GET', '', [], [], { type: 'none', content: '' }, { type: 'none' }, null, 0)
@@ -116,5 +116,35 @@ describe('isBlankTab', () => {
     const tab = createBlankTab()
     tab.name = 'My Request'
     expect(isBlankTab(tab)).toBe(false)
+  })
+})
+
+describe('withoutTabsIn', () => {
+  const tab = (over: Partial<TabState>): TabState => ({ ...createBlankTab(), ...over })
+
+  it('removes tabs under the workspace or on the local server, and keeps the others', () => {
+    const inFile = tab({ filePath: String.raw`C:\tmp\clrsig-x\requests\a.yaml` })
+    const inScenario = tab({ kind: 'scenario', scenarioPath: 'C:/tmp/clrsig-x/scenarios/s.yaml' })
+    const onServer = tab({ url: 'http://localhost:8120/health' })
+    const other = tab({ filePath: String.raw`C:\work\b.yaml` })
+    const next = withoutTabsIn({ tabs: [inFile, inScenario, onServer, other], activeTabId: inFile.id }, 'http://localhost:8120', String.raw`C:\tmp\clrsig-x`)
+    expect(next.tabs).toEqual([other])
+    expect(next.activeTabId).toBe(other.id)
+  })
+
+  it('keeps the active tab when it survives and returns the same state when nothing matches', () => {
+    const a = tab({ filePath: '/ws/a.yaml' })
+    const b = tab({ filePath: '/tmp/x/b.yaml' })
+    const prev = { tabs: [a, b], activeTabId: a.id }
+    expect(withoutTabsIn(prev, null, '/nowhere')).toBe(prev)
+    expect(withoutTabsIn(prev, null, '/tmp/x').activeTabId).toBe(a.id)
+  })
+
+  it('leaves one blank tab when everything is removed', () => {
+    const only = tab({ filePath: '/tmp/x/a.yaml' })
+    const next = withoutTabsIn({ tabs: [only], activeTabId: only.id }, null, '/tmp/x')
+    expect(next.tabs).toHaveLength(1)
+    expect(isBlankTab(next.tabs[0])).toBe(true)
+    expect(next.activeTabId).toBe(next.tabs[0].id)
   })
 })

@@ -19,6 +19,26 @@ describe('BodyEditor', () => {
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 
+  it('Format understands bare {{placeholders}} for numbers, booleans and arrays', () => {
+    const onChange = vi.fn()
+    const body: BodyState = { type: 'json', content: '{"title":"{{title}}","price":{{price}},"tags":{{tags}}}' }
+    render(<BodyEditor body={body} onChange={onChange} />)
+    fireEvent.click(screen.getByText('Format'))
+    expect(onChange).toHaveBeenCalledWith({
+      type: 'json',
+      content: '{\n  "title": "{{title}}",\n  "price": {{price}},\n  "tags": {{tags}}\n}',
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('Format says so when the body is not JSON, instead of doing nothing', () => {
+    const onChange = vi.fn()
+    render(<BodyEditor body={{ type: 'json', content: '{"price": abc}' }} onChange={onChange} />)
+    fireEvent.click(screen.getByText('Format'))
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Not valid JSON')
+  })
+
   it('shows Format button for non-empty json', () => {
     render(<BodyEditor body={json} onChange={() => {}} />)
     expect(screen.getByText('Format')).toBeInTheDocument()

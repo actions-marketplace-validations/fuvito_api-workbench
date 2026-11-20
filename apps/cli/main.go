@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -39,9 +40,9 @@ func (e *exitError) Error() string { return "" }
 
 func main() {
 	root := &cobra.Command{
-		Use:     "clrsig",
-		Short:   "Clear Signal — API Contract Validation and Spec Conformance Testing",
-		Version: version,
+		Use:           "clrsig",
+		Short:         "Clear Signal — API Contract Validation and Spec Conformance Testing",
+		Version:       version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
@@ -416,6 +417,8 @@ func conformCmd() *cobra.Command {
 	var outputFile string
 	var requestTimeout int
 	var failFast bool
+	var readOnly bool
+	var explain bool
 	var vars []string
 	var reports []string
 	var showCoverage bool
@@ -486,28 +489,22 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				return err
 			}
 
-			opts := conformance.Options{
-				FailFast:         failFast,
-				RequestTimeoutMs: requestTimeout,
-			}
-			if tagsCSV != "" {
-				for _, t := range strings.Split(tagsCSV, ",") {
-					if t = strings.TrimSpace(t); t != "" {
-						opts.Tags = append(opts.Tags, t)
-					}
-				}
-			}
-			if pathsCSV != "" {
-				for _, p := range strings.Split(pathsCSV, ",") {
-					if p = strings.TrimSpace(p); p != "" {
-						opts.Paths = append(opts.Paths, p)
-					}
-				}
-			}
-
 			exec := newExecutor()
-			runner := conformance.New(exec)
-			result := runner.Run(context.Background(), spec, baseURL, env, opts)
+			out := application.RunConformance(context.Background(), application.ConformInput{
+				Exec:             exec,
+				Spec:             spec,
+				BaseURL:          baseURL,
+				Env:              env,
+				Tags:             application.SplitList(tagsCSV),
+				Paths:            application.SplitList(pathsCSV),
+				FailFast:         failFast,
+				ReadOnly:         readOnly,
+				RequestTimeoutMs: requestTimeout,
+				Coverage:         showCoverage,
+				Negative:         runNegative,
+				Baseline:         base,
+			})
+			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
 			// Hash the spec bytes to group runs of the same spec in history.
 			rawHash := sha256.Sum256(data)
@@ -515,17 +512,6 @@ only new ones fail the run; --write-baseline records the current violations.`,
 
 			// Record this run to history (silently — a broken db never blocks conformance).
 			recordConformRun(src, specHash, result)
-
-			var cov *conformance.CoverageReport
-			if showCoverage {
-				cov = conformance.ComputeCoverage(result)
-			}
-
-			var negResult *conformance.NegativeResult
-			if runNegative {
-				negRunner := conformance.NewNegative(exec)
-				negResult = negRunner.Run(context.Background(), spec, baseURL, env, opts)
-			}
 
 			render := func(f string) ([]byte, error) {
 				switch f {
@@ -550,7 +536,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				case "markdown":
 					return reporting.ConformMarkdown(result, cov, negResult), nil
 				}
-				text := reporting.ConformText(result, cov)
+				text := reporting.ConformTextExplained(result, cov, explain)
 				if negResult != nil {
 					text += reporting.NegativeText(negResult)
 				}
@@ -566,24 +552,16 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				printCumulativeCoverage(cmd, specHash)
 			}
 
-			_, failed, _ := result.Counts()
-			negFailed := 0
-			if negResult != nil {
-				_, negFailed, _, _ = negResult.Counts()
-			}
-			runFailed := failed > 0 || negFailed > 0
-			current := conformance.Violations(result, negResult)
+			runFailed := out.Failed
 			if writeBaseline != "" {
-				if err := conformance.WriteBaselineFile(writeBaseline, conformance.NewBaseline(current)); err != nil {
+				if err := conformance.WriteBaselineFile(writeBaseline, conformance.NewBaseline(out.Violations)); err != nil {
 					return fmt.Errorf("writing baseline: %w", err)
 				}
-				fmt.Fprintf(cmd.ErrOrStderr(), "Baseline written: %d violation%s recorded in %s\n", len(current), plural(len(current)), writeBaseline)
+				fmt.Fprintf(cmd.ErrOrStderr(), "Baseline written: %d violation%s recorded in %s\n", len(out.Violations), plural(len(out.Violations)), writeBaseline)
 				runFailed = false // recording the current state accepts it
 			}
-			if base != nil {
-				diff := conformance.Compare(current, base)
-				fmt.Fprint(cmd.ErrOrStderr(), diff.Text())
-				runFailed = len(diff.New) > 0
+			if out.Diff != nil {
+				fmt.Fprint(cmd.ErrOrStderr(), out.Diff.Text())
 			}
 			tel := newTelemetryClient()
 			telResult := "pass"
@@ -612,8 +590,10 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
-	cmd.Flags().IntVar(&requestTimeout, "request-timeout", 10000, "Per-request timeout in milliseconds")
+	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
+	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
+	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")
 	cmd.Flags().StringVar(&writeBaseline, "write-baseline", "", "Record the current violations in this file (YAML or JSON by extension) and exit 0")
@@ -754,6 +734,11 @@ func coverageListCmd() *cobra.Command {
 					FailedRuns int      `json:"failedRuns"`
 					LastRunAt  string   `json:"lastRunAt,omitempty"`
 					Exercised  []string `json:"exercised"`
+					// the four totals of the Contracts page: Covered + NotCovered = Total, Passing + Failing = Covered
+					NotCovered int `json:"notCovered"`
+					Passing    int `json:"passing"`
+					Failing    int `json:"failing"`
+					NoResult   int `json:"noResult"`
 				}
 				out := make([]jsonEntry, len(reports))
 				for i, r := range reports {
@@ -771,20 +756,22 @@ func coverageListCmd() *cobra.Command {
 						FailedRuns: r.FailedRuns,
 						LastRunAt:  lastRun,
 						Exercised:  r.Exercised,
+						NotCovered: r.Outcomes().NotCovered,
+						Passing:    r.Outcomes().Passing,
+						Failing:    r.Outcomes().Failing,
+						NoResult:   r.Outcomes().NoResult,
 					}
 				}
 				b, _ := json.MarshalIndent(out, "", "  ")
 				fmt.Fprintln(cmd.OutOrStdout(), string(b))
 			default:
 				for _, r := range reports {
-					pct := r.Percent
-					bar := coverageBar(pct, 20)
 					lastRun := ""
 					if !r.LastRunAt.IsZero() {
 						lastRun = "  last run " + r.LastRunAt.Format("2006-01-02 15:04")
 					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n  %s  %d/%d (%.1f%%)  %d run(s) · %d passed · %d failed%s\n\n",
-						r.SpecFile, bar, r.Covered, r.Total, pct,
+					fmt.Fprintf(cmd.OutOrStdout(), "%s\n  %s\n  scenario runs: %d run(s) · %d passed · %d failed%s\n\n",
+						r.SpecFile, reporting.OutcomesLine(r.Outcomes()),
 						r.TotalRuns, r.PassedRuns, r.FailedRuns, lastRun)
 				}
 			}
@@ -876,16 +863,26 @@ Exit codes:
 					Operation string `json:"operation"`
 					Missing   []int  `json:"missing"`
 				}
+				type jsonTotals struct {
+					Total      int `json:"total"`
+					Covered    int `json:"covered"`
+					NotCovered int `json:"notCovered"`
+					Passing    int `json:"passing"`
+					Failing    int `json:"failing"`
+					NoResult   int `json:"noResult"`
+				}
+				o := report.Outcomes()
 				type jsonOut struct {
-					SpecTitle            string    `json:"specTitle"`
-					SpecVersion          string    `json:"specVersion"`
-					Workspace            string    `json:"workspace"`
-					TotalRuns            int       `json:"totalRuns"`
-					HasGaps              bool      `json:"hasGaps"`
-					NeverExercised       []string  `json:"neverExercised"`
-					HappyPathOnly        []string  `json:"happyPathOnly"`
-					SecuredNeverAuthed   []string  `json:"securedNeverAuthed"`
-					ErrorsNeverTriggered []jsonGap `json:"errorsNeverTriggered"`
+					SpecTitle            string     `json:"specTitle"`
+					SpecVersion          string     `json:"specVersion"`
+					Workspace            string     `json:"workspace"`
+					TotalRuns            int        `json:"totalRuns"`
+					Totals               jsonTotals `json:"totals"`
+					HasGaps              bool       `json:"hasGaps"`
+					NeverExercised       []string   `json:"neverExercised"`
+					HappyPathOnly        []string   `json:"happyPathOnly"`
+					SecuredNeverAuthed   []string   `json:"securedNeverAuthed"`
+					ErrorsNeverTriggered []jsonGap  `json:"errorsNeverTriggered"`
 				}
 				var gaps []jsonGap
 				for _, g := range q.ErrorsNeverTriggered {
@@ -896,6 +893,7 @@ Exit codes:
 					SpecVersion:          version,
 					Workspace:            workspacePath,
 					TotalRuns:            report.TotalRuns,
+					Totals:               jsonTotals{o.Total, o.Covered, o.NotCovered, o.Passing, o.Failing, o.NoResult},
 					HasGaps:              hasGaps,
 					NeverExercised:       q.NeverExercised,
 					HappyPathOnly:        q.HappyPathOnly,
@@ -907,8 +905,8 @@ Exit codes:
 
 			default:
 				fmt.Fprintf(cmd.OutOrStdout(), "Coverage quality — %s  %s\n", title, version)
-				fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s  (%d run(s)  ·  %d/%d operations exercised)\n\n",
-					workspacePath, report.TotalRuns, report.Covered, report.Total)
+				fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s  (%d run(s))\n%s\n\n",
+					workspacePath, report.TotalRuns, reporting.OutcomesLine(report.Outcomes()))
 
 				if !hasGaps {
 					fmt.Fprintln(cmd.OutOrStdout(), "No gaps found — all operations exercised with error paths triggered and auth tested.")
@@ -1002,23 +1000,6 @@ func coverageResetCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
 	return cmd
-}
-
-// coverageBar renders a simple ASCII progress bar of the given width.
-func coverageBar(pct float64, width int) string {
-	filled := int(pct / 100 * float64(width))
-	if filled > width {
-		filled = width
-	}
-	bar := make([]byte, width)
-	for i := range bar {
-		if i < filled {
-			bar[i] = '='
-		} else {
-			bar[i] = '.'
-		}
-	}
-	return "[" + string(bar) + "]"
 }
 
 // --- Telemetry helpers ---

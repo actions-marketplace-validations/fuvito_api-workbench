@@ -43,9 +43,11 @@ func main() {
 			app.bundleService,
 			app.settingsService,
 			app.demoService,
+			app.conformanceServer,
 			app.scenarioService,
 			app.helpService,
 			app.cliBuilder,
+			app.conformance,
 		},
 	})
 	if err != nil {

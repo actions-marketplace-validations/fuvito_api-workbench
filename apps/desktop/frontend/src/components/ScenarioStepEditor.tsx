@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { METHOD_COLOR, HTTP_METHODS, HTTP_REQUEST_HEADERS, BODY_TYPES } from '@/lib/httpUtils'
 import type { HttpMethod } from '@/lib/httpUtils'
 import { varsIn } from '@/lib/stepVars'
+import { formatJsonWithPlaceholders } from '@/lib/jsonFormat'
 import type { StepVarInfo } from '@/lib/stepVars'
 import { HighlightedInput } from '@/components/HighlightedInput'
 import { VarValueInput } from '@/components/KeyValueEditor'
@@ -225,6 +226,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
     (step.timeoutMs && step.timeoutMs > 0) ||
     (step.retryMaxAttempts && step.retryMaxAttempts > 0))
   const [showAdvanced, setShowAdvanced] = useState(!!hasNonDefaultOptions)
+  const [bodyFormatError, setBodyFormatError] = useState(false)
 
   function updateHeader(i: number, u: { name?: string; value?: string }) {
     onChange({ headers: (step.headers ?? []).map((h, hi) => hi === i ? { ...h, ...u } : h) })
@@ -377,9 +379,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
               title="Format JSON"
               disabled={step.bodyType !== 'json'}
               onClick={() => {
-                try {
-                  onChange({ bodyContent: JSON.stringify(JSON.parse(step.bodyContent ?? ''), null, 2) })
-                } catch { /* invalid JSON — leave as-is */ }
+                const formatted = formatJsonWithPlaceholders(step.bodyContent ?? '')
+                setBodyFormatError(formatted === null)
+                if (formatted !== null) onChange({ bodyContent: formatted })
               }}
               className={cn('shrink-0 text-xs px-1.5 py-0.5 rounded border border-[var(--color-border)] transition-colors',
                 step.bodyType === 'json'
@@ -389,6 +391,9 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             >
               Format
             </button>
+          )}
+          {bodyFormatError && step.bodyType === 'json' && (
+            <span role="alert" className="text-xs text-red-400">Not valid JSON, so it was left as it is.</span>
           )}
         </div>
         {(step.bodyType === 'json' || step.bodyType === 'raw' || step.bodyType === 'form-urlencoded') && (

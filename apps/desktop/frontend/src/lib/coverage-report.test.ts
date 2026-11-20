@@ -50,6 +50,12 @@ describe('operationOutcomes', () => {
       .toEqual({ total: 2, covered: 2, passing: 0, failing: 0, noResult: 2, notCovered: 0 })
   })
 
+  it("uses the report's own covered count, like the Go exports, when it is given", () => {
+    // a stored operation that is no longer in the spec must not inflate the tiles
+    expect(operationOutcomes({ total: 2, covered: 1, exercised: ['GET /a', 'POST /gone'], operationResults: { 'GET /a': { lastPassed: true } } }))
+      .toEqual({ total: 2, covered: 1, passing: 1, failing: 0, noResult: 0, notCovered: 1 })
+  })
+
   it('derives never-tested from the total when the missed list is absent', () => {
     expect(operationOutcomes({ total: 5, exercised: ['GET /a'] }).notCovered).toBe(4)
   })

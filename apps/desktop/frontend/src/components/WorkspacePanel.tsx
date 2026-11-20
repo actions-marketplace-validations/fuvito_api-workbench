@@ -54,6 +54,7 @@ type WorkspacePanelProps = {
   onRunFolder?: (folderPath: string) => void
   folderRunState?: FolderRunState | null
   onDismissFolderRun?: () => void
+  onCancelFolderRun?: () => void
   clipboard?: FileClipboard | null
   onCopyFile?: (path: string) => void
   onCutFile?: (path: string) => void
@@ -88,6 +89,7 @@ export function WorkspacePanel({
   onRunFolder,
   folderRunState,
   onDismissFolderRun,
+  onCancelFolderRun,
   clipboard,
   onCopyFile,
   onCutFile,
@@ -209,7 +211,7 @@ export function WorkspacePanel({
               ))
             )}
             {folderRunState && (
-              <FolderRunResults state={folderRunState} onSelectFile={onSelectFile} onDismiss={onDismissFolderRun} />
+              <FolderRunResults state={folderRunState} onSelectFile={onSelectFile} onDismiss={onDismissFolderRun} onCancel={onCancelFolderRun} />
             )}
           </div>
         </>

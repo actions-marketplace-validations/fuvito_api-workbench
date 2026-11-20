@@ -7,18 +7,20 @@ import (
 )
 
 type App struct {
-	ctx              context.Context
-	workspaceService *WorkspaceService
-	requestService   *RequestService
-	openapiService   *OpenAPIService
-	importService    *ImportService
-	bundleService    *BundleService
-	settingsService  *SettingsService
-	demoService      *DemoService
-	scenarioService  *ScenarioService
-	helpService      *HelpService
-	cliBuilder       *CliBuilderService
-	hasDirtyTabs     bool
+	ctx               context.Context
+	workspaceService  *WorkspaceService
+	requestService    *RequestService
+	openapiService    *OpenAPIService
+	importService     *ImportService
+	bundleService     *BundleService
+	settingsService   *SettingsService
+	demoService       *DemoService
+	conformanceServer *ConformanceServerService
+	scenarioService   *ScenarioService
+	helpService       *HelpService
+	cliBuilder        *CliBuilderService
+	conformance       *ConformanceService
+	hasDirtyTabs      bool
 }
 
 func NewApp() *App {
@@ -26,17 +28,23 @@ func NewApp() *App {
 	ss := NewSettingsService()
 	rs := NewRequestService(ws, ss)
 	ss.onSave = rs.RebuildExecutor // rebuild HTTP client whenever settings are saved
+	demo := NewDemoService(ws)
+	demo.portFn = func() int { return ss.GetSettings().DemoServerPort }
+	conf := NewConformanceServerService(ws)
+	conf.portFn = func() int { return ss.GetSettings().ConformanceServerPort }
 	return &App{
-		workspaceService: ws,
-		requestService:   rs,
-		openapiService:   NewOpenAPIService(ws),
-		importService:    NewImportService(ws),
-		bundleService:    NewBundleService(ws),
-		settingsService:  ss,
-		demoService:      NewDemoService(ws),
-		scenarioService:  NewScenarioService(ws, ss),
-		helpService:      NewHelpService(),
-		cliBuilder:       NewCliBuilderService(ws),
+		workspaceService:  ws,
+		requestService:    rs,
+		openapiService:    NewOpenAPIService(ws),
+		importService:     NewImportService(ws),
+		bundleService:     NewBundleService(ws),
+		settingsService:   ss,
+		demoService:       demo,
+		conformanceServer: conf,
+		scenarioService:   NewScenarioService(ws, ss),
+		helpService:       NewHelpService(),
+		cliBuilder:        NewCliBuilderService(ws),
+		conformance:       NewConformanceService(ws, ss),
 	}
 }
 
@@ -51,6 +59,7 @@ func (a *App) startup(ctx context.Context) {
 	a.demoService.setContext(ctx)
 	a.scenarioService.setContext(ctx)
 	a.cliBuilder.setContext(ctx)
+	a.conformance.setContext(ctx)
 	// Set title now that Wails context is live (workspace may already be set from config).
 	a.workspaceService.syncTitle()
 }
@@ -58,6 +67,7 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) shutdown(_ context.Context) {
 	a.requestService.close()
 	a.demoService.StopDemo()
+	a.conformanceServer.Stop()
 }
 
 // SetHasDirtyTabs is called by the frontend whenever the overall dirty state changes.

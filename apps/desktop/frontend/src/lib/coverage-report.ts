@@ -20,6 +20,7 @@ export type OperationOutcomes = {
 
 type OutcomeSource = {
   total: number
+  covered?: number
   exercised?: string[]
   missed?: string[]
   operationResults?: Record<string, { lastPassed: boolean }>
@@ -29,15 +30,18 @@ type OutcomeSource = {
 // passing + failing + noResult = covered, and covered + notCovered = total.
 export function operationOutcomes(e: OutcomeSource): OperationOutcomes {
   const exercised = e.exercised ?? []
-  let passing = 0, failing = 0, noResult = 0
+  let passing = 0, failing = 0
   for (const op of exercised) {
     const r = e.operationResults?.[op]
-    if (!r) noResult++
-    else if (r.lastPassed) passing++
-    else failing++
+    if (r) { if (r.lastPassed) passing++; else failing++ }
   }
-  const covered = exercised.length
-  return { total: e.total, covered, passing, failing, noResult, notCovered: e.missed?.length ?? Math.max(e.total - covered, 0) }
+  // the report's own count when it has one, as the Go core does for every export
+  const covered = e.covered ?? exercised.length
+  return {
+    total: e.total, covered, passing, failing,
+    noResult: Math.max(covered - passing - failing, 0),
+    notCovered: Math.max(e.total - covered, 0),
+  }
 }
 
 export function share(count: number, total: number): number {

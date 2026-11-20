@@ -34,19 +34,24 @@ func contractsFixture() (coverage.Report, *coverage.QualityReport) {
 func TestContractsCSV(t *testing.T) {
 	r, q := contractsFixture()
 	lines := strings.Split(strings.TrimSpace(string(reporting.ContractsCSV(r, q))), "\n")
-	if lines[0] != "Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes" || len(lines) != 5 {
+	if lines[0] != "Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes,Status" || len(lines) != 5 {
 		t.Fatalf("header/rows: %q", lines)
 	}
 	want := []string{
-		"GET,/health,Not Covered,,,Never exercised,",
-		"GET,/users,Covered,Pass,2026-11-17T11:56:00Z,Happy-path only,",
-		"POST,/users,Covered,Fail,2026-11-17T09:00:00Z,No auth tested; Errors never triggered,400 409",
-		"DELETE,/users/{id},Not Covered,,,Never exercised,",
+		"GET,/health,Not Covered,,,Never exercised,,Not covered",
+		"GET,/users,Covered,Pass,2026-11-17T11:56:00Z,Happy-path only,,Passing",
+		"POST,/users,Covered,Fail,2026-11-17T09:00:00Z,No auth tested; Errors never triggered,400 409,Failing",
+		"DELETE,/users/{id},Not Covered,,,Never exercised,,Not covered",
 	}
 	for i, w := range want {
 		if lines[i+1] != w {
 			t.Errorf("row %d\n got %s\nwant %s", i+1, lines[i+1], w)
 		}
+	}
+	r.Exercised = []string{"GET /users", "POST /users"}
+	r.Exercised, r.OperationResults = r.Exercised[:1], map[string]coverage.OperationResult{}
+	if got := string(reporting.ContractsCSV(r, nil)); !strings.Contains(got, "GET,/users,Covered,,,,,Covered (no result)") {
+		t.Errorf("a covered operation without a result is labelled as such: %s", got)
 	}
 	r.Missed = []string{`GET /say,"hi"`}
 	r.Exercised = nil
@@ -59,7 +64,9 @@ func TestContractsMarkdown(t *testing.T) {
 	r, q := contractsFixture()
 	md := string(reporting.ContractsMarkdown(r.SpecFile, r, q, contractsNow))
 	for _, want := range []string{
-		"# Contracts Report — users-api.yaml", "**2 / 4 operations covered (50%)**",
+		"# Contracts Report — users-api.yaml",
+		"| Covered | Not covered | Passing | Failing |", "| 2 (50%) | 2 (50%) | 1 (25%) | 1 (25%) |",
+		"Covered + Not covered = 4 operations; Passing + Failing = Covered.", "## Scenario runs",
 		"| Total runs | 3 |", "| Failed runs | 1 |",
 		"| `GET` | `/users` | ✅ Covered | Pass | 4m ago |",
 		"| `POST` | `/users` | ✅ Covered | Fail | 3h ago |",
@@ -71,6 +78,15 @@ func TestContractsMarkdown(t *testing.T) {
 		if !strings.Contains(md, want) {
 			t.Errorf("missing %q in:\n%s", want, md)
 		}
+	}
+
+	if strings.Contains(md, "operations covered (") || strings.Contains(md, "no recorded result") {
+		t.Errorf("the old headline is gone and a fully recorded spec has no missing-result note:\n%s", md)
+	}
+	noResults := r
+	noResults.OperationResults = nil
+	if got := string(reporting.ContractsMarkdown(r.SpecFile, noResults, nil, contractsNow)); !strings.Contains(got, "_2 covered operation(s) have no recorded result yet._") {
+		t.Errorf("missing-result note:\n%s", got)
 	}
 
 	clear := string(reporting.ContractsMarkdown(r.SpecFile, r, &coverage.QualityReport{}, contractsNow))
@@ -91,7 +107,10 @@ func TestContractsHTML(t *testing.T) {
 	}
 	s := string(b)
 	for _, want := range []string{
-		"<!DOCTYPE html>", "Contracts Report — users-api.yaml", ">50%<", "2 / 4 operations covered",
+		"<!DOCTYPE html>", "Contracts Report — users-api.yaml",
+		`<div class="l">Covered</div><div class="n" style="color:#111827">2<small>50%</small></div>`,
+		`<div class="l">Not covered</div>`, `<div class="l">Passing</div>`, `<div class="l">Failing</div><div class="n" style="color:#dc2626">1<small>25%</small></div>`,
+		"Scenario runs",
 		"3</strong> runs", "1</strong> failed", "✓ Covered", "✓ Pass", "✗ Fail",
 		"Happy-path only (1)", "Error responses never triggered (1)", `<span class="code">400</span>`, "Secured — never tested with auth (1)",
 	} {
@@ -102,18 +121,36 @@ func TestContractsHTML(t *testing.T) {
 	if strings.Contains(s, "<script>alert") || !strings.Contains(s, "&lt;script&gt;") {
 		t.Errorf("paths from a spec must be escaped:\n%s", s)
 	}
-	if !strings.Contains(s, "color:#f59e0b") {
-		t.Error("50% coverage uses the amber bar colour")
+	if strings.Contains(s, "operations covered") || strings.Contains(s, "border-radius:999px") {
+		t.Error("the single coverage percentage and its full-width bar are gone")
 	}
 
-	r.Percent, r.Covered = 90, 4
-	high, _ := reporting.ContractsHTML(r.SpecFile, r, &coverage.QualityReport{}, contractsNow)
-	if !strings.Contains(string(high), "color:#10b981") || !strings.Contains(string(high), "All quality signals clear.") {
-		t.Error("90% is green and an empty quality report says all clear")
+	// a fully covered spec still shows its failing operation, and zero tiles are muted
+	full := coverage.Report{Total: 1, Covered: 1, Percent: 100, Exercised: []string{"GET /a"},
+		OperationResults: map[string]coverage.OperationResult{"GET /a": {LastPassed: false}}}
+	fb, _ := reporting.ContractsHTML(r.SpecFile, full, &coverage.QualityReport{}, contractsNow)
+	fs := string(fb)
+	if !strings.Contains(fs, `<div class="l">Failing</div><div class="n" style="color:#dc2626">1<small>100%</small></div>`) ||
+		!strings.Contains(fs, `<div class="l">Not covered</div><div class="n" style="color:#9ca3af">0<small>0%</small></div>`) ||
+		!strings.Contains(fs, "All quality signals clear.") {
+		t.Errorf("100%% coverage with a failure:\n%s", fs)
 	}
-	low, _ := reporting.ContractsHTML(r.SpecFile, coverage.Report{Percent: 10}, nil, contractsNow)
-	if !strings.Contains(string(low), "color:#ef4444") || strings.Contains(string(low), "Quality Gaps") {
-		t.Error("10% is red and no quality data means no quality section")
+	empty, _ := reporting.ContractsHTML(r.SpecFile, coverage.Report{}, nil, contractsNow)
+	if strings.Contains(string(empty), "Quality Gaps") || !strings.Contains(string(empty), `<div class="l">Covered</div><div class="n" style="color:#111827">0<small>0%</small></div>`) {
+		t.Error("an empty report has zero tiles and no quality section")
+	}
+}
+
+func TestOutcomesLine(t *testing.T) {
+	r, _ := contractsFixture()
+	if got := reporting.OutcomesLine(r.Outcomes()); got != "Covered 2 (50%) · Not covered 2 (50%) · Passing 1 (25%) · Failing 1 (25%) · of 4 operations" {
+		t.Errorf("line: %s", got)
+	}
+	if got := reporting.OutcomesLine(coverage.Report{Total: 3, Covered: 2, Exercised: []string{"a", "b"}}.Outcomes()); !strings.Contains(got, "Failing 0 (0%) · No result 2 (67%) · of 3 operations") {
+		t.Errorf("covered operations without a result are listed so the parts add up: %s", got)
+	}
+	if got := reporting.OutcomesLine(coverage.Outcomes{}); got != "Covered 0 (0%) · Not covered 0 (0%) · Passing 0 (0%) · Failing 0 (0%) · of 0 operations" {
+		t.Errorf("empty: %s", got)
 	}
 }
 
@@ -121,20 +158,20 @@ func TestContractsList(t *testing.T) {
 	r, _ := contractsFixture()
 	other := coverage.Report{SpecFile: "specs/b,c.yaml", Covered: 1, Total: 1, Percent: 100, TotalRuns: 1, PassedRuns: 1}
 	csv := string(reporting.ContractsListCSV([]coverage.Report{r, other}))
-	if !strings.HasPrefix(csv, "Spec,Covered,Total,Percent,Runs,Passed,Failed,Last Run\n") ||
-		!strings.Contains(csv, "specs/users-api.yaml,2,4,50,3,2,1,2026-11-17T11:56:00Z") ||
-		!strings.Contains(csv, `"specs/b,c.yaml",1,1,100,1,1,0,`) {
+	if !strings.HasPrefix(csv, "Spec,Covered,Total,Percent,Runs,Passed,Failed,Last Run,Not Covered,Passing,Failing\n") ||
+		!strings.Contains(csv, "specs/users-api.yaml,2,4,50,3,2,1,2026-11-17T11:56:00Z,2,1,1") ||
+		!strings.Contains(csv, `"specs/b,c.yaml",1,1,100,1,1,0,,0,0,0`) {
 		t.Errorf("csv:\n%s", csv)
 	}
 	md := string(reporting.ContractsListMarkdown([]coverage.Report{r}, contractsNow))
-	if !strings.Contains(md, "| `specs/users-api.yaml` | 2 / 4 | 50% | 3 | 2 | 1 | 4m ago |") {
+	if !strings.Contains(md, "| `specs/users-api.yaml` | 2 (50%) | 2 (50%) | 1 (25%) | 1 (25%) | 3 · 2 passed · 1 failed | 4m ago |") {
 		t.Errorf("markdown:\n%s", md)
 	}
 	if !strings.Contains(string(reporting.ContractsListMarkdown(nil, contractsNow)), "No coverage has been recorded yet") {
 		t.Error("empty list message")
 	}
 	html, err := reporting.ContractsListHTML([]coverage.Report{r}, contractsNow)
-	if err != nil || !strings.Contains(string(html), "specs/users-api.yaml") || !strings.Contains(string(html), "2 / 4") {
+	if err != nil || !strings.Contains(string(html), "specs/users-api.yaml") || !strings.Contains(string(html), "<th>Not covered</th>") || !strings.Contains(string(html), `style="color:#dc2626;font-weight:600">1 <small>25%</small>`) {
 		t.Errorf("html: %v", err)
 	}
 	empty, _ := reporting.ContractsListHTML(nil, contractsNow)

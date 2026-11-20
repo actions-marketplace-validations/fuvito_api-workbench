@@ -1,6 +1,7 @@
 package variables
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"sort"
@@ -35,6 +36,11 @@ func ExpandEnv(s string) string {
 type EnvRef struct {
 	Name string // the process environment variable, for example API_TOKEN
 	Var  string // the environment-file variable that refers to it, for example token
+}
+
+// Message is the sentence the CLI and the desktop show for an unset reference.
+func (r EnvRef) Message() string {
+	return fmt.Sprintf("environment variable %s is not set (the environment variable %q refers to it as ${%s})", r.Name, r.Var, r.Name)
 }
 
 // MissingEnv lists the ${NAME} references in env whose process environment variable is not set.
@@ -99,4 +105,35 @@ func ResolveEnvironment(env *domain.Environment, eng *Engine) (*domain.Environme
 		out.Variables[i] = domain.EnvironmentVariable{Name: v.Name, Value: val, Secret: v.Secret}
 	}
 	return &out, r.TakeErrors()
+}
+
+// WithOverrides returns a copy of env with each name=value in vars overriding or adding a
+// variable; env itself is not modified and may be nil. An override keeps the variable's secret
+// flag, so a secret stays redacted. A malformed entry is an error naming it.
+func WithOverrides(env *domain.Environment, vars []string) (*domain.Environment, error) {
+	out := &domain.Environment{SchemaVersion: domain.CurrentSchemaVersion, Name: "command line"}
+	if env != nil {
+		copied := *env
+		copied.Variables = append([]domain.EnvironmentVariable(nil), env.Variables...)
+		out = &copied
+	}
+	for _, raw := range vars {
+		name, value, ok := strings.Cut(raw, "=")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" {
+			return nil, fmt.Errorf("%q must look like name=value", raw)
+		}
+		replaced := false
+		for i := range out.Variables {
+			if out.Variables[i].Name == name {
+				out.Variables[i].Value = value
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			out.Variables = append(out.Variables, domain.EnvironmentVariable{Name: name, Value: value})
+		}
+	}
+	return out, nil
 }

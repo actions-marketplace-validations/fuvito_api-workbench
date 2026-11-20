@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { StatusBar, shortenPath } from './StatusBar'
+import { StatusBar } from './StatusBar'
+import { shortenPath } from '@/lib/utils'
 
 const envs = [{ name: 'local', path: '/e/local.yaml' }, { name: 'prod', path: '/e/prod.yaml' }]
 
@@ -13,6 +14,19 @@ function renderBar(over: Partial<React.ComponentProps<typeof StatusBar>> = {}) {
 describe('StatusBar', () => {
   beforeEach(() => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } })
+  })
+
+  it('shows a stoppable conformance server chip only while it runs', () => {
+    const onStopConformance = vi.fn()
+    renderBar({ conformancePort: 8120, onStopConformance })
+    expect(screen.getByText('Conformance :8120')).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Stop conformance server'))
+    expect(onStopConformance).toHaveBeenCalled()
+  })
+
+  it('shows no conformance chip by default', () => {
+    renderBar()
+    expect(screen.queryByText(/Conformance :/)).not.toBeInTheDocument()
   })
 
   it('shows only the footer shell without a workspace', () => {

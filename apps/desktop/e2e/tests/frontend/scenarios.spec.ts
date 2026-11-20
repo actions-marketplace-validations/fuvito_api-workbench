@@ -1165,6 +1165,39 @@ test.describe('Scenario visual editor — assertions', () => {
     await expect(value).toHaveValue('{{$randomInt 1 100}}')
   })
 
+  test('run result shows the spec conformance summary and the violations', async ({ page }) => {
+    const detail = { ...SCENARIO_DETAIL, specFile: 'specs/openapi.yaml' }
+    const result = {
+      ...SCENARIO_RESULT,
+      passed: false,
+      steps: [
+        { ...SCENARIO_RESULT.steps[0], specState: 'matched' },
+        { ...SCENARIO_RESULT.steps[1], passed: false, specState: 'violations', specViolations: ['Error at "/name": value must be a string'] },
+      ],
+    }
+    await withScenarios(page, { detail, result })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await page.getByRole('button', { name: /^Run$/ }).click()
+    await page.getByRole('button', { name: 'Setup' }).click()
+    await page.getByRole('tab', { name: 'result' }).click()
+
+    const section = page.getByRole('region', { name: 'Spec conformance' })
+    await expect(section.getByTestId('spec-conformance-summary')).toHaveText('1 of 2 match openapi.yaml, 1 step has violations')
+    await expect(section).toContainText('Fetch user')
+    await expect(section).toContainText('Error at "/name": value must be a string')
+  })
+
+  test('a scenario without a spec shows no conformance section', async ({ page }) => {
+    await withScenarios(page, { detail: SCENARIO_DETAIL, result: SCENARIO_RESULT })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await page.getByRole('button', { name: /^Run$/ }).click()
+    await page.getByRole('button', { name: 'Setup' }).click()
+    await page.getByRole('tab', { name: 'result' }).click()
+    await expect(page.getByRole('region', { name: 'Spec conformance' })).toHaveCount(0)
+  })
+
   test('run result shows the seed and generated variables', async ({ page }) => {
     const result = { ...SCENARIO_RESULT, seed: 4242, variables: [{ name: 'email', value: 'u-abc@example.com' }] }
     await withScenarios(page, { detail: SCENARIO_DETAIL, result })

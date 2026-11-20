@@ -566,16 +566,16 @@ func TestSW2JSON_RefBodyStub(t *testing.T) {
 			if r.Request.Body == nil || r.Request.Body.Type != domain.BodyJSON {
 				t.Fatalf("expected JSON body, got %v", r.Request.Body)
 			}
-			for _, field := range []string{`"title"`, `"isbn"`, `"author"`, `"id"`} {
+			// Only the required fields (title, isbn) are generated; author and id are optional.
+			for _, field := range []string{`"title"`, `"isbn"`} {
 				if !strings.Contains(r.Request.Body.Content, field) {
-					t.Errorf("body stub missing field %s:\n%s", field, r.Request.Body.Content)
+					t.Errorf("body stub missing required field %s:\n%s", field, r.Request.Body.Content)
 				}
 			}
-			// Verify required fields come first (title, isbn before author, id)
-			titleIdx := strings.Index(r.Request.Body.Content, `"title"`)
-			authorIdx := strings.Index(r.Request.Body.Content, `"author"`)
-			if titleIdx > authorIdx {
-				t.Error("required fields should appear before optional fields")
+			for _, field := range []string{`"author"`, `"id"`} {
+				if strings.Contains(r.Request.Body.Content, field) {
+					t.Errorf("body stub must not include optional field %s:\n%s", field, r.Request.Body.Content)
+				}
 			}
 			return
 		}
@@ -858,9 +858,12 @@ func TestOAS30_JSONBodyStub(t *testing.T) {
 			if r.Request.Body == nil || r.Request.Body.Type != domain.BodyJSON {
 				t.Fatalf("expected JSON body, got %v", r.Request.Body)
 			}
-			for _, field := range []string{`"name"`, `"color"`, `"id"`} {
-				if !strings.Contains(r.Request.Body.Content, field) {
-					t.Errorf("body stub missing field %s", field)
+			if !strings.Contains(r.Request.Body.Content, `"name"`) {
+				t.Errorf("body stub missing the required field name: %s", r.Request.Body.Content)
+			}
+			for _, field := range []string{`"color"`, `"id"`} {
+				if strings.Contains(r.Request.Body.Content, field) {
+					t.Errorf("body stub must not include the optional field %s: %s", field, r.Request.Body.Content)
 				}
 			}
 			return

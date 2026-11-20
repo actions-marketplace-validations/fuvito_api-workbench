@@ -205,11 +205,14 @@ export function CliBuilderTab({ preset }: Props) {
     return () => { cancelled = true }
   }, [])
 
-  useEffect(() => {
-    if (!preset) return
-    setCommand(preset.command)
-    setValues(preset.values ?? {})
-  }, [preset])
+  const [appliedPreset, setAppliedPreset] = useState<typeof preset>(null)
+  if (preset !== appliedPreset) {
+    setAppliedPreset(preset)
+    if (preset) {
+      setCommand(preset.command)
+      setValues(preset.values ?? {})
+    }
+  }
 
   useEffect(() => {
     if (!command) return

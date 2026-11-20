@@ -10,3 +10,5 @@ export function GetExampleScenario():Promise<string>;
 export function GetFormatSpec():Promise<string>;
 
 export function GetUserGuide():Promise<string>;
+
+export function GetWhatWeCheck():Promise<string>;

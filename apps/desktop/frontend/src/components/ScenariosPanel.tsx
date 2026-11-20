@@ -34,6 +34,8 @@ type ScenariosPanelProps = {
   onCutScenario?: (path: string) => void
   onPasteToScenarioFolder?: (relFolderPath: string) => void
   runLogTrigger?: number
+  activeScenarioPath?: string | null
+  dirtyScenarioPaths?: Set<string>
 }
 
 export function ScenariosPanel({
@@ -43,7 +45,7 @@ export function ScenariosPanel({
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewFolder, onDeleteScenarioFolder, onRenameScenarioFolder, onRunFolder,
   onRefresh, onMoveScenario, clipboard, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
-  runLogTrigger,
+  runLogTrigger, activeScenarioPath, dirtyScenarioPaths,
 }: ScenariosPanelProps) {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'log'>('scenarios')
   const [renamingScenarioPath, setRenamingScenarioPath] = useState<string | null>(null)
@@ -142,6 +144,8 @@ export function ScenariosPanel({
           onDeleteFolder={onDeleteScenarioFolder}
           onRenameFolder={onRenameScenarioFolder}
           onRunFolder={onRunFolder}
+          activeScenarioPath={activeScenarioPath}
+          dirtyScenarioPaths={dirtyScenarioPaths}
           onOpenTemplateGallery={openTemplateGallery}
           onRefresh={onRefresh}
           onMoveScenario={onMoveScenario}

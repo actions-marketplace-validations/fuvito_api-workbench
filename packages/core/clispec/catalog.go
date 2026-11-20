@@ -195,6 +195,20 @@ var catalog = []Command{
 				Group: GroupAdvanced,
 			},
 			{
+				Name: "explain", Kind: KindBool, Default: "false",
+				Label: "Explain failures",
+				Help: "Under each failing operation, say in plain language what the spec expected, what the server sent, why that fails and what to change. " +
+					"The JSON, HTML, Markdown and JUnit reports always include these explanations; the screen output only with this option, so existing logs do not change.",
+				Group: GroupAdvanced,
+			},
+			{
+				Name: "read-only", Kind: KindBool, Default: "false",
+				Label: "Read requests only",
+				Help: "Send only GET and HEAD requests. POST, PUT, PATCH and DELETE operations are skipped and never sent, " +
+					"so the check cannot create, change or delete data. Use it against a shared or production-like server.",
+				Group: GroupEssential,
+			},
+			{
 				Name: "baseline", Kind: KindString,
 				Label:   "Accept recorded violations",
 				Help:    "Violations already listed in this baseline file are accepted; only new ones fail the run, and fixed ones are reported.",

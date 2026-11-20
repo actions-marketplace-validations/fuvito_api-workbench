@@ -88,7 +88,7 @@ Read-only review of the desktop app (frontend + Wails backend), shared core usag
 
 ## Docs findings
 
-- **`docs/Project.md` is badly formatted** — it reads like a raw chat export: numbered lists restart at 1, the decision table is flattened into unlabeled lines ("Area Decision / Language Go"), and ASCII art is garbled. Either reformat as proper markdown or mark it as a historical transcript; as the first doc a contributor sees, it undercuts polish.
+- **`docs/product/Project.md` is badly formatted** — it reads like a raw chat export: numbered lists restart at 1, the decision table is flattened into unlabeled lines ("Area Decision / Language Go"), and ASCII art is garbled. Either reformat as proper markdown or mark it as a historical transcript; as the first doc a contributor sees, it undercuts polish.
 
 - **`docs/user-guide.md` is stale against the rail UI.** It references "Open Existing in the sidebar", "save icon in the toolbar", "gear icon in the toolbar", "pencil icon in the top bar", and the `?` icon "in the toolbar" — all moved to the Activity Rail / Status Bar / menu bar. The shortcuts table is missing Ctrl+W, Ctrl+Tab, Ctrl+B, Ctrl+Shift+S, Ctrl+1–9, and Ctrl+F (response search).
 
@@ -106,4 +106,4 @@ Read-only review of the desktop app (frontend + Wails backend), shared core usag
 6. **Cancelable scenario runs** — add a cancel token to `RunScenario`/`RunFolder` and a stop button for run-all; add timeout to `loadSpecBytes`.
 7. **Scenario-editor correctness** — scope the Alt+Arrow handler to the active tab (or move it to the step list's own `onKeyDown`), and warn/offer save when running with unsaved edits.
 8. **Upgrade Quick Open → command palette** (requests + scenarios + actions).
-9. **Refresh `docs/user-guide.md` and fix `docs/Project.md` formatting** to match the current UI.
+9. **Refresh `docs/user-guide.md` and fix `docs/product/Project.md` formatting** to match the current UI.

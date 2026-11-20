@@ -1,9 +1,20 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { createLogger } from 'vite'
 import { defineConfig } from 'vitest/config'
+
+// Keeps the "Local: http://…" line (`wails dev` reads the server URL from it) but drops the
+// one-line-per-saved-file hot-reload chatter.
+const logger = createLogger()
+const info = logger.info.bind(logger)
+logger.info = (msg, options) => {
+  if (/hmr (update|invalidate)/.test(msg)) return
+  info(msg, options)
+}
 
 // https://vite.dev/config/
 export default defineConfig({
+  customLogger: logger,
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

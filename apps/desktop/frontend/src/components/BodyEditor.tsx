@@ -3,6 +3,7 @@ import { FolderOpen, X, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { inputCls, selectCls } from '@/lib/styles'
 import { BODY_TYPES } from '@/lib/httpUtils'
+import { formatJsonWithPlaceholders } from '@/lib/jsonFormat'
 import type { BodyState, BodyType } from '@/types'
 import { KeyValueEditor } from '@/components/KeyValueEditor'
 import type { KVPair } from '@/types'
@@ -198,10 +199,12 @@ export function BodyEditor({ body, onChange, onPickFile }: Props) {
     onChange({ type: t, content: t === 'none' ? '' : body.content })
   }
 
+  const [formatError, setFormatError] = useState(false)
+
   function formatJSON() {
-    try {
-      onChange({ ...body, content: JSON.stringify(JSON.parse(body.content), null, 2) })
-    } catch { /* leave as-is */ }
+    const formatted = formatJsonWithPlaceholders(body.content)
+    setFormatError(formatted === null)
+    if (formatted !== null) onChange({ ...body, content: formatted })
   }
 
   function handleFormPairsChange(pairs: KVPair[]) {
@@ -237,6 +240,9 @@ export function BodyEditor({ body, onChange, onPickFile }: Props) {
           >
             Format
           </button>
+        )}
+        {formatError && body.type === 'json' && (
+          <span role="alert" className="text-xs text-red-400">Not valid JSON, so it was left as it is. Check commas, quotes and brackets.</span>
         )}
       </div>
 

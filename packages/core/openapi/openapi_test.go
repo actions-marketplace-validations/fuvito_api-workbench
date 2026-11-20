@@ -298,11 +298,10 @@ func TestParseSwagger2Bytes_BodyStub_Ref(t *testing.T) {
 			if r.Request.Body == nil || r.Request.Body.Type != domain.BodyJSON {
 				t.Error("expected JSON body for createUser")
 			}
-			// User definition has id, username, email — all should appear as placeholders
-			for _, field := range []string{`"id"`, `"username"`, `"email"`} {
-				if !strings.Contains(r.Request.Body.Content, field) {
-					t.Errorf("body stub missing field %s: %s", field, r.Request.Body.Content)
-				}
+			// The User definition (resolved through $ref) declares id, username and email but marks none
+			// of them required, so the generated body asks for no values at all.
+			if got := strings.TrimSpace(r.Request.Body.Content); got != "{}" {
+				t.Errorf("a $ref'd schema without required properties should give {}, got %s", got)
 			}
 			return
 		}
@@ -340,4 +339,37 @@ func TestParseSwagger2Bytes_OAuthBearer(t *testing.T) {
 		}
 	}
 	t.Error("addPet not found")
+}
+
+func TestGenerateRequests_PathLevelParameters(t *testing.T) {
+	spec, err := openapi.ParseBytes([]byte(`
+openapi: "3.0.3"
+info: {title: t, version: "1"}
+paths:
+  /items/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+      - {name: trace, in: header, required: true, schema: {type: string}}
+    get:
+      parameters:
+        - {name: trace, in: header, required: true, schema: {type: string}, description: own}
+      responses: {"200": {description: ok}}
+    delete:
+      responses: {"204": {description: gone}}
+`), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs, err := openapi.GenerateRequests(spec, "http://x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range reqs {
+		if r.Request.URL != "http://x/items/{{id}}" {
+			t.Errorf("%s: URL = %q, want the {{id}} placeholder", r.Request.Method, r.Request.URL)
+		}
+		if len(r.Request.Headers) != 1 || r.Request.Headers[0].Name != "trace" {
+			t.Errorf("%s: headers = %+v, want exactly one trace header (own parameter replaces the shared one)", r.Request.Method, r.Request.Headers)
+		}
+	}
 }

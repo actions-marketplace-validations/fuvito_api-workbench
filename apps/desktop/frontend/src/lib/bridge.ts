@@ -83,11 +83,25 @@ import {
   GetPort as WailsGetDemoPort,
   OpenSpecInBrowser as WailsOpenDemoSpec,
 } from '@wailsjs/go/main/DemoService'
+import { EventsOn } from '@wailsjs/runtime/runtime'
+import {
+  GetConformContext as WailsGetConformContext,
+  InspectConformSpec as WailsInspectConformSpec,
+  RunConformance as WailsRunConformance,
+  CancelConformance as WailsCancelConformance,
+  ExportConformReport as WailsExportConformReport,
+} from '@wailsjs/go/main/ConformanceService'
+import {
+  Stop as WailsStopConformanceServer,
+  OpenWorkspace as WailsOpenConformanceWorkspace,
+  OpenSpecInBrowser as WailsOpenConformanceSpec,
+} from '@wailsjs/go/main/ConformanceServerService'
 import {
   ListScenarios as WailsListScenarios,
   LoadScenario as WailsLoadScenario,
   RunScenario as WailsRunScenario,
   RunFolder as WailsRunFolder,
+  CancelFolderRun as WailsCancelFolderRun,
   LoadScenarioRaw as WailsLoadScenarioRaw,
   SaveScenarioRaw as WailsSaveScenarioRaw,
   ValidateScenarioYAML as WailsValidateScenarioYAML,
@@ -116,6 +130,7 @@ import {
 import {
   GetUserGuide as WailsGetUserGuide,
   GetFormatSpec as WailsGetFormatSpec,
+  GetWhatWeCheck as WailsGetWhatWeCheck,
   GetExampleScenario as WailsGetExampleScenario,
   GetAIPrompt as WailsGetAIPrompt,
   GetAIPromptInstructions as WailsGetAIPromptInstructions,
@@ -179,6 +194,9 @@ export interface AppSettings {
   clientCertFile?: string
   clientKeyFile?: string
   caFile?: string
+  // Dev Server ports; 0 or absent = pick a free port automatically
+  demoServerPort?: number
+  conformanceServerPort?: number
 }
 
 export interface HistoryEntry {
@@ -700,6 +718,162 @@ export async function openDemoSpec(): Promise<string> {
   return result as unknown as string
 }
 
+// ---- Check conformance ----
+
+export interface ConformContext {
+  workspace: string
+  specs: CliFile[]
+  environments: CliFile[]
+  // the file "Active environment" means; empty when none is selected
+  activeEnvironment?: string
+}
+
+export interface ConformSpecInfo {
+  title: string
+  version: string
+  serverUrl: string
+  reads: number
+  writes: number
+  error?: string
+}
+
+export interface ConformRunInput {
+  specPath: string
+  baseUrl: string
+  envPath: string
+  allowWrites: boolean
+  confirmedRemote: boolean
+  tags: string[]
+  paths: string[]
+  negative: boolean
+  failFast: boolean
+  timeoutMs: number
+  recordCoverage: boolean
+  vars: string[]
+}
+
+export interface ConformProbe {
+  operationId: string
+  method: string
+  path: string
+  kind: string
+  description: string
+  status: 'rejected' | 'accepted' | 'error' | 'skipped'
+  statusCode: number
+  error?: string
+}
+
+export interface ConformFinding {
+  kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'request' | 'no-response' | 'other'
+  // where the problem is: the part (response body, response status, response header, request,
+  // network) and what in it (a field path, a header name, the status code)
+  part?: string
+  where?: string
+  // where the expectation comes from in the spec, for example "GET /a → response 200 → headers → X-Total-Count"
+  spec?: string
+  summary: string
+  expected?: string
+  got?: string
+  why: string
+  fix: string
+  detail?: string
+}
+
+export interface ConformOperation {
+  operationId: string
+  method: string
+  path: string
+  // blocked: not sent because a {{placeholder}} had no value
+  status: 'passed' | 'failed' | 'error' | 'blocked' | 'skipped'
+  statusCode: number
+  durationMs: number
+  violations: string[]
+  error?: string
+  // plain-language explanation of each violation (absent in older data)
+  findings?: ConformFinding[]
+}
+
+export interface ConformRunOutput {
+  error?: string
+  specTitle: string
+  baseUrl: string
+  writes: boolean
+  durationMs: number
+  operations: ConformOperation[]
+  total: number
+  covered: number
+  notCovered: number
+  passing: number
+  failing: number
+  probes: ConformProbe[]
+  warnings: string[]
+  // placeholders that kept operations from being sent (each once) and how many operations that hit
+  missingValues?: string[]
+  blockedOperations?: number
+  coverageNote?: string
+}
+
+export type ConformReportFormat = 'html' | 'junit' | 'json' | 'markdown'
+
+export async function getConformContext(): Promise<ConformContext> {
+  return (await WailsGetConformContext()) as unknown as ConformContext
+}
+
+export async function inspectConformSpec(specPath: string): Promise<ConformSpecInfo> {
+  return (await WailsInspectConformSpec(specPath)) as unknown as ConformSpecInfo
+}
+
+export async function runConformance(input: ConformRunInput): Promise<ConformRunOutput> {
+  return (await WailsRunConformance(input as never)) as unknown as ConformRunOutput
+}
+
+export async function cancelConformance(): Promise<void> {
+  await WailsCancelConformance()
+}
+
+export async function exportConformReport(format: ConformReportFormat): Promise<RunReport> {
+  return (await WailsExportConformReport(format)) as unknown as RunReport
+}
+
+export interface ConformProgress {
+  done: number
+  total: number
+  operation: string
+}
+
+// Calls cb after each operation of a conformance run ("conformance:progress"). Returns the
+// function that stops listening. Outside the desktop app (tests, the browser mock) it does nothing.
+export function onConformanceProgress(cb: (progress: ConformProgress) => void): () => void {
+  try {
+    const off = EventsOn('conformance:progress', cb) as unknown
+    return typeof off === 'function' ? (off as () => void) : () => {}
+  } catch {
+    return () => {}
+  }
+}
+
+// ---- Conformance server ----
+
+export interface ConformanceServerResult {
+  port: number
+  workspacePath?: string
+  error?: string
+}
+
+export async function openConformanceWorkspace(): Promise<ConformanceServerResult> {
+  const result = await WailsOpenConformanceWorkspace()
+  return result as unknown as ConformanceServerResult
+}
+
+export async function stopConformanceServer(): Promise<void> {
+  await WailsStopConformanceServer()
+}
+
+export async function openConformanceSpec(): Promise<string> {
+  const result = await WailsOpenConformanceSpec()
+  return result as unknown as string
+}
+
 // ---- Response cache ----
 
 export interface ResponseCacheData extends ResponseData {
@@ -835,6 +1009,10 @@ export interface StepResult {
   requestUrl?: string
   requestHeaders?: Array<{ name: string; value: string }>
   requestBody?: string
+  // spec conformance (absent when the scenario has no spec)
+  specState?: 'matched' | 'violations' | 'not-checked'
+  specReason?: string
+  specViolations?: string[]
 }
 
 export interface ScenarioCoverage {
@@ -1073,6 +1251,10 @@ export interface FolderRunItem {
   passed: boolean
 }
 
+export async function cancelFolderRun(): Promise<void> {
+  await WailsCancelFolderRun()
+}
+
 export async function runFolder(folderPath: string): Promise<FolderRunItem[]> {
   const result = await WailsRunFolder(folderPath)
   return (result ?? []) as unknown as FolderRunItem[]
@@ -1117,6 +1299,10 @@ export async function applyWorkspaceImport(zipPath: string, strategy: string): P
 
 export async function getUserGuide(): Promise<string> {
   return (await WailsGetUserGuide()) as unknown as string
+}
+
+export async function getWhatWeCheck(): Promise<string> {
+  return (await WailsGetWhatWeCheck()) as unknown as string
 }
 
 export async function getFormatSpec(): Promise<string> {

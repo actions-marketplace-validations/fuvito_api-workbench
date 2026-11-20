@@ -8,20 +8,41 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
-	"github.com/fuvito/api-workbench/packages/core/domain"
 )
 
-// ValidationError is a single schema violation.
+// Kinds of violation a response check can report. An empty Kind is a violation this package does
+// not classify (the message says what it is).
+const (
+	KindBody             = "body"               // the body does not match the declared schema
+	KindUndeclaredStatus = "undeclared-status"  // the status code is not declared for the operation
+	KindContentType      = "wrong-content-type" // the response Content-Type is not one the spec declares
+	KindMissingHeader    = "missing-header"     // a header the spec requires was not sent
+	KindBadHeader        = "bad-header"         // a declared header has a value of the wrong type
+	KindRequestParameter = "request-parameter"  // a path, query or header value in the request does not fit its parameter
+	KindRequestBody      = "request-body"       // the request body does not fit the spec
+)
+
+// ValidationError is a single violation.
 type ValidationError struct {
 	Path    string
 	Message string
+	// Kind classifies the violation (one of the Kind constants, or empty).
+	Kind string
+	// Subject is what the violation is about when Kind says so: the status code, the Content-Type
+	// that was sent, or the header or parameter name.
+	Subject string
+	// In is where a request parameter lives: "path", "query", "header" or "cookie".
+	In string
 }
 
 func (e ValidationError) Error() string {
@@ -105,6 +126,11 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 		Header:     make(http.Header),
 		Body:       nopCloser(body),
 	}
+	// Every header the server really sent goes into the check, so headers the spec declares are
+	// compared with what arrived. Content-Type falls back to JSON when the server sent none.
+	for _, h := range resp.Headers {
+		httpResp.Header.Add(h.Name, h.Value)
+	}
 	httpResp.Header.Set("Content-Type", ct)
 
 	input := &openapi3filter.ResponseValidationInput{
@@ -122,11 +148,119 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 
 	if err := openapi3filter.ValidateResponse(context.Background(), input); err != nil {
 		if me, ok := err.(*openapi3filter.ResponseError); ok {
-			return parseSchemaErrors(me.Err)
+			return responseViolations(route, statusCode, ct, me)
 		}
 		return []ValidationError{{Message: err.Error()}}
 	}
 	return nil
+}
+
+var quotedName = regexp.MustCompile(`"([^"]+)"`)
+
+// responseViolations turns the library's ResponseError into violations. The library reports an
+// undeclared status, a wrong Content-Type and a missing header only in Reason (Err is nil); those
+// used to be dropped, which made such responses look conforming and, when a header was declared,
+// stopped the body from ever being checked.
+func responseViolations(route *routers.Route, status int, sentType string, me *openapi3filter.ResponseError) []ValidationError {
+	where := fmt.Sprintf("%s %s", route.Method, route.Path)
+	switch {
+	case me.Reason == "status is not supported":
+		declared := declaredStatuses(route)
+		return []ValidationError{{
+			Kind: KindUndeclaredStatus, Subject: strconv.Itoa(status),
+			Message: fmt.Sprintf("%s answered %d, but the spec declares only %s", where, status, listOrNone(declared)),
+		}}
+	case strings.Contains(me.Reason, "Content-Type has unexpected value"):
+		return []ValidationError{{
+			Kind: KindContentType, Subject: sentType,
+			Message: fmt.Sprintf("%s %d answered with Content-Type %q, but the spec declares %s for this response; the body was not checked",
+				where, status, sentType, listOrNone(declaredContentTypes(route, status))),
+		}}
+	case strings.HasPrefix(me.Reason, "response header ") && strings.HasSuffix(me.Reason, " missing"):
+		name := firstQuoted(me.Reason)
+		return []ValidationError{{
+			Kind: KindMissingHeader, Subject: name,
+			Message: fmt.Sprintf("%s %d: the response header %q is required by the spec but was not sent", where, status, name),
+		}}
+	case strings.HasPrefix(me.Reason, "unable to decode header"):
+		name := firstQuoted(me.Reason)
+		detail := ""
+		if me.Err != nil {
+			detail = ": " + strings.SplitN(me.Err.Error(), "\n", 2)[0]
+		}
+		return []ValidationError{{
+			Kind: KindBadHeader, Subject: name,
+			Message: fmt.Sprintf("%s %d: the response header %q has a value that does not fit the spec%s", where, status, name, detail),
+		}}
+	case me.Err != nil:
+		errs := parseSchemaErrors(me.Err)
+		for i := range errs {
+			errs[i].Kind = KindBody
+		}
+		return errs
+	}
+	return []ValidationError{{Message: me.Error()}}
+}
+
+func firstQuoted(s string) string {
+	if m := quotedName.FindStringSubmatch(s); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+func listOrNone(items []string) string {
+	if len(items) == 0 {
+		return "no responses"
+	}
+	return strings.Join(items, ", ")
+}
+
+func declaredStatuses(route *routers.Route) []string {
+	if route.Operation == nil || route.Operation.Responses == nil {
+		return nil
+	}
+	var codes []string
+	for code := range route.Operation.Responses.Map() {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	return codes
+}
+
+func declaredContentTypes(route *routers.Route, status int) []string {
+	if route.Operation == nil || route.Operation.Responses == nil {
+		return nil
+	}
+	ref := route.Operation.Responses.Status(status)
+	if ref == nil {
+		ref = route.Operation.Responses.Default()
+	}
+	if ref == nil || ref.Value == nil {
+		return nil
+	}
+	var types []string
+	for t := range ref.Value.Content {
+		types = append(types, t)
+	}
+	sort.Strings(types)
+	return types
+}
+
+// HasOperation reports whether the spec declares an operation for method and path, so a caller
+// can tell "matches the spec" apart from "nothing to check" (ValidateResponseByPath returns no
+// violations in both cases).
+func (s *Spec) HasOperation(method, path string) bool {
+	router, err := gorillamux.NewRouter(s.doc)
+	if err != nil {
+		return false
+	}
+	httpReq, err := http.NewRequest(method, path, nil)
+	if err != nil {
+		return false
+	}
+	_, _, err = router.FindRoute(httpReq)
+	return err == nil
 }
 
 // ValidateRequest checks that req conforms to the spec's declared request schema
@@ -189,11 +323,44 @@ func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
 
 	if err := openapi3filter.ValidateRequest(context.Background(), input); err != nil {
 		if re, ok := err.(*openapi3filter.RequestError); ok {
-			return parseSchemaErrors(re.Err)
+			return requestViolations(route, re)
 		}
 		return []ValidationError{{Message: err.Error()}}
 	}
 	return nil
+}
+
+// requestViolations turns the library's RequestError into violations that say which parameter or
+// part of the body is wrong. The parameter, the "request body" context and the Reason used to be
+// dropped, and a RequestError without an inner error produced no violation at all.
+func requestViolations(route *routers.Route, re *openapi3filter.RequestError) []ValidationError {
+	where := fmt.Sprintf("%s %s", route.Method, route.Path)
+	reason := re.Reason
+	if re.Err != nil {
+		if reason == "" || reason == re.Err.Error() {
+			reason = re.Err.Error()
+		} else {
+			reason += ": " + re.Err.Error()
+		}
+	}
+	switch {
+	case re.Parameter != nil:
+		return []ValidationError{{
+			Kind: KindRequestParameter, Subject: re.Parameter.Name, In: re.Parameter.In,
+			Message: fmt.Sprintf("%s: the request %s parameter %q does not fit the spec: %s", where, re.Parameter.In, re.Parameter.Name, strings.SplitN(reason, "\n", 2)[0]),
+		}}
+	case re.RequestBody != nil:
+		if re.Err != nil {
+			errs := parseSchemaErrors(re.Err)
+			for i := range errs {
+				errs[i].Kind = KindRequestBody
+				errs[i].Message = where + ": the request body does not fit the spec: " + errs[i].Message
+			}
+			return errs
+		}
+		return []ValidationError{{Kind: KindRequestBody, Message: where + ": the request body does not fit the spec: " + reason}}
+	}
+	return []ValidationError{{Message: where + ": " + reason}}
 }
 
 func bodyContentType(t domain.BodyType) string {

@@ -65,6 +65,21 @@ export function setupMockBridge() {
           { code: 2, meaning: 'The run could not happen: a file could not be read or parsed.', forCI: 'The pipeline step fails: fix the command or the files first.' },
         ],
       },
+      {
+        name: 'conform', goal: 'Check an API against its OpenAPI spec', summary: 'Calls every operation in the spec and checks each response against what the spec declares.', when: 'To confirm a running API still matches its specification, locally or as a CI gate.',
+        inputs: [
+          { name: 'spec', short: '', positional: true, required: true, kind: 'path', role: 'spec', accepts: ['.yaml'], enum: [], default: '', label: 'OpenAPI spec', help: 'The spec file to check against.', example: 'specs/openapi.yaml', group: 'essential' },
+          { name: 'base-url', short: 'b', positional: false, required: false, kind: 'text', role: '', accepts: [], enum: [], default: '', label: 'Base URL', help: 'Where the API runs.', example: 'http://localhost:8120', group: 'essential' },
+          { name: 'env', short: 'e', positional: false, required: false, kind: 'file', role: 'environment', accepts: ['.yaml'], enum: [], default: '', label: 'Environment', help: 'Variables used by the requests.', example: 'environments/ci.yaml', group: 'essential' },
+          { name: 'read-only', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Read requests only', help: 'Send only GET and HEAD requests.', example: '', group: 'essential' },
+          { name: 'negative', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Negative probes', help: 'Also send wrong requests.', example: '', group: 'advanced' },
+          { name: 'fail-fast', short: '', positional: false, required: false, kind: 'bool', role: '', accepts: [], enum: [], default: 'false', label: 'Stop at the first failure', help: 'Stop early.', example: '', group: 'advanced' },
+          { name: 'tags', short: '', positional: false, required: false, kind: 'string', role: '', accepts: [], enum: [], default: '', label: 'Only these tags', help: 'Tags.', example: 'users', group: 'advanced' },
+          { name: 'paths', short: '', positional: false, required: false, kind: 'string', role: '', accepts: [], enum: [], default: '', label: 'Only these path prefixes', help: 'Prefixes.', example: '/users', group: 'advanced' },
+          { name: 'request-timeout', short: '', positional: false, required: false, kind: 'int', role: '', accepts: [], enum: [], default: '10000', label: 'Request timeout (ms)', help: 'Timeout.', example: '10000', group: 'advanced' },
+        ],
+        outputs: [], exitCodes: [],
+      },
     ] as unknown[],
     cliContext: {
       workspace: '/workspace', runFrom: '/workspace',
@@ -208,6 +223,77 @@ export function setupMockBridge() {
         IsRunning: () => Promise.resolve(false),
         GetPort: () => Promise.resolve(0),
       },
+      ConformanceService: {
+        GetConformContext: () => Promise.resolve({
+          workspace: '/workspace',
+          activeEnvironment: '/workspace/environments/local.yaml',
+          specs: [{ path: '/workspace/specs/shop.yaml', label: 'specs/shop.yaml' }],
+          environments: [{ path: '/workspace/environments/local.yaml', label: 'environments/local.yaml' }],
+        }),
+        InspectConformSpec: () => Promise.resolve({ title: 'Shop', version: '1', serverUrl: 'http://localhost:8120', reads: 3, writes: 2 }),
+        RunConformance: (input: { baseUrl: string; allowWrites: boolean; confirmedRemote: boolean; negative: boolean; tags: string[] }) => {
+          bridge['conformRuns'] = [...((bridge['conformRuns'] as unknown[]) ?? []), input]
+          const local = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(input.baseUrl)
+          const empty = { specTitle: '', baseUrl: input.baseUrl, writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] }
+          if (!local && !input.confirmedRemote) return Promise.resolve({ ...empty, error: 'confirm the base URL ' + input.baseUrl + ' before running: it is not on this computer' })
+          // A test can ask for an operation that needs a value nothing provides, until it is overridden.
+          const needsId = bridge['conformNeedsId'] === true && !((input as unknown as { vars?: string[] }).vars ?? []).some(v => v.startsWith('id='))
+          const op = (operationId: string, method: string, path: string, status: string, statusCode: number, violations: string[] = []) =>
+            ({
+              operationId, method, path, status, statusCode, durationMs: 4, violations,
+              findings: violations.map(v => ({
+                kind: 'wrong-type', part: 'response body', where: 'price', spec: 'GET /items/{id} → response 200 → body schema', summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+                why: 'The server sent text ("9.99") where the spec declares a number.', fix: 'Send a number from the server, or change the spec.', detail: v,
+              })),
+            })
+          const operations = [
+            op('listItems', 'GET', '/items', 'passed', 200),
+            needsId
+              ? ({
+                  operationId: 'getItem', method: 'GET', path: '/items/{{id}}', status: 'blocked', statusCode: 0, durationMs: 0, violations: [],
+                  findings: [{ kind: 'missing-value', where: 'id', summary: 'No value for {{id}}', got: 'not sent', why: 'The request needs {{id}} but nothing provides it. It was not sent, so nothing was compared with the spec.', fix: 'Add id to the environment, or give it as an override (id=…).', detail: 'not sent: no value for {{id}}' }],
+                })
+              : op('getItem', 'GET', '/items/{{id}}', 'failed', 200, ['Error at "/price": value must be a number']),
+            op('health', 'GET', '/health', 'passed', 200),
+            input.allowWrites ? op('createItem', 'POST', '/items', 'passed', 201) : op('createItem', 'POST', '/items', 'skipped', 0),
+            input.allowWrites ? op('deleteItem', 'DELETE', '/items/{{id}}', 'passed', 204) : op('deleteItem', 'DELETE', '/items/{{id}}', 'skipped', 0),
+          ]
+          const covered = operations.filter(o => o.status === 'passed' || o.status === 'failed').length
+          const blockedCount = operations.filter(o => o.status === 'blocked').length
+          const probes = input.negative
+            ? [{ operationId: 'getItem', method: 'GET', path: '/items/{{id}}', kind: 'wrong-type', description: 'id as text', status: 'accepted', statusCode: 200 }]
+            : []
+          return Promise.resolve({
+            ...empty, specTitle: 'Shop', writes: input.allowWrites, durationMs: 21, operations, total: 5, covered,
+            notCovered: 5 - covered, passing: operations.filter(o => o.status === 'passed').length, failing: needsId ? 0 : 1, probes,
+            missingValues: needsId ? ['id'] : [], blockedOperations: blockedCount,
+          })
+        },
+        CancelConformance: noop,
+        ExportConformReport: () => Promise.resolve({ content: '', error: '' }),
+      },
+      HelpService: {
+        GetUserGuide: () => Promise.resolve('# User guide\n\nA guide.'),
+        GetFormatSpec: () => Promise.resolve('# Format spec'),
+        GetExampleScenario: () => Promise.resolve('# Example scenario'),
+        GetAIPromptInstructions: () => Promise.resolve('# AI prompt'),
+        GetAIPrompt: () => Promise.resolve('# AI prompt'),
+        GetWhatWeCheck: () => Promise.resolve([
+          '# What Clear Signal checks', '',
+          '## 1. API Contract Validation', '',
+          '| ID | Title | What it means | State |', '|---|---|---|---|',
+          '| CS-RESP-001 | Undeclared response status | The server answered a status the spec does not declare. | caught |',
+          '| CS-GAP-001 | Formats other than date-time | email and uuid are not validated. | not caught |', '',
+        ].join('\n')),
+      },
+      ConformanceServerService: {
+        Start: () => Promise.resolve({ port: 8120, error: '' }),
+        OpenWorkspace: () => { bridge['workspacePath'] = '/tmp/clrsig-conformance-mock'; return Promise.resolve({ port: 8120, workspacePath: '/tmp/clrsig-conformance-mock', error: '' }) },
+        Stop: noop,
+        IsRunning: () => Promise.resolve(false),
+        GetPort: () => Promise.resolve(0),
+        OpenSpecInBrowser: () => Promise.resolve(''),
+      },
       OpenAPIService: {
         ImportOpenAPISpec: () => Promise.resolve({ count: 0, error: '' }),
         ImportOpenAPISpecFromPath: () => Promise.resolve({ count: 0, error: '' }),
@@ -221,6 +307,7 @@ export function setupMockBridge() {
         ListScenarios: () => Promise.resolve(bridge['scenarios']),
         ListTemplates: () => Promise.resolve([]),
         RunFolder: () => Promise.resolve([]),
+        CancelFolderRun: noop,
         CreateFromTemplate: (templateId: string) => {
           const path = `/workspace/scenarios/${templateId}.yaml`
           return Promise.resolve({ path, error: '' })

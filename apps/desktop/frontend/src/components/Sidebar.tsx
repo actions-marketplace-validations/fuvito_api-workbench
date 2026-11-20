@@ -79,12 +79,15 @@ export type SidebarProps = {
   onRenameScenarioFolder?: (folderPath: string, newName: string) => void
   runAllState?: RunAllState
   runLogTrigger?: number
+  activeScenarioPath?: string | null
+  dirtyScenarioPaths?: Set<string>
   onRunAllScenarios?: () => void
   scenarioError?: string | null
   onRunFolder?: (folderPath: string) => void
   onRunScenarioFolder?: (folderPath: string) => void
   folderRunState?: FolderRunState | null
   onDismissFolderRun?: () => void
+  onCancelFolderRun?: () => void
   selectedCoverageSpecFile?: string | null
   onSelectCoverageSpec?: (specFile: string) => void
   clipboard?: FileClipboard | null
@@ -110,8 +113,8 @@ export function Sidebar({
   onSelectScenario, onNewScenario, onNewScenarioFile,
   onDuplicateScenario, onDeleteScenario, onRenameScenario,
   onNewScenarioFolder, onDeleteScenarioFolder, onRenameScenarioFolder,
-  runAllState, onRunAllScenarios, scenarioError, runLogTrigger,
-  onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun,
+  runAllState, onRunAllScenarios, scenarioError, runLogTrigger, activeScenarioPath, dirtyScenarioPaths,
+  onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun, onCancelFolderRun,
   selectedCoverageSpecFile, onSelectCoverageSpec,
   clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
   onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder,
@@ -175,6 +178,7 @@ export function Sidebar({
           onRunFolder={onRunFolder}
           folderRunState={folderRunState}
           onDismissFolderRun={onDismissFolderRun}
+          onCancelFolderRun={onCancelFolderRun}
           clipboard={clipboard}
           onCopyFile={onCopyFile}
           onCutFile={onCutFile}
@@ -302,6 +306,8 @@ export function Sidebar({
           onCutScenario={onCutScenario}
           onPasteToScenarioFolder={onPasteToScenarioFolder}
           runLogTrigger={runLogTrigger}
+          activeScenarioPath={activeScenarioPath}
+          dirtyScenarioPaths={dirtyScenarioPaths}
           onRunFolder={onRunScenarioFolder}
         />
       )}

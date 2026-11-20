@@ -14,6 +14,9 @@ import (
 	"time"
 )
 
+// demoWorkspacePrefix names the temporary workspace the Demo Server opens.
+const demoWorkspacePrefix = "clrsig-demo-"
+
 //go:embed demo_workspace
 var demoWorkspaceFS embed.FS
 
@@ -34,6 +37,7 @@ type DemoService struct {
 	tempDir          string
 	port             int
 	mu               sync.Mutex
+	portFn           func() int // configured port from Settings; nil or 0 = automatic
 	prevWorkspace    string
 	prevEnvPath      string
 }
@@ -92,11 +96,19 @@ func (d *DemoService) StartDemo() DemoResult {
 		return DemoResult{WorkspacePath: d.tempDir, Port: d.port}
 	}
 
+	if strings.HasPrefix(filepath.Base(d.ws.workspacePath), conformanceWorkspacePrefix) {
+		return DemoResult{Error: "stop the Conformance Server first: its workspace is open"}
+	}
+
 	cleanupStaleDemoTempDirs("")
 
-	port, err := findFreePort(8090)
+	configured := 0
+	if d.portFn != nil {
+		configured = d.portFn()
+	}
+	port, err := choosePort(configured, 8090, "the Demo Server port")
 	if err != nil {
-		return DemoResult{Error: "could not find free port: " + err.Error()}
+		return DemoResult{Error: err.Error()}
 	}
 
 	tmpDir, err := os.MkdirTemp("", "clrsig-demo-*")
@@ -190,6 +202,28 @@ func (d *DemoService) OpenSpecInBrowser() string {
 }
 
 // ---- helpers ----
+
+// sanitizePort keeps a configured port in the unprivileged range; anything else means automatic.
+func sanitizePort(p int) int {
+	if p < 1024 || p > 65535 {
+		return 0
+	}
+	return p
+}
+
+// choosePort returns the configured port when it is free, or the first free port from start when
+// none is configured. A configured port that is taken is an error the user can act on.
+func choosePort(configured, start int, setting string) (int, error) {
+	if configured == 0 {
+		return findFreePort(start)
+	}
+	ln, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", configured))
+	if err != nil {
+		return 0, fmt.Errorf("port %d is already in use. Change %s in Settings, or set it to 0 to pick a free port automatically", configured, setting)
+	}
+	ln.Close()
+	return configured, nil
+}
 
 func findFreePort(start int) (int, error) {
 	for port := start; port < start+30; port++ {

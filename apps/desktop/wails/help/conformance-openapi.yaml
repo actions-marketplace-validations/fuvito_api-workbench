@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: Clear Signal Conformance Server
+  version: "1.0.0"
+  description: >
+    A deliberately imperfect API for trying Spec Conformance Testing. Most
+    operations match this spec; six do not, each in a different way. The
+    list of known violations is in the user guide. Requests are generated
+    with {{placeholders}} for path parameters, so run the check with an
+    environment that sets id (for example 1): see conformance-environment.yaml.
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check (conforms)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string}
+  /products:
+    get:
+      operationId: listProducts
+      summary: List products (conforms)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Product"}
+    post:
+      operationId: createProduct
+      summary: Create a product (conforms)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Product"}
+  /products/{id}:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: integer}}
+    get:
+      operationId: getProduct
+      summary: Get a product (VIOLATION - price is returned as a string)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Product"}
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProduct
+      summary: Delete a product (conforms)
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+  /categories:
+    get:
+      operationId: listCategories
+      summary: List categories (VIOLATION - required field name is missing)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, name]
+                  properties:
+                    id: {type: integer}
+                    name: {type: string}
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List orders (VIOLATION - id is returned as a string)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, total]
+                  properties:
+                    id: {type: integer}
+                    total: {type: number}
+  /widgets:
+    get:
+      operationId: listWidgets
+      summary: List widgets (VIOLATION - served as text/plain although the spec says JSON)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: object}
+  /inventory:
+    get:
+      operationId: getInventory
+      summary: Inventory (VIOLATION - the required X-Total-Count header is never sent)
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Total-Count:
+              required: true
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {type: object}
+  /status:
+    get:
+      operationId: getStatus
+      summary: Service status (VIOLATION - answers 503, which the spec does not declare)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string}
+components:
+  schemas:
+    Product:
+      type: object
+      required: [id, name, price]
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        price: {type: number}

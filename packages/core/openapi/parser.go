@@ -10,50 +10,6 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 )
 
-// buildBodyStub generates a JSON body stub from a request body media type.
-// Each schema property becomes a "{{fieldName}}" placeholder so env variables
-// are automatically substituted during execution.
-func buildBodyStub(mt *openapi3.MediaType) string {
-	if mt == nil || mt.Schema == nil || mt.Schema.Value == nil {
-		return "{}"
-	}
-	props := mt.Schema.Value.Properties
-	if len(props) == 0 {
-		return "{}"
-	}
-
-	required := make(map[string]bool, len(mt.Schema.Value.Required))
-	for _, r := range mt.Schema.Value.Required {
-		required[r] = true
-	}
-
-	// Required fields first (preserving spec order), then optional sorted.
-	var reqFields, optFields []string
-	for _, r := range mt.Schema.Value.Required {
-		if _, ok := props[r]; ok {
-			reqFields = append(reqFields, r)
-		}
-	}
-	for name := range props {
-		if !required[name] {
-			optFields = append(optFields, name)
-		}
-	}
-	sort.Strings(optFields)
-
-	fields := append(reqFields, optFields...)
-	var sb strings.Builder
-	sb.WriteString("{\n")
-	for i, name := range fields {
-		if i > 0 {
-			sb.WriteString(",\n")
-		}
-		sb.WriteString(`  "` + name + `": "{{` + name + `}}"`)
-	}
-	sb.WriteString("\n}")
-	return sb.String()
-}
-
 // Spec wraps a loaded OpenAPI document.
 type Spec struct {
 	doc     *openapi3.T
@@ -105,6 +61,15 @@ type GeneratedRequest struct {
 	Path        string // raw path from the spec, e.g. "/user/{username}"
 }
 
+// FirstServerURL returns the spec's first server URL without a trailing slash, or "" when the
+// spec declares none.
+func (s *Spec) FirstServerURL() string {
+	if len(s.doc.Servers) == 0 {
+		return ""
+	}
+	return strings.TrimRight(s.doc.Servers[0].URL, "/")
+}
+
 // GenerateRequests creates one domain.Request per operation in the spec.
 // baseURL overrides the first server URL when non-empty.
 func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
@@ -142,7 +107,7 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 				continue
 			}
 
-			req := buildRequest(base, method, path, op)
+			req := buildRequest(base, method, path, withPathParameters(item, op))
 			gr := GeneratedRequest{
 				Request:     req,
 				OperationID: op.OperationID,
@@ -155,6 +120,34 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 	}
 
 	return results, nil
+}
+
+// withPathParameters returns op with the parameters declared on its path item added, so a
+// parameter written once for every method of a path (the usual place for {id}) is seen. An
+// operation's own parameter replaces a path-level one with the same name and location. op itself
+// is not modified.
+func withPathParameters(item *openapi3.PathItem, op *openapi3.Operation) *openapi3.Operation {
+	if len(item.Parameters) == 0 {
+		return op
+	}
+	merged := make(openapi3.Parameters, 0, len(item.Parameters)+len(op.Parameters))
+	for _, shared := range item.Parameters {
+		overridden := false
+		for _, own := range op.Parameters {
+			if shared != nil && own != nil && shared.Value != nil && own.Value != nil &&
+				shared.Value.Name == own.Value.Name && shared.Value.In == own.Value.In {
+				overridden = true
+				break
+			}
+		}
+		if !overridden {
+			merged = append(merged, shared)
+		}
+	}
+	merged = append(merged, op.Parameters...)
+	copied := *op
+	copied.Parameters = merged
+	return &copied
 }
 
 func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Request {

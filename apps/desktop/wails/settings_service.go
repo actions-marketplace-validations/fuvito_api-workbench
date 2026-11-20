@@ -43,6 +43,8 @@ func (s *SettingsService) SaveSettings(updated domain.Settings) domain.Settings 
 	if updated.Theme != "light" {
 		updated.Theme = "dark"
 	}
+	updated.DemoServerPort = sanitizePort(updated.DemoServerPort)
+	updated.ConformanceServerPort = sanitizePort(updated.ConformanceServerPort)
 	s.settings = updated
 	s.persist()
 	if s.onSave != nil {

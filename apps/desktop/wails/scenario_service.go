@@ -121,6 +121,11 @@ type StepResultIO struct {
 	RequestURL     string     `json:"requestUrl,omitempty"`
 	RequestHeaders []HeaderIO `json:"requestHeaders,omitempty"`
 	RequestBody    string     `json:"requestBody,omitempty"`
+	// Spec conformance: empty when the scenario has no spec; otherwise matched, violations or
+	// not-checked (with the reason).
+	SpecState      string   `json:"specState,omitempty"`
+	SpecReason     string   `json:"specReason,omitempty"`
+	SpecViolations []string `json:"specViolations,omitempty"`
 }
 
 type CoverageIO struct {
@@ -177,6 +182,8 @@ type ScenarioService struct {
 	settings  *SettingsService
 	mu        sync.Mutex
 	cancelRun context.CancelFunc
+	// cancelFolder stops the request-folder run in progress (RunFolder), if any.
+	cancelFolder context.CancelFunc
 	// runs keeps the latest result of each scenario that was run, so a run report can be
 	// exported from the Go reporting package after a Run All or a folder run.
 	runs map[string]*scenario.Result
@@ -712,17 +719,33 @@ type FolderRunItemIO struct {
 
 // RunFolder executes every request file directly under folderPath (non-recursive)
 // using the active workspace environment. Results are returned in directory order.
+// CancelFolderRun stops it: the request in flight is abandoned (not reported) and the results so
+// far are returned.
 func (s *ScenarioService) RunFolder(folderPath string) []FolderRunItemIO {
 	entries, err := os.ReadDir(folderPath)
 	if err != nil {
 		return []FolderRunItemIO{{Error: err.Error()}}
 	}
 
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.mu.Lock()
+	s.cancelFolder = cancel
+	s.mu.Unlock()
+	defer func() {
+		cancel()
+		s.mu.Lock()
+		s.cancelFolder = nil
+		s.mu.Unlock()
+	}()
+
 	env := s.workspace.ActiveEnvironment()
 	exec := buildExecutor(s.settings)
 
 	var results []FolderRunItemIO
 	for _, e := range entries {
+		if ctx.Err() != nil {
+			break
+		}
 		if e.IsDir() || !isDataFile(e.Name()) {
 			continue
 		}
@@ -747,7 +770,10 @@ func (s *ScenarioService) RunFolder(folderPath string) []FolderRunItemIO {
 		resolver := variables.NewResolver(env)
 		resolved := resolver.InterpolateRequest(req)
 
-		resp, execErr := exec.Execute(s.ctx, resolved)
+		resp, execErr := exec.Execute(ctx, resolved)
+		if ctx.Err() != nil {
+			break // cancelled while this request was in flight: it is not a result
+		}
 		if execErr != nil {
 			results = append(results, FolderRunItemIO{
 				Name:   name,
@@ -892,6 +918,10 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		if sr.Attempts > 1 {
 			step.Attempts = sr.Attempts
 		}
+		step.SpecState, step.SpecReason = string(sr.Spec.State), sr.Spec.Reason
+		for _, v := range sr.Spec.Violations {
+			step.SpecViolations = append(step.SpecViolations, v.Error())
+		}
 		if sr.Request != nil {
 			step.RequestMethod, step.RequestURL, step.RequestHeaders, step.RequestBody = exchangeRequest(sr.Request, result.Secrets)
 		}
@@ -954,31 +984,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 
 			// Accumulate into the workspace coverage store.
 			if s.workspace.workspacePath != "" {
-				stored := loadStoredCoverage(s.workspace.workspacePath, sc.SpecFile)
-				stored.TotalRuns++
-				stored.LastRunAt = time.Now()
-				if result.Passed {
-					stored.PassedRuns++
-				} else {
-					stored.FailedRuns++
-				}
-				stored.Exercised = mergeExercised(stored.Exercised, cov.Exercised)
-				stored.TotalOps = cr.Total
-				now := time.Now()
-				if stored.OperationResults == nil {
-					stored.OperationResults = make(map[string]coverage.OperationResult)
-				}
-				for _, er := range cr.ExercisedResults {
-					prev := stored.OperationResults[er.String()]
-					stored.OperationResults[er.String()] = coverage.OperationResult{
-						LastPassed:  er.Passed,
-						LastRunAt:   now,
-						StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
-						HadAuth:     prev.HadAuth || er.HadAuth,
-					}
-				}
-				if err := saveStoredCoverage(s.workspace.workspacePath, stored); err == nil {
-					acc := buildAccumulatedCoverageIO(stored, loadedSpec)
+				if acc, ok := accumulateCoverage(s.workspace.workspacePath, sc.SpecFile, loadedSpec, cr, result.Passed); ok {
 					out.AccumulatedCoverage = &acc
 				}
 			}
@@ -989,6 +995,15 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 	s.recordScenarioRun(path, out)
 
 	return out
+}
+
+// CancelFolderRun stops the RunFolder call in progress, if any.
+func (s *ScenarioService) CancelFolderRun() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cancelFolder != nil {
+		s.cancelFolder()
+	}
 }
 
 // CancelScenario aborts the currently in-flight RunScenario call, if any.

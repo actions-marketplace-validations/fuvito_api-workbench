@@ -17,6 +17,12 @@ var exampleScenarioMarkdown string
 //go:embed help/ai-prompt.md
 var aiPromptMarkdown string
 
+// whatWeCheckMarkdown is the catalog of what Clear Signal checks and does not check. The file is also
+// the document the repository links to, and tests keep it in step with the code.
+//
+//go:embed help/what-we-check.md
+var whatWeCheckMarkdown string
+
 type HelpService struct{}
 
 func NewHelpService() *HelpService { return &HelpService{} }
@@ -26,6 +32,9 @@ func (h *HelpService) GetUserGuide() string { return userGuideMarkdown }
 func (h *HelpService) GetFormatSpec() string { return formatSpecMarkdown }
 
 func (h *HelpService) GetExampleScenario() string { return exampleScenarioMarkdown }
+
+// GetWhatWeCheck returns the catalog of checks, as shown in the Help panel's What We Check tab.
+func (h *HelpService) GetWhatWeCheck() string { return whatWeCheckMarkdown }
 
 // GetAIPromptInstructions returns the AI prompt document as shown in the Help panel.
 func (h *HelpService) GetAIPromptInstructions() string { return aiPromptMarkdown }

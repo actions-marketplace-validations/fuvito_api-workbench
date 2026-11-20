@@ -30,6 +30,21 @@ function runAll(over: Partial<RunAllState> = {}): RunAllState {
 }
 
 describe('FolderRunResults', () => {
+  it('offers Stop only while the folder is running, and calls it', () => {
+    const onCancel = vi.fn()
+    const { rerender } = render(<FolderRunResults state={folder({ running: true })} onSelectFile={vi.fn()} onCancel={onCancel} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+
+    rerender(<FolderRunResults state={folder({ running: false })} onSelectFile={vi.fn()} onCancel={onCancel} />)
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+  })
+
+  it('says when a run was stopped and counts only the requests that finished', () => {
+    render(<FolderRunResults state={folder({ stopped: true, results: [{ name: 'list', path: '/a', method: 'GET', statusCode: 200, durationMs: 12, passed: true }] })} onSelectFile={vi.fn()} />)
+    expect(screen.getByText(/1\/1 ok, stopped/)).toBeInTheDocument()
+  })
+
   it('summarises a finished run', () => {
     render(<FolderRunResults state={folder()} onSelectFile={vi.fn()} />)
     expect(screen.getByText('users')).toBeInTheDocument()

@@ -29,6 +29,25 @@ type StepResult struct {
 	// Attempts is how many times the request was sent: 1 normally, more when the step's retry
 	// policy re-sent it after a transport error or a 5xx response.
 	Attempts int
+	// Spec is the result of comparing the response with the scenario's spec.
+	Spec SpecCheck
+}
+
+// SpecState is the outcome of checking one step's response against the scenario's spec.
+type SpecState string
+
+const (
+	SpecMatched    SpecState = "matched"
+	SpecViolations SpecState = "violations"
+	SpecNotChecked SpecState = "not-checked"
+)
+
+// SpecCheck records what the spec comparison did for a step. State is empty when the scenario
+// has no spec or the step was skipped. Reason explains SpecNotChecked.
+type SpecCheck struct {
+	State      SpecState
+	Reason     string
+	Violations []openapi.ValidationError
 }
 
 // Result holds the full outcome of running a scenario.
@@ -215,6 +234,9 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 
 	resolved := resolver.InterpolateRequest(step.Request)
 	sr.Request = resolved
+	if r.spec != nil {
+		sr.Spec = SpecCheck{State: SpecNotChecked, Reason: "the step did not complete"}
+	}
 
 	// Assertion values use variables and functions too, so a test can check that a response
 	// echoes a generated value.
@@ -262,9 +284,18 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 		if step.ValidateSpec != nil {
 			doValidate = *step.ValidateSpec
 		}
-		if doValidate {
-			path := urlPath(resolved.URL)
+		path := urlPath(resolved.URL)
+		switch {
+		case !doValidate:
+			sr.Spec = SpecCheck{State: SpecNotChecked, Reason: "spec validation is turned off for this step"}
+		case !r.spec.HasOperation(string(resolved.Method), path):
+			sr.Spec = SpecCheck{State: SpecNotChecked, Reason: "no matching operation in the spec"}
+		default:
 			violations := openapi.ValidateResponseByPath(r.spec, string(resolved.Method), path, resp.StatusCode, resp)
+			sr.Spec = SpecCheck{State: SpecMatched, Violations: violations}
+			if len(violations) > 0 {
+				sr.Spec.State = SpecViolations
+			}
 			for _, v := range violations {
 				ar := domain.AssertionResult{
 					Assertion: domain.Assertion{Type: domain.AssertionSchema, Name: "spec conformance"},

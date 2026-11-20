@@ -1,5 +1,5 @@
 import { Pencil, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, shortenPath } from '@/lib/utils'
 import type { EnvInfo } from '@/lib/bridge'
 
 type StatusBarProps = {
@@ -9,21 +9,16 @@ type StatusBarProps = {
   activeFilePath?: string | null
   demoRunning: boolean
   demoPort: number
+  conformancePort?: number
+  onStopConformance?: () => void
   onEnvChange: (path: string) => void
   onEditEnv: () => void
   onStopDemo: () => void
 }
 
-const MAX_PATH_CHARS = 100
-
-// Long paths lose their start, not their end: the file name is the part that matters.
-export function shortenPath(path: string, max = MAX_PATH_CHARS): string {
-  return path.length <= max ? path : '…' + path.slice(path.length - (max - 1))
-}
-
 export function StatusBar({
   environments, activeEnv, workspacePath, activeFilePath,
-  demoRunning, demoPort,
+  demoRunning, demoPort, conformancePort = 0, onStopConformance,
   onEnvChange, onEditEnv, onStopDemo,
 }: StatusBarProps) {
   const workspaceName = workspacePath
@@ -77,6 +72,28 @@ export function StatusBar({
               type="button"
               onClick={onStopDemo}
               title="Stop demo server"
+              className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors leading-none"
+            >
+              <X size={10} />
+            </button>
+          </>
+        )}
+
+        {conformancePort > 0 && (
+          <>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(`http://localhost:${conformancePort}`).catch(() => {})}
+              title={`Copy base URL · http://localhost:${conformancePort}`}
+              className="text-emerald-400 font-mono hover:text-emerald-300 transition-colors"
+            >
+              Conformance :{conformancePort}
+            </button>
+            <button
+              type="button"
+              onClick={onStopConformance}
+              title="Stop conformance server"
               className="text-[var(--color-muted-foreground)] hover:text-red-400 transition-colors leading-none"
             >
               <X size={10} />

@@ -13,13 +13,13 @@ import (
 // Minimal Swagger 2.0 structs — only the fields needed to generate request stubs.
 
 type swagger2Doc struct {
-	Info         swagger2Info                    `yaml:"info"                json:"info"`
-	Host         string                          `yaml:"host"                json:"host"`
-	BasePath     string                          `yaml:"basePath"            json:"basePath"`
-	Schemes      []string                        `yaml:"schemes"             json:"schemes"`
-	Paths        map[string]swagger2PathItem     `yaml:"paths"               json:"paths"`
-	SecurityDefs map[string]swagger2SecurityDef  `yaml:"securityDefinitions" json:"securityDefinitions"`
-	Definitions  map[string]swagger2Schema       `yaml:"definitions"         json:"definitions"`
+	Info         swagger2Info                   `yaml:"info"                json:"info"`
+	Host         string                         `yaml:"host"                json:"host"`
+	BasePath     string                         `yaml:"basePath"            json:"basePath"`
+	Schemes      []string                       `yaml:"schemes"             json:"schemes"`
+	Paths        map[string]swagger2PathItem    `yaml:"paths"               json:"paths"`
+	SecurityDefs map[string]swagger2SecurityDef `yaml:"securityDefinitions" json:"securityDefinitions"`
+	Definitions  map[string]swagger2Schema      `yaml:"definitions"         json:"definitions"`
 }
 
 type swagger2Info struct {
@@ -60,6 +60,11 @@ type swagger2Schema struct {
 	Properties map[string]swagger2Schema `yaml:"properties" json:"properties"`
 	Required   []string                  `yaml:"required"   json:"required"`
 	Items      *swagger2Schema           `yaml:"items"      json:"items"`
+	AllOf      []swagger2Schema          `yaml:"allOf"      json:"allOf"`
+	Example    any                       `yaml:"example"    json:"example"`
+	Default    any                       `yaml:"default"    json:"default"`
+	Enum       []any                     `yaml:"enum"       json:"enum"`
+	ReadOnly   bool                      `yaml:"readOnly"   json:"readOnly"`
 }
 
 type swagger2SecurityDef struct {
@@ -200,21 +205,9 @@ func buildSwagger2Request(
 			}
 		case "body":
 			if p.Schema != nil {
-				resolved := resolveSwagger2Ref(p.Schema, defs)
-				if resolved != nil && resolved.Type == "array" {
-					itemStub := "{}"
-					if resolved.Items != nil {
-						itemStub = buildSwagger2BodyStub(resolved.Items, defs)
-					}
-					req.Body = &domain.RequestBody{
-						Type:    domain.BodyJSON,
-						Content: "[\n  " + strings.ReplaceAll(itemStub, "\n", "\n  ") + "\n]",
-					}
-				} else {
-					req.Body = &domain.RequestBody{
-						Type:    domain.BodyJSON,
-						Content: buildSwagger2BodyStub(p.Schema, defs),
-					}
+				req.Body = &domain.RequestBody{
+					Type:    domain.BodyJSON,
+					Content: buildSwagger2BodyStub(p.Schema, defs),
 				}
 			}
 		}
@@ -334,41 +327,4 @@ func buildMultipartStub(textFields, fileFields []string) string {
 	}
 	data, _ := json.Marshal(entries)
 	return string(data)
-}
-
-func buildSwagger2BodyStub(s *swagger2Schema, defs map[string]swagger2Schema) string {
-	resolved := resolveSwagger2Ref(s, defs)
-	if resolved == nil || len(resolved.Properties) == 0 {
-		return "{}"
-	}
-
-	required := make(map[string]bool, len(resolved.Required))
-	for _, r := range resolved.Required {
-		required[r] = true
-	}
-
-	var reqFields, optFields []string
-	for _, r := range resolved.Required {
-		if _, ok := resolved.Properties[r]; ok {
-			reqFields = append(reqFields, r)
-		}
-	}
-	for name := range resolved.Properties {
-		if !required[name] {
-			optFields = append(optFields, name)
-		}
-	}
-	sort.Strings(optFields)
-
-	fields := append(reqFields, optFields...)
-	var sb strings.Builder
-	sb.WriteString("{\n")
-	for i, name := range fields {
-		if i > 0 {
-			sb.WriteString(",\n")
-		}
-		sb.WriteString(`  "` + name + `": "{{` + name + `}}"`)
-	}
-	sb.WriteString("\n}")
-	return sb.String()
 }
