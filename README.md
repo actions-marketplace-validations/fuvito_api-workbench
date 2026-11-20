@@ -44,6 +44,8 @@ One command. No test files to write. The spec is the source of truth.
 
 **The Contracts page** — a live scorecard for every OpenAPI spec you test: per-operation coverage and last result, plus quality signals that show what you have *not* proven yet. [See below.](#the-contracts-page)
 
+**Check Conformance, without a terminal** — pick an OpenAPI spec in the desktop app, press run, and see which operations match it and which do not. Read requests only by default. [See below.](#check-conformance-from-the-desktop)
+
 **Impact analysis** — `clrsig impact v1.yaml v2.yaml scenarios/*.yaml` tells you which of your scenarios will stop passing when a spec change ships.
 
 **Negative-path checks** — `clrsig conform --negative` also probes with missing required fields, wrong types, missing auth and missing parameters, to confirm the API rejects what the spec says it must reject.
@@ -110,6 +112,24 @@ clrsig coverage quality openapi.yaml --workspace .
 ```
 
 Contracts data lives in your workspace, never in the cloud. **Reset data** clears a spec's history whenever you want a fresh baseline.
+
+---
+
+## Check conformance from the desktop
+
+Spec Conformance Testing does not need a terminal. The **Check Conformance** page (the shield in the left rail) calls every operation in an OpenAPI spec and checks each response against what the spec declares, using the same code and the same report as `clrsig conform`.
+
+![Check Conformance — four totals and every operation with its violation](docs/images/15-conformance-results.png)
+
+**Safe by default.** Only read requests (`GET`, `HEAD`) are sent. Writes are an explicit tick box that first says how many write requests it will send, and an address that is not on your computer needs a confirmation before anything is sent.
+
+**Same four totals as Contracts.** *Covered*, *Not covered*, *Passing* and *Failing*, then each operation with the exact field that broke the spec. Options add tag and path filters, a request timeout, negative probes, and stop-on-first-failure. **Export report** saves HTML, JUnit, JSON or Markdown, and **Get CLI command** hands you the matching `clrsig conform` line for CI.
+
+**Scenarios report it too.** A scenario that names its spec now says how many responses matched it, and lists the violations under the step that caused them.
+
+![A scenario's result: 1 of 3 responses match the spec, with the violations per step](docs/images/16-scenario-spec-conformance.png)
+
+**A server that is wrong on purpose.** *Help → Dev Servers → Open Conformance Workspace* starts a small API with its own spec, three of whose operations break it, and opens a workspace ready to check. It is the quickest way to see a conformance failure before you point the page at your own API.
 
 ---
 
@@ -306,7 +326,11 @@ API traffic stays on your machine. Project files are YAML you own and can commit
 |---|---|
 | ![Contracts overview](docs/images/10-contracts-overview.png) | ![Contracts quality signals](docs/images/11-contracts-quality-signals.png) |
 
-Light-theme versions of every Contracts image are in [`docs/images`](docs/images) (`*-light.png`).
+| Check Conformance | Scenario spec conformance |
+|---|---|
+| ![Check Conformance](docs/images/15-conformance-results.png) | ![Scenario spec conformance](docs/images/16-scenario-spec-conformance.png) |
+
+Light-theme versions of the Contracts and conformance images are in [`docs/images`](docs/images) (`*-light.png`).
 
 ---
 
