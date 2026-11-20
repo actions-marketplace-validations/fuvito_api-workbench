@@ -11,6 +11,7 @@ import (
 const (
 	FindingMissingField = "missing-field" // the response omits a field the spec requires
 	FindingWrongType    = "wrong-type"    // a field has a different type than the spec declares
+	FindingMissingValue = "missing-value" // the request was not sent: a value it needs is missing
 	FindingRequest      = "request"       // the request built from the spec was itself invalid
 	FindingNoResponse   = "no-response"   // the server never answered
 	FindingOther        = "other"         // a violation this package does not recognise
@@ -42,6 +43,9 @@ func Diagnose(op OperationResult) []Finding {
 		return nil
 	}
 	var out []Finding
+	if op.Blocked != "" {
+		out = append(out, blockedFinding(op))
+	}
 	if op.Error != "" {
 		out = append(out, Finding{
 			Kind:    FindingNoResponse,
@@ -212,4 +216,33 @@ func firstLine(s string) string {
 		return strings.TrimSpace(s[:i])
 	}
 	return strings.TrimSpace(s)
+}
+
+func blockedFinding(op OperationResult) Finding {
+	refs := make([]string, len(op.Missing))
+	overrides := make([]string, len(op.Missing))
+	for i, n := range op.Missing {
+		refs[i] = "{{" + n + "}}"
+		overrides[i] = n + "=…"
+	}
+	if len(op.Missing) == 0 {
+		return Finding{
+			Kind:    FindingMissingValue,
+			Summary: "The request was not sent",
+			Got:     op.Blocked,
+			Why:     "A value the request needs could not be produced, so it was not sent and nothing was compared with the spec.",
+			Fix:     "Correct the dynamic value named above in the environment or the request.",
+			Detail:  op.Blocked,
+		}
+	}
+	return Finding{
+		Kind:    FindingMissingValue,
+		Where:   strings.Join(op.Missing, ", "),
+		Summary: "No value for " + strings.Join(refs, ", "),
+		Got:     "not sent",
+		Why: "The request needs " + strings.Join(refs, ", ") + " (a path parameter, a credential or a body field taken from the spec), " +
+			"but neither the environment nor the variable overrides provide it. It was not sent, so nothing was compared with the spec.",
+		Fix:    "Add " + strings.Join(op.Missing, ", ") + " to the environment, or give it as an override (" + strings.Join(overrides, ", ") + ").",
+		Detail: op.Blocked,
+	}
 }

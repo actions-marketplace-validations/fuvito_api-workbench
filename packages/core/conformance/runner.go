@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -25,11 +26,53 @@ type OperationResult struct {
 	Violations       []openapi.ValidationError
 	Error            string
 	Skipped          bool
+	// Blocked is set when the request was not sent because a value it needs is missing: a
+	// {{placeholder}} nothing provided, or a dynamic value that failed. Missing lists the
+	// placeholder names. A blocked operation is neither passed nor skipped: it counts as failed, so
+	// a check that could not run never looks like one that passed.
+	Blocked string
+	Missing []string
 }
 
 // Passed reports whether the operation executed and conformed to the spec.
 func (r OperationResult) Passed() bool {
-	return !r.Skipped && r.Error == "" && len(r.RequestViolations) == 0 && len(r.Violations) == 0
+	return !r.Skipped && r.Blocked == "" && r.Error == "" && len(r.RequestViolations) == 0 && len(r.Violations) == 0
+}
+
+// BlockedSummary reports how many operations were not sent because a value was missing, and the
+// placeholder names behind that (each once, in the order they were first needed), so a caller can
+// say "set these once" instead of repeating the same names for every operation.
+func (r *ConformResult) BlockedSummary() (operations int, missing []string) {
+	seen := map[string]bool{}
+	for _, op := range r.Operations {
+		if op.Blocked == "" {
+			continue
+		}
+		operations++
+		for _, name := range op.Missing {
+			if !seen[name] {
+				seen[name] = true
+				missing = append(missing, name)
+			}
+		}
+	}
+	return operations, missing
+}
+
+// MissingValuesAdvice is the one-line hint shown under a report that has blocked operations.
+func MissingValuesAdvice(operations int, missing []string) string {
+	if operations == 0 {
+		return ""
+	}
+	plural := "operations were"
+	if operations == 1 {
+		plural = "operation was"
+	}
+	if len(missing) == 0 {
+		return fmt.Sprintf("%d %s not sent because a dynamic value failed (see above).", operations, plural)
+	}
+	return fmt.Sprintf("%d %s not sent because nothing provides: %s. Add them to the environment, or pass them as overrides (name=value).",
+		operations, plural, strings.Join(missing, ", "))
 }
 
 // ConformResult holds the aggregate outcome of a conformance run.
@@ -172,6 +215,16 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		}
 
 		resolved := resolver.InterpolateRequest(gr.Request)
+		if missing, dynamicErrors := UnresolvedPlaceholders(resolved), resolver.TakeErrors(); len(missing) > 0 || len(dynamicErrors) > 0 {
+			or.Missing = missing
+			or.Blocked = blockedReason(missing, dynamicErrors)
+			result.Operations = append(result.Operations, or)
+			handled()
+			if opts.FailFast {
+				break
+			}
+			continue
+		}
 		if opts.RequestTimeoutMs > 0 {
 			resolved.Timeout = time.Duration(opts.RequestTimeoutMs) * time.Millisecond
 		}

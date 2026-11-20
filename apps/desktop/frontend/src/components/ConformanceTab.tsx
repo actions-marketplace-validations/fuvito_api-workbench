@@ -38,6 +38,7 @@ function Tile({ label, value, total, tone }: { label: string; value: number; tot
 const KIND_LABEL: Record<string, string> = {
   'wrong-type': 'wrong type',
   'missing-field': 'missing field',
+  'missing-value': 'missing value',
   'request': 'invalid request',
   'no-response': 'no answer',
   'other': 'other difference',
@@ -73,7 +74,9 @@ function ProblemCard({ op }: { op: ConformOperation }) {
   return (
     <article aria-label={`${op.method} ${op.path} fails`} className="rounded border border-red-500/40 bg-red-500/5 p-3 flex flex-col gap-2">
       <header className="flex flex-wrap items-baseline gap-x-2 text-xs">
-        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">{op.status === 'error' ? 'NO ANSWER' : 'FAILED'}</span>
+        <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
+          {op.status === 'error' ? 'NO ANSWER' : op.status === 'blocked' ? 'NOT SENT' : 'FAILED'}
+        </span>
         <span className="font-mono font-semibold">{op.method}</span>
         <span className="font-mono">{op.path}</span>
         {op.statusCode > 0 && <span className="text-[var(--color-muted-foreground)]">answered {op.statusCode} in {op.durationMs} ms</span>}
@@ -195,6 +198,7 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const [pathsText, setPathsText] = useState('')
   const [timeoutText, setTimeoutText] = useState('')
   const [varsText, setVarsText] = useState('')
+  const [optionsOpen, setOptionsOpen] = useState(false)
   const [negative, setNegative] = useState(false)
   const [failFast, setFailFast] = useState(false)
   const [recordCoverage, setRecordCoverage] = useState(false)
@@ -338,7 +342,11 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
           </p>
         </div>
 
-        <details className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2">
+        <details
+          open={optionsOpen}
+          onToggle={e => setOptionsOpen((e.currentTarget as HTMLDetailsElement).open)}
+          className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
+        >
           <summary className="cursor-pointer text-xs font-medium">Options</summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
@@ -439,7 +447,9 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
         {output && !output.error && (
           <section aria-label="Conformance results" className="flex flex-col gap-4">
             {(() => {
-              const problems = output.operations.filter(o => o.status === 'failed' || o.status === 'error')
+              const problems = output.operations.filter(o => o.status === 'failed' || o.status === 'error' || o.status === 'blocked')
+              const blocked = problems.filter(o => o.status === 'blocked').length
+              const missing = output.missingValues ?? []
               const passed = output.operations.filter(o => o.status === 'passed')
               const notRun = output.operations.filter(o => o.status === 'skipped')
               const kinds = new Map<string, number>()
@@ -450,9 +460,13 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
                 <>
                   <div>
                     <h2 data-testid="conform-headline" className={cn('text-sm font-semibold', problems.length > 0 ? 'text-red-400' : 'text-emerald-400')}>
-                      {problems.length > 0
-                        ? `${problems.length} of ${output.total} operations break the spec`
-                        : `All ${passed.length} checked operations match the spec`}
+                      {problems.length === 0
+                        ? `All ${passed.length} checked operations match the spec`
+                        : problems.length === blocked
+                          ? `${blocked} of ${output.total} operations could not be checked`
+                          : blocked > 0
+                            ? `${problems.length - blocked} of ${output.total} operations break the spec, ${blocked} could not be checked`
+                            : `${problems.length} of ${output.total} operations break the spec`}
                     </h2>
                     {kinds.size > 0 && (
                       <p className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
@@ -463,6 +477,27 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
                       </p>
                     )}
                   </div>
+
+                  {missing.length > 0 && (
+                    <div role="region" aria-label="Missing values" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                      <p className="font-semibold text-amber-400">
+                        {output.blockedOperations ?? blocked} {(output.blockedOperations ?? blocked) === 1 ? 'operation was' : 'operations were'} not sent: no value for {missing.map(m => `{{${m}}}`).join(', ')}
+                      </p>
+                      <p className="mt-1">Nothing was compared for them, so they are not counted as passing. Add the values to the environment, or give them under Options → Variable overrides.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const have = new Set(parseVars(varsText).vars.map(v => v.slice(0, v.indexOf('=')).trim()))
+                          const lines = missing.filter(m => !have.has(m)).map(m => `${m}=`)
+                          if (lines.length) setVarsText(t => (t.trim() ? t.replace(/\n*$/, '\n') : '') + lines.join('\n'))
+                          setOptionsOpen(true)
+                        }}
+                        className="mt-2 rounded border border-amber-500/50 px-2 py-1 text-xs hover:bg-amber-500/20"
+                      >
+                        Add these to Variable overrides
+                      </button>
+                    </div>
+                  )}
 
                   {problems.length > 0 && (
                     <div role="region" aria-label="Problems" className="flex flex-col gap-2.5">

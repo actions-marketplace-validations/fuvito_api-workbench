@@ -345,3 +345,77 @@ describe('run progress', () => {
     expect(stop).toHaveBeenCalled()
   })
 })
+
+describe('operations that could not be sent', () => {
+  const blockedOp = (id: string, method: string, path: string, missing: string[]) => ({
+    operationId: id, method, path, status: 'blocked' as const, statusCode: 0, durationMs: 0, violations: [],
+    findings: [{
+      kind: 'missing-value' as const, where: missing.join(', '), summary: `No value for ${missing.map(m => `{{${m}}}`).join(', ')}`,
+      got: 'not sent', why: 'The request needs a value nothing provides. It was not sent, so nothing was compared with the spec.',
+      fix: `Add ${missing.join(', ')} to the environment, or give it as an override.`, detail: 'not sent',
+    }],
+  })
+  const blockedOutput = {
+    ...output, failing: 0, passing: 1, covered: 1, notCovered: 2, blockedOperations: 2, missingValues: ['id', 'name'],
+    operations: [output.operations[0], blockedOp('a', 'GET', '/a/{{id}}', ['id']), blockedOp('b', 'POST', '/b', ['id', 'name'])],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+  })
+
+  it('shows them as not sent, never as passing, and says what to set once', async () => {
+    bridge.runConformance.mockResolvedValue(blockedOutput)
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('2 of 7 operations could not be checked')
+
+    const card = screen.getByRole('article', { name: 'POST /b fails' })
+    expect(card).toHaveTextContent('NOT SENT')
+    expect(card).toHaveTextContent('No value for {{id}}, {{name}}')
+    expect(screen.getByRole('region', { name: 'Passing operations' })).not.toHaveTextContent('/a/')
+
+    const panel = screen.getByRole('region', { name: 'Missing values' })
+    expect(panel).toHaveTextContent('2 operations were not sent: no value for {{id}}, {{name}}')
+    expect(screen.getByText(/missing value × 2/)).toBeInTheDocument()
+  })
+
+  it('mixes failures and blocked operations in one headline', async () => {
+    bridge.runConformance.mockResolvedValue({
+      ...blockedOutput, failing: 1,
+      operations: [output.operations[0], output.operations[1], blockedOp('a', 'GET', '/a/{{id}}', ['id'])],
+      blockedOperations: 1, missingValues: ['id'],
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('1 of 7 operations break the spec, 1 could not be checked')
+    expect(screen.getByRole('region', { name: 'Missing values' })).toHaveTextContent('1 operation was not sent')
+  })
+
+  it('adds the missing names to the variable overrides, once each, and opens the options', async () => {
+    bridge.runConformance.mockResolvedValue(blockedOutput)
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByRole('region', { name: 'Missing values' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add these to Variable overrides' }))
+    const box = screen.getByLabelText('Variable overrides') as HTMLTextAreaElement
+    expect(box.value).toBe('id=\nname=')
+    expect(screen.getByText('Options').closest('details')).toHaveAttribute('open')
+
+    // Clicking again does not duplicate lines; a value already typed is kept.
+    fireEvent.change(box, { target: { value: 'id=1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add these to Variable overrides' }))
+    expect((screen.getByLabelText('Variable overrides') as HTMLTextAreaElement).value).toBe('id=1\nname=')
+  })
+
+  it('shows no missing-values box when everything was sent', async () => {
+    bridge.runConformance.mockResolvedValue(output)
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    expect(screen.queryByRole('region', { name: 'Missing values' })).not.toBeInTheDocument()
+  })
+})

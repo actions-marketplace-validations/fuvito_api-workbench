@@ -266,11 +266,29 @@ func TestConformanceService_VariableOverrides(t *testing.T) {
 		return ConformOperationIO{}
 	}
 
-	// Without a value for the path parameter, the request keeps its {{id}} placeholder and the
-	// server answers 404 (a declared response), so there is nothing to compare.
-	without := op(svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: envPath}), "getProduct")
-	if without.StatusCode != 404 || len(without.Findings) != 0 {
+	// Without a value for the path parameter the request is not sent at all.
+	var paths []string
+	counting := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		newConformanceMux().ServeHTTP(w, r)
+	}))
+	defer counting.Close()
+	outWithout := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: counting.URL, EnvPath: envPath})
+	without := op(outWithout, "getProduct")
+	if without.Status != "blocked" || without.StatusCode != 0 || len(without.Findings) != 1 || without.Findings[0].Kind != "missing-value" {
 		t.Fatalf("getProduct without id: %+v", without)
+	}
+	// Read-only skips deleteProduct before it needs {{id}}, so only getProduct is blocked.
+	if len(outWithout.MissingValues) != 1 || outWithout.MissingValues[0] != "id" || outWithout.BlockedOperations != 1 {
+		t.Fatalf("missing values %v for %d blocked operations", outWithout.MissingValues, outWithout.BlockedOperations)
+	}
+	for _, p := range paths {
+		if strings.HasPrefix(p, "/products/") {
+			t.Fatalf("a request for %s reached the server although {{id}} had no value: %v", p, paths)
+		}
+	}
+	if outWithout.Covered+outWithout.NotCovered != outWithout.Total {
+		t.Fatalf("Covered + Not covered must equal the total: %+v", outWithout)
 	}
 	// An override supplies it for this run, so the real violation shows.
 	with := op(svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, EnvPath: envPath, Vars: []string{"id=1"}}), "getProduct")

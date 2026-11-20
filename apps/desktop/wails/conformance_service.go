@@ -168,7 +168,7 @@ type ConformOperationIO struct {
 	OperationID string   `json:"operationId"`
 	Method      string   `json:"method"`
 	Path        string   `json:"path"`
-	Status      string   `json:"status"` // passed, failed, error, skipped
+	Status      string   `json:"status"` // passed, failed, error, blocked (not sent: a value is missing), skipped
 	StatusCode  int      `json:"statusCode"`
 	DurationMs  int64    `json:"durationMs"`
 	Violations  []string `json:"violations"`
@@ -193,6 +193,10 @@ type ConformRunOutputIO struct {
 	// Probes is empty unless negative probes were requested. An accepted probe means the server
 	// took a request it should have rejected.
 	Probes []ConformProbeIO `json:"probes"`
+	// MissingValues are the placeholders that kept operations from being sent, each once, and
+	// BlockedOperations how many operations that affected.
+	MissingValues     []string `json:"missingValues"`
+	BlockedOperations int      `json:"blockedOperations"`
 	// Warnings are unset ${NAME} references in the environment: those values stay as written in
 	// the requests, which usually makes them fail for the wrong reason.
 	Warnings []string `json:"warnings"`
@@ -382,6 +386,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		Operations: []ConformOperationIO{},
 		Probes:     []ConformProbeIO{},
 		Warnings:   []string{},
+		MissingValues: []string{},
 		Total:      len(r.Operations),
 	}
 	for _, op := range r.Operations {
@@ -406,6 +411,8 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		switch {
 		case op.Skipped:
 			item.Status = "skipped"
+		case op.Blocked != "":
+			item.Status = "blocked"
 		case op.Error != "":
 			item.Status = "error"
 		case op.Passed():
@@ -426,6 +433,10 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			res.NotCovered++
 		}
 		res.Operations = append(res.Operations, item)
+	}
+	res.BlockedOperations, res.MissingValues = r.BlockedSummary()
+	if res.MissingValues == nil {
+		res.MissingValues = []string{}
 	}
 	if out.Negative != nil {
 		for _, p := range out.Negative.Probes {

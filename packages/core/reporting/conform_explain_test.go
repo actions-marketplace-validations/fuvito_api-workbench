@@ -94,3 +94,71 @@ func TestConformReports_ExplanationsAreRedacted(t *testing.T) {
 		t.Fatalf("markdown is missing the explanation:\n%s", md)
 	}
 }
+
+func blockedFixture() *conformance.ConformResult {
+	return &conformance.ConformResult{
+		SpecTitle: "Shop", SpecVersion: "1", BaseURL: "http://x",
+		Operations: []conformance.OperationResult{
+			{OperationID: "ok", Method: "GET", Path: "/ok", StatusCode: 200},
+			{OperationID: "a", Method: "GET", Path: "/a/{{id}}", Blocked: "not sent: no value for {{id}}", Missing: []string{"id"}},
+			{OperationID: "b", Method: "POST", Path: "/b", Blocked: "not sent: no value for {{id}}, {{name}}", Missing: []string{"id", "name"}},
+		},
+	}
+}
+
+func TestConformReports_BlockedOperations(t *testing.T) {
+	r := blockedFixture()
+	text := ConformText(r, nil)
+	for _, want := range []string{
+		"FAIL  GET     /a/{{id}}", "✗ not sent: no value for {{id}}",
+		"2 operations were not sent because nothing provides: id, name.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("text is missing %q:\n%s", want, text)
+		}
+	}
+	if !strings.Contains(text, "FAILED  3 operations  ·  1 passed  ·  2 failed") {
+		t.Errorf("a blocked operation counts as failed:\n%s", text)
+	}
+	if strings.Count(text, "provides: id, name") != 1 {
+		t.Errorf("the missing names are listed once, not per operation:\n%s", text)
+	}
+
+	js, err := ConformJSON(r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed JSONConformReport
+	if err := json.Unmarshal(js, &parsed); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(parsed.MissingValues, ",") != "id,name" || parsed.Passed {
+		t.Errorf("json: %+v", parsed)
+	}
+	if b := parsed.Operations[2]; b.Blocked == "" || strings.Join(b.Missing, ",") != "id,name" || len(b.Findings) != 1 || b.Findings[0].Kind != "missing-value" {
+		t.Errorf("json operation: %+v", b)
+	}
+
+	junit, err := ConformJUnit(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(junit), "not sent: no value for {{id}}") || !strings.Contains(string(junit), `failures="2"`) {
+		t.Errorf("junit:\n%s", junit)
+	}
+	html, err := ConformHTML(r, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(html), "nothing provides: id, name") {
+		t.Error("html is missing the missing-values line")
+	}
+	if !strings.Contains(string(ConformMarkdown(r, nil, nil)), "not sent: no value for {{id}}") {
+		t.Error("markdown is missing the blocked line")
+	}
+
+	clean := &conformance.ConformResult{Operations: []conformance.OperationResult{{Method: "GET", Path: "/ok", StatusCode: 200}}}
+	if strings.Contains(ConformText(clean, nil), "not sent") {
+		t.Error("a run with nothing blocked must not mention it")
+	}
+}

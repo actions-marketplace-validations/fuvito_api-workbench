@@ -762,7 +762,7 @@ export interface ConformProbe {
 }
 
 export interface ConformFinding {
-  kind: 'missing-field' | 'wrong-type' | 'request' | 'no-response' | 'other'
+  kind: 'missing-field' | 'wrong-type' | 'missing-value' | 'request' | 'no-response' | 'other'
   where?: string
   summary: string
   expected?: string
@@ -776,7 +776,8 @@ export interface ConformOperation {
   operationId: string
   method: string
   path: string
-  status: 'passed' | 'failed' | 'error' | 'skipped'
+  // blocked: not sent because a {{placeholder}} had no value
+  status: 'passed' | 'failed' | 'error' | 'blocked' | 'skipped'
   statusCode: number
   durationMs: number
   violations: string[]
@@ -799,6 +800,9 @@ export interface ConformRunOutput {
   failing: number
   probes: ConformProbe[]
   warnings: string[]
+  // placeholders that kept operations from being sent (each once) and how many operations that hit
+  missingValues?: string[]
+  blockedOperations?: number
   coverageNote?: string
 }
 

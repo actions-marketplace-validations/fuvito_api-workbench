@@ -68,6 +68,27 @@ test.describe('Check Conformance page', () => {
     await expect(page.getByRole('region', { name: 'Negative probes' })).toContainText('1 accepted by the server')
   })
 
+  test('an operation with no value for a placeholder is not sent, and the user is told what to set', async ({ page }) => {
+    await page.addInitScript(() => { (window as unknown as { __bridge: Record<string, unknown> }).__bridge['conformNeedsId'] = true })
+    await gotoApp(page)
+    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
+    await page.getByRole('button', { name: 'Run conformance check' }).click()
+
+    await expect(page.getByTestId('conform-headline')).toHaveText('1 of 5 operations could not be checked')
+    await expect(page.getByRole('article', { name: 'GET /items/{{id}} fails' })).toContainText('NOT SENT')
+    await expect(page.getByRole('region', { name: 'Passing operations' })).not.toContainText('/items/{{id}}')
+    await expect(page.getByRole('region', { name: 'Missing values' })).toContainText('no value for {{id}}')
+
+    // One click puts the name in the overrides; typing a value and running again sends it.
+    await page.getByRole('button', { name: 'Add these to Variable overrides' }).click()
+    await expect(page.getByLabel('Variable overrides')).toHaveValue('id=')
+    await page.getByLabel('Variable overrides').fill('id=1')
+    await page.getByRole('button', { name: 'Run conformance check' }).click()
+    await expect(page.getByRole('region', { name: 'Missing values' })).toHaveCount(0)
+    await expect(page.getByTestId('conform-headline')).toHaveText('1 of 5 operations break the spec')
+  })
+
   test('Get CLI command carries the page choices, read-only included', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Check spec conformance' }).click()

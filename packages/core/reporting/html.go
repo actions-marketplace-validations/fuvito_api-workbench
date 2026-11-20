@@ -266,6 +266,9 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 	x := newRedactor(result.Secrets, false)
 	doc.Subtitle = x.text(doc.Subtitle)
 	ops := htmlSection{Heading: "Operations"}
+	if n, missing := result.BlockedSummary(); n > 0 {
+		ops.Footer = x.text(conformance.MissingValuesAdvice(n, missing))
+	}
 	for _, op := range result.Operations {
 		row := htmlRow{Title: op.Method + " " + op.Path}
 		switch {
@@ -281,6 +284,9 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 		}
 		if op.Error != "" {
 			row.Lines = append(row.Lines, htmlLine{Mark: "!", Text: "error: " + x.text(op.Error)})
+		}
+		if op.Blocked != "" {
+			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: x.text(op.Blocked)})
 		}
 		for _, v := range op.RequestViolations {
 			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: "request: " + x.text(v.Error())})

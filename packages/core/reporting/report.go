@@ -352,6 +352,9 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 		if op.Error != "" {
 			fmt.Fprintf(&b, "         error: %s\n", x.text(op.Error))
 		}
+		if op.Blocked != "" {
+			fmt.Fprintf(&b, "         ✗ %s\n", x.text(op.Blocked))
+		}
 		for _, v := range op.RequestViolations {
 			fmt.Fprintf(&b, "         ✗ request: %s\n", x.text(v.Error()))
 		}
@@ -375,6 +378,9 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	}
 	fmt.Fprintf(&b, "%s  %d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms\n",
 		verdict, total, passed, failed, skipped, result.Duration.Milliseconds())
+	if n, missing := result.BlockedSummary(); n > 0 {
+		fmt.Fprintf(&b, "%s\n", conformance.MissingValuesAdvice(n, missing))
+	}
 
 	if coverage != nil {
 		fmt.Fprintln(&b)
@@ -405,7 +411,9 @@ type JSONConformReport struct {
 	BaseURL     string          `json:"baseURL"`
 	Passed      bool            `json:"passed"`
 	DurationMs  int64           `json:"durationMs"`
-	Operations  []JSONConformOp `json:"operations"`
+	// MissingValues lists the placeholders that kept operations from being sent (each once).
+	MissingValues []string        `json:"missingValues,omitempty"`
+	Operations    []JSONConformOp `json:"operations"`
 	Coverage    *JSONCoverage   `json:"coverage,omitempty"`
 }
 
@@ -418,6 +426,9 @@ type JSONConformOp struct {
 	Passed            bool     `json:"passed"`
 	Skipped           bool     `json:"skipped,omitempty"`
 	Error             string   `json:"error,omitempty"`
+	// Blocked says why the request was not sent (a missing value); Missing names the placeholders.
+	Blocked           string   `json:"blocked,omitempty"`
+	Missing           []string `json:"missing,omitempty"`
 	RequestViolations []string `json:"requestViolations,omitempty"`
 	Violations        []string `json:"violations,omitempty"`
 	// Findings explain each failure in plain language (added in addition to the fields above,
@@ -465,6 +476,7 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		Passed:      failed == 0,
 		DurationMs:  result.Duration.Milliseconds(),
 	}
+	_, report.MissingValues = result.BlockedSummary()
 	for _, op := range result.Operations {
 		jo := JSONConformOp{
 			OperationID: op.OperationID,
@@ -475,6 +487,8 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			Passed:      op.Passed(),
 			Skipped:     op.Skipped,
 			Error:       x.text(op.Error),
+			Blocked:     x.text(op.Blocked),
+			Missing:     op.Missing,
 		}
 		for _, v := range op.RequestViolations {
 			jo.RequestViolations = append(jo.RequestViolations, x.text(v.Error()))
@@ -536,6 +550,9 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 			tc.Error = &jUnitError{Message: x.text(op.Error), Text: x.text(op.Error)}
 		case !op.Passed():
 			var msgs []string
+			if op.Blocked != "" {
+				msgs = append(msgs, "  ✗ "+x.text(op.Blocked))
+			}
 			for _, v := range op.RequestViolations {
 				msgs = append(msgs, "  ✗ request: "+x.text(v.Error()))
 			}

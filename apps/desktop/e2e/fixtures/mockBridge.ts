@@ -236,6 +236,8 @@ export function setupMockBridge() {
           const local = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(input.baseUrl)
           const empty = { specTitle: '', baseUrl: input.baseUrl, writes: false, durationMs: 0, operations: [], total: 0, covered: 0, notCovered: 0, passing: 0, failing: 0, probes: [], warnings: [] }
           if (!local && !input.confirmedRemote) return Promise.resolve({ ...empty, error: 'confirm the base URL ' + input.baseUrl + ' before running: it is not on this computer' })
+          // A test can ask for an operation that needs a value nothing provides, until it is overridden.
+          const needsId = bridge['conformNeedsId'] === true && !((input as unknown as { vars?: string[] }).vars ?? []).some(v => v.startsWith('id='))
           const op = (operationId: string, method: string, path: string, status: string, statusCode: number, violations: string[] = []) =>
             ({
               operationId, method, path, status, statusCode, durationMs: 4, violations,
@@ -246,18 +248,25 @@ export function setupMockBridge() {
             })
           const operations = [
             op('listItems', 'GET', '/items', 'passed', 200),
-            op('getItem', 'GET', '/items/{{id}}', 'failed', 200, ['Error at "/price": value must be a number']),
+            needsId
+              ? ({
+                  operationId: 'getItem', method: 'GET', path: '/items/{{id}}', status: 'blocked', statusCode: 0, durationMs: 0, violations: [],
+                  findings: [{ kind: 'missing-value', where: 'id', summary: 'No value for {{id}}', got: 'not sent', why: 'The request needs {{id}} but nothing provides it. It was not sent, so nothing was compared with the spec.', fix: 'Add id to the environment, or give it as an override (id=…).', detail: 'not sent: no value for {{id}}' }],
+                })
+              : op('getItem', 'GET', '/items/{{id}}', 'failed', 200, ['Error at "/price": value must be a number']),
             op('health', 'GET', '/health', 'passed', 200),
             input.allowWrites ? op('createItem', 'POST', '/items', 'passed', 201) : op('createItem', 'POST', '/items', 'skipped', 0),
             input.allowWrites ? op('deleteItem', 'DELETE', '/items/{{id}}', 'passed', 204) : op('deleteItem', 'DELETE', '/items/{{id}}', 'skipped', 0),
           ]
           const covered = operations.filter(o => o.status === 'passed' || o.status === 'failed').length
+          const blockedCount = operations.filter(o => o.status === 'blocked').length
           const probes = input.negative
             ? [{ operationId: 'getItem', method: 'GET', path: '/items/{{id}}', kind: 'wrong-type', description: 'id as text', status: 'accepted', statusCode: 200 }]
             : []
           return Promise.resolve({
             ...empty, specTitle: 'Shop', writes: input.allowWrites, durationMs: 21, operations, total: 5, covered,
-            notCovered: 5 - covered, passing: operations.filter(o => o.status === 'passed').length, failing: 1, probes,
+            notCovered: 5 - covered, passing: operations.filter(o => o.status === 'passed').length, failing: needsId ? 0 : 1, probes,
+            missingValues: needsId ? ['id'] : [], blockedOperations: blockedCount,
           })
         },
         CancelConformance: noop,
