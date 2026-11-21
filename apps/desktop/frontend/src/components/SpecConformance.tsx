@@ -1,4 +1,5 @@
 import type { StepResult } from '@/lib/bridge'
+import { FindingView } from '@/components/FindingView'
 
 // Spec Conformance Testing summary for one run: how many checked responses match the spec, the
 // violations per step, and which steps were not checked (and why). Renders nothing without a spec.
@@ -24,9 +25,15 @@ export function SpecConformance({ steps, specFile }: { steps: StepResult[]; spec
       {violating.map(s => (
         <div key={s.label}>
           <p className="font-medium">{s.label}</p>
-          <ul className="list-disc pl-5 font-mono text-[11px] text-red-400">
-            {(s.specViolations ?? []).map((v, i) => <li key={i} className="break-all">{v}</li>)}
-          </ul>
+          {(s.specFindings ?? []).length > 0 ? (
+            <div className="mt-1 flex flex-col gap-2">
+              {(s.specFindings ?? []).map((f, i) => <FindingView key={i} f={f} />)}
+            </div>
+          ) : (
+            <ul className="list-disc pl-5 font-mono text-[11px] text-red-400">
+              {(s.specViolations ?? []).map((v, i) => <li key={i} className="break-all">{v}</li>)}
+            </ul>
+          )}
         </div>
       ))}
       {unchecked.length > 0 && (

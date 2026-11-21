@@ -188,6 +188,18 @@ type ConformFindingIO struct {
 	Detail   string `json:"detail,omitempty"`
 }
 
+// findingsIO converts diagnosed findings for the frontend.
+func findingsIO(fs []conformance.Finding) []ConformFindingIO {
+	out := make([]ConformFindingIO, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, ConformFindingIO{
+			Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
+			Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
+		})
+	}
+	return out
+}
+
 type ConformOperationIO struct {
 	OperationID string   `json:"operationId"`
 	Method      string   `json:"method"`
@@ -435,12 +447,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			Violations: []string{},
 			Findings:   []ConformFindingIO{},
 		}
-		for _, f := range conformance.Diagnose(op) {
-			item.Findings = append(item.Findings, ConformFindingIO{
-				Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
-				Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
-			})
-		}
+		item.Findings = append(item.Findings, findingsIO(conformance.Diagnose(op))...)
 		for _, v := range op.RequestViolations {
 			item.Violations = append(item.Violations, "request: "+v.Error())
 		}

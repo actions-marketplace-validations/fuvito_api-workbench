@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/history"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -126,6 +128,9 @@ type StepResultIO struct {
 	SpecState      string   `json:"specState,omitempty"`
 	SpecReason     string   `json:"specReason,omitempty"`
 	SpecViolations []string `json:"specViolations,omitempty"`
+	// SpecFindings explain each violation the way the Check Conformance page does (what the spec
+	// expected, what came back, where, why and how to fix it); SpecViolations is the validator's raw text.
+	SpecFindings []ConformFindingIO `json:"specFindings,omitempty"`
 }
 
 type CoverageIO struct {
@@ -922,6 +927,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		for _, v := range sr.Spec.Violations {
 			step.SpecViolations = append(step.SpecViolations, v.Error())
 		}
+		step.SpecFindings = specFindings(sr)
 		if sr.Request != nil {
 			step.RequestMethod, step.RequestURL, step.RequestHeaders, step.RequestBody = exchangeRequest(sr.Request, result.Secrets)
 		}
@@ -1455,4 +1461,28 @@ func (s *ScenarioService) ListDynamicFunctions() []DynamicFunctionIO {
 		out[i] = DynamicFunctionIO{Name: f.Name, Usage: f.Usage, Description: f.Description, Example: f.Example}
 	}
 	return out
+}
+
+// requestPath is the path part of a request URL, for pointing a finding at the operation.
+func requestPath(raw string) string {
+	if u, err := url.Parse(raw); err == nil && u.Path != "" {
+		return u.Path
+	}
+	if i := strings.Index(raw, "?"); i >= 0 {
+		return raw[:i]
+	}
+	return raw
+}
+
+// specFindings explains the spec violations of one step in plain language, as the Check Conformance
+// page does for an operation. The operation is the one the step called, so its path is the request's.
+func specFindings(sr scenario.StepResult) []ConformFindingIO {
+	if len(sr.Spec.Violations) == 0 || sr.Request == nil {
+		return nil
+	}
+	op := conformance.OperationResult{Method: string(sr.Request.Method), Path: requestPath(sr.Request.URL), Violations: sr.Spec.Violations}
+	if sr.Response != nil {
+		op.StatusCode = sr.Response.StatusCode
+	}
+	return findingsIO(conformance.Diagnose(op))
 }

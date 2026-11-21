@@ -267,4 +267,26 @@ func TestConformanceWorkspaceSampleScenario(t *testing.T) {
 	if len(states) != 3 || states[0] != want[0] || states[1] != want[1] || states[2] != want[2] {
 		t.Fatalf("spec states = %v, want %v", states, want)
 	}
+
+	// The scenario result explains each violation like the Check Conformance page: what, where, why, fix.
+	for i, st := range res.Steps {
+		got := specFindings(st)
+		if st.Spec.State != scenario.SpecViolations {
+			if len(got) != 0 {
+				t.Errorf("step %d matched the spec and must have no findings: %+v", i, got)
+			}
+			continue
+		}
+		if len(got) != len(st.Spec.Violations) {
+			t.Fatalf("step %d: %d findings for %d violations", i, len(got), len(st.Spec.Violations))
+		}
+		for _, f := range got {
+			if f.Summary == "" || f.Why == "" || f.Fix == "" || f.Detail == "" {
+				t.Errorf("step %d: an explained finding needs a summary, why, fix and the raw detail: %+v", i, f)
+			}
+		}
+		if got[0].Spec == "" || !strings.Contains(got[0].Spec, string(st.Request.Method)) {
+			t.Errorf("step %d: the finding must say where in the spec the expectation is: %+v", i, got[0])
+		}
+	}
 }

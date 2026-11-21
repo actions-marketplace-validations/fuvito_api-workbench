@@ -28,6 +28,24 @@ describe('SpecConformance', () => {
     expect(screen.getByText('price: expected number')).toBeInTheDocument()
   })
 
+  it('explains a violation like the Check Conformance page when the step carries findings', () => {
+    render(<SpecConformance steps={[
+      step('bad', {
+        specState: 'violations', passed: false, specViolations: ['price: expected number'],
+        specFindings: [{
+          kind: 'wrong-type', where: 'price', spec: 'GET /items/{id} → response 200 → body schema', summary: '"price" is text, the spec says number',
+          expected: 'number', got: '"9.99"', why: 'The server sent text where the spec declares a number.', fix: 'Send a number from the server.', detail: 'Error at "/price"',
+        }],
+      }),
+    ]} specFile="openapi.yaml" />)
+    expect(screen.getByText('"price" is text, the spec says number')).toBeInTheDocument()
+    expect(screen.getByText('The server sent text where the spec declares a number.')).toBeInTheDocument()
+    expect(screen.getByText('Send a number from the server.')).toBeInTheDocument()
+    expect(screen.getByTestId('finding-spec')).toHaveTextContent('GET /items/{id}')
+    // The raw validator line is not repeated as a bullet; it stays under Technical detail.
+    expect(screen.queryByText('price: expected number')).not.toBeInTheDocument()
+  })
+
   it('shows unchecked steps with the reason and does not count them as matches', () => {
     render(<SpecConformance steps={[
       step('a', { specState: 'matched' }),

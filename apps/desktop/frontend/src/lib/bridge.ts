@@ -1017,6 +1017,7 @@ export interface StepResult {
   specState?: 'matched' | 'violations' | 'not-checked'
   specReason?: string
   specViolations?: string[]
+  specFindings?: ConformFinding[]
 }
 
 export interface ScenarioCoverage {
