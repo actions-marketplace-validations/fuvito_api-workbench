@@ -16,6 +16,8 @@ export type CliBuilderPreset = {
 
 type Props = {
   preset?: CliBuilderPreset | null
+  // Tells the app which command the page has selected, for the CLI Builder sidebar.
+  onCommandChange?: (command: string) => void
 }
 
 const SHELL_LABELS: Record<CliShell, string> = { bash: 'bash', powershell: 'PowerShell', cmd: 'cmd' }
@@ -178,7 +180,7 @@ function Field({ input, value, files, messages, suggestion, onChange }: FieldPro
   )
 }
 
-export function CliBuilderTab({ preset }: Props) {
+export function CliBuilderTab({ preset, onCommandChange }: Props) {
   const [catalog, setCatalog] = useState<CliCommand[] | null>(null)
   const [ctx, setCtx] = useState<CliContext | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -204,6 +206,8 @@ export function CliBuilderTab({ preset }: Props) {
       .catch(e => { if (!cancelled) setLoadError(String(e)) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => { if (command) onCommandChange?.(command) }, [command]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [appliedPreset, setAppliedPreset] = useState<typeof preset>(null)
   if (preset !== appliedPreset) {

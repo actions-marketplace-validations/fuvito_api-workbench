@@ -1,6 +1,6 @@
 # Rail sidebars for every icon, and a last tab per icon
 
-**Status:** Accepted as written by the project owner on 2026-11-21, including the recommendations for decisions 4-7. Not built yet; planned for 0.7.0, phase by phase (section 5).
+**Status:** Accepted as written by the project owner on 2026-11-21, including the recommendations for decisions 4-7. Built on 2026-11-21 in three phases (section 5); ships with 0.7.0.
 **Date:** 2026-11-21
 **Author:** Claude Code, for the project owner
 **Backlog:** B-081

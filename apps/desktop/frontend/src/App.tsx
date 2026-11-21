@@ -20,6 +20,10 @@ import {CoverageTab} from '@/components/CoverageTab'
 import {ConformanceTab} from '@/components/ConformanceTab'
 import {WorkspaceTab} from '@/components/WorkspaceTab'
 import {WorkspaceSidebarPanel} from '@/components/WorkspaceSidebarPanel'
+import {ConformanceSidebarPanel} from '@/components/ConformanceSidebarPanel'
+import type {ConformSummary} from '@/components/ConformanceSidebarPanel'
+import {CliBuilderSidebarPanel} from '@/components/CliBuilderSidebarPanel'
+import type {ConformRequest} from '@/components/ConformanceTab'
 import {useWorkspaceOverview} from '@/hooks/useWorkspaceOverview'
 import {RunnerTab} from '@/components/RunnerTab'
 import {CliBuilderTab} from '@/components/CliBuilderTab'
@@ -317,6 +321,16 @@ export default function App() {
     enabled: tabs.activeTab?.kind === 'workspace' || (sidebarOpen && railTab === 'workspace'),
     refreshTrigger: runLogTrigger + coverageRefreshTrigger + envChanges,
   })
+  // Check Conformance and CLI Builder: the sidebars pick inputs on the pages (a request the page applies),
+  // and the pages report back what is chosen so the sidebars can mark it.
+  const [conformRequest, setConformRequest] = useState<ConformRequest | null>(null)
+  const [conformSel, setConformSel] = useState({ specPath: '', envPath: '' })
+  const [conformResult, setConformResult] = useState<ConformSummary | null>(null)
+  const [cliCommand, setCliCommand] = useState('')
+  function chooseConformInput(choice: { specPath?: string; envPath?: string }) {
+    setConformRequest(prev => ({ id: (prev?.id ?? 0) + 1, ...choice }))
+    tabs.openConformanceTab()
+  }
   const [focusAttention, setFocusAttention] = useState<{ index: number; seq: number }>()
   function showAttention(index: number) {
     tabs.openWorkspaceTab()
@@ -1261,6 +1275,17 @@ export default function App() {
                         onShowIcon={handleRailTabClick}
                       />
                     }
+                    conformancePanel={
+                      <ConformanceSidebarPanel
+                        workspacePath={workspace.workspacePath}
+                        selectedSpec={conformSel.specPath}
+                        selectedEnv={conformSel.envPath}
+                        lastResult={conformResult}
+                        onSelectSpec={path => chooseConformInput({ specPath: path })}
+                        onSelectEnv={path => chooseConformInput({ envPath: path })}
+                      />
+                    }
+                    cliPanel={<CliBuilderSidebarPanel selected={cliCommand} onSelect={name => openCliBuilder({ command: name })} />}
                     clipboard={fileClipboard}
                     onCopyFile={path => setFileClipboard({ op: 'copy', kind: 'request', srcPath: path })}
                     onCutFile={path => setFileClipboard({ op: 'cut', kind: 'request', srcPath: path })}
@@ -1401,7 +1426,12 @@ export default function App() {
                     className="absolute inset-0 overflow-hidden"
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
-                    <ConformanceTab onOpenCliBuilder={values => openCliBuilder({ command: 'conform', values })} />
+                    <ConformanceTab
+                      onOpenCliBuilder={values => openCliBuilder({ command: 'conform', values })}
+                      request={conformRequest}
+                      onSelectionChange={setConformSel}
+                      onResult={setConformResult}
+                    />
                   </div>
                 ))}
 
@@ -1437,7 +1467,7 @@ export default function App() {
                     className="absolute inset-0 overflow-hidden"
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
-                    <CliBuilderTab preset={cliPreset} />
+                    <CliBuilderTab preset={cliPreset} onCommandChange={setCliCommand} />
                   </div>
                 ))}
 

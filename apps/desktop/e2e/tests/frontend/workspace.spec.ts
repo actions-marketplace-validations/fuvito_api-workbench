@@ -170,6 +170,36 @@ test.describe('Workspace page', () => {
     await expect(page.getByRole('article', { name: /does not exist/ })).toBeVisible()
   })
 
+  // The Check Conformance and CLI Builder sidebars pick inputs on their pages.
+  test('the Check Conformance sidebar picks the spec on the page and shows its last result', async ({ page }) => {
+    await gotoApp(page)
+    await page.locator('button[aria-label="Check spec conformance"]').click()
+    const side = page.getByTestId('sidebar-conformance')
+    await expect(side.getByRole('list', { name: 'Workspace specs' })).toContainText('specs/shop.yaml')
+    await expect(side.getByRole('button', { name: 'Active environment' })).toHaveAttribute('aria-pressed', 'true')
+
+    await side.getByRole('button', { name: 'specs/shop.yaml' }).click()
+    await expect(page.locator('#conf-spec')).toHaveValue('/workspace/specs/shop.yaml')
+    await expect(side.getByRole('button', { name: 'specs/shop.yaml' })).toHaveAttribute('aria-pressed', 'true')
+
+    await side.getByRole('button', { name: 'environments/ci.yaml' }).or(side.getByRole('button', { name: 'environments/local.yaml' })).click()
+    await expect(page.locator('#conf-env')).toHaveValue('/workspace/environments/local.yaml')
+
+    await page.getByRole('button', { name: /Run conformance check/ }).click()
+    await expect(side.getByTestId('sidebar-last-result')).toBeVisible()
+  })
+
+  test('the CLI Builder sidebar lists the commands and selects one on the page', async ({ page }) => {
+    await gotoApp(page)
+    await page.locator('button[aria-label="CLI Command Builder"]').click()
+    const side = page.getByTestId('sidebar-cli')
+    await expect(side.getByRole('button', { name: /clrsig run/ })).toBeVisible()
+    await expect(side.getByRole('button', { name: /clrsig run/ })).toHaveAttribute('aria-pressed', 'true')
+    await side.getByRole('button', { name: /clrsig conform/ }).click()
+    await expect(page.getByRole('radio', { name: /Check an API against its OpenAPI spec/ })).toHaveAttribute('aria-checked', 'true')
+    await expect(side.getByRole('button', { name: /clrsig conform/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('Refresh reads the workspace again', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Workspace', exact: true }).click()

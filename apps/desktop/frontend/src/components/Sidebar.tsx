@@ -101,6 +101,8 @@ export type SidebarProps = {
   onPasteToScenarioFolder?: (relFolderPath: string) => void
   // The Workspace icon's panel, built by the app because it shares its snapshot with the Workspace page.
   workspacePanel?: React.ReactNode
+  conformancePanel?: React.ReactNode
+  cliPanel?: React.ReactNode
 }
 
 export function Sidebar({
@@ -119,7 +121,7 @@ export function Sidebar({
   onRunFolder, onRunScenarioFolder, folderRunState, onDismissFolderRun, onCancelFolderRun,
   selectedCoverageSpecFile, onSelectCoverageSpec,
   clipboard, onCopyFile, onCutFile, onPasteToRequestFolder, onPasteToRequestRoot,
-  onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder, workspacePanel,
+  onMoveScenario, onCopyScenario, onCutScenario, onPasteToScenarioFolder, workspacePanel, conformancePanel, cliPanel,
 }: SidebarProps) {
   const [confirmingClear, setConfirmingClear] = useState(false)
   const [requestsView, setRequestsView] = useState<'requests' | 'history'>(() => {
@@ -324,16 +326,10 @@ export function Sidebar({
 
       {tab === 'workspace' && (workspacePanel ?? null)}
 
-      {(tab === 'conformance' || tab === 'cli') && (
-        <div data-testid={`sidebar-${tab}`} className="flex flex-col flex-1 overflow-hidden">
-          <div className="shrink-0 px-3 py-2 border-b border-[var(--color-border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
-            {SIDEBAR_TITLES[tab]}
-          </div>
-        </div>
-      )}
+      {tab === 'conformance' && (conformancePanel ?? null)}
+
+      {tab === 'cli' && (cliPanel ?? null)}
 
     </div>
   )
 }
-
-const SIDEBAR_TITLES = { conformance: 'Check Conformance', cli: 'CLI Builder' } as const

@@ -724,3 +724,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Workspace sidebar** (`WorkspaceSidebarPanel`): workspace name and temporary badge, an environment selector that calls the same `handleEnvChange` as the status bar, the environment's source, the **Needs attention** list (clicking an item opens the Workspace tab and scrolls to that card, `data-attention-index`), and counts that switch to the Requests or Scenarios icon.
 - **One snapshot:** `hooks/useWorkspaceOverview` reads `GetWorkspaceOverview` for both the Workspace page and the sidebar (while either is on screen, and again after a run, a Contracts change or an environment change), so they never disagree. `WorkspaceTab` now takes the snapshot as props instead of reading it itself.
 - **Not yet:** the Check Conformance and CLI Builder sidebars (phase 3). The environment selector stays in the status bar as well.
+
+### 2026-11-21 — Check Conformance and CLI Builder sidebars, phase 3 of B-081 (all three phases built)
+
+- **Check Conformance sidebar** (`ConformanceSidebarPanel`): the workspace's specs and environments (plus *Active environment*), the choice on the page marked, and a *Last result* card (Covered, Passing, Failing of total; click to show the page). A click applies the choice on the page (`ConformRequest`) and shows it; the page reports its selection and its run totals back (`onSelectionChange`, `onResult`), kept in `App` for the session.
+- **CLI Builder sidebar** (`CliBuilderSidebarPanel`): the catalog's commands with their goals; a click selects the command on the page (the existing `preset` path) and the selected one is marked (`onCommandChange`).
+- **Both are pickers:** every option stays on the page; the sidebar lists are named *Workspace specs* and *Workspace environments* so they are not confused with the page's own fields.
+- **B-081 is done:** the model (phase 1), the Workspace sidebar (phase 2) and these two. Not changed: the environment selector also stays in the status bar. Screenshots of the new sidebars are not generated yet.

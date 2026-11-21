@@ -6,6 +6,7 @@ import {
   exportConformReport, saveContentToFile, openInSystemViewer, onConformanceProgress,
 } from '@/lib/bridge'
 import { isLocalUrl, findingWhere, parseVars, splitList, cliValues } from '@/lib/conformHelpers'
+import type { ConformSummary } from '@/components/ConformanceSidebarPanel'
 import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformFinding, ConformReportFormat } from '@/lib/bridge'
 
 const inputClass =
@@ -141,9 +142,18 @@ function ExportMenu({ disabled }: { disabled: boolean }) {
   )
 }
 
-type Props = { onOpenCliBuilder?: (values: Record<string, string>) => void }
+// A choice made in the Check Conformance sidebar; `id` changes with every click so the same choice can be made again.
+export type ConformRequest = { id: number; specPath?: string; envPath?: string }
 
-export function ConformanceTab({ onOpenCliBuilder }: Props) {
+type Props = {
+  onOpenCliBuilder?: (values: Record<string, string>) => void
+  request?: ConformRequest | null
+  // The spec and environment now chosen on the page, and the totals of the last run, for the sidebar.
+  onSelectionChange?: (sel: { specPath: string; envPath: string }) => void
+  onResult?: (summary: ConformSummary) => void
+}
+
+export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, onResult }: Props) {
   const [ctx, setCtx] = useState<ConformContext | null>(null)
   const [loadError, setLoadError] = useState('')
   const [specPath, setSpecPath] = useState('')
@@ -163,6 +173,22 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<ConformProgress | null>(null)
   const [output, setOutput] = useState<ConformRunOutput | null>(null)
+
+  const [appliedRequest, setAppliedRequest] = useState<ConformRequest | null>(null)
+  if ((request ?? null) !== appliedRequest) {
+    setAppliedRequest(request ?? null)
+    if (request) {
+      if (request.specPath !== undefined) setSpecPath(request.specPath)
+      if (request.envPath !== undefined) setEnvPath(request.envPath)
+    }
+  }
+
+  useEffect(() => { onSelectionChange?.({ specPath, envPath }) }, [specPath, envPath]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!output || output.error) return
+    onResult?.({ specPath, specTitle: output.specTitle, total: output.total, covered: output.covered, passing: output.passing, failing: output.failing, failed: !!output.failed })
+  }, [output]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     getConformContext().then(setCtx).catch(e => setLoadError(String(e)))
