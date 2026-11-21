@@ -3,6 +3,17 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.7.0',
+    date: 'unreleased',
+    items: [
+      'Every rail icon works the same way: Workspace, Requests, Scenarios, Contracts, Check Conformance and CLI Builder each open a sidebar, and clicking an icon brings back the tab you last had open under it (for this session). Clicking the lit icon collapses the sidebar; clicking a tab lights its icon and never opens or closes the sidebar, so a collapse you chose is kept',
+      'Workspace sidebar: an environment selector (the same choice as the status bar) with where it came from, the Needs attention list (click an item to see its card on the Workspace page), and counts of requests, scenarios and specs. It reads the same snapshot as the Workspace page, so the two always agree',
+      'Check Conformance sidebar: the workspace\'s specs and environments (click one to fill the matching field on the page), the choice marked, and a Last result card with Covered, Passing and Failing',
+      'CLI Builder sidebar: the commands (run, conform, diff, ...) with their goals; click one to select it on the page',
+      'The Workspace, Check Conformance and CLI Builder pages are no longer special: opening a workspace shows the Workspace tab with the Workspace sidebar open',
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-11-21',
     items: [
