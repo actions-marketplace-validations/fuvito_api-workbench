@@ -1365,6 +1365,7 @@ export default function App() {
                   >
                     <WorkspaceTab
                       workspacePath={workspace.workspacePath}
+                      active={t.id === activeTabId}
                       refreshTrigger={runLogTrigger + coverageRefreshTrigger + envChanges}
                       onOpenScenario={(path, name) => tabs.openScenarioAsTab(path, name)}
                       onOpenContracts={specRef => {

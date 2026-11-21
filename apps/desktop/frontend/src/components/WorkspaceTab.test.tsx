@@ -18,8 +18,8 @@ const base: WorkspaceOverview = {
     { name: 'token', secret: true, set: false, unsetRef: 'API_TOKEN' },
   ],
   specs: [
-    { ref: '../specs/api.yaml', state: 'found', scenarios: ['/ws/shop/scenarios/a.yaml'], coverage: { total: 10, covered: 6, notCovered: 4, passing: 5, failing: 1 } },
-    { ref: 'https://example.com/openapi.yaml', state: 'url', scenarios: ['/ws/shop/scenarios/b.yaml'] },
+    { ref: '../specs/api.yaml', refs: ['../specs/api.yaml'], path: '/ws/shop/specs/api.yaml', state: 'found', scenarios: ['/ws/shop/scenarios/a.yaml'], coverage: [{ ref: '../specs/api.yaml', total: 10, covered: 6, notCovered: 4, passing: 5, failing: 1 }] },
+    { ref: 'https://example.com/openapi.yaml', refs: ['https://example.com/openapi.yaml'], state: 'url', scenarios: ['/ws/shop/scenarios/b.yaml'], coverage: [] },
   ],
   lastRun: { at: '2026-11-21T10:00:00Z', scenario: 'Checkout', passed: false, scenarios: 5, failingNow: 1 },
   attention: [],
@@ -108,6 +108,24 @@ describe('WorkspaceTab', () => {
     expect(handlers.onOpenContracts).toHaveBeenCalledWith('../specs/api.yaml')
   })
 
+  it('shows every Contracts card of a spec that scenarios spell differently, each opening its own card', async () => {
+    show({
+      ...base,
+      specs: [{
+        ref: 'a/openapi.yaml', refs: ['a/openapi.yaml', 'b/openapi.yaml'], path: '/ws/shop/specs/openapi.yaml', state: 'found', scenarios: ['/ws/shop/scenarios/a.yaml', '/ws/shop/scenarios/b.yaml'],
+        coverage: [
+          { ref: 'a/openapi.yaml', total: 4, covered: 4, notCovered: 0, passing: 4, failing: 0 },
+          { ref: 'b/openapi.yaml', total: 4, covered: 1, notCovered: 3, passing: 0, failing: 1 },
+        ],
+      }],
+    })
+    const specs = await screen.findByRole('region', { name: 'Specs' })
+    const buttons = within(specs).getAllByRole('button', { name: /Covered/ })
+    expect(buttons).toHaveLength(2)
+    fireEvent.click(buttons[1])
+    expect(handlers.onOpenContracts).toHaveBeenCalledWith('b/openapi.yaml')
+  })
+
   it('shows the last run, and an empty message when there is none', async () => {
     const { unmount } = show(base)
     expect(await screen.findByTestId('last-run')).toHaveTextContent('FAILED')
@@ -150,6 +168,20 @@ describe('WorkspaceTab', () => {
     expect(handlers.onShowPanel).toHaveBeenCalledWith('scenarios')
     fireEvent.click(screen.getByRole('button', { name: 'Close workspace' }))
     expect(handlers.onCloseWorkspace).toHaveBeenCalled()
+  })
+
+  it('reads the workspace again when its tab becomes active, and not while another tab is showing', async () => {
+    bridge.getWorkspaceOverview.mockResolvedValue(base)
+    const { rerender } = render(<WorkspaceTab workspacePath="/ws/shop" active {...handlers} />)
+    await screen.findByText('shop')
+    expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(1)
+
+    rerender(<WorkspaceTab workspacePath="/ws/shop" active={false} {...handlers} />)
+    rerender(<WorkspaceTab workspacePath="/ws/shop" active={false} refreshTrigger={5} {...handlers} />)
+    expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(1)
+
+    rerender(<WorkspaceTab workspacePath="/ws/shop" active refreshTrigger={5} {...handlers} />)
+    await waitFor(() => expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(2))
   })
 
   it('reports a failed read instead of staying blank', async () => {

@@ -1,6 +1,10 @@
 package main
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 func atomicWrite(path string, data []byte) error {
 	tmp := path + ".tmp"
@@ -8,4 +12,10 @@ func atomicWrite(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// outsideRel reports whether a path made relative with filepath.Rel points outside its base: it is
+// ".." or starts with "../". A name that merely begins with two dots (such as "..notes") is inside.
+func outsideRel(rel string) bool {
+	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

@@ -1340,6 +1340,7 @@ export type AttentionItem = {
 }
 
 export type DashCoverage = {
+  ref: string
   total: number
   covered: number
   notCovered: number
@@ -1353,7 +1354,10 @@ export type DashSpec = {
   path?: string
   state: 'found' | 'missing' | 'outside' | 'url'
   scenarios: string[]
-  coverage?: DashCoverage
+  // every spelling scenarios used for this spec
+  refs: string[]
+  // one entry per stored Contracts card for it (usually one; empty when nothing was recorded)
+  coverage: DashCoverage[]
 }
 
 export type EnvironmentSource = 'remembered' | 'chosen' | 'temporary' | 'none'

@@ -27,6 +27,7 @@ const (
 // Kinds of attention item (stable identifiers, used by the page and by tests).
 const (
 	ItemNoEnvironment   = "no-environment"
+	ItemUndefinedValue  = "undefined-placeholder"
 	ItemUnsetEnvVar     = "unset-env-var"
 	ItemSpecMissing     = "spec-missing"
 	ItemSpecOutside     = "spec-outside"
@@ -71,7 +72,10 @@ type EnvVar struct {
 
 // Spec is a spec named by one or more scenarios.
 type Spec struct {
-	Ref       string   `json:"ref"`  // as written in the scenario
+	Ref string `json:"ref"` // the first spelling a scenario used
+	// Refs holds every spelling scenarios used for this one spec (a path relative to different
+	// folders, an absolute path), because stored coverage is keyed by the spelling.
+	Refs      []string `json:"refs"`
 	Path      string   `json:"path"` // resolved file path (empty for a URL)
 	State     string   `json:"state"`
 	Scenarios []string `json:"scenarios"` // scenario file paths that use it
@@ -119,7 +123,7 @@ func Inspect(root string, env *domain.Environment, envPath string) Report {
 
 	specs := map[string]*Spec{}
 	var specOrder []string
-	unresolved := map[string]bool{}
+	unresolved := map[string][]string{} // placeholder name -> scenarios that use it and nothing in them defines
 	scenDir := filepath.Join(root, "scenarios")
 	_ = filepath.WalkDir(scenDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !isDataFile(d.Name()) {
@@ -155,34 +159,57 @@ func Inspect(root string, env *domain.Environment, envPath string) Report {
 		}
 	}
 
-	if env == nil && r.Environments > 0 && len(unresolved) > 0 {
-		names := make([]string, 0, len(unresolved))
-		for n := range unresolved {
-			names = append(names, n)
-		}
-		sort.Strings(names)
-		shown := names
-		more := ""
-		if len(shown) > 5 {
-			more = fmt.Sprintf(" and %d more", len(shown)-5)
-			shown = shown[:5]
-		}
-		for i := range shown {
-			shown[i] = "{{" + shown[i] + "}}"
-		}
+	names := make([]string, 0, len(unresolved))
+	for n := range unresolved {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	switch {
+	case env == nil && r.Environments > 0 && len(names) > 0:
 		r.Attention = append([]Attention{{
 			ID: ItemNoEnvironment, Severity: SeverityWarning,
 			What:   "No environment is selected.",
-			Where:  fmt.Sprintf("scenarios use %s%s, which nothing in them defines", strings.Join(shown, ", "), more),
+			Where:  fmt.Sprintf("scenarios use %s, which nothing in them defines", nameList(names)),
 			Why:    "Those placeholders stay unresolved, so requests go to the wrong address or fail.",
 			Fix:    "Choose an environment in the top bar.",
 			Target: Target{Kind: "environment", Path: ""},
 		}}, r.Attention...)
+	case env != nil:
+		have := map[string]bool{}
+		for _, v := range env.Variables {
+			have[v.Name] = true
+		}
+		var missing []string
+		users := map[string]bool{}
+		for _, n := range names {
+			if have[n] {
+				continue
+			}
+			missing = append(missing, n)
+			for _, sc := range unresolved[n] {
+				users[sc] = true
+			}
+		}
+		if len(missing) > 0 {
+			var files []string
+			for sc := range users {
+				files = append(files, sc)
+			}
+			sort.Strings(files)
+			r.Attention = append(r.Attention, Attention{
+				ID: ItemUndefinedValue, Severity: SeverityWarning,
+				What:   fmt.Sprintf("The environment %q does not define %s.", envLabel(env, envPath), nameList(missing)),
+				Where:  "used by " + joinMore(files, 3, "scenarios"),
+				Why:    "Nothing in those scenarios defines it either, so the placeholder stays as written and the request fails or goes to the wrong place.",
+				Fix:    "Add the value to the environment, have an earlier step extract it, or pass it with --var when running from the command line.",
+				Target: Target{Kind: "environment", Path: envPath},
+			})
+		}
 	}
 	return r
 }
 
-func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order *[]string, unresolved map[string]bool) {
+func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order *[]string, unresolved map[string][]string) {
 	data, err := os.ReadFile(path)
 	rel := relTo(root, path)
 	if err != nil {
@@ -199,23 +226,46 @@ func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order
 	}
 
 	scDir := filepath.Dir(path)
-	for i, step := range sc.Steps {
-		if step.Request != nil || step.RequestRef == "" {
-			continue
-		}
-		if !requestRefExists(root, scDir, step.RequestRef) {
-			label := step.Label
-			if label == "" {
-				label = fmt.Sprintf("step %d", i+1)
+	used := map[string]bool{}
+	collect := func(texts []string) {
+		for _, t := range texts {
+			for _, m := range placeholderRe.FindAllStringSubmatch(t, -1) {
+				used[m[1]] = true
 			}
-			r.Attention = append(r.Attention, Attention{
-				ID: ItemRequestRef, Severity: SeverityWarning,
-				What:   fmt.Sprintf("The request file %q does not exist.", step.RequestRef),
-				Where:  fmt.Sprintf("%s, step %q", rel, label),
-				Why:    "The step cannot be sent, so the scenario fails when it reaches it.",
-				Fix:    "Choose an existing request in the step, or restore the file under requests/.",
-				Target: Target{Kind: "scenario", Path: path},
-			})
+		}
+	}
+	for i := range sc.Steps {
+		step := &sc.Steps[i]
+		switch {
+		case step.Request != nil:
+			if !step.Disabled {
+				collect(scenario.StepTexts(step))
+			}
+		case step.RequestRef != "":
+			refPath := findRequestRef(root, scDir, step.RequestRef)
+			if refPath == "" {
+				label := step.Label
+				if label == "" {
+					label = fmt.Sprintf("step %d", i+1)
+				}
+				r.Attention = append(r.Attention, Attention{
+					ID: ItemRequestRef, Severity: SeverityWarning,
+					What:   fmt.Sprintf("The request file %q does not exist.", step.RequestRef),
+					Where:  fmt.Sprintf("%s, step %q", rel, label),
+					Why:    "The step cannot be sent, so the scenario fails when it reaches it.",
+					Fix:    "Choose an existing request in the step, or restore the file under requests/.",
+					Target: Target{Kind: "scenario", Path: path},
+				})
+				continue
+			}
+			if step.Disabled {
+				continue
+			}
+			if data, err := os.ReadFile(refPath); err == nil {
+				if req, err := serialization.ParseRequestFile(data, filepath.Base(refPath)); err == nil {
+					collect(scenario.StepTexts(&domain.ScenarioStep{Request: req}))
+				}
+			}
 		}
 	}
 
@@ -226,15 +276,16 @@ func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order
 	defined := map[string]bool{}
 	for _, v := range sc.Variables {
 		defined[v.Name] = true
+		collect([]string{v.Value})
 	}
 	for _, step := range sc.Steps {
 		for _, e := range step.Extractions {
 			defined[e.Name] = true
 		}
 	}
-	for _, m := range placeholderRe.FindAllStringSubmatch(string(data), -1) {
-		if !defined[m[1]] {
-			unresolved[m[1]] = true
+	for name := range used {
+		if !defined[name] {
+			unresolved[name] = append(unresolved[name], rel)
 		}
 	}
 }
@@ -257,7 +308,7 @@ func addSpec(root, scenarioPath, ref string, specs map[string]*Spec, order *[]st
 	}
 	sp, ok := specs[key]
 	if !ok {
-		sp = &Spec{Ref: ref}
+		sp = &Spec{Ref: ref, Refs: []string{}}
 		switch {
 		case strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://"):
 			sp.State = SpecURL
@@ -275,6 +326,12 @@ func addSpec(root, scenarioPath, ref string, specs map[string]*Spec, order *[]st
 		*order = append(*order, key)
 	}
 	sp.Scenarios = append(sp.Scenarios, scenarioPath)
+	for _, r := range sp.Refs {
+		if r == ref {
+			return
+		}
+	}
+	sp.Refs = append(sp.Refs, ref)
 }
 
 func resolveSpec(scenarioDir, ref string) string {
@@ -284,17 +341,19 @@ func resolveSpec(scenarioDir, ref string) string {
 	return filepath.Join(scenarioDir, ref)
 }
 
-func requestRefExists(root, scenarioDir, ref string) bool {
+// findRequestRef returns the file a step's requestRef points at, looked up the way the runner
+// does (the scenario's folder, then the workspace's requests/), or "" when it is missing.
+func findRequestRef(root, scenarioDir, ref string) string {
 	candidates := []string{ref}
 	if !filepath.IsAbs(ref) {
 		candidates = []string{filepath.Join(scenarioDir, ref), filepath.Join(root, "requests", ref)}
 	}
 	for _, c := range candidates {
 		if info, err := os.Stat(c); err == nil && !info.IsDir() {
-			return true
+			return c
 		}
 	}
-	return false
+	return ""
 }
 
 func describeEnv(env *domain.Environment) []EnvVar {
@@ -320,6 +379,28 @@ func envLabel(env *domain.Environment, path string) string {
 		return env.Name
 	}
 	return filepath.Base(path)
+}
+
+// nameList renders placeholder names as {{name}}, at most five, then "and N more".
+func nameList(names []string) string {
+	shown, more := names, ""
+	if len(shown) > 5 {
+		more = fmt.Sprintf(" and %d more", len(shown)-5)
+		shown = shown[:5]
+	}
+	out := make([]string, len(shown))
+	for i, n := range shown {
+		out[i] = "{{" + n + "}}"
+	}
+	return strings.Join(out, ", ") + more
+}
+
+// joinMore lists at most max items, then "and N more <noun>".
+func joinMore(items []string, max int, noun string) string {
+	if len(items) <= max {
+		return strings.Join(items, ", ")
+	}
+	return fmt.Sprintf("%s and %d more %s", strings.Join(items[:max], ", "), len(items)-max, noun)
 }
 
 func scenarioList(root string, paths []string) string {

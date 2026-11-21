@@ -6,6 +6,9 @@ import type { AttentionItem, DashSpec, EnvironmentSource, WorkspaceOverview } fr
 
 type Props = {
   workspacePath: string
+  // False while another tab is showing; the page reads the workspace again when it becomes active,
+  // so a problem fixed elsewhere is gone when the user comes back.
+  active?: boolean
   // Bumped by the app after something that changes what the page shows (a scenario run, a new environment).
   refreshTrigger?: number
   onOpenScenario: (path: string, name: string) => void
@@ -53,7 +56,7 @@ function formatTime(iso?: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
 }
 
-export function WorkspaceTab({ workspacePath, refreshTrigger = 0, onOpenScenario, onOpenContracts, onShowPanel, onCloseWorkspace }: Props) {
+export function WorkspaceTab({ workspacePath, active = true, refreshTrigger = 0, onOpenScenario, onOpenContracts, onShowPanel, onCloseWorkspace }: Props) {
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -71,7 +74,7 @@ export function WorkspaceTab({ workspacePath, refreshTrigger = 0, onOpenScenario
     }
   }, [])
 
-  useEffect(() => { void load() }, [load, workspacePath, refreshTrigger])
+  useEffect(() => { if (active) void load() }, [load, active, workspacePath, refreshTrigger])
 
   if (!overview) {
     return (
@@ -144,7 +147,7 @@ export function WorkspaceTab({ workspacePath, refreshTrigger = 0, onOpenScenario
               ) : (
                 <ul className="divide-y divide-[var(--color-border)]">
                   {overview.specs.map(sp => (
-                    <li key={sp.ref} className="px-3 py-2 text-xs flex flex-col gap-1">
+                    <li key={sp.path || sp.ref} className="px-3 py-2 text-xs flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono truncate flex-1" title={sp.ref}>{sp.ref}</span>
                         <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[10px]', sp.state === 'missing' ? 'bg-red-500/10 text-red-400' : sp.state === 'found' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-[var(--color-muted)] text-[var(--color-muted-foreground)]')}>
@@ -153,15 +156,15 @@ export function WorkspaceTab({ workspacePath, refreshTrigger = 0, onOpenScenario
                       </div>
                       <div className="text-[var(--color-muted-foreground)]">
                         Used by {sp.scenarios.length} {sp.scenarios.length === 1 ? 'scenario' : 'scenarios'}
-                        {sp.coverage && (
-                          <>
+                        {sp.coverage.map(c => (
+                          <span key={c.ref}>
                             {' · '}
-                            <button type="button" onClick={() => onOpenContracts(sp.ref)} className="underline hover:text-[var(--color-foreground)]">
-                              Covered {sp.coverage.covered}, Not covered {sp.coverage.notCovered}, Passing {sp.coverage.passing}, Failing {sp.coverage.failing}
+                            <button type="button" onClick={() => onOpenContracts(c.ref)} className="underline hover:text-[var(--color-foreground)]">
+                              Covered {c.covered}, Not covered {c.notCovered}, Passing {c.passing}, Failing {c.failing}
                             </button>
-                          </>
-                        )}
-                        {!sp.coverage && ' · no coverage recorded yet'}
+                          </span>
+                        ))}
+                        {sp.coverage.length === 0 && ' · no coverage recorded yet'}
                       </div>
                     </li>
                   ))}

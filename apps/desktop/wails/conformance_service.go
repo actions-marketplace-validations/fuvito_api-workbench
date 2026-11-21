@@ -323,7 +323,7 @@ func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Sp
 	specName := scenarioSpecRef(ws, in.SpecPath)
 	if specName == "" {
 		specName = in.SpecPath
-		if rel, err := filepath.Rel(ws, in.SpecPath); err == nil && !strings.HasPrefix(rel, "..") {
+		if rel, err := filepath.Rel(ws, in.SpecPath); err == nil && !outsideRel(rel) {
 			specName = filepath.ToSlash(rel)
 		}
 	}

@@ -240,3 +240,78 @@ func snapshot(t *testing.T, root string) string {
 	})
 	return b.String()
 }
+
+func TestInspect_SelectedEnvironmentThatDoesNotDefineAPlaceholder(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "specs/api.yaml", "x")
+	write(t, root, "scenarios/users.yaml", `schemaVersion: "1"
+title: Users
+specFile: ../specs/api.yaml
+steps:
+  - label: List
+    request:
+      method: GET
+      url: "{{baseUrl}}/users"
+      headers:
+        - {name: Authorization, value: "Bearer {{token}}"}
+`)
+	envPath := filepath.Join(root, "environments", "staging.yaml")
+	env := &domain.Environment{Name: "Staging", Variables: []domain.EnvironmentVariable{{Name: "baseUrl", Value: "http://x"}}}
+
+	r := Inspect(root, env, envPath)
+	a := has(r, ItemUndefinedValue)
+	if a == nil || !strings.Contains(a.What, "{{token}}") || strings.Contains(a.What, "{{baseUrl}}") || !strings.Contains(a.Where, "scenarios/users.yaml") {
+		t.Fatalf("want the environment named as lacking {{token}} only, got %+v", a)
+	}
+	if a.Target.Kind != "environment" || a.Target.Path != envPath {
+		t.Fatalf("target: %+v", a.Target)
+	}
+
+	env.Variables = append(env.Variables, domain.EnvironmentVariable{Name: "token", Value: "t", Secret: true})
+	if r := Inspect(root, env, envPath); has(r, ItemUndefinedValue) != nil {
+		t.Fatalf("every placeholder is defined now: %v", ids(r))
+	}
+}
+
+func TestInspect_OnlyWhatIsSentCountsAsAPlaceholderUse(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "requests/login.yaml", "schemaVersion: \"1\"\nname: Login\nmethod: POST\nurl: \"{{baseUrl}}/login\"\nbody:\n  type: json\n  content: '{\"user\":\"{{fromRequestFile}}\"}'\n")
+	write(t, root, "scenarios/s.yaml", `schemaVersion: "1"
+title: "About {{inTitle}}"
+description: "uses {{inDescription}}"
+steps:
+  - label: "Login with {{inLabel}}"
+    notes: "set {{inNotes}} first"
+    requestRef: login.yaml
+  - label: Disabled
+    disabled: true
+    request: {method: GET, url: "{{baseUrl}}/{{inDisabledStep}}"}
+`)
+	env := &domain.Environment{Name: "E", Variables: []domain.EnvironmentVariable{{Name: "baseUrl", Value: "x"}}}
+	r := Inspect(root, env, filepath.Join(root, "environments", "e.yaml"))
+	a := has(r, ItemUndefinedValue)
+	if a == nil || !strings.Contains(a.What, "{{fromRequestFile}}") {
+		t.Fatalf("a placeholder inside the referenced request file must count: %+v", a)
+	}
+	for _, not := range []string{"inTitle", "inDescription", "inLabel", "inNotes", "inDisabledStep"} {
+		if strings.Contains(a.What, not) {
+			t.Errorf("{{%s}} is never sent and must not count", not)
+		}
+	}
+}
+
+func TestInspect_OneSpecNamedDifferentlyKeepsEverySpelling(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "specs/api.yaml", "x")
+	write(t, root, "scenarios/a.yaml", strings.Replace(okScenario, "../specs/api.yaml", "../specs/api.yaml", 1))
+	write(t, root, "scenarios/deep/b.yaml", strings.Replace(okScenario, "../specs/api.yaml", "../../specs/api.yaml", 1))
+	write(t, root, "scenarios/deep/c.yaml", strings.Replace(okScenario, "../specs/api.yaml", "../../specs/api.yaml", 1))
+	r := Inspect(root, nil, "")
+	if len(r.Specs) != 1 {
+		t.Fatalf("one file is one spec row, got %d: %+v", len(r.Specs), r.Specs)
+	}
+	sp := r.Specs[0]
+	if len(sp.Refs) != 2 || sp.Refs[0] != "../specs/api.yaml" || sp.Refs[1] != "../../specs/api.yaml" || len(sp.Scenarios) != 3 {
+		t.Fatalf("spec: %+v", sp)
+	}
+}

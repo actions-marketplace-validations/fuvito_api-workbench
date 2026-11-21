@@ -26,12 +26,16 @@ type DashSpecIO struct {
 	Path      string   `json:"path,omitempty"`
 	State     string   `json:"state"`
 	Scenarios []string `json:"scenarios"`
-	// Coverage is nil when no run has recorded this spec yet.
-	Coverage *DashCoverageIO `json:"coverage,omitempty"`
+	// Refs are the spellings scenarios used for this spec; stored coverage is keyed by spelling.
+	Refs []string `json:"refs"`
+	// Coverage has one entry per spelling that has recorded runs (usually one, empty when no run
+	// has recorded this spec yet).
+	Coverage []DashCoverageIO `json:"coverage"`
 }
 
 // DashCoverageIO carries the four Contracts totals: Covered + NotCovered = Total, Passing + Failing = Covered.
 type DashCoverageIO struct {
+	Ref        string `json:"ref"`
 	Total      int    `json:"total"`
 	Covered    int    `json:"covered"`
 	NotCovered int    `json:"notCovered"`
@@ -113,23 +117,34 @@ func (d *DashboardService) GetWorkspaceOverview() WorkspaceOverviewIO {
 	}
 	out.Attention = rep.Attention
 
+	// Look coverage up by the store's own key, as the store does: spellings that differ only in
+	// punctuation (../specs/a.yaml and ../../specs/a.yaml) share one stored entry and one card.
 	stored := map[string]AccumulatedCoverageIO{}
 	for _, c := range d.scenario.ListAccumulatedCoverage() {
-		stored[c.SpecFile] = c
+		stored[coverageKey(c.SpecFile)] = c
 	}
 	for _, sp := range rep.Specs {
-		item := DashSpecIO{Ref: sp.Ref, Path: sp.Path, State: sp.State, Scenarios: sp.Scenarios}
-		if c, ok := stored[sp.Ref]; ok {
+		item := DashSpecIO{Ref: sp.Ref, Refs: sp.Refs, Path: sp.Path, State: sp.State, Scenarios: sp.Scenarios, Coverage: []DashCoverageIO{}}
+		seen := map[string]bool{}
+		for _, ref := range sp.Refs {
+			key := coverageKey(ref)
+			c, ok := stored[key]
+			if !ok || seen[key] {
+				continue
+			}
+			seen[key] = true
+			ref = c.SpecFile // the spelling the Contracts card is shown under
 			cov := coverageTotals(c)
-			item.Coverage = &cov
+			cov.Ref = ref
+			item.Coverage = append(item.Coverage, cov)
 			if cov.Failing > 0 {
 				out.Attention = append(out.Attention, workspaceinfo.Attention{
 					ID: "spec-failing", Severity: workspaceinfo.SeverityWarning,
 					What:   fmt.Sprintf("%d of %d covered operations failed the last time they ran.", cov.Failing, cov.Covered),
-					Where:  fmt.Sprintf("spec %s", sp.Ref),
+					Where:  fmt.Sprintf("spec %s", ref),
 					Why:    "The API did not match the spec, or an assertion failed, in the most recent run.",
 					Fix:    "Open Contracts to see which operations failed, then open their scenario's Result tab.",
-					Target: workspaceinfo.Target{Kind: "contracts", Path: sp.Ref},
+					Target: workspaceinfo.Target{Kind: "contracts", Path: ref},
 				})
 			}
 		}

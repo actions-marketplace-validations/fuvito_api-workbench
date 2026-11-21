@@ -44,6 +44,11 @@ func validateVariables(sc *domain.Scenario, add func(step int, name, msg string)
 }
 
 // stepStrings returns every text in a step that may contain {{variables}} or {{$functions}}.
+// StepTexts returns every piece of a step that is sent or compared and may hold a {{placeholder}}:
+// the request's URL, headers, query, body and auth, and the assertions. Notes and labels are not
+// included, because they are never sent.
+func StepTexts(step *domain.ScenarioStep) []string { return stepStrings(step) }
+
 func stepStrings(step *domain.ScenarioStep) []string {
 	var out []string
 	if r := step.Request; r != nil {

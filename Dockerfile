@@ -9,7 +9,8 @@ COPY packages/core/ ./packages/core/
 # Build from inside apps/cli so the replace directive (../../packages/core)
 # resolves to /src/packages/core. GOWORK=off keeps other workspace modules out.
 WORKDIR /src/apps/cli
-RUN CGO_ENABLED=0 GOWORK=off go build -ldflags="-s -w" -o /usr/local/bin/clrsig .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOWORK=off go build -ldflags="-s -w -X main.version=${VERSION}" -o /usr/local/bin/clrsig .
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata

@@ -5,7 +5,7 @@ const overview = {
   requests: 3, scenarios: 2, environments: 1,
   environmentName: 'Staging', environmentPath: '/workspace/environments/staging.yaml', environmentSource: 'remembered',
   envVars: [{ name: 'baseUrl', secret: false, set: true }, { name: 'token', secret: true, set: false, unsetRef: 'API_TOKEN' }],
-  specs: [{ ref: '../specs/gone.yaml', state: 'missing', scenarios: ['/workspace/scenarios/users.yaml'] }],
+  specs: [{ ref: '../specs/gone.yaml', refs: ['../specs/gone.yaml'], path: '/workspace/specs/gone.yaml', state: 'missing', scenarios: ['/workspace/scenarios/users.yaml'], coverage: [] }],
   lastRun: undefined,
   attention: [{
     id: 'spec-missing', severity: 'warning',
@@ -54,6 +54,19 @@ test.describe('Workspace page', () => {
     await page.getByRole('button', { name: 'Workspace', exact: true }).click()
     await page.getByRole('button', { name: 'Close workspace' }).click()
     await expect(page.getByText(/No environment will be remembered for this workspace\./)).toBeVisible()
+  })
+
+  test('reads the workspace again when you come back to the tab, so a fixed problem is gone', async ({ page }) => {
+    await gotoApp(page)
+    await page.evaluate(o => { (window as any).__bridge.workspaceOverview = o }, overview)
+    await page.getByRole('button', { name: 'Workspace', exact: true }).click()
+    await expect(page.getByRole('article', { name: /does not exist/ })).toBeVisible()
+
+    // The user fixes it elsewhere, then returns to the Workspace tab without pressing Refresh.
+    await page.getByRole('tab', { name: /New Request/ }).click()
+    await page.evaluate(() => { (window as any).__bridge.workspaceOverview = { ...(window as any).__bridge.workspaceOverview, attention: [], specs: [] } })
+    await page.getByRole('tab', { name: /Workspace/ }).click()
+    await expect(page.getByTestId('attention-empty')).toBeVisible()
   })
 
   test('Refresh reads the workspace again', async ({ page }) => {

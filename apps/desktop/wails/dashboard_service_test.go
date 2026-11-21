@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/fuvito/api-workbench/packages/core/coverage"
 )
 
 func newTestDashboard(t *testing.T) (*DashboardService, *WorkspaceService) {
@@ -170,5 +172,81 @@ func TestCoverageTotals(t *testing.T) {
 	})
 	if c.NotCovered != 4 || c.Passing != 2 || c.Failing != 1 {
 		t.Fatalf("totals: %+v", c)
+	}
+}
+
+// One spec file that two scenarios spell differently shares one stored coverage entry (the store
+// keys by letters and digits only), so Contracts shows one card. The page must find that entry
+// whichever spelling it looks up, show it once, and warn about a failure in it.
+func TestDashboard_OneSpecNamedTwoWaysShowsItsSharedCoverageOnce(t *testing.T) {
+	d, ws := newTestDashboard(t)
+	root := t.TempDir()
+	envPath := writeWS(t, root, "environments/local.yaml", dashEnv)
+	writeWS(t, root, "specs/api.yaml", "openapi: 3.0.0")
+	writeWS(t, root, "scenarios/a.yaml", dashScenario)
+	writeWS(t, root, "scenarios/deep/b.yaml", strings.Replace(dashScenario, "../specs/api.yaml", "../../specs/api.yaml", 1))
+	ws.enterWorkspace(root)
+	if err := ws.SelectEnvironment(envPath); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := saveStoredCoverage(root, coverage.StoredCoverage{SpecFile: "../specs/api.yaml", TotalRuns: 1, PassedRuns: 1, TotalOps: 4, Exercised: []string{"GET /a"},
+		OperationResults: map[string]coverage.OperationResult{"GET /a": {LastPassed: true}}}); err != nil {
+		t.Fatal(err)
+	}
+	// A run of the second scenario loads the same entry (same key) and adds to it.
+	st := loadStoredCoverage(root, "../../specs/api.yaml")
+	st.TotalRuns++
+	st.FailedRuns++
+	st.Exercised = append(st.Exercised, "GET /b")
+	st.OperationResults["GET /b"] = coverage.OperationResult{LastPassed: false}
+	if err := saveStoredCoverage(root, st); err != nil {
+		t.Fatal(err)
+	}
+
+	o := d.GetWorkspaceOverview()
+	if len(o.Specs) != 1 || len(o.Specs[0].Refs) != 2 {
+		t.Fatalf("one spec with two spellings: %+v", o.Specs)
+	}
+	cov := o.Specs[0].Coverage
+	if len(cov) != 1 || cov[0].Passing != 1 || cov[0].Failing != 1 || cov[0].Covered != 2 {
+		t.Fatalf("the shared coverage should be shown once with both runs, got %+v", cov)
+	}
+	failing := 0
+	for _, a := range o.Attention {
+		if a.ID == "spec-failing" {
+			failing++
+		}
+	}
+	if failing != 1 {
+		t.Fatalf("one warning for the one shared entry, got %d", failing)
+	}
+}
+
+// The bundled sample workspaces are healthy, so the page must not warn about them: a false warning
+// on the first workspace a new user opens would teach them to ignore the list.
+func TestDashboard_SampleWorkspacesNeedNoAttention(t *testing.T) {
+	isolateHome(t)
+
+	demo := filepath.Join(t.TempDir(), demoWorkspacePrefix+"x")
+	if err := extractDemoWorkspace(demo, 8090); err != nil {
+		t.Fatal(err)
+	}
+	conf := t.TempDir()
+	if err := writeConformanceWorkspace(conf, 8120); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, root := range map[string]string{"demo": demo, "conformance": conf} {
+		ws := NewWorkspaceService()
+		ws.openWorkspaceDirect(root)
+		d := NewDashboardService(ws, NewScenarioService(ws, NewSettingsService()))
+		o := d.GetWorkspaceOverview()
+		if o.EnvironmentName == "" {
+			t.Fatalf("%s: the sample environment should be active", name)
+		}
+		for _, a := range o.Attention {
+			t.Errorf("%s workspace: unexpected attention item %s: %s (%s)", name, a.ID, a.What, a.Where)
+		}
 	}
 }
