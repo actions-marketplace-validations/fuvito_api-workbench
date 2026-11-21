@@ -83,6 +83,19 @@ func TestDemoWorkspace_ScenarioAndConformanceRunsShareOneContractsCard(t *testin
 		t.Fatalf("want one Contracts card for the Demo spec, got %d: %v (%s)", len(cards), names, out.CoverageNote)
 	}
 	if cards[0].TotalRuns != 2 {
-		t.Fatalf("both runs belong on that card, got %d runs", cards[0].TotalRuns)
+		t.Fatalf("both runs belong on that card, got %d runs (scenario run counted coverage: %v; conformance: error %q, covered %d, note %q; demo port %d)",
+			cards[0].TotalRuns, run.AccumulatedCoverage != nil, out.Error, out.Covered, out.CoverageNote, res.Port)
+	}
+
+	// Opening the card reloads the spec by the name the scenarios wrote, which is relative to the
+	// scenario's folder, not to wherever the app was started.
+	detail, err := scenarios.GetAccumulatedCoverage(cards[0].SpecFile)
+	if err != nil || detail == nil || detail.Total != 24 {
+		t.Fatalf("opening the Contracts card for %q: %+v, %v", cards[0].SpecFile, detail, err)
+	}
+	for _, format := range []string{"markdown", "html", "csv"} {
+		if rep := scenarios.ExportCoverageReport(cards[0].SpecFile, format); rep.Error != "" || rep.Content == "" {
+			t.Fatalf("export %s: %q", format, rep.Error)
+		}
 	}
 }

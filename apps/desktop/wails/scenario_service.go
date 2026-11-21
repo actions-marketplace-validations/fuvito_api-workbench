@@ -1124,7 +1124,7 @@ func (s *ScenarioService) GetAccumulatedCoverage(specFile string) (*AccumulatedC
 	if stored.TotalRuns == 0 {
 		return nil, nil
 	}
-	specData, specExt, err := loadSpecBytes(specFile, "")
+	specData, specExt, err := loadWorkspaceSpec(s.workspace.workspacePath, specFile)
 	if err != nil {
 		return nil, fmt.Errorf("loading spec: %w", err)
 	}
@@ -1213,7 +1213,7 @@ func (s *ScenarioService) ExportCoverageReport(specFile, format string) Coverage
 	if stored.TotalRuns == 0 {
 		return CoverageReportIO{Error: "no coverage has been recorded for this spec yet"}
 	}
-	specData, specExt, err := loadSpecBytes(specFile, "")
+	specData, specExt, err := loadWorkspaceSpec(s.workspace.workspacePath, specFile)
 	if err != nil {
 		return CoverageReportIO{Error: fmt.Sprintf("loading spec: %v", err)}
 	}

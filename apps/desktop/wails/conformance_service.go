@@ -506,3 +506,55 @@ func scenarioSpecRef(ws, specPath string) string {
 	})
 	return found
 }
+
+// loadWorkspaceSpec loads the spec a Contracts entry is keyed by. The key is the specFile string
+// exactly as the scenarios wrote it, and a relative one is relative to the scenario's own folder,
+// so it is tried from the folder of each scenario that names it, then from the workspace root.
+func loadWorkspaceSpec(ws, specRef string) (data []byte, format string, err error) {
+	if strings.Contains(specRef, "://") || filepath.IsAbs(specRef) {
+		return loadSpecBytes(specRef, "")
+	}
+	dirs := scenarioDirsUsing(ws, specRef)
+	dirs = append(dirs, ws, filepath.Join(ws, "scenarios"))
+	var firstErr error
+	for _, dir := range dirs {
+		data, format, err = loadSpecBytes(specRef, dir)
+		if err == nil {
+			return data, format, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return nil, "", fmt.Errorf("spec file %q was not found relative to the scenarios that use it or to the workspace: %w", specRef, firstErr)
+}
+
+// scenarioDirsUsing lists the folders of the scenarios whose specFile is exactly specRef.
+func scenarioDirsUsing(ws, specRef string) []string {
+	var dirs []string
+	seen := map[string]bool{}
+	_ = filepath.WalkDir(filepath.Join(ws, "scenarios"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".yaml", ".yml", ".json":
+		default:
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		sc, err := serialization.ParseScenarioFile(data, filepath.Base(path))
+		if err != nil || sc.SpecFile != specRef {
+			return nil
+		}
+		if dir := filepath.Dir(path); !seen[dir] {
+			seen[dir] = true
+			dirs = append(dirs, dir)
+		}
+		return nil
+	})
+	return dirs
+}
