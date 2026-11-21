@@ -1,6 +1,6 @@
 # Rail sidebars for every icon, and a last tab per icon
 
-**Status:** Proposed (the three key decisions were answered by the project owner on 2026-11-21; the rest is for review before building). Planned for 0.7.0.
+**Status:** Accepted as written by the project owner on 2026-11-21, including the recommendations for decisions 4-7. Not built yet; planned for 0.7.0, phase by phase (section 5).
 **Date:** 2026-11-21
 **Author:** Claude Code, for the project owner
 **Backlog:** B-081
@@ -148,7 +148,7 @@ Answered by the project owner on 2026-11-21:
 2. **Sidebar content:** Workspace shows the environment and the Needs attention list; Check Conformance shows the workspace's specs and environments.
 3. **CLI Builder:** yes, it gets a sidebar that lists the commands, so every icon works the same way.
 
-Open, with recommendations:
+Accepted by the project owner on 2026-11-21 as recommended:
 
 4. **Remember last tabs across restarts?** *Recommendation: no.* The app always starts on the landing page and reopens nothing; tabs are not restored today either. Session-only memory is enough.
 5. **Where does the environment selector live once the Workspace sidebar has one?** *Recommendation: keep it in the top bar as well for now* (it is useful from every icon), and let both write the same state; revisit removing the top-bar copy after use.
@@ -160,4 +160,5 @@ Open, with recommendations:
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-21 | Proposal drafted after the owner asked for sidebars on Workspace and Conformance and a last tab per rail icon | Claude Code |
-| 2026-11-21 | Timing: 0.6.0 first; build for 0.7.0. Content: Workspace = environment + attention; Conformance = specs + environments. CLI Builder gets a commands sidebar too. Decisions 4-7 open | Project owner |
+| 2026-11-21 | Timing: 0.6.0 first; build for 0.7.0. Content: Workspace = environment + attention; Conformance = specs + environments. CLI Builder gets a commands sidebar too. Decisions 4-7 left open | Project owner |
+| 2026-11-21 | Proposal approved as written: decisions 4-7 accepted as recommended (session-only last tabs; environment selector in the top bar and the Workspace sidebar; no blank tab for an icon without one; Workspace first with a divider after the four work icons) | Project owner |
