@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { WorkspaceTab, openSummary } from './WorkspaceTab'
 import type { WorkspaceOverview } from '@/lib/bridge'
 
 const bridge = vi.hoisted(() => ({
-  getWorkspaceOverview: vi.fn(),
   openInExplorer: vi.fn(),
 }))
 vi.mock('@/lib/bridge', () => bridge)
@@ -31,11 +30,11 @@ const handlers = {
   onOpenContracts: vi.fn(),
   onShowPanel: vi.fn(),
   onCloseWorkspace: vi.fn(),
+  onRefresh: vi.fn(),
 }
 
-function show(o: WorkspaceOverview) {
-  bridge.getWorkspaceOverview.mockResolvedValue(o)
-  return render(<WorkspaceTab workspacePath={o.path} {...handlers} />)
+function show(o: WorkspaceOverview, extra: Partial<React.ComponentProps<typeof WorkspaceTab>> = {}) {
+  return render(<WorkspaceTab overview={o} error={null} loading={false} {...handlers} {...extra} />)
 }
 
 describe('WorkspaceTab', () => {
@@ -150,14 +149,10 @@ describe('WorkspaceTab', () => {
     expect(screen.getByTestId('env-source')).toHaveTextContent('temporary workspace, not remembered')
   })
 
-  it('reads the workspace again on Refresh and when the workspace changes', async () => {
-    const { rerender } = show(base)
-    await screen.findByText('shop')
-    expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(1)
-    fireEvent.click(screen.getByRole('button', { name: /Refresh/ }))
-    await waitFor(() => expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(2))
-    rerender(<WorkspaceTab workspacePath="/ws/other" {...handlers} />)
-    await waitFor(() => expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(3))
+  it('asks the app to read the workspace again on Refresh', async () => {
+    show(base)
+    fireEvent.click(await screen.findByRole('button', { name: /Refresh/ }))
+    expect(handlers.onRefresh).toHaveBeenCalledTimes(1)
   })
 
   it('shows contents links, close workspace and a load error', async () => {
@@ -170,23 +165,20 @@ describe('WorkspaceTab', () => {
     expect(handlers.onCloseWorkspace).toHaveBeenCalled()
   })
 
-  it('reads the workspace again when its tab becomes active, and not while another tab is showing', async () => {
-    bridge.getWorkspaceOverview.mockResolvedValue(base)
-    const { rerender } = render(<WorkspaceTab workspacePath="/ws/shop" active {...handlers} />)
-    await screen.findByText('shop')
-    expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(1)
-
-    rerender(<WorkspaceTab workspacePath="/ws/shop" active={false} {...handlers} />)
-    rerender(<WorkspaceTab workspacePath="/ws/shop" active={false} refreshTrigger={5} {...handlers} />)
-    expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(1)
-
-    rerender(<WorkspaceTab workspacePath="/ws/shop" active refreshTrigger={5} {...handlers} />)
-    await waitFor(() => expect(bridge.getWorkspaceOverview).toHaveBeenCalledTimes(2))
+  it('scrolls to the attention card named by the sidebar', () => {
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    const item = { id: 'x', severity: 'info' as const, what: 'a', where: 'b', why: 'c', fix: 'd', target: { kind: 'scenario' as const, path: '' } }
+    const o = { ...base, attention: [item, { ...item, what: 'second' }] }
+    const { rerender } = show(o)
+    expect(scrolled).not.toHaveBeenCalled()
+    rerender(<WorkspaceTab overview={o} error={null} loading={false} focusAttention={{ index: 1, seq: 1 }} {...handlers} />)
+    expect(scrolled).toHaveBeenCalledTimes(1)
+    expect(scrolled.mock.instances[0]).toHaveAttribute('data-attention-index', '1')
   })
 
   it('reports a failed read instead of staying blank', async () => {
-    bridge.getWorkspaceOverview.mockRejectedValue(new Error('boom'))
-    render(<WorkspaceTab workspacePath="/ws/shop" {...handlers} />)
+    render(<WorkspaceTab overview={null} error="boom" loading={false} {...handlers} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('boom')
   })
 })

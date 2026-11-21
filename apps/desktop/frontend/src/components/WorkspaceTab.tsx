@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Info, RefreshCw, FolderOpen, X, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getWorkspaceOverview, openInExplorer } from '@/lib/bridge'
+import { openInExplorer } from '@/lib/bridge'
 import type { AttentionItem, DashSpec, EnvironmentSource, WorkspaceOverview } from '@/lib/bridge'
 
 type Props = {
-  workspacePath: string
-  // False while another tab is showing; the page reads the workspace again when it becomes active,
-  // so a problem fixed elsewhere is gone when the user comes back.
-  active?: boolean
-  // Bumped by the app after something that changes what the page shows (a scenario run, a new environment).
-  refreshTrigger?: number
+  // The snapshot is read by the app (useWorkspaceOverview) and shared with the Workspace sidebar.
+  overview: WorkspaceOverview | null
+  error: string | null
+  loading: boolean
+  onRefresh: () => void
+  // Set when an item in the sidebar was clicked: the page scrolls to that attention card.
+  focusAttention?: { index: number; seq: number }
   onOpenScenario: (path: string, name: string) => void
   onOpenContracts: (specRef: string) => void
   onShowPanel: (panel: 'explorer' | 'scenarios') => void
@@ -56,25 +57,15 @@ function formatTime(iso?: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
 }
 
-export function WorkspaceTab({ workspacePath, active = true, refreshTrigger = 0, onOpenScenario, onOpenContracts, onShowPanel, onCloseWorkspace }: Props) {
-  const [overview, setOverview] = useState<WorkspaceOverview | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+export function WorkspaceTab({ overview, error, loading, onRefresh, focusAttention, onOpenScenario, onOpenContracts, onShowPanel, onCloseWorkspace }: Props) {
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
+  const page = useRef<HTMLDivElement>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      setOverview(await getWorkspaceOverview())
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { if (active) void load() }, [load, active, workspacePath, refreshTrigger])
+  useEffect(() => {
+    if (!focusAttention || !overview) return
+    page.current?.querySelector(`[data-attention-index="${focusAttention.index}"]`)?.scrollIntoView?.({ block: 'center' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusAttention?.seq, overview !== null])
 
   if (!overview) {
     return (
@@ -88,7 +79,7 @@ export function WorkspaceTab({ workspacePath, active = true, refreshTrigger = 0,
   const showReminder = overview.open && dismissedFor !== overview.path
 
   return (
-    <div className="flex-1 overflow-auto" data-testid="workspace-page">
+    <div ref={page} className="flex-1 overflow-auto" data-testid="workspace-page">
       <div className="p-5 flex flex-col gap-4">
         {showReminder && (
           <div role="status" data-testid="workspace-reminder" className="flex items-center gap-2 rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-xs">
@@ -110,7 +101,7 @@ export function WorkspaceTab({ workspacePath, active = true, refreshTrigger = 0,
             </h1>
             <p className="text-xs text-[var(--color-muted-foreground)] truncate" title={overview.path}>{overview.path}</p>
           </div>
-          <button type="button" onClick={() => void load()} disabled={loading} className="flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2.5 py-1 text-xs hover:bg-[var(--color-muted)] disabled:opacity-50">
+          <button type="button" onClick={onRefresh} disabled={loading} className="flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2.5 py-1 text-xs hover:bg-[var(--color-muted)] disabled:opacity-50">
             <RefreshCw size={12} className={cn(loading && 'animate-spin')} aria-hidden /> Refresh
           </button>
           <button type="button" onClick={() => void openInExplorer(overview.path)} className="flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2.5 py-1 text-xs hover:bg-[var(--color-muted)]">
@@ -134,7 +125,7 @@ export function WorkspaceTab({ workspacePath, active = true, refreshTrigger = 0,
               ) : (
                 <ul className="divide-y divide-[var(--color-border)]">
                   {attention.map((a, i) => (
-                    <AttentionCard key={`${a.id}-${i}`} item={a} onOpenScenario={onOpenScenario} onOpenContracts={onOpenContracts} />
+                    <AttentionCard key={`${a.id}-${i}`} index={i} item={a} onOpenScenario={onOpenScenario} onOpenContracts={onOpenContracts} />
                   ))}
                 </ul>
               )}
@@ -226,15 +217,16 @@ export function WorkspaceTab({ workspacePath, active = true, refreshTrigger = 0,
   )
 }
 
-function AttentionCard({ item, onOpenScenario, onOpenContracts }: {
+function AttentionCard({ item, index, onOpenScenario, onOpenContracts }: {
   item: AttentionItem
+  index: number
   onOpenScenario: (path: string, name: string) => void
   onOpenContracts: (specRef: string) => void
 }) {
   const warn = item.severity === 'warning'
   return (
     <li>
-      <article aria-label={item.what} className="px-3 py-3 text-xs flex flex-col gap-1">
+      <article aria-label={item.what} data-attention-index={index} className="px-3 py-3 text-xs flex flex-col gap-1">
         <div className="flex items-start gap-2">
           {warn ? <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-400" aria-hidden /> : <Info size={14} className="shrink-0 mt-0.5 text-sky-400" aria-hidden />}
           <p className="font-medium">{item.what}</p>

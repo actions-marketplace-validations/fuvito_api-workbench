@@ -507,4 +507,22 @@ describe('where the problem is', () => {
     expect(within(card).queryByTestId('finding-where')).not.toBeInTheDocument()
     expect(within(card).queryByTestId('finding-spec')).not.toBeInTheDocument()
   })
+  it('applies a choice made in the sidebar and reports the selection and the last result', async () => {
+    const onSelectionChange = vi.fn()
+    const onResult = vi.fn()
+    const { rerender } = render(<ConformanceTab onSelectionChange={onSelectionChange} onResult={onResult} />)
+    await screen.findByLabelText(/Spec/)
+    rerender(<ConformanceTab request={{ id: 1, specPath: '/ws/api.yaml' }} onSelectionChange={onSelectionChange} onResult={onResult} />)
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:8120'))
+    expect(screen.getByLabelText(/Spec/)).toHaveValue('/ws/api.yaml')
+    expect(onSelectionChange).toHaveBeenLastCalledWith({ specPath: '/ws/api.yaml', envPath: '' })
+
+    rerender(<ConformanceTab request={{ id: 2, envPath: '/ws/environments/local.yaml' }} onSelectionChange={onSelectionChange} onResult={onResult} />)
+    expect(screen.getByLabelText(/Environment/)).toHaveValue('/ws/environments/local.yaml')
+    expect(screen.getByLabelText(/Spec/)).toHaveValue('/ws/api.yaml')
+
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ specPath: '/ws/api.yaml', specTitle: 'Shop', total: 7, covered: 5, passing: 4, failing: 1 }))
+  })
 })

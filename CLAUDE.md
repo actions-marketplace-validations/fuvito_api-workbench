@@ -718,3 +718,18 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **One model for all six icons:** `lib/railIcons.ts` (`iconForTab`, `recordTab`, `tabToRestore`; replaces `railFocus.ts`). Clicking an icon shows its sidebar and brings back the last tab opened under it (this session only); clicking the lit icon collapses the sidebar; switching tabs lights the tab's icon and records it but never opens or closes the sidebar. Workspace, Check Conformance and CLI Builder open their page when nothing is open under them; Requests, Scenarios and Contracts do not create a tab. Opening a workspace shows the Workspace tab with the Workspace sidebar open.
 - **Removed:** the 0.6.0 rules that closed the sidebar for page tabs and reopened it on return (`lastWasPage`, `showWorkspacePage`) and the `highlightedTab` / `workspaceActive` / `conformanceActive` / `cliActive` rail props.
 - **Not yet:** the Workspace sidebar content (phase 2) and the Check Conformance and CLI Builder sidebars (phase 3); those three sidebars show only their title. Playwright: the 0.6.0 rail tests were rewritten for the new rule, plus two new ones (every icon opens its sidebar; each icon restores its last tab).
+
+### 2026-11-21 — Workspace sidebar, phase 2 of B-081
+
+- **Workspace sidebar** (`WorkspaceSidebarPanel`): workspace name and temporary badge, an environment selector that calls the same `handleEnvChange` as the status bar, the environment's source, the **Needs attention** list (clicking an item opens the Workspace tab and scrolls to that card, `data-attention-index`), and counts that switch to the Requests or Scenarios icon.
+- **One snapshot:** `hooks/useWorkspaceOverview` reads `GetWorkspaceOverview` for both the Workspace page and the sidebar (while either is on screen, and again after a run, a Contracts change or an environment change), so they never disagree. `WorkspaceTab` now takes the snapshot as props instead of reading it itself.
+- **Not yet:** the Check Conformance and CLI Builder sidebars (phase 3). The environment selector stays in the status bar as well.
+
+### 2026-11-21 — Check Conformance and CLI Builder sidebars, phase 3 of B-081 (all three phases built)
+
+- **Check Conformance sidebar** (`ConformanceSidebarPanel`): the workspace's specs and environments (plus *Active environment*), the choice on the page marked, and a *Last result* card (Covered, Passing, Failing of total; click to show the page). A click applies the choice on the page (`ConformRequest`) and shows it; the page reports its selection and its run totals back (`onSelectionChange`, `onResult`), kept in `App` for the session.
+- **CLI Builder sidebar** (`CliBuilderSidebarPanel`): the catalog's commands with their goals; a click selects the command on the page (the existing `preset` path) and the selected one is marked (`onCommandChange`).
+- **Both are pickers:** every option stays on the page; the sidebar lists are named *Workspace specs* and *Workspace environments* so they are not confused with the page's own fields.
+- **B-081 is done:** the model (phase 1), the Workspace sidebar (phase 2) and these two. Not changed: the environment selector also stays in the status bar. Screenshots of the new sidebars are not generated yet.
+- **Screenshots:** the whole gallery was regenerated for the rail with a sidebar on every icon; new `18-conformance-sidebar` and `19-cli-builder-sidebar` (dark and light, from `screenshots-workspace.spec.ts`), and `17-workspace-page` now shows the Workspace sidebar. README gallery updated.
+- **In-app release notes:** `AboutDialog.tsx` has a 0.7.0 entry marked `unreleased` (the rail sidebars). At release time set its date and bump the version text in `AboutDialog.tsx` (and its two tests) and `help/user-guide.md`.

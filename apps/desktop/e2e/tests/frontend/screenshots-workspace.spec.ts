@@ -63,6 +63,10 @@ async function openWorkspacePage(page: Page, theme: 'dark' | 'light') {
       const b = (window as unknown as Record<string, Record<string, unknown>>)['__bridge']
       ;(b['settings'] as Record<string, unknown>)['theme'] = theme
       b['workspaceOverview'] = overview
+      // The environment the overview names, so the sidebar's selector agrees with it.
+      const staging = { name: 'Staging', path: 'C:/work/shop-api/environments/staging.yaml' }
+      b['environments'] = [{ name: 'Local', path: 'C:/work/shop-api/environments/local.yaml' }, staging, { name: 'Production', path: 'C:/work/shop-api/environments/production.yaml' }]
+      b['activeEnv'] = staging
     },
     { theme, overview: OVERVIEW },
   )
@@ -79,5 +83,29 @@ for (const theme of ['dark', 'light'] as const) {
   test(`${tag} workspace page`, async ({ page }) => {
     await openWorkspacePage(page, theme)
     await page.screenshot({ path: path.join(IMAGES_DIR, `17-workspace-page${suffix}.png`), animations: 'disabled' })
+  })
+}
+
+// The Check Conformance and CLI Builder pages with their sidebars: every rail icon opens a sidebar.
+for (const theme of ['dark', 'light'] as const) {
+  const tag = theme === 'dark' ? '@screenshot-workspace' : '@screenshot-workspace-light'
+  const suffix = theme === 'dark' ? '' : '-light'
+
+  test(`${tag} conformance sidebar`, async ({ page }) => {
+    await openWorkspacePage(page, theme)
+    await page.locator('button[aria-label="Check spec conformance"]').click()
+    await page.getByTestId('sidebar-conformance').getByRole('button', { name: 'specs/shop.yaml' }).click()
+    await page.getByLabel(/Base URL/).waitFor({ timeout: 5_000 })
+    await page.getByRole('button', { name: /Run conformance check/ }).click()
+    await page.getByTestId('sidebar-last-result').waitFor({ timeout: 5_000 })
+    await page.screenshot({ path: path.join(IMAGES_DIR, `18-conformance-sidebar${suffix}.png`), animations: 'disabled' })
+  })
+
+  test(`${tag} cli builder sidebar`, async ({ page }) => {
+    await openWorkspacePage(page, theme)
+    await page.locator('button[aria-label="CLI Command Builder"]').click()
+    await page.getByTestId('sidebar-cli').getByRole('button', { name: /clrsig conform/ }).click()
+    await page.getByTestId('cli-command').waitFor({ timeout: 5_000 })
+    await page.screenshot({ path: path.join(IMAGES_DIR, `19-cli-builder-sidebar${suffix}.png`), animations: 'disabled' })
   })
 }

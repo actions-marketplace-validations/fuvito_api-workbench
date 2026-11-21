@@ -145,6 +145,61 @@ test.describe('Workspace page', () => {
     await selected(/Workspace/)
   })
 
+  // The Workspace sidebar is a summary that drives the page: the same snapshot, an environment
+  // selector, and attention items that show the matching card on the page.
+  test('the Workspace sidebar lists what needs attention and shows its card on the page', async ({ page }) => {
+    await page.addInitScript(o => {
+      (window as any).__bridge.workspaceOverview = o;
+      (window as any).__bridge.environments = [{ name: 'local', path: '/workspace/environments/local.yaml' }, { name: 'staging', path: '/workspace/environments/staging.yaml' }]
+    }, overview)
+    await gotoApp(page)
+    await page.getByRole('button', { name: 'Workspace', exact: true }).click()
+    const side = page.getByTestId('sidebar-workspace')
+    await expect(side).toBeVisible()
+    await expect(side.getByRole('list', { name: 'Needs attention' })).toContainText('does not exist')
+    await expect(side.getByTestId('sidebar-env-source')).toContainText('remembered for this workspace')
+    await expect(side.getByRole('combobox', { name: 'Environment' })).toBeVisible()
+    await expect(side.getByRole('button', { name: '3 requests' })).toBeVisible()
+
+    // The page and the sidebar come from one snapshot.
+    await expect(page.getByTestId('workspace-page').getByRole('article', { name: /does not exist/ })).toBeVisible()
+
+    // Clicking an item shows the Workspace page with that card.
+    await side.getByRole('button', { name: /does not exist/ }).click()
+    await expect(page.getByRole('tab', { name: /Workspace/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('article', { name: /does not exist/ })).toBeVisible()
+  })
+
+  // The Check Conformance and CLI Builder sidebars pick inputs on their pages.
+  test('the Check Conformance sidebar picks the spec on the page and shows its last result', async ({ page }) => {
+    await gotoApp(page)
+    await page.locator('button[aria-label="Check spec conformance"]').click()
+    const side = page.getByTestId('sidebar-conformance')
+    await expect(side.getByRole('list', { name: 'Workspace specs' })).toContainText('specs/shop.yaml')
+    await expect(side.getByRole('button', { name: 'Active environment' })).toHaveAttribute('aria-pressed', 'true')
+
+    await side.getByRole('button', { name: 'specs/shop.yaml' }).click()
+    await expect(page.locator('#conf-spec')).toHaveValue('/workspace/specs/shop.yaml')
+    await expect(side.getByRole('button', { name: 'specs/shop.yaml' })).toHaveAttribute('aria-pressed', 'true')
+
+    await side.getByRole('button', { name: 'environments/ci.yaml' }).or(side.getByRole('button', { name: 'environments/local.yaml' })).click()
+    await expect(page.locator('#conf-env')).toHaveValue('/workspace/environments/local.yaml')
+
+    await page.getByRole('button', { name: /Run conformance check/ }).click()
+    await expect(side.getByTestId('sidebar-last-result')).toBeVisible()
+  })
+
+  test('the CLI Builder sidebar lists the commands and selects one on the page', async ({ page }) => {
+    await gotoApp(page)
+    await page.locator('button[aria-label="CLI Command Builder"]').click()
+    const side = page.getByTestId('sidebar-cli')
+    await expect(side.getByRole('button', { name: /clrsig run/ })).toBeVisible()
+    await expect(side.getByRole('button', { name: /clrsig run/ })).toHaveAttribute('aria-pressed', 'true')
+    await side.getByRole('button', { name: /clrsig conform/ }).click()
+    await expect(page.getByRole('radio', { name: /Check an API against its OpenAPI spec/ })).toHaveAttribute('aria-checked', 'true')
+    await expect(side.getByRole('button', { name: /clrsig conform/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('Refresh reads the workspace again', async ({ page }) => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'Workspace', exact: true }).click()
@@ -172,7 +227,7 @@ test.describe('Workspace page', () => {
     await lit('Requests')
     await notLit('Workspace')
     await expect(sidebar).toBeVisible()
-    await expect(sidebar.getByText('Filter requests…').or(sidebar.getByText('No request files yet'))).toBeVisible()
+    await expect(sidebar.getByText('Filter requestsâ€¦').or(sidebar.getByText('No request files yet'))).toBeVisible()
 
     // A sidebar the user collapses stays collapsed while tabs change; the active tab's icon is lit.
     await rail.getByRole('button', { name: 'Requests' }).click()
