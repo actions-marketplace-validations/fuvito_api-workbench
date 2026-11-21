@@ -25,6 +25,7 @@ What a user reads **inside the app** (the Help panel). These files are embedded 
 | [`guides/`](guides/) | How-to guides for people who run Clear Signal outside the app: [CI/CD integration](guides/ci-integration.md), [authenticated conformance runs](guides/authed-conform.md) |
 | [`process/`](process/) | How the project is run: the [release process](process/release-process.md), manual steps that need an account or a browser |
 | [`product/`](product/) | Why the product exists and where it is going: the founding planning notes, the requirements and roadmap, the presentation |
+| [`enterprise/`](enterprise/README.md) | Notes for the commercial enterprise edition (teams that own part of an API, org-wide rollup, identity, audit). Kept apart from the open-source project; nothing there is built |
 | [`archive/`](archive/) | Retired documents kept only so old links still resolve |
 | `images/`, `demo.gif`, `demo.tape` | Assets the README, the demo workflow and the screenshot tests use; the paths are fixed |
 
@@ -34,5 +35,6 @@ What a user reads **inside the app** (the Help panel). These files are embedded 
 - A **design** for a new feature: `docs/enhancements/`.
 - A **plan, a to-do or a backlog item**: `docs/planning/backlog.md`.
 - An **audit or comparison**: `docs/reports/`.
+- A note about the **enterprise edition** (not the open-source product): `docs/enterprise/`.
 - A **how-to** for CI or scripting users: `docs/guides/`.
 - A failure kind or a gap we learn about: a row in `what-we-check.md` (and its evidence test).

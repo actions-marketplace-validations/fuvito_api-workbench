@@ -88,7 +88,7 @@ import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
 import {serializeScenarioToYAML} from '@/components/scenario-yaml'
 import {isTabDirty, isPageTab, withoutTabsIn} from '@/lib/tabState'
-import {railTargetForTab} from '@/lib/railFocus'
+import {iconForTab, isRailIcon, recordTab, tabToRestore, type LastTabs} from '@/lib/railIcons'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
@@ -103,20 +103,14 @@ export default function App() {
     localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
-  // The Workspace page is a full-width page, not a side panel: showing it closes the sidebar and
-  // the rail lights only its icon. A panel icon (Requests, Scenarios, Contracts) opens the sidebar
-  // again and takes the highlight. The panel the next click opens is the one used last.
-  function showWorkspacePage() {
-    tabs.openWorkspaceTab()
-    setSidebarOpen(false)
-    localStorage.setItem('ui.sidebarOpen', 'false')
-  }
-
-  // A workspace the user just opened (open, new, recent, Demo Server) starts on its Workspace page.
+  // A workspace the user just opened (open, new, recent, Demo Server) starts on its Workspace tab,
+  // with the Workspace sidebar showing.
   function onWorkspaceOpened() {
-    setRailTab('explorer')
-    localStorage.setItem('ui.railTab', 'explorer')
-    showWorkspacePage()
+    setRailTab('workspace')
+    localStorage.setItem('ui.railTab', 'workspace')
+    setSidebarOpen(true)
+    localStorage.setItem('ui.sidebarOpen', 'true')
+    tabs.openWorkspaceTab()
   }
 
   const workspace = useWorkspace({
@@ -186,40 +180,27 @@ export default function App() {
   })
   const [railTab, setRailTab] = useState<RailTab>(() => {
     const saved = localStorage.getItem('ui.railTab')
-    const valid: RailTab[] = ['explorer', 'scenarios', 'coverage']
     // 'history' was a rail tab of its own before it moved next to the requests list
-    return valid.includes(saved as RailTab) ? (saved as RailTab) : 'explorer'
+    return isRailIcon(saved) ? saved : 'explorer'
   })
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })
-  // The rail follows the tabs: switching to a tab points the sidebar at the panel that tab belongs to,
-  // and a full-width page tab (Workspace, Check Conformance, CLI Builder) closes the sidebar. When
-  // the previous tab was such a page, the sidebar was closed by the page, not by the user, so
-  // switching back to a request, scenario or Contracts tab opens it again; between panel tabs it
-  // stays as the user left it. A click on a rail icon still wins until the next tab switch. Skipped
-  // on the first render so a saved panel choice is not overwritten at startup.
-  const lastRailTabId = useRef(tabs.activeTabId)
-  const lastWasPage = useRef(railTargetForTab(tabs.activeTab?.kind).page !== undefined)
+  // Every rail icon remembers the last tab opened under it (this session only). Switching to a tab
+  // lights its icon, points the sidebar at that icon's panel and records the tab; it never opens or
+  // closes the sidebar, which is the user's choice. A click on a rail icon (handleRailTabClick) shows
+  // the icon's sidebar and brings back its last tab. Not applied on the first render so a saved icon
+  // is not overwritten at startup.
+  const lastTabs = useRef<LastTabs>({})
+  const firstRailRender = useRef(true)
   useEffect(() => {
-    if (lastRailTabId.current === tabs.activeTabId) return
-    lastRailTabId.current = tabs.activeTabId
-    const target = railTargetForTab(tabs.activeTab?.kind)
-    if (target.panel) {
-      setRailTab(target.panel)
-      localStorage.setItem('ui.railTab', target.panel)
-      if (lastWasPage.current) {
-        setSidebarOpen(true)
-        localStorage.setItem('ui.sidebarOpen', 'true')
-      }
-    } else {
-      setSidebarOpen(false)
-      localStorage.setItem('ui.sidebarOpen', 'false')
-    }
-    lastWasPage.current = target.page !== undefined
+    lastTabs.current = recordTab(lastTabs.current, tabs.activeTab)
+    if (firstRailRender.current) { firstRailRender.current = false; return }
+    const icon = iconForTab(tabs.activeTab?.kind)
+    setRailTab(icon)
+    localStorage.setItem('ui.railTab', icon)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.activeTabId])
-  const railTarget = railTargetForTab(tabs.activeTab?.kind)
   const [railExpanded, setRailExpanded] = useState(() => {
     return localStorage.getItem('ui.railExpanded') === 'true'
   })
@@ -240,16 +221,22 @@ export default function App() {
     tabs.openCliTab()
   }
 
-  function handleRailTabClick(tab: RailTab) {
-    if (tab === railTab && sidebarOpen) {
+  function handleRailTabClick(icon: RailTab) {
+    if (icon === railTab && sidebarOpen) {
       setSidebarOpen(false)
       localStorage.setItem('ui.sidebarOpen', 'false')
-    } else {
-      setRailTab(tab)
-      localStorage.setItem('ui.railTab', tab)
-      setSidebarOpen(true)
-      localStorage.setItem('ui.sidebarOpen', 'true')
+      return
     }
+    setRailTab(icon)
+    localStorage.setItem('ui.railTab', icon)
+    setSidebarOpen(true)
+    localStorage.setItem('ui.sidebarOpen', 'true')
+    const id = tabToRestore(lastTabs.current, icon, tabs.tabs)
+    if (id) {
+      if (id !== tabs.activeTabId) tabs.switchTo(id)
+    } else if (icon === 'workspace') tabs.openWorkspaceTab()
+    else if (icon === 'conformance') tabs.openConformanceTab()
+    else if (icon === 'cli') openCliBuilder()
   }
 
   function handleToggleRailExpanded() {
@@ -1182,20 +1169,11 @@ export default function App() {
           <div className="flex flex-1 overflow-hidden">
             <ActivityRail
               activeTab={railTab}
-              sidebarOpen={sidebarOpen}
               expanded={railExpanded}
               onTabClick={handleRailTabClick}
               onToggleExpanded={handleToggleRailExpanded}
               onShowSettings={() => settings.setShowSettings(true)}
               onShowHelp={() => setShowHelp(true)}
-              onOpenCliBuilder={() => openCliBuilder()}
-              onOpenConformance={() => tabs.openConformanceTab()}
-              onOpenWorkspace={showWorkspacePage}
-              // An open sidebar shows its panel; with it closed the icon of the active tab is lit.
-              highlightedTab={sidebarOpen ? railTab : (railTarget.panel ?? null)}
-              workspaceActive={!sidebarOpen && railTarget.page === 'workspace'}
-              conformanceActive={!sidebarOpen && railTarget.page === 'conformance'}
-              cliActive={!sidebarOpen && railTarget.page === 'cli'}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />

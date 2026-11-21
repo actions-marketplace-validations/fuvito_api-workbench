@@ -1,7 +1,9 @@
 import { FolderOpen, Play, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal, ShieldCheck, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type RailTab = 'explorer' | 'scenarios' | 'coverage'
+import type { RailIcon } from '@/lib/railIcons'
+
+export type RailTab = RailIcon
 
 type NavItem = {
   tab: RailTab
@@ -18,29 +20,20 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 type ActivityRailProps = {
+  // The icon whose sidebar is showing, and the only one lit.
   activeTab: RailTab
-  sidebarOpen: boolean
   expanded: boolean
   onTabClick: (tab: RailTab) => void
   onToggleExpanded: () => void
   onShowSettings: () => void
   onShowHelp: () => void
-  onOpenCliBuilder?: () => void
-  onOpenConformance?: () => void
-  onOpenWorkspace?: () => void
-  // Which panel icon to light. When omitted it is the open panel (and none while the sidebar is
-  // closed); the app passes the panel of the active tab so the rail follows the tabs.
-  highlightedTab?: RailTab | null
-  workspaceActive?: boolean
-  conformanceActive?: boolean
-  cliActive?: boolean
   demoRunning?: boolean
   onStopDemo?: () => void
 }
 
 export function ActivityRail({
-  activeTab, sidebarOpen, expanded,
-  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, onOpenConformance, onOpenWorkspace, highlightedTab, workspaceActive, conformanceActive, cliActive, demoRunning, onStopDemo,
+  activeTab, expanded,
+  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, demoRunning, onStopDemo,
 }: ActivityRailProps) {
   return (
     <div
@@ -49,31 +42,34 @@ export function ActivityRail({
     >
       {/* Primary nav */}
       <nav role="navigation" aria-label="Activity" className="flex flex-col py-1 mt-1">
-        {onOpenWorkspace && (
-          <button
-            type="button"
-            title={expanded ? undefined : 'Workspace'}
-            aria-label="Workspace"
-            aria-current={workspaceActive ? 'page' : undefined}
-            onClick={onOpenWorkspace}
-            className={cn(
-              'relative flex items-center h-9 transition-colors',
-              expanded ? 'gap-2.5 px-3' : 'justify-center w-11',
-              workspaceActive
-                ? 'text-sky-400 bg-[var(--color-muted)]'
-                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
-            )}
-          >
-            {workspaceActive && (
-              <span className="absolute left-0 inset-y-1 w-[3px] rounded-r-full bg-current opacity-70" aria-hidden />
-            )}
-            <LayoutDashboard size={16} className="shrink-0" aria-hidden />
-            {expanded && <span className="text-xs font-medium truncate">Workspace</span>}
-          </button>
-        )}
-        {onOpenWorkspace && <div role="separator" className="my-1 mx-2 border-t border-[var(--color-border)]" />}
+        {(() => {
+          const active = activeTab === 'workspace'
+          return (
+            <button
+              type="button"
+              title={expanded ? undefined : 'Workspace'}
+              aria-label="Workspace"
+              aria-current={active ? 'page' : undefined}
+              onClick={() => onTabClick('workspace')}
+              className={cn(
+                'relative flex items-center h-9 transition-colors',
+                expanded ? 'gap-2.5 px-3' : 'justify-center w-11',
+                active
+                  ? 'text-sky-400 bg-[var(--color-muted)]'
+                  : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
+              )}
+            >
+              {active && (
+                <span className="absolute left-0 inset-y-1 w-[3px] rounded-r-full bg-current opacity-70" aria-hidden />
+              )}
+              <LayoutDashboard size={16} className="shrink-0" aria-hidden />
+              {expanded && <span className="text-xs font-medium truncate">Workspace</span>}
+            </button>
+          )
+        })()}
+        <div role="separator" className="my-1 mx-2 border-t border-[var(--color-border)]" />
         {NAV_ITEMS.map(({ tab, icon: Icon, label, title, activeColor }) => {
-          const active = highlightedTab !== undefined ? highlightedTab === tab : sidebarOpen && activeTab === tab
+          const active = activeTab === tab
           return (
             <button
               key={tab}
@@ -121,8 +117,8 @@ export function ActivityRail({
         )}
 
         {([
-          ...(onOpenConformance ? [{ icon: ShieldCheck, label: 'Conformance', title: 'Check spec conformance', onClick: onOpenConformance, active: !!conformanceActive }] : []),
-          ...(onOpenCliBuilder ? [{ icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: onOpenCliBuilder, active: !!cliActive }] : []),
+          { icon: ShieldCheck, label: 'Conformance', title: 'Check spec conformance', onClick: () => onTabClick('conformance'), active: activeTab === 'conformance' },
+          { icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: () => onTabClick('cli'), active: activeTab === 'cli' },
           { icon: Settings,   label: 'Settings', title: 'Settings', onClick: onShowSettings },
           { icon: HelpCircle, label: 'Help',     title: 'Help',     onClick: onShowHelp },
         ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string; onClick: () => void; active?: boolean }[]).map(({ icon: Icon, label, title, onClick, active }) => (

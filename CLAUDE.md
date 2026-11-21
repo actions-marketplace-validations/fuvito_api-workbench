@@ -196,6 +196,8 @@ Cloud accounts, team sync, hosted collaboration, GraphQL, WebSockets, gRPC, load
 
 Do not implement or stub any of these without explicit user direction.
 
+Commercial or enterprise-edition ideas, and anything else that is out of scope for this open-source project, are written as dated notes in `docs/enterprise/` (see its README) instead of being built, stubbed or added to the backlog.
+
 ---
 
 ## 10. Changelog
@@ -710,3 +712,9 @@ Do not implement or stub any of these without explicit user direction.
 - **Docs for the release:** README (Workspace page section and screenshot `17-workspace-page`, feature bullet), `README-DEVELOPER.md` (status, pinned Wails, tracked `wailsjs/runtime`, the rail/tab/Workspace page architecture, pre-release checklist), `docs/process/release-process.md` (tag the CI-tested SHA, `git pull --rebase` after bot commits, Docker version argument, pinned Wails), user guide (version 0.6.0, the Workspace page and rail behaviour), the GitHub Release notes, a new next-steps snapshot `docs/planning/next_steps/2026-11-21-next-steps.md`.
 - **Known gap:** the 0.6.0 release notes inside the app (`AboutDialog.tsx`) predate the last UI fixes; the GitHub Release carries the complete notes.
 - **Next:** B-081 (a sidebar and a last tab on every rail icon; proposal `docs/enhancements/2026-11-21-rail-sidebars-and-last-tab.md`) is planned for 0.7.0.
+
+### 2026-11-21 — Rail sidebars and last tab per icon, phase 1 (B-081; design: `docs/enhancements/2026-11-21-rail-sidebars-and-last-tab.md`, approved as written)
+
+- **One model for all six icons:** `lib/railIcons.ts` (`iconForTab`, `recordTab`, `tabToRestore`; replaces `railFocus.ts`). Clicking an icon shows its sidebar and brings back the last tab opened under it (this session only); clicking the lit icon collapses the sidebar; switching tabs lights the tab's icon and records it but never opens or closes the sidebar. Workspace, Check Conformance and CLI Builder open their page when nothing is open under them; Requests, Scenarios and Contracts do not create a tab. Opening a workspace shows the Workspace tab with the Workspace sidebar open.
+- **Removed:** the 0.6.0 rules that closed the sidebar for page tabs and reopened it on return (`lastWasPage`, `showWorkspacePage`) and the `highlightedTab` / `workspaceActive` / `conformanceActive` / `cliActive` rail props.
+- **Not yet:** the Workspace sidebar content (phase 2) and the Check Conformance and CLI Builder sidebars (phase 3); those three sidebars show only their title. Playwright: the 0.6.0 rail tests were rewritten for the new rule, plus two new ones (every icon opens its sidebar; each icon restores its last tab).
