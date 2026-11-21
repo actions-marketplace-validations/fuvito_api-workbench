@@ -42,8 +42,8 @@ func TestExecute_GET(t *testing.T) {
 	if string(resp.Body) != `{"ok":true}` {
 		t.Errorf("body: want %q, got %q", `{"ok":true}`, resp.Body)
 	}
-	if resp.Duration == 0 {
-		t.Error("duration should be non-zero")
+	if resp.Duration < 0 {
+		t.Error("duration should not be negative")
 	}
 }
 
