@@ -18,6 +18,7 @@ import {ChevronLeft} from 'lucide-react'
 import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
 import {ConformanceTab} from '@/components/ConformanceTab'
+import {WorkspaceTab} from '@/components/WorkspaceTab'
 import {RunnerTab} from '@/components/RunnerTab'
 import {CliBuilderTab} from '@/components/CliBuilderTab'
 import type {CliBuilderPreset} from '@/components/CliBuilderTab'
@@ -63,6 +64,7 @@ import {
   stopConformanceServer,
   openConformanceSpec,
   openConformanceWorkspace,
+  getCloseReminder,
   pickFile,
   quitApp,
   renameScenario,
@@ -100,12 +102,18 @@ export default function App() {
     localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
+  // A workspace the user just opened (open, new, recent, Demo Server) starts on its Workspace page.
+  function onWorkspaceOpened() {
+    switchToExplorer()
+    tabs.openWorkspaceTab()
+  }
+
   const workspace = useWorkspace({
     setTabsState: tabs.setTabsState,
     tabsStateRef: tabs.tabsStateRef,
     openFileAsTab: tabs.openFileAsTab,
     loadCacheIntoTab: tabs.loadCacheIntoTab,
-    onWorkspaceOpened: switchToExplorer,
+    onWorkspaceOpened,
   })
   const settings = useSettings()
   const demo = useDemo({
@@ -113,7 +121,7 @@ export default function App() {
     refreshHistory: workspace.refreshHistory,
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
-    onWorkspaceOpened: switchToExplorer,
+    onWorkspaceOpened,
     onError: message => setAppError(message),
   })
 
@@ -132,6 +140,7 @@ export default function App() {
       setConformanceWorkspace(result.workspacePath ?? '')
       await workspace.refreshWorkspace()
       switchToExplorer()
+      tabs.openWorkspaceTab()
       tabs.openConformanceTab()
     } finally {
       setConformanceStarting(false)
@@ -226,6 +235,11 @@ export default function App() {
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState(false)
   const [pendingWorkspaceAction, setPendingWorkspaceAction] = useState<(() => void) | null>(null)
 
+  // What closing will remember, appended to the unsaved-changes confirmation.
+  const [closeReminder, setCloseReminder] = useState('')
+  const [envChanges, setEnvChanges] = useState(0)
+  useEffect(() => { setEnvChanges(n => n + 1) }, [workspace.activeEnv?.path])
+
   async function doCloseWorkspace() {
     if (demo.demoRunning) {
       try { await stopDemo() } catch { /* best-effort */ }
@@ -238,6 +252,7 @@ export default function App() {
     const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
     if (hasDirty) {
       setPendingWorkspaceAction(null)
+      getCloseReminder().then(setCloseReminder).catch(() => setCloseReminder(''))
       setPendingCloseWorkspace(true)
     } else {
       doCloseWorkspace()
@@ -249,6 +264,7 @@ export default function App() {
     const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
     if (hasDirty) {
       setPendingWorkspaceAction(() => action)
+      getCloseReminder().then(setCloseReminder).catch(() => setCloseReminder(''))
       setPendingCloseWorkspace(true)
     } else {
       doCloseWorkspace().then(() => action())
@@ -904,7 +920,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance',
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance' | 'workspace',
     filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
@@ -1023,7 +1039,7 @@ export default function App() {
         return (
           <DiscardChangesDialog
             title={action ? 'Switch workspace' : 'Close workspace'}
-            message={`${dirtyCount} ${noun} unsaved changes. ${action ? 'Switch workspace' : 'Close workspace'} and discard them?`}
+            message={`${dirtyCount} ${noun} unsaved changes. ${action ? 'Switch workspace' : 'Close workspace'} and discard them?${closeReminder ? ` ${closeReminder}` : ''}`}
             onCancel={() => { setPendingCloseWorkspace(false); setPendingWorkspaceAction(null) }}
             onDiscard={() => {
               setPendingCloseWorkspace(false)
@@ -1135,6 +1151,8 @@ export default function App() {
               onShowHelp={() => setShowHelp(true)}
               onOpenCliBuilder={() => openCliBuilder()}
               onOpenConformance={() => tabs.openConformanceTab()}
+              onOpenWorkspace={() => tabs.openWorkspaceTab()}
+              workspaceActive={activeTab?.kind === 'workspace'}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />
@@ -1334,6 +1352,33 @@ export default function App() {
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
                     <ConformanceTab onOpenCliBuilder={values => openCliBuilder({ command: 'conform', values })} />
+                  </div>
+                ))}
+
+                {/* Workspace tab (single instance) */}
+                {tabList.filter(t => t.kind === 'workspace').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <WorkspaceTab
+                      workspacePath={workspace.workspacePath}
+                      refreshTrigger={runLogTrigger + coverageRefreshTrigger + envChanges}
+                      onOpenScenario={(path, name) => tabs.openScenarioAsTab(path, name)}
+                      onOpenContracts={specRef => {
+                        setSelectedCoverageSpecFile(specRef)
+                        tabs.openCoverageTab()
+                        setCoverageRefreshTrigger(n => n + 1)
+                      }}
+                      onShowPanel={panel => {
+                        setRailTab(panel)
+                        localStorage.setItem('ui.railTab', panel)
+                        setSidebarOpen(true)
+                        localStorage.setItem('ui.sidebarOpen', 'true')
+                      }}
+                      onCloseWorkspace={requestCloseWorkspace}
+                    />
                   </div>
                 ))}
 

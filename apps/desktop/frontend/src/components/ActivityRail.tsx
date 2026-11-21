@@ -1,4 +1,4 @@
-import { FolderOpen, Play, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal, ShieldCheck } from 'lucide-react'
+import { FolderOpen, Play, BarChart2, Settings, HelpCircle, ChevronsRight, ChevronsLeft, Terminal, ShieldCheck, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type RailTab = 'explorer' | 'scenarios' | 'coverage'
@@ -27,13 +27,15 @@ type ActivityRailProps = {
   onShowHelp: () => void
   onOpenCliBuilder?: () => void
   onOpenConformance?: () => void
+  onOpenWorkspace?: () => void
+  workspaceActive?: boolean
   demoRunning?: boolean
   onStopDemo?: () => void
 }
 
 export function ActivityRail({
   activeTab, sidebarOpen, expanded,
-  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, onOpenConformance, demoRunning, onStopDemo,
+  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, onOpenConformance, onOpenWorkspace, workspaceActive, demoRunning, onStopDemo,
 }: ActivityRailProps) {
   return (
     <div
@@ -42,6 +44,28 @@ export function ActivityRail({
     >
       {/* Primary nav */}
       <nav role="navigation" aria-label="Activity" className="flex flex-col py-1 mt-1">
+        {onOpenWorkspace && (
+          <button
+            type="button"
+            title={expanded ? undefined : 'Workspace'}
+            aria-label="Workspace"
+            aria-current={workspaceActive ? 'page' : undefined}
+            onClick={onOpenWorkspace}
+            className={cn(
+              'relative flex items-center h-9 transition-colors',
+              expanded ? 'gap-2.5 px-3' : 'justify-center w-11',
+              workspaceActive
+                ? 'text-sky-400 bg-[var(--color-muted)]'
+                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
+            )}
+          >
+            {workspaceActive && (
+              <span className="absolute left-0 inset-y-1 w-[3px] rounded-r-full bg-current opacity-70" aria-hidden />
+            )}
+            <LayoutDashboard size={16} className="shrink-0" aria-hidden />
+            {expanded && <span className="text-xs font-medium truncate">Workspace</span>}
+          </button>
+        )}
         {NAV_ITEMS.map(({ tab, icon: Icon, label, title, activeColor }) => {
           const active = sidebarOpen && activeTab === tab
           return (

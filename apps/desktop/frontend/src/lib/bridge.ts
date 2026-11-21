@@ -22,6 +22,7 @@ import {
   ListEnvironments as WailsListEnvironments,
   SelectEnvironment as WailsSelectEnvironment,
   GetActiveEnvironment as WailsGetActiveEnvironment,
+  GetCloseReminder as WailsGetCloseReminder,
   GetEnvironment as WailsGetEnvironment,
   SaveEnvironment as WailsSaveEnvironment,
   DeleteEnvironment as WailsDeleteEnvironment,
@@ -91,6 +92,7 @@ import {
   CancelConformance as WailsCancelConformance,
   ExportConformReport as WailsExportConformReport,
 } from '@wailsjs/go/main/ConformanceService'
+import { GetWorkspaceOverview as WailsGetWorkspaceOverview } from '@wailsjs/go/main/DashboardService'
 import {
   Stop as WailsStopConformanceServer,
   OpenWorkspace as WailsOpenConformanceWorkspace,
@@ -1323,4 +1325,61 @@ export async function getAIPromptInstructions(): Promise<string> {
 // The complete prompt to paste into an AI assistant: instructions + format spec + example.
 export async function getAIPrompt(): Promise<string> {
   return (await WailsGetAIPrompt()) as unknown as string
+}
+
+// ---- Workspace page ----
+
+export type AttentionItem = {
+  id: string
+  severity: 'warning' | 'info'
+  what: string
+  where: string
+  why: string
+  fix: string
+  target: { kind: 'scenario' | 'environment' | 'spec' | 'request' | 'contracts'; path: string }
+}
+
+export type DashCoverage = {
+  total: number
+  covered: number
+  notCovered: number
+  passing: number
+  failing: number
+  lastRunAt?: string
+}
+
+export type DashSpec = {
+  ref: string
+  path?: string
+  state: 'found' | 'missing' | 'outside' | 'url'
+  scenarios: string[]
+  coverage?: DashCoverage
+}
+
+export type EnvironmentSource = 'remembered' | 'chosen' | 'temporary' | 'none'
+
+export type WorkspaceOverview = {
+  open: boolean
+  path: string
+  name: string
+  temporary: boolean
+  requests: number
+  scenarios: number
+  environments: number
+  environmentName?: string
+  environmentPath?: string
+  environmentSource: EnvironmentSource
+  envVars: { name: string; secret: boolean; set: boolean; unsetRef?: string }[]
+  specs: DashSpec[]
+  lastRun?: { at: string; scenario: string; passed: boolean; scenarios: number; failingNow: number }
+  attention: AttentionItem[]
+  snapshotAt: string
+}
+
+export async function getWorkspaceOverview(): Promise<WorkspaceOverview> {
+  return (await WailsGetWorkspaceOverview()) as unknown as WorkspaceOverview
+}
+
+export async function getCloseReminder(): Promise<string> {
+  return WailsGetCloseReminder()
 }

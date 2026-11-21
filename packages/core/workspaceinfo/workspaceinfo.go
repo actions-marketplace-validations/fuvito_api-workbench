@@ -1,0 +1,379 @@
+// Package workspaceinfo describes the state of a workspace folder: what it contains, which
+// environment is active, which spec files its scenarios use, and what needs attention. It reads
+// files with the same parsers the runners use and never writes anything.
+package workspaceinfo
+
+import (
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+
+	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/scenario"
+	"github.com/fuvito/api-workbench/packages/core/serialization"
+	"github.com/fuvito/api-workbench/packages/core/variables"
+)
+
+// Severity of an attention item.
+const (
+	SeverityWarning = "warning" // a run will fail or mislead
+	SeverityInfo    = "info"    // worth knowing, nothing breaks
+)
+
+// Kinds of attention item (stable identifiers, used by the page and by tests).
+const (
+	ItemNoEnvironment   = "no-environment"
+	ItemUnsetEnvVar     = "unset-env-var"
+	ItemSpecMissing     = "spec-missing"
+	ItemSpecOutside     = "spec-outside"
+	ItemScenarioInvalid = "scenario-invalid"
+	ItemRequestRef      = "request-ref-missing"
+)
+
+// Spec file states.
+const (
+	SpecFound   = "found"
+	SpecMissing = "missing"
+	SpecOutside = "outside" // resolves outside the workspace; not read
+	SpecURL     = "url"     // not fetched
+)
+
+// Target says where the fix is, so the page can offer a button that goes there.
+type Target struct {
+	Kind string `json:"kind"` // scenario, environment, spec, request
+	Path string `json:"path"`
+}
+
+// Attention is one thing that needs the user's attention, written as what, where, why and fix.
+type Attention struct {
+	ID       string `json:"id"`
+	Severity string `json:"severity"`
+	What     string `json:"what"`
+	Where    string `json:"where"`
+	Why      string `json:"why"`
+	Fix      string `json:"fix"`
+	Target   Target `json:"target"`
+}
+
+// EnvVar describes an environment variable without ever carrying its value.
+type EnvVar struct {
+	Name   string `json:"name"`
+	Secret bool   `json:"secret"`
+	// Set is false when the value is empty or refers to a process variable (${NAME}) that is not set.
+	Set bool `json:"set"`
+	// UnsetRef names the unset process variable, when that is why Set is false.
+	UnsetRef string `json:"unsetRef,omitempty"`
+}
+
+// Spec is a spec named by one or more scenarios.
+type Spec struct {
+	Ref       string   `json:"ref"`  // as written in the scenario
+	Path      string   `json:"path"` // resolved file path (empty for a URL)
+	State     string   `json:"state"`
+	Scenarios []string `json:"scenarios"` // scenario file paths that use it
+}
+
+// Report is the state of one workspace.
+type Report struct {
+	Root            string      `json:"root"`
+	Requests        int         `json:"requests"`
+	Scenarios       int         `json:"scenarios"`
+	Environments    int         `json:"environments"`
+	EnvironmentName string      `json:"environmentName,omitempty"`
+	EnvironmentPath string      `json:"environmentPath,omitempty"`
+	EnvVars         []EnvVar    `json:"envVars"`
+	Specs           []Spec      `json:"specs"`
+	Attention       []Attention `json:"attention"`
+}
+
+var (
+	placeholderRe = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}`)
+)
+
+// Inspect reports on the workspace at root. env and envPath are the active environment (nil and
+// "" when none is selected).
+func Inspect(root string, env *domain.Environment, envPath string) Report {
+	r := Report{Root: root, EnvVars: []EnvVar{}, Specs: []Spec{}, Attention: []Attention{}}
+	r.Requests = countDataFiles(filepath.Join(root, "requests"))
+	r.Environments = countDataFilesFlat(filepath.Join(root, "environments"))
+
+	if env != nil {
+		r.EnvironmentName = env.Name
+		r.EnvironmentPath = envPath
+		r.EnvVars = describeEnv(env)
+		for _, ref := range variables.MissingEnv(env) {
+			r.Attention = append(r.Attention, Attention{
+				ID: ItemUnsetEnvVar, Severity: SeverityWarning,
+				What:   fmt.Sprintf("The process variable %s is not set.", ref.Name),
+				Where:  fmt.Sprintf("environment %q, variable %q refers to it as ${%s}", envLabel(env, envPath), ref.Var, ref.Name),
+				Why:    "The value stays as written in every request, so requests fail for the wrong reason.",
+				Fix:    fmt.Sprintf("Set %s in the environment that starts clrsig, or give %q a value in the environment file.", ref.Name, ref.Var),
+				Target: Target{Kind: "environment", Path: envPath},
+			})
+		}
+	}
+
+	specs := map[string]*Spec{}
+	var specOrder []string
+	unresolved := map[string]bool{}
+	scenDir := filepath.Join(root, "scenarios")
+	_ = filepath.WalkDir(scenDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !isDataFile(d.Name()) {
+			return nil
+		}
+		r.Scenarios++
+		inspectScenario(root, p, &r, specs, &specOrder, unresolved)
+		return nil
+	})
+	for _, k := range specOrder {
+		sp := specs[k]
+		sort.Strings(sp.Scenarios)
+		r.Specs = append(r.Specs, *sp)
+		switch sp.State {
+		case SpecMissing:
+			r.Attention = append(r.Attention, Attention{
+				ID: ItemSpecMissing, Severity: SeverityWarning,
+				What:   fmt.Sprintf("The spec file %q does not exist.", sp.Ref),
+				Where:  fmt.Sprintf("used by %s", scenarioList(root, sp.Scenarios)),
+				Why:    "Responses are not checked against a spec, and conformance and coverage are not recorded.",
+				Fix:    "Choose the spec file in the scenario's Setup row, or put the file back at " + sp.Path + ".",
+				Target: Target{Kind: "scenario", Path: sp.Scenarios[0]},
+			})
+		case SpecOutside:
+			r.Attention = append(r.Attention, Attention{
+				ID: ItemSpecOutside, Severity: SeverityInfo,
+				What:   fmt.Sprintf("The spec file %q is outside this workspace.", sp.Ref),
+				Where:  fmt.Sprintf("used by %s", scenarioList(root, sp.Scenarios)),
+				Why:    "It works on this computer, but the workspace is not self-contained and was not checked here.",
+				Fix:    "Copy the spec into the workspace (for example under specs/) and point the scenario at it.",
+				Target: Target{Kind: "scenario", Path: sp.Scenarios[0]},
+			})
+		}
+	}
+
+	if env == nil && r.Environments > 0 && len(unresolved) > 0 {
+		names := make([]string, 0, len(unresolved))
+		for n := range unresolved {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		shown := names
+		more := ""
+		if len(shown) > 5 {
+			more = fmt.Sprintf(" and %d more", len(shown)-5)
+			shown = shown[:5]
+		}
+		for i := range shown {
+			shown[i] = "{{" + shown[i] + "}}"
+		}
+		r.Attention = append([]Attention{{
+			ID: ItemNoEnvironment, Severity: SeverityWarning,
+			What:   "No environment is selected.",
+			Where:  fmt.Sprintf("scenarios use %s%s, which nothing in them defines", strings.Join(shown, ", "), more),
+			Why:    "Those placeholders stay unresolved, so requests go to the wrong address or fail.",
+			Fix:    "Choose an environment in the top bar.",
+			Target: Target{Kind: "environment", Path: ""},
+		}}, r.Attention...)
+	}
+	return r
+}
+
+func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order *[]string, unresolved map[string]bool) {
+	data, err := os.ReadFile(path)
+	rel := relTo(root, path)
+	if err != nil {
+		r.Attention = append(r.Attention, scenarioProblem(path, rel, "cannot be read: "+err.Error()))
+		return
+	}
+	sc, err := serialization.ParseScenarioFile(data, filepath.Base(path))
+	if err != nil {
+		r.Attention = append(r.Attention, scenarioProblem(path, rel, "cannot be parsed: "+err.Error()))
+		return
+	}
+	for _, iss := range scenario.Validate(sc, "") {
+		r.Attention = append(r.Attention, scenarioProblem(path, rel, iss.String()))
+	}
+
+	scDir := filepath.Dir(path)
+	for i, step := range sc.Steps {
+		if step.Request != nil || step.RequestRef == "" {
+			continue
+		}
+		if !requestRefExists(root, scDir, step.RequestRef) {
+			label := step.Label
+			if label == "" {
+				label = fmt.Sprintf("step %d", i+1)
+			}
+			r.Attention = append(r.Attention, Attention{
+				ID: ItemRequestRef, Severity: SeverityWarning,
+				What:   fmt.Sprintf("The request file %q does not exist.", step.RequestRef),
+				Where:  fmt.Sprintf("%s, step %q", rel, label),
+				Why:    "The step cannot be sent, so the scenario fails when it reaches it.",
+				Fix:    "Choose an existing request in the step, or restore the file under requests/.",
+				Target: Target{Kind: "scenario", Path: path},
+			})
+		}
+	}
+
+	if sc.SpecFile != "" {
+		addSpec(root, path, sc.SpecFile, specs, order)
+	}
+
+	defined := map[string]bool{}
+	for _, v := range sc.Variables {
+		defined[v.Name] = true
+	}
+	for _, step := range sc.Steps {
+		for _, e := range step.Extractions {
+			defined[e.Name] = true
+		}
+	}
+	for _, m := range placeholderRe.FindAllStringSubmatch(string(data), -1) {
+		if !defined[m[1]] {
+			unresolved[m[1]] = true
+		}
+	}
+}
+
+func scenarioProblem(path, rel, msg string) Attention {
+	return Attention{
+		ID: ItemScenarioInvalid, Severity: SeverityWarning,
+		What:   "The scenario has a problem: " + msg,
+		Where:  rel,
+		Why:    "Running it reports a setup error instead of results.",
+		Fix:    "Open the scenario and fix the problem named above.",
+		Target: Target{Kind: "scenario", Path: path},
+	}
+}
+
+func addSpec(root, scenarioPath, ref string, specs map[string]*Spec, order *[]string) {
+	key := ref
+	if !strings.HasPrefix(ref, "http://") && !strings.HasPrefix(ref, "https://") {
+		key = resolveSpec(filepath.Dir(scenarioPath), ref)
+	}
+	sp, ok := specs[key]
+	if !ok {
+		sp = &Spec{Ref: ref}
+		switch {
+		case strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://"):
+			sp.State = SpecURL
+		case !within(root, key):
+			sp.Path, sp.State = key, SpecOutside
+		default:
+			sp.Path = key
+			if info, err := os.Stat(key); err != nil || info.IsDir() {
+				sp.State = SpecMissing
+			} else {
+				sp.State = SpecFound
+			}
+		}
+		specs[key] = sp
+		*order = append(*order, key)
+	}
+	sp.Scenarios = append(sp.Scenarios, scenarioPath)
+}
+
+func resolveSpec(scenarioDir, ref string) string {
+	if filepath.IsAbs(ref) {
+		return filepath.Clean(ref)
+	}
+	return filepath.Join(scenarioDir, ref)
+}
+
+func requestRefExists(root, scenarioDir, ref string) bool {
+	candidates := []string{ref}
+	if !filepath.IsAbs(ref) {
+		candidates = []string{filepath.Join(scenarioDir, ref), filepath.Join(root, "requests", ref)}
+	}
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && !info.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+func describeEnv(env *domain.Environment) []EnvVar {
+	unset := map[string]string{}
+	for _, ref := range variables.MissingEnv(env) {
+		if _, ok := unset[ref.Var]; !ok {
+			unset[ref.Var] = ref.Name
+		}
+	}
+	out := make([]EnvVar, 0, len(env.Variables))
+	for _, v := range env.Variables {
+		ev := EnvVar{Name: v.Name, Secret: v.Secret, Set: strings.TrimSpace(v.Value) != ""}
+		if name, bad := unset[v.Name]; bad {
+			ev.Set, ev.UnsetRef = false, name
+		}
+		out = append(out, ev)
+	}
+	return out
+}
+
+func envLabel(env *domain.Environment, path string) string {
+	if env.Name != "" {
+		return env.Name
+	}
+	return filepath.Base(path)
+}
+
+func scenarioList(root string, paths []string) string {
+	rel := make([]string, len(paths))
+	for i, p := range paths {
+		rel[i] = relTo(root, p)
+	}
+	if len(rel) > 3 {
+		return fmt.Sprintf("%s and %d more scenarios", strings.Join(rel[:3], ", "), len(rel)-3)
+	}
+	return strings.Join(rel, ", ")
+}
+
+func relTo(root, p string) string {
+	if rel, err := filepath.Rel(root, p); err == nil {
+		return filepath.ToSlash(rel)
+	}
+	return p
+}
+
+func within(root, p string) bool {
+	rel, err := filepath.Rel(root, p)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func isDataFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".yaml", ".yml", ".json":
+		return true
+	}
+	return false
+}
+
+func countDataFiles(dir string) int {
+	n := 0
+	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && isDataFile(d.Name()) {
+			n++
+		}
+		return nil
+	})
+	return n
+}
+
+func countDataFilesFlat(dir string) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() && isDataFile(e.Name()) {
+			n++
+		}
+	}
+	return n
+}

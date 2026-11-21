@@ -104,4 +104,19 @@ describe('ActivityRail', () => {
     setup({ demoRunning: true, expanded: true })
     expect(screen.getByText('Stop Demo')).toBeInTheDocument()
   })
+
+  it('puts Workspace first, only when it can be opened, and marks it when its page is showing', () => {
+    const onOpenWorkspace = vi.fn()
+    const { unmount } = setup()
+    expect(screen.queryByRole('button', { name: 'Workspace' })).not.toBeInTheDocument()
+    unmount()
+
+    setup({ onOpenWorkspace, workspaceActive: true })
+    const nav = screen.getByRole('navigation', { name: 'Activity' })
+    const first = nav.querySelector('button')
+    expect(first).toHaveAttribute('aria-label', 'Workspace')
+    expect(first).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(first!)
+    expect(onOpenWorkspace).toHaveBeenCalled()
+  })
 })

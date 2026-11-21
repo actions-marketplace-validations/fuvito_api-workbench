@@ -679,3 +679,10 @@ Do not implement or stub any of these without explicit user direction.
 - **Backlog:** the remaining findings of the review are B-061, B-063, B-064, B-065 (hardening) and B-067 to B-070 (UI); B-058 (Action inputs) is still open.
 - **Release:** version 0.6.0 in `AboutDialog.tsx` (with release notes) and the user guide.
 
+### 2026-11-21 — Workspace page (B-055; design: `docs/enhancements/2026-11-21-workspace-dashboard.md`)
+
+- **Core:** `packages/core/workspaceinfo` (`Inspect(root, env, envPath) Report`): counts, environment variables as set/unset (never a value), the specs scenarios name (found, missing, outside, URL; URLs are never fetched) and attention items written as what / where / why / fix: no environment while scenarios need one, unset `${NAME}`, unparsable or invalid scenario, missing `requestRef`, missing or outside spec. Uses the existing parsers and `scenario.Validate`; reads only.
+- **Desktop:** `DashboardService.GetWorkspaceOverview` adds the environment source (`remembered`, `chosen`, `temporary`, `none`; tracked in `WorkspaceService`, never persisted), stored Contracts totals per spec, the last scenario run from the on-disk run log, and a "spec-failing" item. `WorkspaceService.GetCloseReminder` feeds one extra line in the unsaved-tabs confirmation.
+- **UI:** singleton `workspace` page tab (`WorkspaceTab`), first item in the Activity Rail, opened by `onWorkspaceOpened` when a workspace is opened (the Conformance Server then focuses Check Conformance). Opening summary line is dismissible. No file format or config change; informs, blocks nothing.
+- **Docs:** user guide section "The Workspace page" (and the outdated "last workspace is remembered" sentence corrected). **Not done:** screenshots; `clrsig validate` printing the same items (B-071); dismissing a warning per workspace (deliberately left out).
+

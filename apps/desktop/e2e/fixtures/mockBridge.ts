@@ -47,6 +47,13 @@ export function setupMockBridge() {
     scenarioResultCache: {} as Record<string, unknown>,
     recentWorkspaces: [] as unknown[],
     coverage: [] as Array<{ specFile: string }>,
+    workspaceOverview: {
+      open: true, path: '/workspace', name: 'workspace', temporary: false,
+      requests: 0, scenarios: 0, environments: 0,
+      environmentSource: 'none', envVars: [], specs: [], attention: [],
+      snapshotAt: '2026-11-21T10:00:00Z',
+    } as unknown,
+    closeReminder: 'No environment will be remembered for this workspace.',
     pickedFile: '' as string,
     cliCatalog: [
       {
@@ -180,6 +187,7 @@ export function setupMockBridge() {
         ListRequests: () => Promise.resolve(bridge['fileTree']),
         ListEnvironments: () => Promise.resolve(bridge['environments']),
         GetActiveEnvironment: () => Promise.resolve(bridge['activeEnv']),
+        GetCloseReminder: () => Promise.resolve(bridge['closeReminder']),
         GetEnvironment: () => Promise.resolve({ name: '', variables: [] }),
         ActiveEnvironment: noopNull,
         OpenWorkspace: () => { bridge['workspacePath'] = '/workspace'; return Promise.resolve('/workspace') },
@@ -222,6 +230,9 @@ export function setupMockBridge() {
         StopDemo: noop,
         IsRunning: () => Promise.resolve(false),
         GetPort: () => Promise.resolve(0),
+      },
+      DashboardService: {
+        GetWorkspaceOverview: () => Promise.resolve(bridge['workspaceOverview']),
       },
       ConformanceService: {
         GetConformContext: () => Promise.resolve({

@@ -37,9 +37,25 @@ When a workspace is opened, the first request file found in the tree is loaded a
 
 **Switching workspaces:** opening or switching to a workspace (via the File menu, the Open Workspace button, or a recent workspace entry) closes the current workspace and all its tabs first. If any tabs have unsaved changes, a confirmation dialog appears before the switch.
 
-The last-used workspace and active environment are remembered between sessions.
+The app always starts on the landing page; recent workspaces are listed there. The environment you choose is remembered **per workspace** and restored when you open that workspace again (the temporary Demo and Conformance workspaces are never remembered).
 
 **Recent workspaces:** The landing page (shown when no workspace is open) lists your recently used workspaces. If you have opened a workspace before, a **Resume** button appears at the top — it reopens the most recent workspace in one click. The File menu → Recent Workspaces submenu lists up to ten recent paths from anywhere in the app.
+
+### The Workspace page
+
+Opening a workspace (File → Open or New Workspace, a recent entry, or Help → Dev Servers) opens the **Workspace** page. It is the first item in the Activity Rail, so you can come back to it at any time; the tabs you already had open stay open behind it.
+
+The page shows, at a glance:
+
+- **A reminder line** at the top: which environment is active and where that choice came from (*remembered for this workspace*, *chosen this session*, *temporary workspace, not remembered* or *none chosen*), and how many things need attention. Dismiss it with the cross.
+- **Needs attention:** things that would make a run fail or mislead. Each says what is wrong, where, why it matters and how to fix it, with a button that goes there. The items are: no environment selected although scenarios use placeholders only an environment can supply; an environment value that refers to a process variable (`${NAME}`) that is not set; a scenario that cannot be parsed or fails validation; a `requestRef` whose request file is missing; a `specFile` that does not exist (or lies outside the workspace, shown as information); and a spec whose last recorded run had failing operations. The page informs; it never blocks a run.
+- **Specs** that scenarios name, whether each file is found, missing, outside the workspace or a URL (URLs are never fetched here), and the Contracts totals recorded for it.
+- **Last results:** the most recent scenario run in this workspace and how many scenarios failed the last time they ran. This comes from the run log kept on disk, so it survives a restart.
+- **Contents and Environment:** counts of requests, scenarios, environments and specs, and the environment's variables as *set* or *unset*. A secret value is never shown.
+
+The page reads the workspace when it opens, after a scenario run, when you change the environment, and when you press **Refresh**. It only reads; it never changes a file.
+
+When you close or switch workspaces and have unsaved tabs, the confirmation also tells you what will be remembered (for example *The environment "Staging" will be remembered for this workspace.*).
 
 ---
 

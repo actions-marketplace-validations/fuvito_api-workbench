@@ -124,7 +124,18 @@ type WorkspaceService struct {
 	activeEnv        *domain.Environment
 	recentWorkspaces []string
 	workspaceEnvs    map[string]string
+	// activeEnvSource says why the active environment is the one it is: "remembered" (restored for
+	// this workspace), "chosen" (picked this session), "temporary" (a Demo or Conformance workspace
+	// selected its own) or "none". It is derived, never persisted.
+	activeEnvSource string
 }
+
+const (
+	envSourceRemembered = "remembered"
+	envSourceChosen     = "chosen"
+	envSourceTemporary  = "temporary"
+	envSourceNone       = "none"
+)
 
 func NewWorkspaceService() *WorkspaceService {
 	cfg := loadConfig()
@@ -203,11 +214,13 @@ func (w *WorkspaceService) ActiveEnvironment() *domain.Environment {
 func (w *WorkspaceService) openWorkspaceDirect(path string) {
 	w.workspacePath = path
 	w.syncTitle()
+	w.activeEnvSource = envSourceNone
 	envPath := filepath.Join(path, "environments", "local.yaml")
 	if _, err := os.Stat(envPath); err == nil {
 		w.activeEnvPath = envPath
 		if env, err := w.loadEnvFile(envPath); err == nil {
 			w.activeEnv = env
+			w.activeEnvSource = envSourceTemporary
 		}
 	}
 }
@@ -242,6 +255,7 @@ func (w *WorkspaceService) CloseWorkspace() {
 	w.workspacePath = ""
 	w.activeEnvPath = ""
 	w.activeEnv = nil
+	w.activeEnvSource = ""
 	w.persistConfig()
 	w.syncTitle()
 }
@@ -301,6 +315,7 @@ func (w *WorkspaceService) SelectEnvironment(path string) error {
 	if path == "" {
 		w.activeEnv = nil
 		w.activeEnvPath = ""
+		w.activeEnvSource = envSourceNone
 		w.rememberEnvironment("")
 		w.persistConfig()
 		return nil
@@ -311,6 +326,7 @@ func (w *WorkspaceService) SelectEnvironment(path string) error {
 	}
 	w.activeEnv = env
 	w.activeEnvPath = path
+	w.activeEnvSource = envSourceChosen
 	w.rememberEnvironment(path)
 	w.persistConfig()
 	return nil
@@ -343,6 +359,7 @@ func (w *WorkspaceService) enterWorkspace(path string) {
 	w.workspacePath = path
 	w.activeEnv = nil
 	w.activeEnvPath = ""
+	w.activeEnvSource = envSourceNone
 	rel, ok := w.workspaceEnvs[path]
 	if !ok {
 		return
@@ -351,7 +368,25 @@ func (w *WorkspaceService) enterWorkspace(path string) {
 	if env, err := w.loadEnvFile(full); err == nil {
 		w.activeEnv = env
 		w.activeEnvPath = full
+		w.activeEnvSource = envSourceRemembered
 	}
+}
+
+// GetCloseReminder says what closing the open workspace will remember, for the close confirmation.
+func (w *WorkspaceService) GetCloseReminder() string {
+	switch {
+	case w.workspacePath == "":
+		return ""
+	case isTempWorkspace(w.workspacePath):
+		return "This is a temporary workspace: it is removed when its server stops and nothing is remembered."
+	case w.activeEnv != nil && w.activeEnvPath != "":
+		name := w.activeEnv.Name
+		if name == "" {
+			name = filepath.Base(w.activeEnvPath)
+		}
+		return "The environment \"" + name + "\" will be remembered for this workspace."
+	}
+	return "No environment will be remembered for this workspace."
 }
 
 // GetActiveEnvironment returns info about the currently selected environment (or nil).

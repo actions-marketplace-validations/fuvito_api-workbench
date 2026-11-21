@@ -1,6 +1,6 @@
 # Workspace dashboard and open/close reminders
 
-**Status:** Accepted (2026-11-21, all six decisions answered)
+**Status:** Done in 0.6.0 (all three phases built 2026-11-21; accepted the same day, all six decisions answered)
 **Date:** 2026-11-21
 **Author:** Claude Code, for the project owner
 **Backlog:** B-055 (owner request, 2026-11-20)
@@ -139,3 +139,4 @@ All answered by the project owner on 2026-11-21.
 |---|---|---|
 | 2026-11-21 | Proposal drafted from B-055 | Claude Code |
 | 2026-11-21 | Accepted. Open automatically and first in the rail; name "Workspace"; no blocking; no dismissing for now; stored last-run time after restart; CLI parity as a follow-up (B-071) | Project owner |
+| 2026-11-21 | Built, all three phases. Two deviations: (1) the scenario run log is already stored on disk (SQLite), so "last results" survive a restart and decision 5 is better met than the proposal assumed; (2) the page opens through the existing `onWorkspaceOpened` hook (open, new, recent, Demo Server), not by watching the workspace path, so a workspace already open when the app reloads does not steal focus; the Conformance Server opens the Workspace page first and then Check Conformance, so Check Conformance stays the active tab. Close reminder is appended to the existing unsaved-tabs confirmation only, as proposed | Claude Code |

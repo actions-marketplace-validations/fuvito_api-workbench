@@ -6,6 +6,7 @@ const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> =
     version: '0.6.0',
     date: '2026-11-21',
     items: [
+      'Workspace page: the first item in the rail, opened when you open a workspace. It shows the active environment and where that choice came from, the specs your scenarios use, the last results, and a Needs attention list (no environment, unset ${NAME}, missing spec or request file, broken scenario), each with a fix',
       'Check Conformance page in the desktop app: safe-by-default (reads only) spec conformance runs with four totals, a failure-first report, negative probes, export and an optional Contracts coverage record; Help → Dev Servers adds a Conformance Server with deliberate defects',
       'More accurate response checks (behaviour change): the status, Content-Type and declared headers are now compared, not only the body; CI that was silently green can turn red. Adopt gradually with clrsig conform --write-baseline / --baseline',
       'Every failure says what, where, why and how to fix it (--explain, HTML, Markdown, JUnit, JSON); operations with a missing value are reported as not sent instead of being sent with a placeholder',
