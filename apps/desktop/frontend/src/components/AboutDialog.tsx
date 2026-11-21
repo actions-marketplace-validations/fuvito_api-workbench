@@ -4,13 +4,17 @@ import { cn } from '@/lib/utils'
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
     version: '0.7.0',
-    date: 'unreleased',
+    date: '2026-11-21',
     items: [
-      'Every rail icon works the same way: Workspace, Requests, Scenarios, Contracts, Check Conformance and CLI Builder each open a sidebar, and clicking an icon brings back the tab you last had open under it (for this session). Clicking the lit icon collapses the sidebar; clicking a tab lights its icon and never opens or closes the sidebar, so a collapse you chose is kept',
+      'Every rail icon works the same way: Workspace, Requests, Scenarios, Contracts, Check Conformance and CLI Command Builder each open a sidebar, and clicking an icon brings back the tab you last had open under it (for this session). Clicking the lit icon collapses the sidebar; clicking a tab lights its icon and never opens or closes the sidebar, so a collapse you chose is kept',
       'Workspace sidebar: an environment selector (the same choice as the status bar) with where it came from, the Needs attention list (click an item to see its card on the Workspace page), and counts of requests, scenarios and specs. It reads the same snapshot as the Workspace page, so the two always agree',
-      'Check Conformance sidebar: the workspace\'s specs and environments (click one to fill the matching field on the page), the choice marked, and a Last result card with Covered, Passing and Failing',
-      'CLI Builder sidebar: the commands (run, conform, diff, ...) with their goals; click one to select it on the page',
-      'The Workspace, Check Conformance and CLI Builder pages are no longer special: opening a workspace shows the Workspace tab with the Workspace sidebar open',
+      'Check Conformance sidebar: the workspace\'s specs and environments (click one to fill the matching field on the page), the choice marked, and a Last result card. CLI Command Builder sidebar: the commands with their goals; click one to select it on the page',
+      'A scenario result explains each spec violation the way the Check Conformance page does: what the spec expected, what came back, where, in the spec, why it fails and how to fix it (the validator\'s own text is under Technical detail)',
+      'Behaviour change: the Check Conformance page reads spec and environment files only from the open workspace (symbolic links are resolved), and says to copy a file into the workspace when it is not there. A spec that scenarios reach through a link out of the workspace is shown as outside',
+      'Dev servers: the Demo and Conformance Servers no longer send CORS headers and refuse requests that are not addressed to localhost or that come from another website; a second running copy of the app no longer loses its temporary workspace when you start a dev server',
+      'GitHub Action: inputs for the newer conform and diff flags (fail-on, against, read-only, negative, explain, baseline, write-baseline, tags, paths, request-timeout, var, report); inputs are passed as environment variables so a value cannot change what runs',
+      'One name per feature (Check Conformance, CLI Command Builder, Contracts) and tabs carry the rail\'s icons instead of three-letter codes; the request URL field keeps a usable width, with the timeout and redirect options wrapping under it',
+      'CLI Command Builder opens without a red error, unselected choices look clickable and the explanation stacks under its term; the Check Conformance Base URL hint waits for a spec; Settings shows Automatic for the dev server ports; a dismissed Workspace reminder stays dismissed',
     ],
   },
   {
@@ -153,7 +157,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.6.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
