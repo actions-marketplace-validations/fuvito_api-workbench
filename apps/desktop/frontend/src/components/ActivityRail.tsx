@@ -66,6 +66,7 @@ export function ActivityRail({
             {expanded && <span className="text-xs font-medium truncate">Workspace</span>}
           </button>
         )}
+        {onOpenWorkspace && <div role="separator" className="my-1 mx-2 border-t border-[var(--color-border)]" />}
         {NAV_ITEMS.map(({ tab, icon: Icon, label, title, activeColor }) => {
           const active = sidebarOpen && activeTab === tab
           return (
