@@ -88,6 +88,7 @@ import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
 import {serializeScenarioToYAML} from '@/components/scenario-yaml'
 import {isTabDirty, isPageTab, withoutTabsIn} from '@/lib/tabState'
+import {railTargetForTab} from '@/lib/railFocus'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
@@ -192,6 +193,25 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })
+  // The rail follows the tabs: switching to a tab points the sidebar at the panel that tab belongs to
+  // (open or closed stays as the user left it), and a full-width page tab (Workspace, Check
+  // Conformance, CLI Builder) closes the sidebar. A click on a rail icon still wins until the next
+  // tab switch. Skipped on the first render so a saved panel choice is not overwritten at startup.
+  const lastRailTabId = useRef(tabs.activeTabId)
+  useEffect(() => {
+    if (lastRailTabId.current === tabs.activeTabId) return
+    lastRailTabId.current = tabs.activeTabId
+    const target = railTargetForTab(tabs.activeTab?.kind)
+    if (target.panel) {
+      setRailTab(target.panel)
+      localStorage.setItem('ui.railTab', target.panel)
+    } else {
+      setSidebarOpen(false)
+      localStorage.setItem('ui.sidebarOpen', 'false')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabs.activeTabId])
+  const railTarget = railTargetForTab(tabs.activeTab?.kind)
   const [railExpanded, setRailExpanded] = useState(() => {
     return localStorage.getItem('ui.railExpanded') === 'true'
   })
@@ -1163,7 +1183,11 @@ export default function App() {
               onOpenCliBuilder={() => openCliBuilder()}
               onOpenConformance={() => tabs.openConformanceTab()}
               onOpenWorkspace={showWorkspacePage}
-              workspaceActive={activeTab?.kind === 'workspace' && !sidebarOpen}
+              // An open sidebar shows its panel; with it closed the icon of the active tab is lit.
+              highlightedTab={sidebarOpen ? railTab : (railTarget.panel ?? null)}
+              workspaceActive={!sidebarOpen && railTarget.page === 'workspace'}
+              conformanceActive={!sidebarOpen && railTarget.page === 'conformance'}
+              cliActive={!sidebarOpen && railTarget.page === 'cli'}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />

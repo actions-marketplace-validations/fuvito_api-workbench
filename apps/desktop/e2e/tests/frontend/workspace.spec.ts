@@ -109,4 +109,53 @@ test.describe('Workspace page', () => {
     await page.getByTestId('workspace-page').getByRole('button', { name: 'Refresh' }).click()
     await expect(page.getByRole('article', { name: /does not exist/ })).toBeVisible()
   })
+
+  // The rail follows the tabs: the active tab decides which icon is lit, and a page tab (Workspace,
+  // Check Conformance) has no sidebar. A rail click still wins until the next tab switch.
+  test('clicking tabs lights the matching rail icon and shows or hides the sidebar', async ({ page }) => {
+    await gotoApp(page)
+    const rail = page.getByRole('navigation', { name: 'Activity' })
+    const lit = async (name: string) => expect(page.getByRole('button', { name, exact: true }).first()).toHaveAttribute('aria-current', 'page')
+    const notLit = async (name: string) => expect(page.getByRole('button', { name, exact: true }).first()).not.toHaveAttribute('aria-current', 'page')
+    const sidebar = page.getByTestId('sidebar')
+
+    // Open the Workspace page: it is lit alone and the sidebar is gone.
+    await rail.getByRole('button', { name: 'Workspace' }).click()
+    await lit('Workspace')
+    await expect(sidebar).toHaveCount(0)
+
+    // Back to the request tab: Requests is lit even though the sidebar stays closed.
+    await page.getByRole('tab', { name: /New Request/ }).click()
+    await lit('Requests')
+    await notLit('Workspace')
+    await expect(sidebar).toHaveCount(0)
+
+    // A panel icon opens the sidebar; the Workspace tab then closes it again.
+    await rail.getByRole('button', { name: 'Requests' }).click()
+    await expect(sidebar).toBeVisible()
+    await page.getByRole('tab', { name: /Workspace/ }).click()
+    await lit('Workspace')
+    await expect(sidebar).toHaveCount(0)
+
+    // Another page: Check Conformance lights its own icon; coming back to the request tab moves it.
+    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await lit('Check spec conformance')
+    await notLit('Workspace')
+    await expect(sidebar).toHaveCount(0)
+    await page.getByRole('tab', { name: /New Request/ }).click()
+    await lit('Requests')
+    await notLit('Check spec conformance')
+
+    // With the sidebar open on another panel, switching to a request tab points it at Requests.
+    await rail.getByRole('button', { name: 'Scenarios' }).click()
+    await expect(sidebar).toBeVisible()
+    await page.getByRole('tab', { name: /Workspace/ }).click()
+    await rail.getByRole('button', { name: 'Scenarios' }).click()
+    await expect(sidebar).toBeVisible()
+    await page.getByRole('tab', { name: /New Request/ }).click()
+    await lit('Requests')
+    await expect(sidebar).toBeVisible()
+    await expect(sidebar.getByText('Filter requests…').or(sidebar.getByText('No request files yet'))).toBeVisible()
+  })
 })
+

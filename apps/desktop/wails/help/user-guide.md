@@ -45,6 +45,8 @@ The app always starts on the landing page; recent workspaces are listed there. T
 
 Opening a workspace (File → Open or New Workspace, a recent entry, or Help → Dev Servers) opens the **Workspace** page. It is the first item in the Activity Rail, so you can come back to it at any time; the tabs you already had open stay open behind it. Unlike Requests, Scenarios and Contracts, it is a full-width page and has no sidebar: clicking its icon closes the sidebar and lights only that icon, and clicking one of the three panel icons opens the sidebar again and moves the highlight there (the page stays open as a tab).
 
+**The rail follows your tabs.** Clicking a tab lights the icon it belongs to: a request tab lights Requests, scenario and Run Results tabs light Scenarios, the Contracts tab lights Contracts, and the Workspace, Check Conformance and CLI Builder pages light their own icons. Switching to a tab of a panel kind points the sidebar at that panel (it stays open or closed as you left it, so a collapse you chose is kept); switching to one of the full-width pages closes the sidebar. A click on a rail icon always takes effect until you switch tabs again.
+
 The page shows, at a glance:
 
 - **A reminder line** at the top: which environment is active and where that choice came from (*remembered for this workspace*, *chosen this session*, *temporary workspace, not remembered* or *none chosen*), and how many things need attention. Dismiss it with the cross.

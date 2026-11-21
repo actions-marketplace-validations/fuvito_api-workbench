@@ -28,14 +28,19 @@ type ActivityRailProps = {
   onOpenCliBuilder?: () => void
   onOpenConformance?: () => void
   onOpenWorkspace?: () => void
+  // Which panel icon to light. When omitted it is the open panel (and none while the sidebar is
+  // closed); the app passes the panel of the active tab so the rail follows the tabs.
+  highlightedTab?: RailTab | null
   workspaceActive?: boolean
+  conformanceActive?: boolean
+  cliActive?: boolean
   demoRunning?: boolean
   onStopDemo?: () => void
 }
 
 export function ActivityRail({
   activeTab, sidebarOpen, expanded,
-  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, onOpenConformance, onOpenWorkspace, workspaceActive, demoRunning, onStopDemo,
+  onTabClick, onToggleExpanded, onShowSettings, onShowHelp, onOpenCliBuilder, onOpenConformance, onOpenWorkspace, highlightedTab, workspaceActive, conformanceActive, cliActive, demoRunning, onStopDemo,
 }: ActivityRailProps) {
   return (
     <div
@@ -68,7 +73,7 @@ export function ActivityRail({
         )}
         {onOpenWorkspace && <div role="separator" className="my-1 mx-2 border-t border-[var(--color-border)]" />}
         {NAV_ITEMS.map(({ tab, icon: Icon, label, title, activeColor }) => {
-          const active = sidebarOpen && activeTab === tab
+          const active = highlightedTab !== undefined ? highlightedTab === tab : sidebarOpen && activeTab === tab
           return (
             <button
               key={tab}
@@ -116,22 +121,27 @@ export function ActivityRail({
         )}
 
         {([
-          ...(onOpenConformance ? [{ icon: ShieldCheck, label: 'Conformance', title: 'Check spec conformance', onClick: onOpenConformance }] : []),
-          ...(onOpenCliBuilder ? [{ icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: onOpenCliBuilder }] : []),
+          ...(onOpenConformance ? [{ icon: ShieldCheck, label: 'Conformance', title: 'Check spec conformance', onClick: onOpenConformance, active: !!conformanceActive }] : []),
+          ...(onOpenCliBuilder ? [{ icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: onOpenCliBuilder, active: !!cliActive }] : []),
           { icon: Settings,   label: 'Settings', title: 'Settings', onClick: onShowSettings },
           { icon: HelpCircle, label: 'Help',     title: 'Help',     onClick: onShowHelp },
-        ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string; onClick: () => void }[]).map(({ icon: Icon, label, title, onClick }) => (
+        ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string; onClick: () => void; active?: boolean }[]).map(({ icon: Icon, label, title, onClick, active }) => (
           <button
             key={label}
             type="button"
             title={expanded ? undefined : title}
             aria-label={title}
+            aria-current={active ? 'page' : undefined}
             onClick={onClick}
             className={cn(
-              'flex items-center h-9 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)] transition-colors',
+              'relative flex items-center h-9 transition-colors',
               expanded ? 'gap-2.5 px-3' : 'justify-center w-11',
+              active
+                ? 'text-sky-400 bg-[var(--color-muted)]'
+                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]',
             )}
           >
+            {active && <span className="absolute left-0 inset-y-1 w-[3px] rounded-r-full bg-current opacity-70" aria-hidden />}
             <Icon size={16} className="shrink-0" aria-hidden />
             {expanded && <span className="text-xs font-medium">{label}</span>}
           </button>
