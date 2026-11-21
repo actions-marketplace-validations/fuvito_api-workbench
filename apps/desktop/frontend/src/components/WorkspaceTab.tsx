@@ -120,7 +120,7 @@ export function WorkspaceTab({ workspacePath, refreshTrigger = 0, onOpenScenario
 
         {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
 
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(360px,38%)]">
           <div className="flex flex-col gap-4 min-w-0">
             <section aria-label="Needs attention" className="rounded border border-[var(--color-border)] bg-[var(--color-card)]">
               <h2 className="px-3 py-2 text-xs font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] border-b border-[var(--color-border)]">
