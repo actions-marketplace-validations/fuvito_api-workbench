@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -77,20 +79,40 @@ func newDemoMux() http.Handler {
 	mux.HandleFunc("/page", withCount(handleDemoHTMLPage))
 	mux.HandleFunc("/report.html", withCount(handleDemoHTMLReport))
 
-	return corsMiddleware(mux)
+	return localOnlyMiddleware(mux)
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+// localOnlyMiddleware keeps the dev servers to the user's own computer. There is no CORS, so another
+// website cannot read an answer, and two checks stop the cases CORS does not: a Host that is not a
+// loopback name (DNS rebinding) and a cross-site Origin (a page in the browser sending a request).
+func localOnlyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
+		if !isLoopbackHost(r.Host) {
+			demoErrJSON(w, http.StatusForbidden, "this server answers only requests addressed to localhost")
 			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			u, err := url.Parse(origin)
+			if err != nil || u.Host != r.Host {
+				demoErrJSON(w, http.StatusForbidden, "this server does not answer requests from other websites")
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isLoopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func handleDemoOpenAPISpec(w http.ResponseWriter, r *http.Request) {

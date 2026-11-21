@@ -315,3 +315,18 @@ func TestInspect_OneSpecNamedDifferentlyKeepsEverySpelling(t *testing.T) {
 		t.Fatalf("spec: %+v", sp)
 	}
 }
+
+func TestInspect_ASpecReachedThroughALinkOutOfTheWorkspaceIsOutside(t *testing.T) {
+	root := t.TempDir()
+	elsewhere := t.TempDir()
+	write(t, elsewhere, "api.yaml", "x")
+	if err := os.Symlink(elsewhere, filepath.Join(root, "linked")); err != nil {
+		t.Skip("symbolic links are not available here:", err)
+	}
+	write(t, root, "scenarios/a.yaml", strings.Replace(okScenario, "../specs/api.yaml", "../linked/api.yaml", 1))
+	env := &domain.Environment{Variables: []domain.EnvironmentVariable{{Name: "baseUrl", Value: "x"}}}
+	r := Inspect(root, env, "e.yaml")
+	if len(r.Specs) != 1 || r.Specs[0].State != SpecOutside {
+		t.Fatalf("a link that leaves the workspace must be reported as outside: %+v", r.Specs)
+	}
+}

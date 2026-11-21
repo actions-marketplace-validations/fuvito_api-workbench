@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
 )
@@ -134,6 +135,10 @@ func TestWorkspaceConfig_TempWorkspacesLeaveNoResidue(t *testing.T) {
 	stale2 := filepath.Join(tmp, conformanceWorkspacePrefix+"456")
 	for _, d := range []string{stale, stale2} {
 		os.MkdirAll(d, 0o755)
+	}
+	old := time.Now().Add(-2 * tempLegacyStaleAfter) // left by a copy that is gone
+	for _, d := range []string{stale, stale2} {
+		os.Chtimes(d, old, old)
 	}
 	saveConfig(workspaceConfig{RecentWorkspaces: []string{stale, filepath.Join(tmp, "gone"), stale2}})
 

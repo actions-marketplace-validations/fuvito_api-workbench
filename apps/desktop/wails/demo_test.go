@@ -24,6 +24,7 @@ type demoCall struct {
 func doDemo(t *testing.T, h http.Handler, c demoCall) (int, http.Header, string) {
 	t.Helper()
 	req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+	req.Host = "localhost:8090"
 	for k, v := range c.headers {
 		req.Header.Set(k, v)
 	}
@@ -50,11 +51,8 @@ func TestDemoServer_Basics(t *testing.T) {
 	if code != 200 || decode(t, body)["status"] != "ok" || !strings.Contains(hdr.Get("Content-Type"), "json") {
 		t.Errorf("health: %d %s", code, body)
 	}
-	if hdr.Get("Access-Control-Allow-Origin") != "*" {
-		t.Error("CORS header missing")
-	}
-	if code, _, _ := doDemo(t, h, demoCall{method: "OPTIONS", path: "/users"}); code != http.StatusNoContent {
-		t.Errorf("preflight: %d", code)
+	if hdr.Get("Access-Control-Allow-Origin") != "" {
+		t.Error("the dev servers must not send CORS headers: another website could read them")
 	}
 	if code, _, _ := doDemo(t, h, demoCall{method: "POST", path: "/health"}); code != 405 {
 		t.Errorf("health POST: %d", code)
@@ -148,6 +146,7 @@ func TestDemoServer_Auth(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "/auth/basic", nil)
+	req.Host = "localhost:8090"
 	req.SetBasicAuth("demo", "demo")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -405,6 +404,9 @@ func TestFindFreePortAndStaleCleanup(t *testing.T) {
 	for _, d := range []string{stale, keep, other} {
 		os.MkdirAll(d, 0o755)
 	}
+	// Left by a copy that is gone: no owner file and untouched for longer than the legacy limit.
+	old := time.Now().Add(-2 * tempLegacyStaleAfter)
+	os.Chtimes(stale, old, old)
 	defer os.RemoveAll(keep)
 	defer os.RemoveAll(other)
 	cleanupStaleDemoTempDirs(keep)
@@ -427,5 +429,93 @@ func TestStopDemo_WhenNotRunningKeepsWorkspace(t *testing.T) {
 	d.StopDemo()
 	if ws.GetWorkspacePath() != dir {
 		t.Errorf("stopping a demo that is not running must not touch the workspace, got %q", ws.GetWorkspacePath())
+	}
+}
+
+func TestDevServers_AnswerOnlyTheirOwnComputer(t *testing.T) {
+	resetDemoState()
+	for name, h := range map[string]http.Handler{"demo": newDemoMux(), "conformance": newConformanceMux()} {
+		call := func(host, origin string) int {
+			req := httptest.NewRequest("GET", "/health", nil)
+			req.Host = host
+			if origin != "" {
+				req.Header.Set("Origin", origin)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			return rec.Code
+		}
+		for _, host := range []string{"localhost:8090", "127.0.0.1:8120", "[::1]:8090", "LOCALHOST"} {
+			if code := call(host, ""); code == http.StatusForbidden {
+				t.Errorf("%s: host %q must be answered", name, host)
+			}
+		}
+		for _, host := range []string{"evil.example.com", "evil.example.com:8090", "192.168.1.5:8090", ""} {
+			if code := call(host, ""); code != http.StatusForbidden {
+				t.Errorf("%s: host %q must be refused, got %d", name, host, code)
+			}
+		}
+		if code := call("localhost:8090", "https://evil.example.com"); code != http.StatusForbidden {
+			t.Errorf("%s: a cross-site Origin must be refused, got %d", name, code)
+		}
+		if code := call("localhost:8090", "http://localhost:8090"); code == http.StatusForbidden {
+			t.Errorf("%s: the server's own origin must be answered", name)
+		}
+	}
+}
+
+func TestTempWorkspaceCleanup_LeavesAnotherRunningCopyAlone(t *testing.T) {
+	base := t.TempDir()
+	mk := func(name string) string {
+		d := filepath.Join(base, name)
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	age := func(path string, by time.Duration) {
+		ts := time.Now().Add(-by)
+		if err := os.Chtimes(path, ts, ts); err != nil {
+			t.Fatal(err)
+		}
+	}
+	owner := func(dir string) string { return filepath.Join(dir, tempOwnerFile) }
+
+	liveCopy := mk("clrsig-demo-live")        // another copy refreshed its owner file a moment ago
+	deadCopy := mk("clrsig-conformance-dead") // its owner file stopped being refreshed
+	legacyNew := mk("clrsig-demo-legacynew")  // no owner file, but changed recently
+	legacyOld := mk("clrsig-demo-legacyold")  // no owner file and untouched for hours
+	unrelated := mk("something-else")
+	for _, d := range []string{liveCopy, deadCopy} {
+		if err := os.WriteFile(owner(d), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	age(owner(deadCopy), 2*tempOwnerStaleAfter)
+	age(legacyOld, 2*tempLegacyStaleAfter)
+	age(unrelated, 24*time.Hour)
+
+	removeStaleTempWorkspaces(base, "", demoWorkspacePrefix, conformanceWorkspacePrefix)
+
+	for dir, want := range map[string]bool{liveCopy: true, deadCopy: false, legacyNew: true, legacyOld: false, unrelated: true} {
+		_, err := os.Stat(dir)
+		if (err == nil) != want {
+			t.Errorf("%s: exists=%v, want %v", filepath.Base(dir), err == nil, want)
+		}
+	}
+}
+
+func TestClaimTempWorkspace_WritesAFreshOwnerFile(t *testing.T) {
+	dir := t.TempDir()
+	claimTempWorkspace(dir)
+	info, err := os.Stat(filepath.Join(dir, tempOwnerFile))
+	if err != nil {
+		t.Fatalf("owner file: %v", err)
+	}
+	if isStaleTempWorkspace(dir, info.ModTime().Add(time.Second)) {
+		t.Fatal("a folder claimed a moment ago must not be stale")
+	}
+	if !isStaleTempWorkspace(dir, info.ModTime().Add(2*tempOwnerStaleAfter)) {
+		t.Fatal("a folder nobody refreshes must become stale")
 	}
 }

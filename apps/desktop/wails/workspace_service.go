@@ -172,19 +172,10 @@ func prunedRecentWorkspaces(in []string) []string {
 	return out
 }
 
-// cleanupStaleTempWorkspaces removes demo and conformance temp workspaces left
-// behind by a session that ended without stopping its server.
+// cleanupStaleTempWorkspaces removes demo and conformance temp workspaces left behind by a session that
+// ended without stopping its server, but not one that another running copy of the app has open.
 func cleanupStaleTempWorkspaces() {
-	base := os.TempDir()
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if e.IsDir() && isTempWorkspace(e.Name()) {
-			os.RemoveAll(filepath.Join(base, e.Name())) //nolint:errcheck
-		}
-	}
+	removeStaleTempWorkspaces(os.TempDir(), "", demoWorkspacePrefix, conformanceWorkspacePrefix)
 }
 
 func (w *WorkspaceService) setContext(ctx context.Context) {

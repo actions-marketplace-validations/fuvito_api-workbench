@@ -118,6 +118,7 @@ func (c *ConformanceServerService) OpenWorkspace() ConformanceServerResult {
 	if err != nil {
 		return ConformanceServerResult{Port: res.Port, Error: "could not create the workspace: " + err.Error()}
 	}
+	claimTempWorkspace(dir)
 	if err := writeConformanceWorkspace(dir, res.Port); err != nil {
 		os.RemoveAll(dir)
 		return ConformanceServerResult{Port: res.Port, Error: "could not create the workspace: " + err.Error()}

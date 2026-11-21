@@ -80,6 +80,9 @@ type ConformSpecInfoIO struct {
 // InspectConformSpec reads a spec so the page can show its default base URL and how many
 // operations would send a write request.
 func (s *ConformanceService) InspectConformSpec(specPath string) ConformSpecInfoIO {
+	if err := s.insideWorkspace("spec", specPath); err != nil {
+		return ConformSpecInfoIO{Error: err.Error()}
+	}
 	spec, err := loadSpecFile(specPath)
 	if err != nil {
 		return ConformSpecInfoIO{Error: err.Error()}
@@ -94,6 +97,23 @@ func (s *ConformanceService) InspectConformSpec(specPath string) ConformSpecInfo
 		}
 	}
 	return info
+}
+
+// insideWorkspace refuses a file the page was asked to read when it is not in the open workspace: the page
+// only offers workspace files, so anything else is a request the interface did not make (CLAUDE.md
+// section 7: file operations stay inside the project).
+func (s *ConformanceService) insideWorkspace(what, path string) error {
+	if path == "" {
+		return nil
+	}
+	ws := s.ws.GetWorkspacePath()
+	if ws == "" {
+		return fmt.Errorf("open a workspace first: Clear Signal reads the %s only from the open workspace", what)
+	}
+	if !pathInside(ws, path) {
+		return fmt.Errorf("the %s %q is outside the open workspace %q, and Clear Signal reads only files inside it; copy the file into the workspace (for example into specs/) and choose it there", what, path, ws)
+	}
+	return nil
 }
 
 func loadSpecFile(path string) (*openapi.Spec, error) {
@@ -228,6 +248,12 @@ func IsLocalBaseURL(raw string) bool {
 // refuses a non-local base URL that the user has not confirmed, including a URL that only came
 // from the spec's servers.
 func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutputIO {
+	if err := s.insideWorkspace("spec", in.SpecPath); err != nil {
+		return ConformRunOutputIO{Error: err.Error()}
+	}
+	if err := s.insideWorkspace("environment", in.EnvPath); err != nil {
+		return ConformRunOutputIO{Error: err.Error()}
+	}
 	spec, err := loadSpecFile(in.SpecPath)
 	if err != nil {
 		return ConformRunOutputIO{Error: err.Error()}

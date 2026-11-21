@@ -1,0 +1,8 @@
+# One line-ending rule for everyone: text files are stored with LF in the repository.
+# Go and shell sources and CI files are also checked out with LF (gofmt and bash need it).
+* text=auto
+*.go text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.gitattributes text eol=lf
