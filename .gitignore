@@ -58,9 +58,10 @@ apps/desktop/wails/frontend/dist/
 # Wails build output binary
 apps/desktop/wails/build/bin/
 
-# Wails-generated TypeScript binding models (large, regenerated on build)
+# Wails-generated TypeScript binding models (large, regenerated on build).
+# wailsjs/go/*.js and wailsjs/runtime are tracked: the frontend imports them, and CI builds it
+# before any wails command has generated them.
 apps/desktop/frontend/wailsjs/go/models.ts
-apps/desktop/frontend/wailsjs/runtime/
 
 # ---- Secrets and config ----
 
