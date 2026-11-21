@@ -3,7 +3,7 @@ title: Echo — Contract Checks
 description: |
   Echo GET passes cleanly. Echo POST has a copy-paste error in the expected method value.
   The status/404 step passes its status check but fails on the wrong expected code value.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Echo GET

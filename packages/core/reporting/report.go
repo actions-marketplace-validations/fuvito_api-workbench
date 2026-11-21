@@ -335,9 +335,28 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
 	fmt.Fprintf(&b, "Base URL: %s\n\n", x.text(result.BaseURL))
 
+	sent, unanswered, firstErr := 0, 0, ""
 	for _, op := range result.Operations {
+		if op.Skipped || op.Blocked != "" {
+			continue
+		}
+		sent++
+		if op.Error != "" {
+			unanswered++
+			if firstErr == "" {
+				firstErr = op.Error
+			}
+		}
+	}
+	nobodyAnswered := sent > 0 && unanswered == sent
+
+	for _, op := range result.Operations {
+		path := op.Path
+		if op.SpecPath != "" {
+			path = op.SpecPath
+		}
 		if op.Skipped {
-			fmt.Fprintf(&b, "  SKIP  %-7s %s\n", op.Method, op.Path)
+			fmt.Fprintf(&b, "  SKIP  %-7s %s\n", op.Method, path)
 			continue
 		}
 		status := "PASS"
@@ -348,8 +367,8 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 		if op.StatusCode > 0 {
 			suffix = fmt.Sprintf("  %d  %dms", op.StatusCode, op.DurationMs)
 		}
-		fmt.Fprintf(&b, "  %s  %-7s %s%s\n", status, op.Method, op.Path, suffix)
-		if op.Error != "" {
+		fmt.Fprintf(&b, "  %s  %-7s %s%s\n", status, op.Method, path, suffix)
+		if op.Error != "" && !nobodyAnswered {
 			fmt.Fprintf(&b, "         error: %s\n", x.text(op.Error))
 		}
 		if op.Blocked != "" {
@@ -369,6 +388,9 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	}
 
 	fmt.Fprintln(&b)
+	if nobodyAnswered {
+		fmt.Fprintf(&b, "No operation got an answer from %s: is the server running?\n  First error: %s\n\n", x.text(result.BaseURL), x.text(firstErr))
+	}
 	passed, failed, skipped := result.Counts()
 	total := passed + failed + skipped
 

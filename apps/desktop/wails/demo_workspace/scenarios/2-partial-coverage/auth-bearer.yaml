@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: Bearer Token Auth
 description: Login and access a protected profile endpoint using the returned Bearer token.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Login

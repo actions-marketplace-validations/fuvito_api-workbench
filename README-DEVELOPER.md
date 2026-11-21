@@ -6,7 +6,7 @@
 
 Clear Signal is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
 
-> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working. Current release: v0.5.0. Recent additions: single-file bundle import/export (desktop and `clrsig bundle`), the AI prompt and example scenario in the Help panel, Contracts coverage quality signals with CSV/Markdown/HTML export, negative-path conformance (`conform --negative`), `clrsig impact`, and an MCP server (`clrsig mcp`).
+> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working. Current release: v0.6.0. Recent additions: the Check Conformance page and Conformance Server, more accurate response checks (status, Content-Type and declared headers, not only the body) with a plain-language *what / where / why / fix* for every failure, dynamic values and scenario variables, the CLI Command Builder, running scenarios from folders, `--report` / `--var` / markdown output, secret redaction in every report, the What We Check catalog, and the Workspace page (what needs attention before you run). Earlier: bundle import/export, the AI prompt in the Help panel, Contracts coverage with exports, `conform --negative`, `clrsig impact`, and an MCP server.
 
 ---
 
@@ -95,7 +95,7 @@ See [`clrsig-action/README.md`](clrsig-action/README.md) for all commands, input
 | Go | 1.26+ |
 | Node.js | 22+ |
 | pnpm | 9+ |
-| Wails CLI | v2 (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`) |
+| Wails CLI | v2.17.1 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1`); the app is held at that version and `release.yml` pins it too |
 
 Wails also requires a C compiler on the host. On Windows, [TDM-GCC](https://jmeubank.github.io/tdm-gcc/) or [MSYS2](https://www.msys2.org/) works. See the [Wails prerequisites guide](https://wails.io/docs/gettingstarted/installation) for platform-specific setup.
 
@@ -434,6 +434,14 @@ Screenshots for the docs are generated with `pnpm test -- --grep @screenshot-cli
 
 ---
 
+## Desktop UI: the rail, tabs and the Workspace page
+
+- **Rail and tabs** (`ActivityRail`, `lib/railFocus.ts`, `App.tsx`). Every tab kind belongs to one rail icon: request → Requests, scenario and runner → Scenarios, coverage → Contracts, and the full-width pages (`workspace`, `conformance`, `cli`) have their own icons and no sidebar. Switching tabs lights the tab's icon and points the sidebar at its panel; a page tab closes the sidebar, and coming back from a page reopens it; between panel tabs the sidebar stays as the user left it; a rail click wins until the next tab switch. The sidebar has `data-testid="sidebar"`. `docs/enhancements/2026-11-21-rail-sidebars-and-last-tab.md` proposes replacing this with a sidebar and a remembered last tab for every icon (B-081).
+- **Opening a workspace** (`onWorkspaceOpened` in `App.tsx`): the Workspace tab is created leftmost and stays active, the first request opens after it. Page tabs outlive a workspace, so "open the first request" ignores them.
+- **Workspace page** (`WorkspaceTab`, `DashboardService`, `packages/core/workspaceinfo`). `workspaceinfo.Inspect` is pure Go, reads files with the same parsers as the runners and never writes; it returns counts, the environment's variables as set/unset (never a value), the specs scenarios name (URLs are never fetched) and the attention items. A placeholder counts as used only in what is sent (`scenario.StepTexts`, plus the request files a step points at). `DashboardService` adds the environment source, Contracts totals (looked up by the store's own key, `coverage.Key`), the last scenario run from the on-disk run log, and a "spec-failing" item. The page reads again on open, on tab activation, after a run and when the environment changes. Design: `docs/enhancements/2026-11-21-workspace-dashboard.md`.
+
+---
+
 ## How Workspaces Work
 
 Clear Signal organises requests as **plain YAML files on disk** — not in a proprietary binary format, not in a database. This means your collection is fully version-controllable with git, diffable in any editor, and portable across machines.
@@ -540,7 +548,7 @@ wails build
 
 ### Regenerate TypeScript bindings
 
-Bindings are generated automatically by `wails build` or `wails dev`. `wailsjs/go/models.ts` and `wailsjs/runtime/` are gitignored; the per-service `wailsjs/go/main/*.js` and `*.d.ts` files **are** tracked, so commit them whenever you add or change a bound Go method.
+Bindings are generated automatically by `wails build` or `wails dev`. `wailsjs/go/models.ts` is gitignored. The per-service `wailsjs/go/main/*.js` and `*.d.ts` files **and `wailsjs/runtime/`** are tracked: the frontend imports them and CI builds the frontend before any `wails` command has run, so commit them whenever you add or change a bound Go method (run `wails generate module` in `apps/desktop/wails`). A new Go service also needs a stub in `apps/desktop/e2e/fixtures/mockBridge.ts`.
 
 ---
 
@@ -567,6 +575,8 @@ api-workbench/
 │       ├── clispec/        # Catalog of the clrsig CLI (commands, inputs, exit codes) — drives the CLI Command Builder
 │       ├── clibuild/       # Builds, checks and explains a command line (paths, shell quoting, report names)
 │       ├── conformance/    # Conformance runner — all spec operations, negative probes, violations
+│       ├── application/    # Shared orchestration (RunConformance) used by the CLI, MCP server and desktop
+│       ├── workspaceinfo/  # Reads a workspace folder: counts, environment, specs, attention items (Workspace page)
 │       ├── coverage/       # Accumulated spec coverage store + quality signals
 │       ├── bundle/         # Single-file bundles: parse, validate, import, export, run
 │       ├── serialization/  # YAML/JSON round-trip for requests, environments, scenarios, bundles
@@ -606,7 +616,10 @@ The GUI and CLI must never implement their own HTTP execution, assertion, or sce
 Run these before tagging a release. All commands from the repo root unless noted.
 
 ```bash
-# 1 — Go core tests
+# 0 — formatting (CI fails on any difference)
+test -z "$(gofmt -l $(git ls-files '*.go'))"
+
+# 1 — Go core tests (also run apps/cli, apps/desktop/wails and examples/server)
 go test ./packages/core/...
 
 # 2 — CLI builds
@@ -626,7 +639,8 @@ Then verify manually:
 
 - [ ] Version bumped in `apps/desktop/frontend/src/components/AboutDialog.tsx` and `apps/desktop/wails/help/user-guide.md`
 - [ ] Release notes entry added in `AboutDialog.tsx` (`RELEASE_NOTES` array)
-- [ ] Screenshots in `docs/images/` look correct in the README
+- [ ] Screenshots in `docs/images/` look correct in the README (the screenshot suites rewrite them)
+- [ ] `docs/process/release-process.md` section 2 and 4 walked through (CI green on the exact commit you tag, Docker `--version`, the tap bump commit)
 
 ---
 

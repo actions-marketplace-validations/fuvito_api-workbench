@@ -56,7 +56,7 @@ describe('CoverageSidebarPanel', () => {
     b.listAccumulatedCoverage.mockResolvedValue([entry({ specFile: 'a.yaml' })])
     const onSelectSpec = vi.fn()
     render(<CoverageSidebarPanel workspacePath="/ws" selectedSpecFile="b.yaml" onSelectSpec={onSelectSpec} />)
-    await screen.findByText('a.yaml')
+    await screen.findAllByText('a.yaml')
     expect(onSelectSpec).not.toHaveBeenCalled()
   })
 
@@ -64,9 +64,22 @@ describe('CoverageSidebarPanel', () => {
     b.listAccumulatedCoverage.mockResolvedValue([entry({ specFile: 'a.yaml' }), entry({ specFile: 'b.yaml' })])
     const onSelectSpec = vi.fn()
     render(<CoverageSidebarPanel workspacePath="/ws" selectedSpecFile="a.yaml" onSelectSpec={onSelectSpec} />)
-    fireEvent.click(await screen.findByText('b.yaml'))
+    fireEvent.click((await screen.findAllByText('b.yaml'))[0])
     expect(onSelectSpec).toHaveBeenCalledWith('b.yaml')
     fireEvent.click(screen.getByTitle('Refresh'))
     await waitFor(() => expect(b.listAccumulatedCoverage).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows where each spec comes from, so two specs with the same file name can be told apart', async () => {
+    b.listAccumulatedCoverage.mockResolvedValue([
+      entry({ specFile: 'http://localhost:8090/openapi.yaml' }),
+      entry({ specFile: 'specs/openapi.yaml', totalRuns: 1, passedRuns: 1 }),
+    ])
+    render(<CoverageSidebarPanel workspacePath="/ws" selectedSpecFile="specs/openapi.yaml" onSelectSpec={vi.fn()} />)
+    await waitFor(() => expect(screen.getAllByTestId('spec-location')).toHaveLength(2))
+    expect(screen.getAllByText('openapi.yaml')).toHaveLength(2)
+    const where = screen.getAllByTestId('spec-location').map(e => e.textContent)
+    expect(where).toEqual(['http://localhost:8090/openapi.yaml', 'specs/openapi.yaml'])
+    expect(screen.getAllByTestId('spec-location')[0]).toHaveAttribute('title', 'http://localhost:8090/openapi.yaml')
   })
 })

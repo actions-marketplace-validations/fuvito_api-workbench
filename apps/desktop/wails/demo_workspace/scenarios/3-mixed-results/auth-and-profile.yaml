@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: Auth and Profile
 description: Login and profile fetch — both pass. A clean baseline in an otherwise mixed folder.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Login

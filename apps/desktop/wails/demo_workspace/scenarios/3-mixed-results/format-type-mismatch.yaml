@@ -3,7 +3,7 @@ title: Format Type Mismatch
 description: |
   Simulates a developer who assumed all endpoints return JSON. The status checks pass,
   but the Content-Type assertions fail because these endpoints return XML and HTML.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Atom feed (expected JSON, got XML)

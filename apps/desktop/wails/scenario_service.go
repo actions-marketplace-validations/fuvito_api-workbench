@@ -203,7 +203,7 @@ func (s *ScenarioService) resultCachePath(scenarioPath string) (string, error) {
 		return "", fmt.Errorf("no workspace open")
 	}
 	rel, err := filepath.Rel(wsPath, scenarioPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || outsideRel(rel) {
 		return "", fmt.Errorf("path is outside the current workspace")
 	}
 	base := strings.TrimSuffix(strings.TrimSuffix(rel, ".yaml"), ".yml")
@@ -549,7 +549,7 @@ func (s *ScenarioService) MoveScenario(srcPath, destFolderRelPath string) (strin
 	}
 	scenDir := filepath.Join(wsPath, "scenarios")
 	rel, err := filepath.Rel(scenDir, srcPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || outsideRel(rel) {
 		return "", fmt.Errorf("source is outside the scenarios directory")
 	}
 	var destDir string
@@ -588,7 +588,7 @@ func (s *ScenarioService) CopyScenario(srcPath, destFolderRelPath string) (strin
 	}
 	scenDir := filepath.Join(wsPath, "scenarios")
 	rel, err := filepath.Rel(scenDir, srcPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || outsideRel(rel) {
 		return "", fmt.Errorf("source is outside the scenarios directory")
 	}
 	var destDir string
@@ -1124,7 +1124,7 @@ func (s *ScenarioService) GetAccumulatedCoverage(specFile string) (*AccumulatedC
 	if stored.TotalRuns == 0 {
 		return nil, nil
 	}
-	specData, specExt, err := loadSpecBytes(specFile, "")
+	specData, specExt, err := loadWorkspaceSpec(s.workspace.workspacePath, specFile)
 	if err != nil {
 		return nil, fmt.Errorf("loading spec: %w", err)
 	}
@@ -1213,7 +1213,7 @@ func (s *ScenarioService) ExportCoverageReport(specFile, format string) Coverage
 	if stored.TotalRuns == 0 {
 		return CoverageReportIO{Error: "no coverage has been recorded for this spec yet"}
 	}
-	specData, specExt, err := loadSpecBytes(specFile, "")
+	specData, specExt, err := loadWorkspaceSpec(s.workspace.workspacePath, specFile)
 	if err != nil {
 		return CoverageReportIO{Error: fmt.Sprintf("loading spec: %v", err)}
 	}

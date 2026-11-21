@@ -15,3 +15,10 @@ variables:
     value: "1"
   - name: runId
     value: "demo-{{$randomString 6}}"
+  # Used by the Check Conformance page: the spec calls these path and security values by name.
+  - name: id
+    value: "1"
+  - name: code
+    value: "200"
+  - name: token
+    value: "demo-jwt-abc123"

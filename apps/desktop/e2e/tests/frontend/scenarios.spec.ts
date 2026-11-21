@@ -440,6 +440,17 @@ test.describe('Scenario management — run all', () => {
     await expect(table.getByText('Flow B')).toBeVisible()
   })
 
+  // The scenario list also carries a placeholder per folder; those are not scenarios and must not run.
+  test('Run All runs only scenarios, not the folders that hold them', async ({ page }) => {
+    const folder = { isFolder: true, folder: 'group', path: '/ws/scenarios/group', title: '' }
+    await withScenarios(page, { initialScenarios: [folder, { ...FLOW_A, folder: 'group', path: '/ws/scenarios/group/flow-a.yaml' }, FLOW_B] })
+    await gotoApp(page)
+    await page.locator('aside').getByTitle('Run all scenarios', { exact: true }).click()
+    await expect(page.getByText('All passed')).toBeVisible()
+    await expect(page.getByText(/2\/2 scenarios/)).toBeVisible()
+    await expect(page.getByRole('table').getByRole('row')).toHaveCount(3) // header + 2 scenarios
+  })
+
   test('clicking a result row opens the scenario tab', async ({ page }) => {
     const detailA = { path: FLOW_A.path, title: 'Flow A', description: '', steps: [], error: '' }
     await withScenarios(page, { initialScenarios: [FLOW_A, FLOW_B], detail: detailA })

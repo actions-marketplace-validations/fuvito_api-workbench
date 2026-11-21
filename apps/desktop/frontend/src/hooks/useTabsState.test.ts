@@ -287,6 +287,23 @@ describe('opening things', () => {
     expect(result.current.tabs.find(t => t.id === a)).toMatchObject({ name: 'CLI Builder', kind: 'cli' })
   })
 
+  it('the Workspace page opens as the leftmost tab and stays put when it is shown again', () => {
+    const { result } = setup()
+    let a = ''
+    act(() => result.current.handleNewTab())
+    const before = result.current.tabs.map(t => t.id)
+    act(() => { a = result.current.openWorkspaceTab() })
+    expect(result.current.tabs.map(t => t.id)).toEqual([a, ...before])
+    expect(result.current.activeTabId).toBe(a)
+    expect(result.current.tabs[0]).toMatchObject({ kind: 'workspace', name: 'Workspace' })
+
+    act(() => result.current.handleNewTab())
+    act(() => { result.current.openWorkspaceTab() })
+    expect(result.current.tabs.filter(t => t.kind === 'workspace')).toHaveLength(1)
+    expect(result.current.tabs[0].id).toBe(a)
+    expect(result.current.activeTabId).toBe(a)
+  })
+
   it('opening the same scenario twice switches to the existing tab', () => {
     const { result } = setup()
     let a = '', b = ''

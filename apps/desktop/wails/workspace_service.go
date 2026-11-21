@@ -27,8 +27,8 @@ type workspaceConfig struct {
 	// WorkspaceEnvs remembers the selected environment per workspace: workspace
 	// path -> environment file path relative to that workspace.
 	WorkspaceEnvs map[string]string `json:"workspaceEnvs,omitempty"`
-	WindowWidth      int      `json:"windowWidth,omitempty"`
-	WindowHeight     int      `json:"windowHeight,omitempty"`
+	WindowWidth   int               `json:"windowWidth,omitempty"`
+	WindowHeight  int               `json:"windowHeight,omitempty"`
 }
 
 func configPath() (string, error) {
@@ -124,7 +124,18 @@ type WorkspaceService struct {
 	activeEnv        *domain.Environment
 	recentWorkspaces []string
 	workspaceEnvs    map[string]string
+	// activeEnvSource says why the active environment is the one it is: "remembered" (restored for
+	// this workspace), "chosen" (picked this session), "temporary" (a Demo or Conformance workspace
+	// selected its own) or "none". It is derived, never persisted.
+	activeEnvSource string
 }
+
+const (
+	envSourceRemembered = "remembered"
+	envSourceChosen     = "chosen"
+	envSourceTemporary  = "temporary"
+	envSourceNone       = "none"
+)
 
 func NewWorkspaceService() *WorkspaceService {
 	cfg := loadConfig()
@@ -203,11 +214,13 @@ func (w *WorkspaceService) ActiveEnvironment() *domain.Environment {
 func (w *WorkspaceService) openWorkspaceDirect(path string) {
 	w.workspacePath = path
 	w.syncTitle()
+	w.activeEnvSource = envSourceNone
 	envPath := filepath.Join(path, "environments", "local.yaml")
 	if _, err := os.Stat(envPath); err == nil {
 		w.activeEnvPath = envPath
 		if env, err := w.loadEnvFile(envPath); err == nil {
 			w.activeEnv = env
+			w.activeEnvSource = envSourceTemporary
 		}
 	}
 }
@@ -242,6 +255,7 @@ func (w *WorkspaceService) CloseWorkspace() {
 	w.workspacePath = ""
 	w.activeEnvPath = ""
 	w.activeEnv = nil
+	w.activeEnvSource = ""
 	w.persistConfig()
 	w.syncTitle()
 }
@@ -301,6 +315,7 @@ func (w *WorkspaceService) SelectEnvironment(path string) error {
 	if path == "" {
 		w.activeEnv = nil
 		w.activeEnvPath = ""
+		w.activeEnvSource = envSourceNone
 		w.rememberEnvironment("")
 		w.persistConfig()
 		return nil
@@ -311,6 +326,7 @@ func (w *WorkspaceService) SelectEnvironment(path string) error {
 	}
 	w.activeEnv = env
 	w.activeEnvPath = path
+	w.activeEnvSource = envSourceChosen
 	w.rememberEnvironment(path)
 	w.persistConfig()
 	return nil
@@ -328,7 +344,7 @@ func (w *WorkspaceService) rememberEnvironment(envPath string) {
 		return
 	}
 	rel, err := filepath.Rel(w.workspacePath, envPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || outsideRel(rel) {
 		return
 	}
 	if w.workspaceEnvs == nil {
@@ -343,6 +359,7 @@ func (w *WorkspaceService) enterWorkspace(path string) {
 	w.workspacePath = path
 	w.activeEnv = nil
 	w.activeEnvPath = ""
+	w.activeEnvSource = envSourceNone
 	rel, ok := w.workspaceEnvs[path]
 	if !ok {
 		return
@@ -351,7 +368,25 @@ func (w *WorkspaceService) enterWorkspace(path string) {
 	if env, err := w.loadEnvFile(full); err == nil {
 		w.activeEnv = env
 		w.activeEnvPath = full
+		w.activeEnvSource = envSourceRemembered
 	}
+}
+
+// GetCloseReminder says what closing the open workspace will remember, for the close confirmation.
+func (w *WorkspaceService) GetCloseReminder() string {
+	switch {
+	case w.workspacePath == "":
+		return ""
+	case isTempWorkspace(w.workspacePath):
+		return "This is a temporary workspace: it is removed when its server stops and nothing is remembered."
+	case w.activeEnv != nil && w.activeEnvPath != "":
+		name := w.activeEnv.Name
+		if name == "" {
+			name = filepath.Base(w.activeEnvPath)
+		}
+		return "The environment \"" + name + "\" will be remembered for this workspace."
+	}
+	return "No environment will be remembered for this workspace."
 }
 
 // GetActiveEnvironment returns info about the currently selected environment (or nil).
@@ -517,7 +552,7 @@ func (w *WorkspaceService) CreateFolder(parentPath, name string) (string, error)
 	}
 	if w.workspacePath != "" {
 		rel, err := filepath.Rel(w.workspacePath, parentPath)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || outsideRel(rel) {
 			return "", fmt.Errorf("path is outside the current workspace")
 		}
 	}
@@ -538,11 +573,15 @@ func (w *WorkspaceService) CreateFolder(parentPath, name string) (string, error)
 // DeleteFolder removes an empty folder from the workspace.
 // Hidden files (e.g. .DS_Store) are ignored when checking emptiness.
 func (w *WorkspaceService) DeleteFolder(path string) error {
-	if w.workspacePath != "" {
-		rel, err := filepath.Rel(w.workspacePath, path)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			return fmt.Errorf("path is outside the current workspace")
-		}
+	if w.workspacePath == "" {
+		return fmt.Errorf("open a workspace first")
+	}
+	rel, err := filepath.Rel(w.workspacePath, path)
+	if err != nil || outsideRel(rel) {
+		return fmt.Errorf("path is outside the current workspace")
+	}
+	if rel == "." {
+		return fmt.Errorf("the workspace folder itself cannot be deleted here")
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -551,6 +590,11 @@ func (w *WorkspaceService) DeleteFolder(path string) error {
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), ".") {
 			return fmt.Errorf("folder is not empty")
+		}
+		// Hidden files (.DS_Store and the like) do not make a folder non-empty; a hidden folder
+		// (.git, .clrsig-coverage) holds real content and is never removed along with it.
+		if e.IsDir() {
+			return fmt.Errorf("folder contains the hidden folder %s; remove it yourself first", e.Name())
 		}
 	}
 	return os.RemoveAll(path)
@@ -565,7 +609,7 @@ func (w *WorkspaceService) RenameFolder(path, newName string) (string, error) {
 	}
 	if w.workspacePath != "" {
 		rel, err := filepath.Rel(w.workspacePath, path)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || outsideRel(rel) {
 			return "", fmt.Errorf("path is outside the current workspace")
 		}
 	}
@@ -595,7 +639,7 @@ func (w *WorkspaceService) RenameRequest(path, newName string) (string, error) {
 	}
 	if w.workspacePath != "" {
 		rel, err := filepath.Rel(w.workspacePath, path)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || outsideRel(rel) {
 			return "", fmt.Errorf("path is outside the current workspace")
 		}
 	}
@@ -638,7 +682,7 @@ func (w *WorkspaceService) MoveRequest(srcPath, destDir string) (string, error) 
 	if w.workspacePath != "" {
 		for _, p := range []string{srcPath, destDir} {
 			rel, err := filepath.Rel(w.workspacePath, p)
-			if err != nil || strings.HasPrefix(rel, "..") {
+			if err != nil || outsideRel(rel) {
 				return "", fmt.Errorf("path is outside the current workspace")
 			}
 		}
@@ -665,7 +709,7 @@ func (w *WorkspaceService) CopyRequest(srcPath, destDir string) (string, error) 
 	if w.workspacePath != "" {
 		for _, p := range []string{srcPath, destDir} {
 			rel, err := filepath.Rel(w.workspacePath, p)
-			if err != nil || strings.HasPrefix(rel, "..") {
+			if err != nil || outsideRel(rel) {
 				return "", fmt.Errorf("path is outside the current workspace")
 			}
 		}
@@ -707,7 +751,7 @@ func (w *WorkspaceService) DeleteRequest(path string) error {
 	// Safety: only allow deletion of files within the workspace.
 	if w.workspacePath != "" {
 		rel, err := filepath.Rel(w.workspacePath, path)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		if err != nil || outsideRel(rel) {
 			return fmt.Errorf("path is outside the current workspace")
 		}
 	}
@@ -1092,7 +1136,7 @@ func (w *WorkspaceService) cachePath(reqPath string) (string, error) {
 		return "", fmt.Errorf("no workspace open")
 	}
 	rel, err := filepath.Rel(w.workspacePath, reqPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || outsideRel(rel) {
 		return "", fmt.Errorf("path is outside the current workspace")
 	}
 	base := strings.TrimSuffix(strings.TrimSuffix(rel, ".yaml"), ".yml")
@@ -1309,7 +1353,7 @@ func (w *WorkspaceService) ApplyWorkspaceImport(zipPath, strategy string) ApplyI
 			continue
 		}
 		dest := filepath.Join(w.workspacePath, filepath.FromSlash(f.Name))
-		if rel, err := filepath.Rel(w.workspacePath, dest); err != nil || strings.HasPrefix(rel, "..") {
+		if rel, err := filepath.Rel(w.workspacePath, dest); err != nil || outsideRel(rel) {
 			continue
 		}
 		_, existErr := os.Stat(dest)

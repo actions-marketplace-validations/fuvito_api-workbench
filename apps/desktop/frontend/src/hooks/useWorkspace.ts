@@ -10,7 +10,7 @@ import {
   getRecentWorkspaces, openWorkspaceByPath,
 } from '@/lib/bridge'
 import type { HistoryEntry, FileNode, EnvInfo, RequestFileIO, ScenarioInfo } from '@/lib/bridge'
-import { createBlankTab, computeStateKey, isBlankTab } from '@/lib/tabState'
+import { createBlankTab, computeStateKey, isBlankTab, isPageTab } from '@/lib/tabState'
 import type { TabsStateTuple } from '@/hooks/useTabsState'
 
 function findFirstRequestFile(nodes: FileNode[]): string | null {
@@ -99,7 +99,8 @@ export function useWorkspace(deps: {
   async function openFirstFileInTree(tree: FileNode[]) {
     const firstPath = findFirstRequestFile(tree)
     if (!firstPath) return
-    if (!tabsStateRef.current.tabs.every(t => isBlankTab(t))) return
+    // Page tabs (Workspace, Run Results, ...) outlive a workspace and do not count as the user's work.
+    if (!tabsStateRef.current.tabs.filter(t => !isPageTab(t.kind)).every(t => isBlankTab(t))) return
     try {
       const r = await loadRequest(firstPath)
       if (!r) return

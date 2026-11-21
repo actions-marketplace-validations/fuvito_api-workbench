@@ -306,4 +306,3 @@ func TestScenarioCoverage_UnknownURL(t *testing.T) {
 		t.Errorf("unknown URL should not count as covered, got Covered=%d", cov.Covered)
 	}
 }
-

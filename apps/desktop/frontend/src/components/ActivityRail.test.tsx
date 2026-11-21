@@ -104,4 +104,35 @@ describe('ActivityRail', () => {
     setup({ demoRunning: true, expanded: true })
     expect(screen.getByText('Stop Demo')).toBeInTheDocument()
   })
+
+  it('puts Workspace first, only when it can be opened, and marks it when its page is showing', () => {
+    const onOpenWorkspace = vi.fn()
+    const { unmount } = setup()
+    expect(screen.queryByRole('button', { name: 'Workspace' })).not.toBeInTheDocument()
+    unmount()
+
+    setup({ onOpenWorkspace, workspaceActive: true })
+    const nav = screen.getByRole('navigation', { name: 'Activity' })
+    const first = nav.querySelector('button')
+    expect(first).toHaveAttribute('aria-label', 'Workspace')
+    expect(first).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(first!)
+    expect(onOpenWorkspace).toHaveBeenCalled()
+  })
+
+  it('lights the panel the app names, even with the sidebar closed, and none when it names none', () => {
+    const { unmount } = setup({ sidebarOpen: false, activeTab: 'explorer', highlightedTab: 'scenarios' })
+    expect(screen.getByRole('button', { name: 'Scenarios' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Requests' })).not.toHaveAttribute('aria-current', 'page')
+    unmount()
+    setup({ sidebarOpen: true, activeTab: 'explorer', highlightedTab: null })
+    expect(screen.getByRole('button', { name: 'Requests' })).not.toHaveAttribute('aria-current', 'page')
+  })
+
+  it('lights the Conformance and CLI Builder page icons when their pages are showing', () => {
+    setup({ onOpenConformance: vi.fn(), onOpenCliBuilder: vi.fn(), conformanceActive: true })
+    expect(screen.getByRole('button', { name: 'Check spec conformance' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'CLI Command Builder' })).not.toHaveAttribute('aria-current', 'page')
+  })
 })
+

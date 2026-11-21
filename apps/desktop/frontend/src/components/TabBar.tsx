@@ -8,7 +8,7 @@ export type TabInfo = {
   name: string | null
   method: string
   isDirty: boolean
-  kind?: 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance'
+  kind?: 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance' | 'workspace'
   filePath?: string | null
 }
 
@@ -148,6 +148,8 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
                 <span className="shrink-0 font-mono font-bold text-label text-sky-400">CLI</span>
               ) : tab.kind === 'conformance' ? (
                 <span className="shrink-0 font-mono font-bold text-label text-emerald-400">CHK</span>
+              ) : tab.kind === 'workspace' ? (
+                <span className="shrink-0 font-mono font-bold text-label text-sky-400">WS</span>
               ) : tab.kind === 'scenario' ? (
                 <span className="shrink-0 font-mono font-bold text-label text-violet-400">SCN</span>
               ) : (
@@ -162,6 +164,8 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
                     ? (tab.name ?? 'CLI Builder')
                   : tab.kind === 'conformance'
                     ? (tab.name ?? 'Check Conformance')
+                  : tab.kind === 'workspace'
+                    ? (tab.name ?? 'Workspace')
                   : tab.kind === 'runner'
                     ? (tab.name ?? 'Run Results')
                     : tab.kind === 'scenario'

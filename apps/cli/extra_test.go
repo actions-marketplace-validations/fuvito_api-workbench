@@ -768,18 +768,26 @@ func TestDiffCmd_HTMLOutput(t *testing.T) {
 	}
 }
 
-// CS-IMP-001 / CS-GAP-007 (KnownGap, backlog B-051): impact reads the path after the LAST {{...}}
-// of a step URL, so a path that ends in a placeholder (the usual {{baseUrl}}/users/{{userId}})
-// yields no path and never matches, and a placeholder in the middle cuts the path short. This test
-// pins today's behaviour so the catalog stays true; when the bug is fixed it must be updated.
-func TestImpact_PlaceholderInThePathIsNotMatched_KnownGap(t *testing.T) {
-	if got := impactExtractPath("{{baseUrl}}/users/{{userId}}"); got != "" {
-		t.Errorf("a path ending in a placeholder gives no path today, got %q", got)
+// CS-IMP-001: a placeholder in a step URL path stands for one path segment (backlog B-051).
+func TestImpact_PlaceholderInThePathIsMatched(t *testing.T) {
+	cases := []struct {
+		spec, url string
+		want      bool
+	}{
+		{"/users/{id}", "{{baseUrl}}/users/{{userId}}", true},
+		{"/users/{id}/orders", "{{baseUrl}}/users/{{userId}}/orders", true},
+		{"/users/{id}/orders", "{{baseUrl}}/users/{{userId}}", false},
+		{"/users/{id}", "https://{{host}}/users/{{userId}}?x={{y}}", true},
+		{"/orders", "{{baseUrl}}/users/{{userId}}/orders", false},
+		{"/users/me", "{{baseUrl}}/users/{{userId}}", false},
+		{"/users", "{{baseUrl}}/users?page={{p}}", true},
 	}
-	if impactPathMatches("/users/{id}", "{{baseUrl}}/users/{{userId}}") {
-		t.Error("a step whose path ends in a placeholder is not matched to /users/{id} today")
+	for _, c := range cases {
+		if got := impactPathMatches(c.spec, c.url); got != c.want {
+			t.Errorf("impactPathMatches(%q, %q) = %v, want %v", c.spec, c.url, got, c.want)
+		}
 	}
-	if got := impactExtractPath("{{baseUrl}}/users/{{userId}}/orders"); got != "/orders" {
-		t.Errorf("a placeholder in the middle cuts the path to what follows it today, got %q", got)
+	if got := impactExtractPath("{{baseUrl}}/users/{{userId}}/orders"); got != "/users/{{userId}}/orders" {
+		t.Errorf("path = %q", got)
 	}
 }

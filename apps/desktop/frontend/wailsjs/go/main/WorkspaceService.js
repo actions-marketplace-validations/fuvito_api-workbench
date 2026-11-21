@@ -46,6 +46,10 @@ export function GetActiveEnvironment() {
   return window['go']['main']['WorkspaceService']['GetActiveEnvironment']();
 }
 
+export function GetCloseReminder() {
+  return window['go']['main']['WorkspaceService']['GetCloseReminder']();
+}
+
 export function GetEnvironment(arg1) {
   return window['go']['main']['WorkspaceService']['GetEnvironment'](arg1);
 }

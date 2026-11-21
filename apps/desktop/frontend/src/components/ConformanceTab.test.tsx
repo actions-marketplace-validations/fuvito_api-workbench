@@ -395,6 +395,18 @@ describe('operations that could not be sent', () => {
     expect(screen.getByRole('region', { name: 'Missing values' })).toHaveTextContent('1 operation was not sent')
   })
 
+  it('says nothing was reached when every sent operation got no answer, and counts skipped ones apart', async () => {
+    const dead = (id: string) => ({ ...output.operations[0], operationId: id, path: `/${id}`, status: 'error', error: 'dial tcp: refused', statusCode: 0, violations: [], findings: [] })
+    bridge.runConformance.mockResolvedValue({
+      ...output, failed: true, covered: 0, passing: 0, failing: 0, notCovered: 3, total: 3,
+      operations: [dead('a'), dead('b'), { ...dead('c'), status: 'skipped', error: '' }],
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('No operation was reached: is the server running at')
+    expect(screen.getByTestId('conform-skipped')).toHaveTextContent('1 skipped')
+  })
+
   it('adds the missing names to the variable overrides, once each, and opens the options', async () => {
     bridge.runConformance.mockResolvedValue(blockedOutput)
     await chooseSpec()

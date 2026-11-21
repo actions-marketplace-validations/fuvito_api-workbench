@@ -445,14 +445,14 @@ func TestIsSwagger2_AllVersions(t *testing.T) {
 		data string
 		want bool
 	}{
-		{"swagger 2.0 JSON",        sw2JSON,                                    true},
-		{"swagger 2.0 YAML",        sw2YAML,                                    true},
-		{"swagger 2.0 single-quote","swagger: '2.0'\ninfo:\n  title: T\n  version: \"1\"\npaths: {}", true},
-		{"openapi 3.0.3",           oas30JSON,                                  false},
-		{"openapi 3.1.0",           oas31JSON,                                  false},
-		{"swagger 1.x",             sw1JSON,                                    false},
-		{"empty object",            "{}",                                       false},
-		{"random text",             "not a spec",                               false},
+		{"swagger 2.0 JSON", sw2JSON, true},
+		{"swagger 2.0 YAML", sw2YAML, true},
+		{"swagger 2.0 single-quote", "swagger: '2.0'\ninfo:\n  title: T\n  version: \"1\"\npaths: {}", true},
+		{"openapi 3.0.3", oas30JSON, false},
+		{"openapi 3.1.0", oas31JSON, false},
+		{"swagger 1.x", sw1JSON, false},
+		{"empty object", "{}", false},
+		{"random text", "not a spec", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

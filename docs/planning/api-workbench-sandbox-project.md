@@ -305,7 +305,7 @@ No server needed. Pairs in `specs/diff/<case>/v1.yaml` and `v2.yaml`:
 | `endpoint-added` | new operation | INFO (CS-DIFF-003) |
 | `description-changed` | text only | none or INFO |
 | `impact-hit` | breaking change on an operation a scenario step calls | CS-IMP-001 |
-| `impact-placeholder-path` | the same, but the step URL has `{{id}}` in the path | pins CS-GAP-007 (missed today) |
+| `impact-placeholder-path` | the same, but the step URL has `{{id}}` in the path | CS-IMP-001 (matched since 0.6.0) |
 
 Each case has `--fail-on breaking`, `warning` and `info` expectations.
 

@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: User CRUD
 description: Full create-read-update-delete cycle for the users resource.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Login

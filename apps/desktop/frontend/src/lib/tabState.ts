@@ -4,7 +4,7 @@ import type { HttpMethod } from './httpUtils'
 
 export type TabState = {
   id: string
-  kind?: 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance'
+  kind?: 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance' | 'workspace'
   // request tab fields
   method: HttpMethod
   url: string
@@ -90,7 +90,7 @@ export function createBlankTab(targetDir: string | null = null): TabState {
 
 // Page tabs show an app screen (not a request or scenario file), so they are never dirty or blank.
 export function isPageTab(kind: TabState['kind']): boolean {
-  return kind === 'coverage' || kind === 'runner' || kind === 'cli' || kind === 'conformance'
+  return kind === 'coverage' || kind === 'runner' || kind === 'cli' || kind === 'conformance' || kind === 'workspace'
 }
 
 type TabsStateTuple = { tabs: TabState[]; activeTabId: string }

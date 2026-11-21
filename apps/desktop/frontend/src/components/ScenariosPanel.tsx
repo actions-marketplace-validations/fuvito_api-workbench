@@ -129,7 +129,7 @@ export function ScenariosPanel({
 
       {activeTab === 'scenarios' && (
       <>
-        <div className="flex-1 overflow-auto py-1">
+        <div className="flex-1 overflow-auto py-1 flex flex-col">
         <WorkspaceScenarioSection
           scenarios={scenarios}
           scenarioError={scenarioError}

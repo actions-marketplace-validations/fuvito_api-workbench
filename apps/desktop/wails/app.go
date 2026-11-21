@@ -20,6 +20,7 @@ type App struct {
 	helpService       *HelpService
 	cliBuilder        *CliBuilderService
 	conformance       *ConformanceService
+	dashboard         *DashboardService
 	hasDirtyTabs      bool
 }
 
@@ -32,6 +33,7 @@ func NewApp() *App {
 	demo.portFn = func() int { return ss.GetSettings().DemoServerPort }
 	conf := NewConformanceServerService(ws)
 	conf.portFn = func() int { return ss.GetSettings().ConformanceServerPort }
+	scenarios := NewScenarioService(ws, ss)
 	return &App{
 		workspaceService:  ws,
 		requestService:    rs,
@@ -41,7 +43,8 @@ func NewApp() *App {
 		settingsService:   ss,
 		demoService:       demo,
 		conformanceServer: conf,
-		scenarioService:   NewScenarioService(ws, ss),
+		scenarioService:   scenarios,
+		dashboard:         NewDashboardService(ws, scenarios),
 		helpService:       NewHelpService(),
 		cliBuilder:        NewCliBuilderService(ws),
 		conformance:       NewConformanceService(ws, ss),

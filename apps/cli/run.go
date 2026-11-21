@@ -471,4 +471,3 @@ func expandScenarioArgs(cmd *cobra.Command, args []string, noRecursive bool) ([]
 	}
 	return found.Files, nil
 }
-

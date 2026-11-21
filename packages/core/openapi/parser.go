@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Spec wraps a loaded OpenAPI document.
@@ -150,6 +150,26 @@ func withPathParameters(item *openapi3.PathItem, op *openapi3.Operation) *openap
 	return &copied
 }
 
+// parameterValue is the value a generated request carries for a required query or header
+// parameter: the spec's own example, default or first enum value, otherwise a {{name}} placeholder
+// so a run that has no value for it is reported as "not sent" instead of sending an empty value.
+func parameterValue(p *openapi3.Parameter) string {
+	if p.Example != nil {
+		return fmt.Sprint(p.Example)
+	}
+	if sc := p.Schema; sc != nil && sc.Value != nil {
+		switch {
+		case sc.Value.Example != nil:
+			return fmt.Sprint(sc.Value.Example)
+		case sc.Value.Default != nil:
+			return fmt.Sprint(sc.Value.Default)
+		case len(sc.Value.Enum) > 0:
+			return fmt.Sprint(sc.Value.Enum[0])
+		}
+	}
+	return "{{" + p.Name + "}}"
+}
+
 func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Request {
 	name := op.Summary
 	if name == "" {
@@ -181,14 +201,14 @@ func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Req
 			if p.Required {
 				req.QueryParams = append(req.QueryParams, domain.QueryParam{
 					Name:  p.Name,
-					Value: "",
+					Value: parameterValue(p),
 				})
 			}
 		case "header":
 			if p.Required {
 				req.Headers = append(req.Headers, domain.Header{
 					Name:  p.Name,
-					Value: "",
+					Value: parameterValue(p),
 				})
 			}
 		}

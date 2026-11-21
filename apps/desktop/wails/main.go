@@ -48,6 +48,7 @@ func main() {
 			app.helpService,
 			app.cliBuilder,
 			app.conformance,
+			app.dashboard,
 		},
 	})
 	if err != nil {

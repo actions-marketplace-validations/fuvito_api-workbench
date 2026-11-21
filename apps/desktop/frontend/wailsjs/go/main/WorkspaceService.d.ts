@@ -25,6 +25,8 @@ export function ExportWorkspace():Promise<string>;
 
 export function GetActiveEnvironment():Promise<main.EnvironmentInfoIO>;
 
+export function GetCloseReminder():Promise<string>;
+
 export function GetEnvironment(arg1:string):Promise<main.EnvironmentIO>;
 
 export function GetEnvironmentRaw(arg1:string):Promise<string>;

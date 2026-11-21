@@ -163,11 +163,11 @@ func lenientServer(t *testing.T) *httptest.Server {
 func TestNegativeResult_Counts(t *testing.T) {
 	r := &conformance.NegativeResult{
 		Probes: []conformance.NegativeProbeResult{
-			{StatusCode: 422},               // passed
-			{StatusCode: 401},               // passed
-			{StatusCode: 200},               // failed
-			{Error: "connection refused"},   // errored
-			{Skipped: true},                 // skipped
+			{StatusCode: 422},             // passed
+			{StatusCode: 401},             // passed
+			{StatusCode: 200},             // failed
+			{Error: "connection refused"}, // errored
+			{Skipped: true},               // skipped
 		},
 	}
 	passed, failed, skipped, errored := r.Counts()

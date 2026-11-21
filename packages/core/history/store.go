@@ -41,13 +41,13 @@ type Store struct {
 }
 
 var sensitiveHeaderNames = map[string]bool{
-	"authorization":     true,
-	"cookie":            true,
+	"authorization":       true,
+	"cookie":              true,
 	"proxy-authorization": true,
-	"x-api-key":         true,
-	"x-auth-token":      true,
-	"x-access-token":    true,
-	"x-secret":          true,
+	"x-api-key":           true,
+	"x-auth-token":        true,
+	"x-access-token":      true,
+	"x-secret":            true,
 }
 
 func redactHeaders(headers []Header) []Header {

@@ -18,6 +18,7 @@ import {ChevronLeft} from 'lucide-react'
 import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
 import {ConformanceTab} from '@/components/ConformanceTab'
+import {WorkspaceTab} from '@/components/WorkspaceTab'
 import {RunnerTab} from '@/components/RunnerTab'
 import {CliBuilderTab} from '@/components/CliBuilderTab'
 import type {CliBuilderPreset} from '@/components/CliBuilderTab'
@@ -63,6 +64,7 @@ import {
   stopConformanceServer,
   openConformanceSpec,
   openConformanceWorkspace,
+  getCloseReminder,
   pickFile,
   quitApp,
   renameScenario,
@@ -86,6 +88,7 @@ import {authStateToPayload} from '@/lib/httpUtils'
 import {parseCurl} from '@/lib/curlImport'
 import {serializeScenarioToYAML} from '@/components/scenario-yaml'
 import {isTabDirty, isPageTab, withoutTabsIn} from '@/lib/tabState'
+import {railTargetForTab} from '@/lib/railFocus'
 
 export default function App() {
   // Cross-dependency ref: useTabsState needs refreshWorkspace before useWorkspace is initialized
@@ -100,12 +103,28 @@ export default function App() {
     localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
+  // The Workspace page is a full-width page, not a side panel: showing it closes the sidebar and
+  // the rail lights only its icon. A panel icon (Requests, Scenarios, Contracts) opens the sidebar
+  // again and takes the highlight. The panel the next click opens is the one used last.
+  function showWorkspacePage() {
+    tabs.openWorkspaceTab()
+    setSidebarOpen(false)
+    localStorage.setItem('ui.sidebarOpen', 'false')
+  }
+
+  // A workspace the user just opened (open, new, recent, Demo Server) starts on its Workspace page.
+  function onWorkspaceOpened() {
+    setRailTab('explorer')
+    localStorage.setItem('ui.railTab', 'explorer')
+    showWorkspacePage()
+  }
+
   const workspace = useWorkspace({
     setTabsState: tabs.setTabsState,
     tabsStateRef: tabs.tabsStateRef,
     openFileAsTab: tabs.openFileAsTab,
     loadCacheIntoTab: tabs.loadCacheIntoTab,
-    onWorkspaceOpened: switchToExplorer,
+    onWorkspaceOpened,
   })
   const settings = useSettings()
   const demo = useDemo({
@@ -113,7 +132,7 @@ export default function App() {
     refreshHistory: workspace.refreshHistory,
     setTabsState: tabs.setTabsState,
     openFirstFileInTree: workspace.openFirstFileInTree,
-    onWorkspaceOpened: switchToExplorer,
+    onWorkspaceOpened,
     onError: message => setAppError(message),
   })
 
@@ -132,6 +151,7 @@ export default function App() {
       setConformanceWorkspace(result.workspacePath ?? '')
       await workspace.refreshWorkspace()
       switchToExplorer()
+      tabs.openWorkspaceTab()
       tabs.openConformanceTab()
     } finally {
       setConformanceStarting(false)
@@ -173,6 +193,33 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })
+  // The rail follows the tabs: switching to a tab points the sidebar at the panel that tab belongs to,
+  // and a full-width page tab (Workspace, Check Conformance, CLI Builder) closes the sidebar. When
+  // the previous tab was such a page, the sidebar was closed by the page, not by the user, so
+  // switching back to a request, scenario or Contracts tab opens it again; between panel tabs it
+  // stays as the user left it. A click on a rail icon still wins until the next tab switch. Skipped
+  // on the first render so a saved panel choice is not overwritten at startup.
+  const lastRailTabId = useRef(tabs.activeTabId)
+  const lastWasPage = useRef(railTargetForTab(tabs.activeTab?.kind).page !== undefined)
+  useEffect(() => {
+    if (lastRailTabId.current === tabs.activeTabId) return
+    lastRailTabId.current = tabs.activeTabId
+    const target = railTargetForTab(tabs.activeTab?.kind)
+    if (target.panel) {
+      setRailTab(target.panel)
+      localStorage.setItem('ui.railTab', target.panel)
+      if (lastWasPage.current) {
+        setSidebarOpen(true)
+        localStorage.setItem('ui.sidebarOpen', 'true')
+      }
+    } else {
+      setSidebarOpen(false)
+      localStorage.setItem('ui.sidebarOpen', 'false')
+    }
+    lastWasPage.current = target.page !== undefined
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabs.activeTabId])
+  const railTarget = railTargetForTab(tabs.activeTab?.kind)
   const [railExpanded, setRailExpanded] = useState(() => {
     return localStorage.getItem('ui.railExpanded') === 'true'
   })
@@ -226,6 +273,11 @@ export default function App() {
   const [pendingCloseWorkspace, setPendingCloseWorkspace] = useState(false)
   const [pendingWorkspaceAction, setPendingWorkspaceAction] = useState<(() => void) | null>(null)
 
+  // What closing will remember, appended to the unsaved-changes confirmation.
+  const [closeReminder, setCloseReminder] = useState('')
+  const [envChanges, setEnvChanges] = useState(0)
+  useEffect(() => { setEnvChanges(n => n + 1) }, [workspace.activeEnv?.path])
+
   async function doCloseWorkspace() {
     if (demo.demoRunning) {
       try { await stopDemo() } catch { /* best-effort */ }
@@ -238,6 +290,7 @@ export default function App() {
     const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
     if (hasDirty) {
       setPendingWorkspaceAction(null)
+      getCloseReminder().then(setCloseReminder).catch(() => setCloseReminder(''))
       setPendingCloseWorkspace(true)
     } else {
       doCloseWorkspace()
@@ -249,6 +302,7 @@ export default function App() {
     const hasDirty = tabs.tabs.some(t => isTabDirty(t) || (t.kind === 'scenario' && t.scenarioDirty))
     if (hasDirty) {
       setPendingWorkspaceAction(() => action)
+      getCloseReminder().then(setCloseReminder).catch(() => setCloseReminder(''))
       setPendingCloseWorkspace(true)
     } else {
       doCloseWorkspace().then(() => action())
@@ -439,7 +493,8 @@ export default function App() {
   }
 
   async function handleRunAll() {
-    const list = workspace.scenarioList
+    // The list also holds a placeholder per folder (so empty folders can be drawn); only scenarios run.
+    const list = workspace.scenarioList.filter(s => !s.isFolder)
     if (!list.length) return
     const envPath = workspace.activeEnv?.path ?? ''
     runAllCancelRef.current = false
@@ -904,7 +959,7 @@ export default function App() {
     name: t.name,
     method: t.method,
     isDirty: isTabDirty(t),
-    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance',
+    kind: (t.kind ?? 'request') as 'request' | 'scenario' | 'coverage' | 'runner' | 'cli' | 'conformance' | 'workspace',
     filePath: t.kind === 'scenario' ? (t.scenarioPath ?? null) : (t.filePath ?? null),
   }))
 
@@ -1023,7 +1078,7 @@ export default function App() {
         return (
           <DiscardChangesDialog
             title={action ? 'Switch workspace' : 'Close workspace'}
-            message={`${dirtyCount} ${noun} unsaved changes. ${action ? 'Switch workspace' : 'Close workspace'} and discard them?`}
+            message={`${dirtyCount} ${noun} unsaved changes. ${action ? 'Switch workspace' : 'Close workspace'} and discard them?${closeReminder ? ` ${closeReminder}` : ''}`}
             onCancel={() => { setPendingCloseWorkspace(false); setPendingWorkspaceAction(null) }}
             onDiscard={() => {
               setPendingCloseWorkspace(false)
@@ -1135,6 +1190,12 @@ export default function App() {
               onShowHelp={() => setShowHelp(true)}
               onOpenCliBuilder={() => openCliBuilder()}
               onOpenConformance={() => tabs.openConformanceTab()}
+              onOpenWorkspace={showWorkspacePage}
+              // An open sidebar shows its panel; with it closed the icon of the active tab is lit.
+              highlightedTab={sidebarOpen ? railTab : (railTarget.panel ?? null)}
+              workspaceActive={!sidebarOpen && railTarget.page === 'workspace'}
+              conformanceActive={!sidebarOpen && railTarget.page === 'conformance'}
+              cliActive={!sidebarOpen && railTarget.page === 'cli'}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />
@@ -1142,6 +1203,7 @@ export default function App() {
             {sidebarOpen && (
               <>
                 <aside
+                  data-testid="sidebar"
                   className="shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] overflow-hidden"
                   style={{ width: sidebarWidth }}
                 >
@@ -1334,6 +1396,34 @@ export default function App() {
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
                     <ConformanceTab onOpenCliBuilder={values => openCliBuilder({ command: 'conform', values })} />
+                  </div>
+                ))}
+
+                {/* Workspace tab (single instance) */}
+                {tabList.filter(t => t.kind === 'workspace').map(t => (
+                  <div
+                    key={t.id}
+                    className="absolute inset-0 overflow-hidden"
+                    style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
+                  >
+                    <WorkspaceTab
+                      workspacePath={workspace.workspacePath}
+                      active={t.id === activeTabId}
+                      refreshTrigger={runLogTrigger + coverageRefreshTrigger + envChanges}
+                      onOpenScenario={(path, name) => tabs.openScenarioAsTab(path, name)}
+                      onOpenContracts={specRef => {
+                        setSelectedCoverageSpecFile(specRef)
+                        tabs.openCoverageTab()
+                        setCoverageRefreshTrigger(n => n + 1)
+                      }}
+                      onShowPanel={panel => {
+                        setRailTab(panel)
+                        localStorage.setItem('ui.railTab', panel)
+                        setSidebarOpen(true)
+                        localStorage.setItem('ui.sidebarOpen', 'true')
+                      }}
+                      onCloseWorkspace={requestCloseWorkspace}
+                    />
                   </div>
                 ))}
 
