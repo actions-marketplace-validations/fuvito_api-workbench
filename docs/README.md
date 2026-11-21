@@ -20,7 +20,7 @@ What a user reads **inside the app** (the Help panel). These files are embedded 
 | Folder | What goes there |
 |---|---|
 | [`enhancements/`](enhancements/README.md) | One dated design proposal per major feature, agreed before it is built (`YYYY-MM-DD-short-name.md`) |
-| [`planning/`](planning/) | What is open and what comes next: the [backlog](planning/backlog.md) (edited in place), dated [next-step snapshots](planning/next_steps/README.md), product requirement documents such as the failure-catalog repo |
+| [`planning/`](planning/) | What is open and what comes next: the [backlog](planning/backlog.md) (edited in place), dated [next-step snapshots](planning/next_steps/README.md), product requirement documents such as the failure-catalog repo and the [sandbox project](planning/api-workbench-sandbox-project.md) (the separate, in-memory API fixtures Clear Signal is tested against, local first and then Cloud Run) |
 | [`reports/`](reports/) | Audits and comparisons, written once: `check-YYYY-MM-DD.md` project checks, competitor comparisons |
 | [`guides/`](guides/) | How-to guides for people who run Clear Signal outside the app: [CI/CD integration](guides/ci-integration.md), [authenticated conformance runs](guides/authed-conform.md) |
 | [`process/`](process/) | How the project is run: the [release process](process/release-process.md), manual steps that need an account or a browser |
