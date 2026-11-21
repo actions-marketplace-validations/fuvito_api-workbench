@@ -19,6 +19,8 @@ import {ScenarioViewer} from '@/components/ScenarioViewer'
 import {CoverageTab} from '@/components/CoverageTab'
 import {ConformanceTab} from '@/components/ConformanceTab'
 import {WorkspaceTab} from '@/components/WorkspaceTab'
+import {WorkspaceSidebarPanel} from '@/components/WorkspaceSidebarPanel'
+import {useWorkspaceOverview} from '@/hooks/useWorkspaceOverview'
 import {RunnerTab} from '@/components/RunnerTab'
 import {CliBuilderTab} from '@/components/CliBuilderTab'
 import type {CliBuilderPreset} from '@/components/CliBuilderTab'
@@ -307,6 +309,19 @@ export default function App() {
   const [selectedCoverageSpecFile, setSelectedCoverageSpecFile] = useState<string | null>(null)
   // Bump to trigger a Contracts tab refresh (on tab switch + after any scenario run)
   const [coverageRefreshTrigger, setCoverageRefreshTrigger] = useState(0)
+
+  // The Workspace page and the Workspace sidebar read one snapshot, so they never disagree. It is read
+  // while either is on screen and again when a run, a Contracts change or an environment change happens.
+  const workspaceOverview = useWorkspaceOverview({
+    workspacePath: workspace.workspacePath,
+    enabled: tabs.activeTab?.kind === 'workspace' || (sidebarOpen && railTab === 'workspace'),
+    refreshTrigger: runLogTrigger + coverageRefreshTrigger + envChanges,
+  })
+  const [focusAttention, setFocusAttention] = useState<{ index: number; seq: number }>()
+  function showAttention(index: number) {
+    tabs.openWorkspaceTab()
+    setFocusAttention(prev => ({ index, seq: (prev?.seq ?? 0) + 1 }))
+  }
 
   // Workspace export / import
   const [pendingImport, setPendingImport] = useState<ScanImportResult | null>(null)
@@ -1233,6 +1248,19 @@ export default function App() {
                       tabs.openCoverageTab()
                       setCoverageRefreshTrigger(t => t + 1)
                     }}
+                    workspacePanel={
+                      <WorkspaceSidebarPanel
+                        overview={workspaceOverview.overview}
+                        error={workspaceOverview.error}
+                        loading={workspaceOverview.loading}
+                        onRefresh={() => void workspaceOverview.reload()}
+                        environments={workspace.environments}
+                        activeEnvPath={workspace.activeEnv?.path ?? ''}
+                        onEnvChange={workspace.handleEnvChange}
+                        onShowAttention={showAttention}
+                        onShowIcon={handleRailTabClick}
+                      />
+                    }
                     clipboard={fileClipboard}
                     onCopyFile={path => setFileClipboard({ op: 'copy', kind: 'request', srcPath: path })}
                     onCutFile={path => setFileClipboard({ op: 'cut', kind: 'request', srcPath: path })}
@@ -1385,21 +1413,18 @@ export default function App() {
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
                     <WorkspaceTab
-                      workspacePath={workspace.workspacePath}
-                      active={t.id === activeTabId}
-                      refreshTrigger={runLogTrigger + coverageRefreshTrigger + envChanges}
+                      overview={workspaceOverview.overview}
+                      error={workspaceOverview.error}
+                      loading={workspaceOverview.loading}
+                      onRefresh={() => void workspaceOverview.reload()}
+                      focusAttention={focusAttention}
                       onOpenScenario={(path, name) => tabs.openScenarioAsTab(path, name)}
                       onOpenContracts={specRef => {
                         setSelectedCoverageSpecFile(specRef)
                         tabs.openCoverageTab()
                         setCoverageRefreshTrigger(n => n + 1)
                       }}
-                      onShowPanel={panel => {
-                        setRailTab(panel)
-                        localStorage.setItem('ui.railTab', panel)
-                        setSidebarOpen(true)
-                        localStorage.setItem('ui.sidebarOpen', 'true')
-                      }}
+                      onShowPanel={handleRailTabClick}
                       onCloseWorkspace={requestCloseWorkspace}
                     />
                   </div>
