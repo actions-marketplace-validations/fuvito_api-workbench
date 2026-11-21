@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: Authentication Flows
 description: Exercises all three auth methods — Bearer token (login + profile), Basic auth, and API key.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Login

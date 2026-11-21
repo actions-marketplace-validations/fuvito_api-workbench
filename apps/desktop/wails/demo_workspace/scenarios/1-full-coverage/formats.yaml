@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: Alternative Response Formats
 description: Atom feed, sitemap XML, structured data XML, and two HTML endpoints — covers all five format operations.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Atom feed

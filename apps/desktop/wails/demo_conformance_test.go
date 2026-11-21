@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 )
 
@@ -45,5 +46,43 @@ func TestDemoWorkspace_CheckConformancePageListsAndRunsTheSpec(t *testing.T) {
 	}
 	if out.Failing != 0 || out.Covered != info.Reads || out.Passing != out.Covered {
 		t.Fatalf("the Demo API should match its own spec on every read: %+v (reads %d)", out, info.Reads)
+	}
+}
+
+// A scenario run and a conformance run on the Demo Server must feed one Contracts card: the
+// scenarios name the spec file, and the page records its run under the name the scenarios use.
+func TestDemoWorkspace_ScenarioAndConformanceRunsShareOneContractsCard(t *testing.T) {
+	isolateHome(t)
+	ws := newWS(t, t.TempDir())
+	d := NewDemoService(ws)
+	res := d.StartDemo()
+	if res.Error != "" {
+		t.Fatal(res.Error)
+	}
+	defer d.StopDemo()
+
+	scenarios := NewScenarioService(ws, NewSettingsService())
+	run := scenarios.RunScenario(filepath.Join(res.WorkspacePath, "scenarios", "1-full-coverage", "health.yaml"), "", 0)
+	if run.Error != "" || run.SpecError != "" || run.AccumulatedCoverage == nil {
+		t.Fatalf("scenario run: error=%q specError=%q coverage=%v", run.Error, run.SpecError, run.AccumulatedCoverage)
+	}
+
+	svc := NewConformanceService(ws, NewSettingsService())
+	spec := svc.GetConformContext().Specs[0].Path
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, RecordCoverage: true})
+	if out.Error != "" {
+		t.Fatal(out.Error)
+	}
+
+	cards := scenarios.ListAccumulatedCoverage()
+	if len(cards) != 1 {
+		var names []string
+		for _, c := range cards {
+			names = append(names, c.SpecFile)
+		}
+		t.Fatalf("want one Contracts card for the Demo spec, got %d: %v (%s)", len(cards), names, out.CoverageNote)
+	}
+	if cards[0].TotalRuns != 2 {
+		t.Fatalf("both runs belong on that card, got %d runs", cards[0].TotalRuns)
 	}
 }

@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: User Lifecycle
 description: Login, list users, create a new user, fetch and verify it, update it, then delete it.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Login

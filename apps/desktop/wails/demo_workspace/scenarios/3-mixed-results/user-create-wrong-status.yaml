@@ -4,7 +4,7 @@ description: |
   Simulates a contract drift: the spec says POST /users returns 201 Created, but
   this scenario still expects 200 OK from an older version of the API. The name and
   ID assertions pass; the status assertion fails.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Login

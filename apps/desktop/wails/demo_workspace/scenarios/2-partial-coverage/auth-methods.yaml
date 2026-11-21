@@ -1,7 +1,7 @@
 schemaVersion: "1"
 title: Alternative Auth Methods
 description: Basic auth and API key — both return 200 with the authenticated identity.
-specFile: "http://localhost:DEMO_PORT/openapi.yaml"
+specFile: "../../specs/openapi.yaml"
 
 steps:
   - label: Basic auth
