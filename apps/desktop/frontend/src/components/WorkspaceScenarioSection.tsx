@@ -410,14 +410,14 @@ export function WorkspaceScenarioSection({
   return (
     <>
       {scenarioError && (
-        <div className="mx-2 mt-2 px-2 py-1 text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded truncate" title={scenarioError}>
+        <div className="shrink-0 mx-2 mt-2 px-2 py-1 text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 rounded truncate" title={scenarioError}>
           {scenarioError}
         </div>
       )}
       {(scenarios.some(s => !s.isFolder) || onNewScenario) && (
         <>
           {/* Toolbar, like the requests panel: no root folder node, items start at the top level */}
-          <div className="px-2 py-1.5 border-b border-[var(--color-border)] flex items-center gap-1.5 justify-end">
+          <div className="shrink-0 px-2 py-1.5 border-b border-[var(--color-border)] flex items-center gap-1.5 justify-end">
             {onRunAllScenarios && scenarios.filter(s => !s.isFolder).length > 0 && (
               <button
                 type="button"
@@ -454,7 +454,7 @@ export function WorkspaceScenarioSection({
           </div>
 
           {scenarios.some(s => !s.isFolder) && (
-            <div className="flex items-center gap-1.5 px-2 py-1 border-b border-[var(--color-border)]">
+            <div className="shrink-0 flex items-center gap-1.5 px-2 py-1 border-b border-[var(--color-border)]">
               <Search size={10} className="shrink-0 text-[var(--color-muted-foreground)]" />
               <input
                 type="text"
@@ -474,7 +474,7 @@ export function WorkspaceScenarioSection({
           {/* Empty space below the items is the root: drop a scenario here to move it out of a folder */}
           <div
             data-testid="scenario-root"
-            className={cn('min-h-full', rootDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40')}
+            className={cn('flex-1', rootDragOver && 'bg-[var(--color-accent)]/10 outline outline-1 outline-[var(--color-accent)]/40')}
             onDragOver={e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setRootDragOver(true) }}
             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setRootDragOver(false) }}
             onDrop={e => {
