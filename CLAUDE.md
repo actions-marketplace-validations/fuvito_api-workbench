@@ -686,3 +686,8 @@ Do not implement or stub any of these without explicit user direction.
 - **UI:** singleton `workspace` page tab (`WorkspaceTab`), first item in the Activity Rail, opened by `onWorkspaceOpened` when a workspace is opened (the Conformance Server then focuses Check Conformance). Opening summary line is dismissible. No file format or config change; informs, blocks nothing.
 - **Docs:** user guide section "The Workspace page" (and the outdated "last workspace is remembered" sentence corrected). **Not done:** screenshots; `clrsig validate` printing the same items (B-071); dismissing a warning per workspace (deliberately left out).
 
+### 2026-11-21 — Demo workspace works with Check Conformance; sidebar scrollbar fix
+
+- **Demo Server:** its scenarios name the spec by URL, but the Check Conformance page lists spec *files* in the workspace, so the page's spec list was empty for the Demo Server (the Conformance Server ships a file). `extractDemoWorkspace` now also writes `specs/openapi.yaml` (the embedded demo spec with its `servers` URL set to the port the server runs on), and the demo `local` environment gains `id`, `code` and `token`, which the generated requests use as placeholders. Result: a read-only check passes all 15 read operations with nothing not sent; the 9 write operations are skipped. Scenarios still use the URL spec, so a conformance run recorded to Contracts is a separate card (B-010). Test: `TestDemoWorkspace_CheckConformancePageListsAndRunsTheSpec`.
+- **Scenarios panel:** the root drop zone was `min-h-full` below the toolbar and filter rows, so the list always overflowed by their height and showed a scrollbar; it now fills the remaining height. Regression tests in `sidebar-scroll.spec.ts`.
+

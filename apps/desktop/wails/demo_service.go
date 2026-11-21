@@ -260,6 +260,16 @@ func extractDemoWorkspace(dstDir string, port int) error {
 		return err
 	}
 
+	// The scenarios name the spec by URL, but the Check Conformance page lists spec files found in
+	// the workspace, so the same spec is also written as a file, pointing at this port.
+	if err := os.MkdirAll(filepath.Join(dstDir, "specs"), 0755); err != nil {
+		return err
+	}
+	spec := strings.ReplaceAll(string(demoOpenAPIYAML), "http://localhost:8090", fmt.Sprintf("http://localhost:%d", port))
+	if err := os.WriteFile(filepath.Join(dstDir, "specs", "openapi.yaml"), []byte(spec), 0644); err != nil {
+		return err
+	}
+
 	// Protect environment files from accidental git commits in the temp dir.
 	return os.WriteFile(filepath.Join(dstDir, "environments", ".gitignore"), []byte("*\n"), 0644)
 }
