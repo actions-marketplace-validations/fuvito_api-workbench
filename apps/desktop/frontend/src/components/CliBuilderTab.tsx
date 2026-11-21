@@ -271,8 +271,12 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   }
 
   const knownFields = new Set(current.inputs.map(i => i.name))
-  const forField = (name: string) => (result?.messages ?? []).filter(m => m.field === name)
-  const general = (result?.messages ?? []).filter(m => !knownFields.has(m.field) && m.severity !== 'info')
+  // Nothing is wrong with a form the user has not touched: required-field errors wait for the first
+  // value (a preset from another screen counts), so the page does not open with a red error.
+  const started = Object.keys(values).length > 0
+  const shown = (result?.messages ?? []).filter(m => started || m.severity !== 'error')
+  const forField = (name: string) => shown.filter(m => m.field === name)
+  const general = shown.filter(m => !knownFields.has(m.field) && m.severity !== 'info')
   const essential = current.inputs.filter(i => i.group === 'essential')
   const advanced = current.inputs.filter(i => i.group === 'advanced')
 
@@ -316,7 +320,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
                   'text-left rounded border px-3 py-2 text-xs transition-colors',
                   c.name === command
                     ? 'border-[var(--color-accent)] bg-[var(--color-muted)] text-[var(--color-foreground)]'
-                    : 'border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+                    : 'border-[var(--color-border)] text-[var(--color-foreground)] hover:bg-[var(--color-muted)] hover:border-[var(--color-accent)]',
                 )}
               >
                 <span className="font-medium">{c.goal}</span>
@@ -409,7 +413,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
             >
               {text || 'Fill in the fields on the left to build the command.'}
             </pre>
-            {result && !result.valid && (
+            {started && result && !result.valid && (
               <p className="mt-1 text-[11px] text-red-400">Fix the problems below before using this command.</p>
             )}
           </section>
@@ -450,9 +454,9 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
                 <h3 className="text-xs font-semibold text-[var(--color-foreground)] mb-1">Part by part</h3>
                 <dl className="flex flex-col gap-1.5">
                   {result.explanation.parts.map((p, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(8rem,16rem)_1fr] gap-3 text-xs">
+                    <div key={i} className="flex flex-col gap-0.5 text-xs">
                       <dt className="font-mono break-all text-[var(--color-foreground)]">{p.token}</dt>
-                      <dd className="text-[var(--color-muted-foreground)]">{p.meaning}</dd>
+                      <dd className="pl-3 text-[var(--color-muted-foreground)]">{p.meaning}</dd>
                     </div>
                   ))}
                 </dl>

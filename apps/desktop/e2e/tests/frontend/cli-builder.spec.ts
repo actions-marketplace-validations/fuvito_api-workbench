@@ -6,7 +6,7 @@ test.describe('CLI Command Builder', () => {
 
     await page.getByRole('button', { name: 'CLI Command Builder' }).click()
     await expect(page.getByRole('heading', { name: 'CLI Command Builder' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: /CLI Builder/ })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /CLI Command Builder/ })).toBeVisible()
 
     const command = page.getByTestId('cli-command')
     await expect(command).toContainText('Fill in the fields')
@@ -66,6 +66,6 @@ test.describe('CLI Command Builder', () => {
     await gotoApp(page)
     await page.getByRole('button', { name: 'CLI Command Builder' }).click()
     await page.getByRole('button', { name: 'CLI Command Builder' }).click()
-    await expect(page.getByRole('tab', { name: /CLI Builder/ })).toHaveCount(1)
+    await expect(page.getByRole('tab', { name: /CLI Command Builder/ })).toHaveCount(1)
   })
 })

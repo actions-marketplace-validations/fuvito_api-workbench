@@ -140,7 +140,7 @@ var catalog = []Command{
 	},
 	{
 		Name:    "conform",
-		Goal:    "Check an API against its OpenAPI spec",
+		Goal:    "Spec Conformance Testing: check an API against its OpenAPI spec",
 		Summary: "Sends a request to every operation in an OpenAPI spec and checks each response against the schema the spec declares.",
 		When:    "To prove a running API matches its spec with no test files to write.",
 		Inputs: []Input{

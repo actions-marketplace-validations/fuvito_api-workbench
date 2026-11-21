@@ -1,5 +1,5 @@
 import { FolderOpen, Save, FilePlus, CopyPlus } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, shortenPath } from '@/lib/utils'
 import { SnippetButton } from '@/components/SnippetButton'
 import { isTabDirty } from '@/lib/tabState'
 import type { TabState } from '@/lib/tabState'
@@ -23,8 +23,9 @@ export function AppToolbar({
     <header className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-card)] shrink-0">
       <div className="min-w-0 flex-1 flex items-center gap-1.5">
         {activeTab.kind === 'scenario' ? (
-          <span className="text-xs text-[var(--color-muted-foreground)] truncate">
-            {activeTab.name ?? 'Scenario'}
+          // The tab and the large title already say the scenario's name; this line says where its file is.
+          <span className="text-xs text-[var(--color-muted-foreground)] truncate" title={activeTab.scenarioPath ?? undefined}>
+            {activeTab.scenarioPath ? shortenPath(activeTab.scenarioPath.replace(/\\/g, '/'), 70) : (activeTab.name ?? 'Scenario')}
           </span>
         ) : (
           <>

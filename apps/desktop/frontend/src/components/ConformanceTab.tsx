@@ -273,10 +273,12 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           </div>
 
           <div className="flex flex-col gap-1 sm:col-span-2">
-            <label htmlFor="conf-base" className="text-xs font-medium">Base URL <span className="text-red-400">*</span></label>
+            <label htmlFor="conf-base" className="text-xs font-medium">Base URL{info && !info.serverUrl && <span className="text-red-400"> *</span>}</label>
             <input id="conf-base" value={baseUrl} onChange={e => { setBaseUrl(e.target.value); setConfirmedRemote(false) }} placeholder="http://localhost:8120" className={cn(inputClass, 'font-mono')} />
             <p className="text-[11px] text-[var(--color-muted-foreground)]">
-              {info?.serverUrl ? 'Starts as the first server in the spec; change it to test another deployment.' : 'The spec declares no server, so enter the address to test.'}
+              {!info ? 'Choose a spec first; the address starts as the first server it declares.'
+                : info.serverUrl ? 'Starts as the first server in the spec; change it to test another deployment.'
+                : 'The spec declares no server, so enter the address to test.'}
             </p>
           </div>
         </div>

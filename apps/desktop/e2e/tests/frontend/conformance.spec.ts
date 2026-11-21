@@ -3,7 +3,7 @@ import { test, expect, gotoApp } from '../../fixtures/test.js'
 test.describe('Check Conformance page', () => {
   test('runs a read-only check and shows the totals and the violation', async ({ page }) => {
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await expect(page.getByRole('heading', { name: 'Check Conformance' })).toBeVisible()
     await expect(page.getByRole('tab', { name: /Check Conformance/ })).toBeVisible()
 
@@ -36,7 +36,7 @@ test.describe('Check Conformance page', () => {
 
   test('sending writes is an explicit choice and says how many', async ({ page }) => {
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
 
     await page.getByLabel(/Also send write requests/).check()
@@ -49,7 +49,7 @@ test.describe('Check Conformance page', () => {
 
   test('a base URL that is not on this computer needs confirmation', async ({ page }) => {
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
     await page.getByLabel(/^Base URL/).fill('https://api.example.com')
 
@@ -63,7 +63,7 @@ test.describe('Check Conformance page', () => {
 
   test('negative probes are listed with the ones the server accepted', async ({ page }) => {
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
     await page.getByText('Options', { exact: true }).click()
     await page.getByLabel(/Also run negative probes/).check()
@@ -74,7 +74,7 @@ test.describe('Check Conformance page', () => {
   test('an operation with no value for a placeholder is not sent, and the user is told what to set', async ({ page }) => {
     await page.addInitScript(() => { (window as unknown as { __bridge: Record<string, unknown> }).__bridge['conformNeedsId'] = true })
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
     await page.getByRole('button', { name: 'Run conformance check' }).click()
 
@@ -113,7 +113,7 @@ test.describe('Check Conformance page', () => {
 
   test('Get CLI command carries the page choices, read-only included', async ({ page }) => {
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
     await page.getByText('Options', { exact: true }).click()
     await page.getByLabel('Tags').fill('items, orders')
@@ -148,7 +148,7 @@ test.describe('Check Conformance page', () => {
 
   test('with writes ticked the command has no --read-only', async ({ page }) => {
     await gotoApp(page)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await page.getByLabel(/^Spec/).selectOption('/workspace/specs/shop.yaml')
     await page.getByLabel(/Also send write requests/).check()
     await page.getByRole('button', { name: 'Get CLI command' }).click()

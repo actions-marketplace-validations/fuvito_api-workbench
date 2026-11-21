@@ -108,6 +108,12 @@ describe('AppToolbar — non-request tabs', () => {
     expect(screen.queryByText('snippet')).not.toBeInTheDocument()
   })
 
+  it('shows the scenario file path, not the name the tab and title already show', () => {
+    setup(tab({ kind: 'scenario', name: 'Login flow', scenarioPath: 'C:\\ws\\scenarios\\login.yaml' }))
+    expect(screen.getByText('C:/ws/scenarios/login.yaml')).toBeInTheDocument()
+    expect(screen.queryByText('Login flow')).not.toBeInTheDocument()
+  })
+
   it('falls back to a generic scenario label', () => {
     setup(tab({ kind: 'scenario', name: null }))
     expect(screen.getByText('Scenario')).toBeInTheDocument()

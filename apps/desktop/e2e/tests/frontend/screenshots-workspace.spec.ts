@@ -93,7 +93,7 @@ for (const theme of ['dark', 'light'] as const) {
 
   test(`${tag} conformance sidebar`, async ({ page }) => {
     await openWorkspacePage(page, theme)
-    await page.locator('button[aria-label="Check spec conformance"]').click()
+    await page.locator('button[aria-label="Check Conformance"]').click()
     await page.getByTestId('sidebar-conformance').getByRole('button', { name: 'specs/shop.yaml' }).click()
     await page.getByLabel(/Base URL/).waitFor({ timeout: 5_000 })
     await page.getByRole('button', { name: /Run conformance check/ }).click()

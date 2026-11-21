@@ -48,4 +48,17 @@ test.describe('App shell', () => {
     await gotoApp(page)
     await expect(page.getByTitle('Settings', { exact: true })).toBeVisible()
   })
+
+  // The URL is the most important field of the request screen: at 1280 px it must stay usable, with
+  // the timeout and redirect options wrapping to a second line instead of squeezing it.
+  test('the request URL field keeps a usable width at 1280 px', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await gotoApp(page)
+    const url = page.getByPlaceholder('https://api.example.com/endpoint')
+    await expect(url).toBeVisible()
+    const box = await url.boundingBox()
+    expect(box!.width).toBeGreaterThanOrEqual(250)
+    await expect(page.getByPlaceholder('default')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible()
+  })
 })

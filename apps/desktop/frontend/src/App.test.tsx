@@ -92,7 +92,7 @@ describe('App — workspace shell', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'History' }))
     expect(await screen.findByText('No requests yet')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Contracts' }))
-    expect(await screen.findByText('No coverage data yet')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing recorded in Contracts yet')).toBeInTheDocument()
     expect(localStorage.getItem('ui.railTab')).toBe('coverage')
   })
 

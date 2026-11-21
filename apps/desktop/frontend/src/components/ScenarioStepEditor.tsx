@@ -368,6 +368,7 @@ export function StepEditorCard({ step, index, isFirst, isLast, onChange, onRemov
             onChange={e => onChange({ bodyType: e.target.value })}
             className={selectCls}
             title="Request body type"
+            aria-label="Request body type"
           >
             {BODY_TYPES
               .filter(t => t.value !== 'multipart' || step.bodyType === 'multipart')

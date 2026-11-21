@@ -116,7 +116,7 @@ test.describe('Scenarios', () => {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     const tab = page.getByRole('tab').filter({ hasText: 'User flow' })
     await expect(tab).toBeVisible()
-    await expect(tab).toContainText('SCN')
+    await expect(tab.locator('[data-kind="scenario"]')).toBeVisible()
     await expect(tab).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -258,7 +258,7 @@ test.describe('Scenario management — create', () => {
     // A tab opens for the new scenario
     const tab = page.getByRole('tab').filter({ hasText: 'My Test Scenario' })
     await expect(tab).toBeVisible()
-    await expect(tab).toContainText('SCN')
+    await expect(tab.locator('[data-kind="scenario"]')).toBeVisible()
   })
 })
 
@@ -384,7 +384,7 @@ test.describe('Scenario management — duplicate', () => {
     await page.locator('aside').getByTitle('Duplicate scenario').click()
     const tab = page.getByRole('tab').filter({ hasText: 'user-flow-copy' })
     await expect(tab).toBeVisible()
-    await expect(tab).toContainText('SCN')
+    await expect(tab.locator('[data-kind="scenario"]')).toBeVisible()
   })
 })
 

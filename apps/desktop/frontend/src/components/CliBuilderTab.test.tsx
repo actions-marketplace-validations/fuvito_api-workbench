@@ -186,8 +186,12 @@ describe('CliBuilderTab', () => {
       ],
     }))
     await ready()
+    // An untouched form shows no required-field error, only the warning.
+    expect(await screen.findByText('something general')).toBeInTheDocument()
+    expect(screen.queryByText('Scenario not found: nope.yaml')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Fix the problems below/)).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/Scenario/, { selector: 'input' }), { target: { value: 'nope.yaml' } })
     expect(await screen.findByText('Scenario not found: nope.yaml')).toBeInTheDocument()
-    expect(screen.getByText('something general')).toBeInTheDocument()
     expect(screen.getByText(/Fix the problems below/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Copy/ })).toBeDisabled()
   })
