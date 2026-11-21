@@ -193,11 +193,14 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     return localStorage.getItem('ui.sidebarOpen') !== 'false'
   })
-  // The rail follows the tabs: switching to a tab points the sidebar at the panel that tab belongs to
-  // (open or closed stays as the user left it), and a full-width page tab (Workspace, Check
-  // Conformance, CLI Builder) closes the sidebar. A click on a rail icon still wins until the next
-  // tab switch. Skipped on the first render so a saved panel choice is not overwritten at startup.
+  // The rail follows the tabs: switching to a tab points the sidebar at the panel that tab belongs to,
+  // and a full-width page tab (Workspace, Check Conformance, CLI Builder) closes the sidebar. When
+  // the previous tab was such a page, the sidebar was closed by the page, not by the user, so
+  // switching back to a request, scenario or Contracts tab opens it again; between panel tabs it
+  // stays as the user left it. A click on a rail icon still wins until the next tab switch. Skipped
+  // on the first render so a saved panel choice is not overwritten at startup.
   const lastRailTabId = useRef(tabs.activeTabId)
+  const lastWasPage = useRef(railTargetForTab(tabs.activeTab?.kind).page !== undefined)
   useEffect(() => {
     if (lastRailTabId.current === tabs.activeTabId) return
     lastRailTabId.current = tabs.activeTabId
@@ -205,10 +208,15 @@ export default function App() {
     if (target.panel) {
       setRailTab(target.panel)
       localStorage.setItem('ui.railTab', target.panel)
+      if (lastWasPage.current) {
+        setSidebarOpen(true)
+        localStorage.setItem('ui.sidebarOpen', 'true')
+      }
     } else {
       setSidebarOpen(false)
       localStorage.setItem('ui.sidebarOpen', 'false')
     }
+    lastWasPage.current = target.page !== undefined
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.activeTabId])
   const railTarget = railTargetForTab(tabs.activeTab?.kind)
