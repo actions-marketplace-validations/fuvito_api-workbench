@@ -320,6 +320,16 @@ export function Sidebar({
         />
       )}
 
+      {(tab === 'workspace' || tab === 'conformance' || tab === 'cli') && (
+        <div data-testid={`sidebar-${tab}`} className="flex flex-col flex-1 overflow-hidden">
+          <div className="shrink-0 px-3 py-2 border-b border-[var(--color-border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
+            {SIDEBAR_TITLES[tab]}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
+
+const SIDEBAR_TITLES = { workspace: 'Workspace', conformance: 'Check Conformance', cli: 'CLI Builder' } as const

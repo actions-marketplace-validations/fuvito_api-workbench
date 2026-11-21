@@ -46,8 +46,8 @@ test.describe('Workspace page', () => {
     await expect(page.getByTestId('workspace-page')).toBeVisible()
     await expect(page.getByRole('tab', { name: /Workspace/ })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('navigation', { name: 'Activity' }).getByRole('button', { name: 'Workspace' })).toHaveAttribute('aria-current', 'page')
-    // A workspace that was just opened starts on the full-width page, with the sidebar closed.
-    await expect(page.getByTestId('sidebar')).toHaveCount(0)
+    // A workspace that was just opened starts on the Workspace tab with the Workspace sidebar showing.
+    await expect(page.getByTestId('sidebar-workspace')).toBeVisible()
   })
 
   test('a workspace starts on the Workspace tab, then the first request, with the Workspace tab active', async ({ page }) => {
@@ -89,34 +89,60 @@ test.describe('Workspace page', () => {
     await expect(page.getByTestId('attention-empty')).toBeVisible()
   })
 
-  // The Workspace page is full width, not a side panel: the rail never shows it and a panel
-  // icon highlighted at the same time, and the sidebar state follows the icon last clicked.
-  test('the Workspace icon closes the sidebar and lights alone; a panel icon brings the sidebar back', async ({ page }) => {
+  // Every rail icon works the same way: click shows its sidebar, clicking the lit icon collapses it.
+  test('every rail icon opens its own sidebar, and the lit icon collapses it', async ({ page }) => {
     await gotoApp(page)
-    const rail = page.getByRole('navigation', { name: 'Activity' })
-    const workspace = rail.getByRole('button', { name: 'Workspace' })
-    const requests = rail.getByRole('button', { name: 'Requests' })
+    const sidebar = page.getByTestId('sidebar')
+    const rail = { getByRole: (_: 'button', o: { name: string }) => page.locator(`button[aria-label="${o.name}"]`) }
+    const icons: [string, string | null][] = [
+      ['Workspace', 'sidebar-workspace'], ['Check spec conformance', 'sidebar-conformance'], ['CLI Command Builder', 'sidebar-cli'],
+      ['Requests', null], ['Scenarios', null], ['Contracts', null],
+    ]
+    for (const [name, id] of icons) {
+      const icon = rail.getByRole('button', { name })
+      await icon.click()
+      await expect(sidebar).toBeVisible()
+      if (id) await expect(page.getByTestId(id)).toBeVisible()
+      await expect(page.locator('[aria-current="page"]')).toHaveCount(1)
+      await expect(icon).toHaveAttribute('aria-current', 'page')
+    }
+    // The lit icon collapses the sidebar and stays lit; clicking it again shows the sidebar.
+    const contracts = rail.getByRole('button', { name: 'Contracts' })
+    await contracts.click()
+    await expect(sidebar).toHaveCount(0)
+    await expect(contracts).toHaveAttribute('aria-current', 'page')
+    await contracts.click()
+    await expect(sidebar).toBeVisible()
+  })
 
-    await expect(page.getByTestId('sidebar')).toBeVisible()
-    await expect(requests).toHaveAttribute('aria-current', 'page')
+  test('each icon brings back the last tab opened under it', async ({ page }) => {
+    await page.addInitScript(`
+      window.__bridge.scenarios = [{ title: 'User flow', path: '/workspace/scenarios/user-flow.yaml', stepCount: 1 }];
+      window.__bridge.scenarioDetail = { path: '/workspace/scenarios/user-flow.yaml', title: 'User flow', description: '', error: '', steps: [] };
+    `)
+    await gotoApp(page)
+    const rail = { getByRole: (_: 'button', o: { name: string }) => page.locator(`button[aria-label="${o.name}"]`) }
+    const selected = (name: RegExp) => expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true')
 
-    await workspace.click()
-    await expect(page.getByTestId('workspace-page')).toBeVisible()
-    await expect(page.getByTestId('sidebar')).toHaveCount(0)
-    await expect(workspace).toHaveAttribute('aria-current', 'page')
-    await expect(requests).not.toHaveAttribute('aria-current', 'page')
+    await rail.getByRole('button', { name: 'Scenarios' }).click()
+    await page.getByTestId('sidebar').getByText('User flow').click()
+    await selected(/User flow/)
 
-    await requests.click()
-    await expect(page.getByTestId('sidebar')).toBeVisible()
-    await expect(requests).toHaveAttribute('aria-current', 'page')
-    await expect(workspace).not.toHaveAttribute('aria-current', 'page')
-    // The page is still the open tab; only the rail's highlight moved.
+    await rail.getByRole('button', { name: 'Workspace' }).click()
+    await selected(/Workspace/)
     await expect(page.getByTestId('workspace-page')).toBeVisible()
 
     await rail.getByRole('button', { name: 'Scenarios' }).click()
+    await selected(/User flow/)
+    await rail.getByRole('button', { name: 'Check spec conformance' }).click()
+    await selected(/Conformance/)
+    await rail.getByRole('button', { name: 'Workspace' }).click()
+    await selected(/Workspace/)
+
+    // An icon with nothing open under it shows its sidebar and keeps the current tab.
+    await rail.getByRole('button', { name: 'Contracts' }).click()
     await expect(page.getByTestId('sidebar')).toBeVisible()
-    await workspace.click()
-    await expect(page.getByTestId('sidebar')).toHaveCount(0)
+    await selected(/Workspace/)
   })
 
   test('Refresh reads the workspace again', async ({ page }) => {
@@ -128,50 +154,45 @@ test.describe('Workspace page', () => {
     await expect(page.getByRole('article', { name: /does not exist/ })).toBeVisible()
   })
 
-  // The rail follows the tabs: the active tab decides which icon is lit. A page tab (Workspace,
-  // Check Conformance) has no sidebar; coming back from a page to a request, scenario or Contracts
-  // tab shows the sidebar again. A rail click still wins until the next tab switch.
-  test('clicking tabs lights the matching rail icon and shows or hides the sidebar', async ({ page }) => {
+  // Switching tabs lights the tab's icon and points the sidebar at its panel; it never opens or
+  // closes the sidebar, which is the user's choice.
+  test('clicking tabs lights the matching rail icon and leaves the sidebar as the user had it', async ({ page }) => {
     await gotoApp(page)
     const rail = page.getByRole('navigation', { name: 'Activity' })
     const lit = async (name: string) => expect(page.getByRole('button', { name, exact: true }).first()).toHaveAttribute('aria-current', 'page')
     const notLit = async (name: string) => expect(page.getByRole('button', { name, exact: true }).first()).not.toHaveAttribute('aria-current', 'page')
     const sidebar = page.getByTestId('sidebar')
 
-    // Open the Workspace page: it is lit alone and the sidebar is gone.
     await rail.getByRole('button', { name: 'Workspace' }).click()
     await lit('Workspace')
-    await expect(sidebar).toHaveCount(0)
+    await expect(sidebar).toBeVisible()
+    await expect(page.getByTestId('sidebar-workspace')).toBeVisible()
 
-    // Back to the request tab: Requests is lit and its sidebar is shown again.
     await page.getByRole('tab', { name: /New Request/ }).click()
     await lit('Requests')
     await notLit('Workspace')
     await expect(sidebar).toBeVisible()
+    await expect(sidebar.getByText('Filter requests…').or(sidebar.getByText('No request files yet'))).toBeVisible()
 
-    // A sidebar the user collapses stays collapsed, and the active tab's icon stays lit.
+    // A sidebar the user collapses stays collapsed while tabs change; the active tab's icon is lit.
     await rail.getByRole('button', { name: 'Requests' }).click()
     await expect(sidebar).toHaveCount(0)
-    await lit('Requests')
-
-    // The Workspace tab, then Check Conformance, each light their own icon with no sidebar.
     await page.getByRole('tab', { name: /Workspace/ }).click()
     await lit('Workspace')
     await expect(sidebar).toHaveCount(0)
     await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await expect(page.getByRole('tab', { name: /Check Conformance|Conformance/ }).first()).toBeVisible()
     await lit('Check spec conformance')
     await notLit('Workspace')
-    await expect(sidebar).toHaveCount(0)
-
-    // Back to the request tab from a page: the sidebar returns, pointed at Requests.
+    // Clicking an icon shows its sidebar; clicking a tab afterwards leaves it showing and re-points it.
+    await expect(sidebar).toBeVisible()
+    await expect(page.getByTestId('sidebar-conformance')).toBeVisible()
     await page.getByRole('tab', { name: /New Request/ }).click()
     await lit('Requests')
-    await notLit('Check spec conformance')
     await expect(sidebar).toBeVisible()
-    await expect(sidebar.getByText('Filter requestsâ€¦').or(sidebar.getByText('No request files yet'))).toBeVisible()
   })
 
-  test('a scenario tab clicked after the Workspace page shows the Scenarios sidebar', async ({ page }) => {
+  test('a scenario tab clicked after the Workspace tab shows the Scenarios sidebar', async ({ page }) => {
     await page.addInitScript(`
       window.__bridge.scenarios = [{ title: 'User flow', path: '/workspace/scenarios/user-flow.yaml', stepCount: 1 }];
       window.__bridge.scenarioDetail = { path: '/workspace/scenarios/user-flow.yaml', title: 'User flow', description: '', error: '', steps: [] };
@@ -186,7 +207,7 @@ test.describe('Workspace page', () => {
     await expect(rail.getByRole('button', { name: 'Scenarios' })).toHaveAttribute('aria-current', 'page')
 
     await rail.getByRole('button', { name: 'Workspace' }).click()
-    await expect(sidebar).toHaveCount(0)
+    await expect(page.getByTestId('sidebar-workspace')).toBeVisible()
 
     await page.getByRole('tab', { name: /User flow/ }).click()
     await expect(sidebar).toBeVisible()
