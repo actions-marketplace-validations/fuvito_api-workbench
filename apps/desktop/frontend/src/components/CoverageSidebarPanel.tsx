@@ -94,6 +94,13 @@ export function CoverageSidebarPanel({ workspacePath, selectedSpecFile, onSelect
                 </span>
                 <span className={cn('text-xs font-bold tabular-nums shrink-0', pctColor)}>{pct}%</span>
               </div>
+              <div
+                data-testid="spec-location"
+                className="mb-1.5 -mt-1 truncate font-mono text-[10px] text-[var(--color-muted-foreground)]"
+                title={entry.specFile}
+              >
+                {entry.specFile}
+              </div>
               <div className="h-1 rounded-full bg-[var(--color-border)] overflow-hidden mb-1.5">
                 <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${Math.min(pct, 100)}%` }} />
               </div>
