@@ -534,7 +534,8 @@ export function useTabsState(deps: {
     setTabsState(prev => {
       const dup = prev.tabs.find(t => t.kind === 'workspace')
       if (dup) return { ...prev, activeTabId: dup.id }
-      return { tabs: [...prev.tabs, newTab], activeTabId: newTab.id }
+      // The Workspace page is the home tab: it opens leftmost, ahead of the requests opened with it.
+      return { tabs: [newTab, ...prev.tabs], activeTabId: newTab.id }
     })
     return id
   }

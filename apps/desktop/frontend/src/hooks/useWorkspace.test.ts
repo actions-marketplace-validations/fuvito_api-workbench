@@ -149,6 +149,17 @@ describe('opening workspaces', () => {
     expect(b.listRequests).not.toHaveBeenCalled()
   })
 
+  it('still opens the first request when a page tab such as Workspace is already open', async () => {
+    primeRefresh()
+    b.openWorkspace.mockResolvedValue('/ws')
+    b.loadRequest.mockResolvedValue(req({ title: 'first' }))
+    const { result } = setup()
+    act(() => { result.current.tabs.openWorkspaceTab() })
+    await act(async () => { await result.current.ws.handleOpenWorkspace() })
+    expect(b.loadRequest).toHaveBeenCalledWith('/ws/requests/sub/a.yaml')
+    expect(result.current.tabs.tabs.map(t => t.kind ?? 'request')).toEqual(['workspace', 'request', 'request'])
+  })
+
   it('does not replace tabs the user already has open', async () => {
     primeRefresh()
     b.openWorkspace.mockResolvedValue('/ws')

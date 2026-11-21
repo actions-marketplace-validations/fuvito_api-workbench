@@ -53,6 +53,7 @@ export function setupMockBridge() {
       environmentSource: 'none', envVars: [], specs: [], attention: [],
       snapshotAt: '2026-11-21T10:00:00Z',
     } as unknown,
+    loadRequestResult: null as unknown,
     closeReminder: 'No environment will be remembered for this workspace.',
     pickedFile: '' as string,
     cliCatalog: [
@@ -197,7 +198,7 @@ export function setupMockBridge() {
         GetRecentWorkspaces: () => Promise.resolve(bridge['recentWorkspaces'] ?? []),
         SaveRequest: (r: Record<string, string>) =>
           Promise.resolve('/workspace/' + (r?.name || 'req') + '.yaml'),
-        LoadRequest: noopNull,
+        LoadRequest: () => Promise.resolve(bridge['loadRequestResult'] ?? null),
         OpenRequest: noopNull,
         DeleteRequest: noop,
         CreateFolder: noop,

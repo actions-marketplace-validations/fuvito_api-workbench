@@ -50,6 +50,24 @@ test.describe('Workspace page', () => {
     await expect(page.getByTestId('sidebar')).toHaveCount(0)
   })
 
+  test('a workspace starts on the Workspace tab, then the first request, with the Workspace tab active', async ({ page }) => {
+    await page.addInitScript(`
+      window.__bridge.workspacePath = '';
+      window.__bridge.fileTree = [{ name: 'health.yaml', path: '/workspace/requests/health.yaml', isDir: false, method: 'GET' }];
+      window.__bridge.loadRequestResult = { title: 'Health Check', method: 'GET', url: 'http://localhost:8090/health', filePath: '/workspace/requests/health.yaml' };
+    `)
+    await page.goto('/')
+    await page.getByRole('button', { name: /Open Workspace/ }).first().click()
+    await expect(page.getByTestId('workspace-page')).toBeVisible()
+
+    const tabs = page.getByRole('tab')
+    await expect(tabs).toHaveCount(2)
+    await expect(tabs.nth(0)).toContainText('Workspace')
+    await expect(tabs.nth(1)).toContainText('Health Check')
+    await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true')
+    await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'false')
+  })
+
   test('shows what closing will remember when unsaved tabs ask for a confirmation', async ({ page }) => {
     await gotoApp(page)
     await page.getByPlaceholder('https://api.example.com/endpoint').fill('https://example.com/a')
