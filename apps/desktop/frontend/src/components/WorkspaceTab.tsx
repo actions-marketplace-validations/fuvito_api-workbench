@@ -86,7 +86,7 @@ export function WorkspaceTab({ workspacePath, refreshTrigger = 0, onOpenScenario
 
   return (
     <div className="flex-1 overflow-auto" data-testid="workspace-page">
-      <div className="mx-auto max-w-5xl p-5 flex flex-col gap-4">
+      <div className="p-5 flex flex-col gap-4">
         {showReminder && (
           <div role="status" data-testid="workspace-reminder" className="flex items-center gap-2 rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-xs">
             <Info size={14} className="shrink-0 text-sky-400" aria-hidden />
