@@ -352,7 +352,13 @@ API traffic stays on your machine. Project files are YAML you own and can commit
 
 ![Workspace page](docs/images/17-workspace-page.png)
 
-Light-theme versions of the Contracts, conformance and Workspace images are in [`docs/images`](docs/images) (`*-light.png`).
+**A sidebar for every icon**
+
+| Check Conformance | CLI Builder |
+|---|---|
+| ![Check Conformance with its sidebar](docs/images/18-conformance-sidebar.png) | ![CLI Command Builder with its sidebar](docs/images/19-cli-builder-sidebar.png) |
+
+Light-theme versions of the Contracts, conformance, Workspace and sidebar images are in [`docs/images`](docs/images) (`*-light.png`).
 
 ---
 
