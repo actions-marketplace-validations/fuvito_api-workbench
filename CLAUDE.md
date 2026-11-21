@@ -196,6 +196,8 @@ Cloud accounts, team sync, hosted collaboration, GraphQL, WebSockets, gRPC, load
 
 Do not implement or stub any of these without explicit user direction.
 
+Commercial or enterprise-edition ideas, and anything else that is out of scope for this open-source project, are written as dated notes in `docs/enterprise/` (see its README) instead of being built, stubbed or added to the backlog.
+
 ---
 
 ## 10. Changelog
