@@ -42,8 +42,14 @@ apps/desktop/wails/help/user-guide.md                  ← same
 All commands from the repo root:
 
 ```bash
-# Go core tests
+# Formatting (CI fails on any difference)
+test -z "$(gofmt -l $(git ls-files '*.go'))"
+
+# Go tests, all four modules
 go test ./packages/core/...
+(cd apps/cli && go test ./...)
+(cd apps/desktop/wails && go test ./...)
+(cd examples/server && go test ./...)
 
 # CLI builds clean
 go build -o /tmp/clrsig-check ./apps/cli/...
@@ -54,7 +60,10 @@ cd apps/desktop/frontend && npx tsc --noEmit -p tsconfig.app.json
 # Frontend unit tests
 pnpm test
 
-# E2E screenshot tests (also regenerates docs/images/)
+# Browser tests against the mock bridge (everything except the live-server smoke tests)
+cd apps/desktop/e2e && npx playwright test --grep-invert "smoke|@screenshot"
+
+# Screenshot tests (also regenerates docs/images/ -- look at the diff before committing)
 cd apps/desktop/e2e && npx playwright test --grep "@screenshot"
 ```
 
@@ -74,7 +83,7 @@ git commit -m "chore: prepare v0.x.0 release"
 git push origin main
 ```
 
-Wait for CI to go green on `main` before tagging.
+Wait for CI to go green on `main` before tagging, and tag **the commit CI tested**: after a push, bots commit to `main` (the demo GIF workflow and, after a release, the tap bump), so run `git fetch` and tag the SHA whose CI run is green (`git tag v0.x.0 <sha>`), not whatever is at the top. If a push is rejected because a bot got there first, `git pull --rebase` and push again.
 
 - [ ] CI is green on `main`
 
@@ -97,7 +106,7 @@ This triggers `release.yml`, which runs these jobs in order:
 6. `publish` — downloads all artifacts, generates SHA256 sidecars, creates GitHub Release
 7. `update-tap` — runs `scripts/update-tap.py`, auto-commits updated `Formula/clrsig.rb` and `bucket/clrsig.json`
 
-Watch the run at `github.com/fuvito/api-workbench/actions`.
+Watch the run at `github.com/fuvito/api-workbench/actions` (or `gh run watch <id>`). The release job installs the pinned Wails CLI (`wails@v2.17.1`, matching `go.mod`); raise the pin together with the app, never to `@latest`.
 
 - [ ] All CI jobs green
 
@@ -133,7 +142,7 @@ docker run --rm ghcr.io/fuvito/api-workbench:v0.2.0 --version
 docker run --rm ghcr.io/fuvito/api-workbench:latest --version
 ```
 
-- [ ] Both tags pull and print the correct version
+- [ ] Both tags pull and print the correct version (the image gets it from the `VERSION` build argument in `release.yml`; `dev` means the argument was lost)
 
 ### Homebrew
 

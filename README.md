@@ -46,6 +46,8 @@ One command. No test files to write. The spec is the source of truth.
 
 **Check Conformance, without a terminal** — pick an OpenAPI spec in the desktop app, press run, and see which operations match it and which do not. Read requests only by default. [See below.](#check-conformance-from-the-desktop)
 
+**Know the state of your workspace** — the Workspace page opens with every workspace and says which environment is active and why, which specs your scenarios use and how well they are covered, the last results, and a short *Needs attention* list (an unset `${NAME}`, a missing spec or request file, a placeholder the environment does not define), each with how to fix it. [See below.](#the-workspace-page)
+
 **Nothing left to guess** — [what we check, and what we do not](apps/desktop/wails/help/what-we-check.md): every failure Clear Signal reports, with an ID, an example and the test that proves it, and the failures it cannot catch yet.
 
 **Impact analysis** — `clrsig impact v1.yaml v2.yaml scenarios/*.yaml` tells you which of your scenarios will stop passing when a spec change ships.
@@ -132,6 +134,20 @@ Spec Conformance Testing does not need a terminal. The **Check Conformance** pag
 ![A scenario's result: 1 of 3 responses match the spec, with the violations per step](docs/images/16-scenario-spec-conformance.png)
 
 **A server that is wrong on purpose.** *Help → Dev Servers → Start Conformance Server* starts a small API with its own spec, six of whose operations break it (a wrong type, a missing field, a wrong Content-Type, a missing header and an undeclared status), and opens a workspace ready to check, the same way the Demo Server does. It is the quickest way to see a conformance failure before you point the page at your own API.
+
+---
+
+## The Workspace page
+
+When you open a workspace, the **Workspace** page (the first icon in the left rail) tells you what state it is in, so you do not have to find out by running something and watching it fail.
+
+![The Workspace page: what needs attention, the specs in use and the active environment](docs/images/17-workspace-page.png)
+
+- **Needs attention** lists things that would make a run fail or mislead, each as *what, where, why, how to fix*, with a button that goes there: an environment value that refers to a process variable (`${NAME}`) that is not set, a placeholder a scenario uses but the selected environment does not define, a scenario that does not parse, a missing request or spec file. It informs; it never blocks a run.
+- **Environment** shows which one is active and where that choice came from (remembered for this workspace, chosen this session, or none). Secret values are never shown, only whether they are set.
+- **Specs** shows the spec files your scenarios name, whether each exists, and the four Contracts totals recorded for it. **Last results** shows the most recent scenario run.
+
+The page only reads: it never changes a file, and it never fetches a URL.
 
 ---
 
@@ -332,7 +348,11 @@ API traffic stays on your machine. Project files are YAML you own and can commit
 |---|---|
 | ![Check Conformance](docs/images/15-conformance-results.png) | ![Scenario spec conformance](docs/images/16-scenario-spec-conformance.png) |
 
-Light-theme versions of the Contracts and conformance images are in [`docs/images`](docs/images) (`*-light.png`).
+**Workspace page**
+
+![Workspace page](docs/images/17-workspace-page.png)
+
+Light-theme versions of the Contracts, conformance and Workspace images are in [`docs/images`](docs/images) (`*-light.png`).
 
 ---
 
