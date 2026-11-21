@@ -17,6 +17,12 @@ const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> =
       'Fix: a valid XML (or other non-JSON) response is no longer reported as a violation; it is listed as not checked',
       'Fix: clrsig impact now matches steps whose URL path contains a {{placeholder}}',
       'The conformance text report shows the spec path, and a dead server gives one clear line instead of one error per operation; the page shows the run verdict and says when no operation was reached',
+      'The rail follows your tabs: switching tabs lights the matching rail icon and shows or hides the sidebar; opening a workspace shows the Workspace tab first, then the first request',
+      'Demo Server workspace now includes its spec and passes a read-only conformance check out of the box; its scenarios and the conformance run share one Contracts card',
+      'Contracts: each card shows where its spec comes from, and a spec named by a relative path can be opened and exported',
+      'Fix: Run All no longer runs folders as scenarios, and the Scenarios panel no longer shows a scrollbar when its few items fit',
+      'Fix: the Docker image reports its version; DeleteFolder and workspace path checks are stricter',
+      'Known: builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper warn on first run',
     ],
   },
   {
