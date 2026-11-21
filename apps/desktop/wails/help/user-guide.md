@@ -43,7 +43,7 @@ The app always starts on the landing page; recent workspaces are listed there. T
 
 ### The Workspace page
 
-Opening a workspace (File → Open or New Workspace, a recent entry, or Help → Dev Servers) opens the **Workspace** page. It is the first item in the Activity Rail, so you can come back to it at any time; the tabs you already had open stay open behind it.
+Opening a workspace (File → Open or New Workspace, a recent entry, or Help → Dev Servers) opens the **Workspace** page. It is the first item in the Activity Rail, so you can come back to it at any time; the tabs you already had open stay open behind it. Unlike Requests, Scenarios and Contracts, it is a full-width page and has no sidebar: clicking its icon closes the sidebar and lights only that icon, and clicking one of the three panel icons opens the sidebar again and moves the highlight there (the page stays open as a tab).
 
 The page shows, at a glance:
 

@@ -102,10 +102,20 @@ export default function App() {
     localStorage.setItem('ui.sidebarOpen', 'true')
   }
 
+  // The Workspace page is a full-width page, not a side panel: showing it closes the sidebar and
+  // the rail lights only its icon. A panel icon (Requests, Scenarios, Contracts) opens the sidebar
+  // again and takes the highlight. The panel the next click opens is the one used last.
+  function showWorkspacePage() {
+    tabs.openWorkspaceTab()
+    setSidebarOpen(false)
+    localStorage.setItem('ui.sidebarOpen', 'false')
+  }
+
   // A workspace the user just opened (open, new, recent, Demo Server) starts on its Workspace page.
   function onWorkspaceOpened() {
-    switchToExplorer()
-    tabs.openWorkspaceTab()
+    setRailTab('explorer')
+    localStorage.setItem('ui.railTab', 'explorer')
+    showWorkspacePage()
   }
 
   const workspace = useWorkspace({
@@ -1152,8 +1162,8 @@ export default function App() {
               onShowHelp={() => setShowHelp(true)}
               onOpenCliBuilder={() => openCliBuilder()}
               onOpenConformance={() => tabs.openConformanceTab()}
-              onOpenWorkspace={() => tabs.openWorkspaceTab()}
-              workspaceActive={activeTab?.kind === 'workspace'}
+              onOpenWorkspace={showWorkspacePage}
+              workspaceActive={activeTab?.kind === 'workspace' && !sidebarOpen}
               demoRunning={demo.demoRunning}
               onStopDemo={demo.handleStopDemo}
             />
@@ -1161,6 +1171,7 @@ export default function App() {
             {sidebarOpen && (
               <>
                 <aside
+                  data-testid="sidebar"
                   className="shrink-0 flex flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] overflow-hidden"
                   style={{ width: sidebarWidth }}
                 >

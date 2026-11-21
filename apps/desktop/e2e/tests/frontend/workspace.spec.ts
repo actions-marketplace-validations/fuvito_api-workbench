@@ -46,6 +46,8 @@ test.describe('Workspace page', () => {
     await expect(page.getByTestId('workspace-page')).toBeVisible()
     await expect(page.getByRole('tab', { name: /Workspace/ })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('navigation', { name: 'Activity' }).getByRole('button', { name: 'Workspace' })).toHaveAttribute('aria-current', 'page')
+    // A workspace that was just opened starts on the full-width page, with the sidebar closed.
+    await expect(page.getByTestId('sidebar')).toHaveCount(0)
   })
 
   test('shows what closing will remember when unsaved tabs ask for a confirmation', async ({ page }) => {
@@ -67,6 +69,36 @@ test.describe('Workspace page', () => {
     await page.evaluate(() => { (window as any).__bridge.workspaceOverview = { ...(window as any).__bridge.workspaceOverview, attention: [], specs: [] } })
     await page.getByRole('tab', { name: /Workspace/ }).click()
     await expect(page.getByTestId('attention-empty')).toBeVisible()
+  })
+
+  // The Workspace page is full width, not a side panel: the rail never shows it and a panel
+  // icon highlighted at the same time, and the sidebar state follows the icon last clicked.
+  test('the Workspace icon closes the sidebar and lights alone; a panel icon brings the sidebar back', async ({ page }) => {
+    await gotoApp(page)
+    const rail = page.getByRole('navigation', { name: 'Activity' })
+    const workspace = rail.getByRole('button', { name: 'Workspace' })
+    const requests = rail.getByRole('button', { name: 'Requests' })
+
+    await expect(page.getByTestId('sidebar')).toBeVisible()
+    await expect(requests).toHaveAttribute('aria-current', 'page')
+
+    await workspace.click()
+    await expect(page.getByTestId('workspace-page')).toBeVisible()
+    await expect(page.getByTestId('sidebar')).toHaveCount(0)
+    await expect(workspace).toHaveAttribute('aria-current', 'page')
+    await expect(requests).not.toHaveAttribute('aria-current', 'page')
+
+    await requests.click()
+    await expect(page.getByTestId('sidebar')).toBeVisible()
+    await expect(requests).toHaveAttribute('aria-current', 'page')
+    await expect(workspace).not.toHaveAttribute('aria-current', 'page')
+    // The page is still the open tab; only the rail's highlight moved.
+    await expect(page.getByTestId('workspace-page')).toBeVisible()
+
+    await rail.getByRole('button', { name: 'Scenarios' }).click()
+    await expect(page.getByTestId('sidebar')).toBeVisible()
+    await workspace.click()
+    await expect(page.getByTestId('sidebar')).toHaveCount(0)
   })
 
   test('Refresh reads the workspace again', async ({ page }) => {
