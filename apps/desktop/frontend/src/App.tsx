@@ -455,7 +455,8 @@ export default function App() {
   }
 
   async function handleRunAll() {
-    const list = workspace.scenarioList
+    // The list also holds a placeholder per folder (so empty folders can be drawn); only scenarios run.
+    const list = workspace.scenarioList.filter(s => !s.isFolder)
     if (!list.length) return
     const envPath = workspace.activeEnv?.path ?? ''
     runAllCancelRef.current = false
