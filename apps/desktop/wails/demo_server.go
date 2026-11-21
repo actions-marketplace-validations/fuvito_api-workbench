@@ -343,10 +343,10 @@ func handleDemoBasicAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	demoWriteJSON(w, http.StatusOK, map[string]any{
-		"message":      "Authenticated via Basic auth",
-		"username":     user,
-		"auth_method":  "Basic",
-		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+		"message":     "Authenticated via Basic auth",
+		"username":    user,
+		"auth_method": "Basic",
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -365,11 +365,11 @@ func handleDemoAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 	masked := key[:9] + strings.Repeat("*", len(key)-9)
 	demoWriteJSON(w, http.StatusOK, map[string]any{
-		"message":    "API key accepted",
-		"key_prefix": masked,
-		"scope":      []string{"read", "write"},
+		"message":     "API key accepted",
+		"key_prefix":  masked,
+		"scope":       []string{"read", "write"},
 		"auth_method": "API Key",
-		"timestamp":  time.Now().UTC().Format(time.RFC3339),
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -596,20 +596,20 @@ func handleDemoUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 		demoWriteJSON(w, http.StatusCreated, map[string]any{
-			"id":          fmt.Sprintf("file-%d", time.Now().UnixMilli()%100000),
-			"name":        header.Filename,
-			"size":        header.Size,
+			"id":           fmt.Sprintf("file-%d", time.Now().UnixMilli()%100000),
+			"name":         header.Filename,
+			"size":         header.Size,
 			"content_type": header.Header.Get("Content-Type"),
-			"uploaded_at": time.Now().UTC().Format(time.RFC3339),
-			"message":     "File uploaded successfully via multipart/form-data",
+			"uploaded_at":  time.Now().UTC().Format(time.RFC3339),
+			"message":      "File uploaded successfully via multipart/form-data",
 		})
 		return
 	}
 
 	// Accept application/json with simulated upload
 	var body struct {
-		Filename string `json:"filename"`
-		MimeType string `json:"mimeType"`
+		Filename  string `json:"filename"`
+		MimeType  string `json:"mimeType"`
 		SizeBytes int64  `json:"sizeBytes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Filename == "" {
@@ -623,13 +623,13 @@ func handleDemoUpload(w http.ResponseWriter, r *http.Request) {
 		body.SizeBytes = 1024
 	}
 	demoWriteJSON(w, http.StatusCreated, map[string]any{
-		"id":          fmt.Sprintf("file-%d", time.Now().UnixMilli()%100000),
-		"name":        body.Filename,
-		"size":        body.SizeBytes,
+		"id":           fmt.Sprintf("file-%d", time.Now().UnixMilli()%100000),
+		"name":         body.Filename,
+		"size":         body.SizeBytes,
 		"content_type": body.MimeType,
-		"uploaded_at": time.Now().UTC().Format(time.RFC3339),
-		"url":         fmt.Sprintf("/files/%s", body.Filename),
-		"message":     "Simulated upload — send multipart/form-data for a real file upload",
+		"uploaded_at":  time.Now().UTC().Format(time.RFC3339),
+		"url":          fmt.Sprintf("/files/%s", body.Filename),
+		"message":      "Simulated upload — send multipart/form-data for a real file upload",
 	})
 }
 

@@ -414,18 +414,33 @@ export function ConformanceTab({ onOpenCliBuilder }: Props) {
               for (const op of problems) {
                 for (const kind of new Set((op.findings ?? []).map(f => f.kind))) kinds.set(kind, (kinds.get(kind) ?? 0) + 1)
               }
+              const noAnswer = problems.filter(o => o.status === 'error').length
+              const broken = problems.length - blocked - noAnswer
+              let headline: string
+              if (problems.length === 0) {
+                headline = `All ${passed.length} checked operations match the spec`
+              } else if (output.covered === 0 && noAnswer > 0) {
+                headline = `No operation was reached: is the server running at ${output.baseUrl}?`
+              } else if (broken === 0 && noAnswer === 0) {
+                headline = `${blocked} of ${output.total} operations could not be checked`
+              } else {
+                const parts: string[] = []
+                if (broken > 0) parts.push(`${broken} of ${output.total} operations break the spec`)
+                if (noAnswer > 0) parts.push(`${noAnswer} got no answer`)
+                if (blocked > 0) parts.push(`${blocked} could not be checked`)
+                headline = parts.join(', ')
+              }
               return (
                 <>
                   <div>
-                    <h2 data-testid="conform-headline" className={cn('text-sm font-semibold', problems.length > 0 ? 'text-red-400' : 'text-emerald-400')}>
-                      {problems.length === 0
-                        ? `All ${passed.length} checked operations match the spec`
-                        : problems.length === blocked
-                          ? `${blocked} of ${output.total} operations could not be checked`
-                          : blocked > 0
-                            ? `${problems.length - blocked} of ${output.total} operations break the spec, ${blocked} could not be checked`
-                            : `${problems.length} of ${output.total} operations break the spec`}
+                    <h2 data-testid="conform-headline" className={cn('text-sm font-semibold', problems.length > 0 || output.failed ? 'text-red-400' : 'text-emerald-400')}>
+                      {headline}
                     </h2>
+                    {notRun.length > 0 && (
+                      <p data-testid="conform-skipped" className="mt-1 text-[11px] text-[var(--color-muted-foreground)]">
+                        {notRun.length} skipped (not sent: read-only mode or a filter left them out)
+                      </p>
+                    )}
                     {kinds.size > 0 && (
                       <p className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
                         <span className="text-[var(--color-muted-foreground)]">Why they fail:</span>

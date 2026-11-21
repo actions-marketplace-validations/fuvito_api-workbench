@@ -31,15 +31,15 @@ type DemoResult struct {
 }
 
 type DemoService struct {
-	ctx              context.Context
-	ws               *WorkspaceService
-	server           *http.Server
-	tempDir          string
-	port             int
-	mu               sync.Mutex
-	portFn           func() int // configured port from Settings; nil or 0 = automatic
-	prevWorkspace    string
-	prevEnvPath      string
+	ctx           context.Context
+	ws            *WorkspaceService
+	server        *http.Server
+	tempDir       string
+	port          int
+	mu            sync.Mutex
+	portFn        func() int // configured port from Settings; nil or 0 = automatic
+	prevWorkspace string
+	prevEnvPath   string
 }
 
 func NewDemoService(ws *WorkspaceService) *DemoService {

@@ -671,3 +671,11 @@ Do not implement or stub any of these without explicit user direction.
 ### 2026-11-20 — Environment remembered per workspace
 
 - The selected environment is stored per workspace (`workspaceEnvs` in `~/.clrsig/config.json`, path relative to the workspace, including "no environment") and restored when that workspace is opened (`enterWorkspace`); a workspace no longer inherits the previous one's environment. Temporary demo and conformance workspaces are not remembered. File → Close Workspace (already present) returns to the landing page. Test: `TestWorkspaceEnvironment_RememberedPerWorkspace`. Dashboard and open/close reminders: backlog B-055.
+
+### 2026-11-21 — 0.6.0 release batch (from `docs/reports/check-2026-11-20.md`)
+
+- **Fixed:** `clrsig impact` matches steps whose URL path contains a placeholder (B-051); required query and header parameters are generated as the spec's example/default/first enum value or a `{{name}}` placeholder, so a missing value is "not sent" (B-056, OpenAPI 3.x and Swagger 2.0); a declared media type with no decoder (XML, CSV, ...) is "not checked" (CS-NC-009) instead of a violation, in both response checkers (B-052); the Check Conformance page carries the run verdict (`failed`), its headline separates break the spec / got no answer / could not be checked and says when nothing was reached, and skipped operations get their own line (B-057, B-066); the CLI conform text report prints the spec path (B-060) and one "No operation got an answer" block for a dead server; a second `RunConformance` is refused while one is active (B-062); `gofmt -w` over every Go file plus a "Check formatting" step in CI (B-059).
+- **Catalog:** CS-GAP-007 removed (fixed), CS-RESP-012 and CS-GAP-004 now "not checked", CS-NC-009 added.
+- **Backlog:** the remaining findings of the review are B-061, B-063, B-064, B-065 (hardening) and B-067 to B-070 (UI); B-058 (Action inputs) is still open.
+- **Release:** version 0.6.0 in `AboutDialog.tsx` (with release notes) and the user guide.
+

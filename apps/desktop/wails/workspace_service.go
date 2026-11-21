@@ -27,8 +27,8 @@ type workspaceConfig struct {
 	// WorkspaceEnvs remembers the selected environment per workspace: workspace
 	// path -> environment file path relative to that workspace.
 	WorkspaceEnvs map[string]string `json:"workspaceEnvs,omitempty"`
-	WindowWidth      int      `json:"windowWidth,omitempty"`
-	WindowHeight     int      `json:"windowHeight,omitempty"`
+	WindowWidth   int               `json:"windowWidth,omitempty"`
+	WindowHeight  int               `json:"windowHeight,omitempty"`
 }
 
 func configPath() (string, error) {

@@ -6,7 +6,7 @@
 
 Clear Signal is an open-source, local-first desktop application that lets you verify APIs conform to their declared contracts (OpenAPI specifications, schema assertions, and response validation), detect breaking changes, and enforce conformance in CI/CD pipelines — all without a cloud account.
 
-> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working. Current release: v0.5.0. Recent additions: single-file bundle import/export (desktop and `clrsig bundle`), the AI prompt and example scenario in the Help panel, Contracts coverage quality signals with CSV/Markdown/HTML export, negative-path conformance (`conform --negative`), `clrsig impact`, and an MCP server (`clrsig mcp`).
+> **Status:** Phases 0–5 complete — public MVP. The desktop app, full HTTP client, workspace management, OpenAPI import, scenario engine + CLI, settings, timing breakdown, and cross-platform release workflow are all working. Current release: v0.6.0. Recent additions: single-file bundle import/export (desktop and `clrsig bundle`), the AI prompt and example scenario in the Help panel, Contracts coverage quality signals with CSV/Markdown/HTML export, negative-path conformance (`conform --negative`), `clrsig impact`, and an MCP server (`clrsig mcp`).
 
 ---
 

@@ -3,6 +3,22 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.6.0',
+    date: '2026-11-21',
+    items: [
+      'Check Conformance page in the desktop app: safe-by-default (reads only) spec conformance runs with four totals, a failure-first report, negative probes, export and an optional Contracts coverage record; Help → Dev Servers adds a Conformance Server with deliberate defects',
+      'More accurate response checks (behaviour change): the status, Content-Type and declared headers are now compared, not only the body; CI that was silently green can turn red. Adopt gradually with clrsig conform --write-baseline / --baseline',
+      'Every failure says what, where, why and how to fix it (--explain, HTML, Markdown, JUnit, JSON); operations with a missing value are reported as not sent instead of being sent with a placeholder',
+      'Generated requests are valid by default: typed required-only bodies, and required query and header parameters become {{placeholders}}; clrsig conform --read-only',
+      'Dynamic values and scenario variables ({{$guid}}, {{$randomInt}}, {{$calc}}, --seed), the CLI Command Builder, running scenarios from folders, --report, --var, markdown output, Postman/Insomnia import',
+      'Secret values are masked in every report; ${NAME} in environment files is now expanded from the process environment',
+      'What We Check catalog in the Help panel: every check, its ID, and the known gaps',
+      'Fix: a valid XML (or other non-JSON) response is no longer reported as a violation; it is listed as not checked',
+      'Fix: clrsig impact now matches steps whose URL path contains a {{placeholder}}',
+      'The conformance text report shows the spec path, and a dead server gives one clear line instead of one error per operation; the page shows the run verdict and says when no operation was reached',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-11-17',
     items: [
@@ -119,7 +135,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.5.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.6.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

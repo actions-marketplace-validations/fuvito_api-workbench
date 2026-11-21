@@ -206,6 +206,9 @@ type ConformRunOutputIO struct {
 	Warnings []string `json:"warnings"`
 	// CoverageNote says what happened to RecordCoverage: recorded under which spec name, or why not.
 	CoverageNote string `json:"coverageNote,omitempty"`
+	// Failed is the run's verdict, the one the CLI turns into exit code 1: a violation, a failed
+	// probe, an operation that was not sent or got no answer, or (with a baseline) a new violation.
+	Failed bool `json:"failed"`
 }
 
 // IsLocalBaseURL reports whether the URL points at this computer.
@@ -260,6 +263,11 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
+	if s.cancelRun != nil {
+		s.mu.Unlock()
+		cancel()
+		return ConformRunOutputIO{Error: "a conformance run is already in progress: cancel it or wait for it to finish"}
+	}
 	s.cancelRun = cancel
 	s.mu.Unlock()
 	defer func() {
@@ -392,6 +400,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		Warnings:      []string{},
 		MissingValues: []string{},
 		Total:         len(r.Operations),
+		Failed:        out.Failed,
 	}
 	for _, op := range r.Operations {
 		item := ConformOperationIO{

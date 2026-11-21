@@ -373,3 +373,46 @@ paths:
 		}
 	}
 }
+
+// CS-REQ: a required query or header parameter is generated as a {{name}} placeholder (or the
+// spec's example, default or first enum value), never as an empty value (backlog B-056).
+func TestGenerateRequests_RequiredParametersGetPlaceholders(t *testing.T) {
+	spec, err := openapi.ParseBytes([]byte(`
+openapi: 3.0.3
+info: {title: t, version: "1"}
+paths:
+  /items:
+    get:
+      operationId: listItems
+      parameters:
+        - {name: limit, in: query, required: true, schema: {type: integer}}
+        - {name: sort, in: query, required: true, schema: {type: string, enum: [asc, desc]}}
+        - {name: page, in: query, required: true, schema: {type: integer, default: 1}}
+        - {name: X-Trace, in: header, required: true, schema: {type: string}}
+        - {name: optional, in: query, schema: {type: string}}
+      responses: {"200": {description: ok}}
+`), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs, err := openapi.GenerateRequests(spec, "http://x")
+	if err != nil || len(reqs) != 1 {
+		t.Fatalf("reqs=%d err=%v", len(reqs), err)
+	}
+	got := map[string]string{}
+	for _, q := range reqs[0].Request.QueryParams {
+		got[q.Name] = q.Value
+	}
+	want := map[string]string{"limit": "{{limit}}", "sort": "asc", "page": "1"}
+	if len(got) != len(want) {
+		t.Fatalf("query params = %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("query %s = %q, want %q", k, got[k], v)
+		}
+	}
+	if h := reqs[0].Request.Headers; len(h) != 1 || h[0].Value != "{{X-Trace}}" {
+		t.Errorf("headers = %v", h)
+	}
+}

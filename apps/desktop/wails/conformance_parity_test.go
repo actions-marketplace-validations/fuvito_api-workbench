@@ -151,3 +151,36 @@ func TestConformanceService_CancelStopsARunInProgress(t *testing.T) {
 		t.Fatalf("run after cancel: %+v", again)
 	}
 }
+
+// A second run while one is active is refused, so it cannot take over the first run's cancel handle.
+func TestConformanceService_RefusesASecondRunWhileOneIsActive(t *testing.T) {
+	started := make(chan struct{}, 16)
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started <- struct{}{}
+		<-r.Context().Done()
+	}))
+	defer slow.Close()
+
+	svc := newTestConformanceService(t)
+	spec, env := conformanceSpecFile(t), conformanceEnvFile(t)
+	done := make(chan ConformRunOutputIO, 1)
+	go func() {
+		done <- svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: slow.URL, EnvPath: env, TimeoutMs: 20000})
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the run never reached the server")
+	}
+
+	second := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: slow.URL, EnvPath: env})
+	if !strings.Contains(second.Error, "already in progress") {
+		t.Fatalf("second run error = %q", second.Error)
+	}
+	svc.CancelConformance()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancel did not stop the first run")
+	}
+}

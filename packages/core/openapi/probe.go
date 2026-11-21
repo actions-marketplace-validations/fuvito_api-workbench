@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // ProbeKind classifies the contract rule a negative probe exercises.

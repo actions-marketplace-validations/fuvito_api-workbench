@@ -77,6 +77,9 @@ func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []Vali
 
 	ct := contentType(resp)
 	mediaType := respRef.Value.Content.Get(ct)
+	if mediaType != nil && !strings.Contains(strings.ToLower(ct), "json") {
+		return nil // declared media type this check cannot read (XML, CSV, ...): not checked
+	}
 	if mediaType == nil {
 		mediaType = respRef.Value.Content.Get("application/json")
 	}
@@ -192,6 +195,8 @@ func responseViolations(route *routers.Route, status int, sentType string, me *o
 			Kind: KindBadHeader, Subject: name,
 			Message: fmt.Sprintf("%s %d: the response header %q has a value that does not fit the spec%s", where, status, name, detail),
 		}}
+	case me.Err != nil && strings.HasPrefix(me.Err.Error(), "unsupported content type"):
+		return nil // no decoder for the declared media type: the body is not checked, not a violation
 	case me.Err != nil:
 		errs := parseSchemaErrors(me.Err)
 		for i := range errs {

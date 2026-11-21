@@ -53,7 +53,7 @@ func TestConformDoesNotSendWhenAValueIsMissing(t *testing.T) {
 		t.Fatalf("an operation that could not be sent fails the run: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"FAIL  GET     /items/{{id}}", "✗ not sent: no value for {{id}}",
+		"FAIL  GET     /items/{id}", "✗ not sent: no value for {{id}}",
 		"1 operation was not sent because nothing provides: id.", "1 passed  ·  1 failed",
 	} {
 		if !strings.Contains(out, want) {

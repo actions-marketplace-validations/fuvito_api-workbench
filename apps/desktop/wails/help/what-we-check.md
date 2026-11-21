@@ -36,7 +36,7 @@ Every failure message follows the same shape: **what** is wrong, **where** it is
 | CS-RESP-009 | Body matches no `oneOf` / `anyOf` branch | A polymorphic body fits none of the allowed shapes. | `{"c":1}` with branches that need `a` or `b`. | caught | caught | `TestCheck_ResponseBody` |
 | CS-RESP-010 | Undeclared extra property | The body has a property the schema does not declare. | `{"id":1,"extra":true}`. | **partly**: caught only when the schema sets `additionalProperties: false`. OpenAPI allows extra properties by default, so on an open schema this is not a violation. | same | `TestCheck_ResponseBody` (both rows, one is **KnownGap**) |
 | CS-RESP-011 | `writeOnly` property in a response | A property marked `writeOnly` (for example a password) appears in a response. | `{"secret":"x"}`. | caught | not caught | `TestCheck_ResponseOnlyRules` |
-| CS-RESP-012 | Body media type that cannot be read | The declared media type has no decoder (for example `application/xml`). It is **reported as a violation whatever the body is**, so a valid XML response fails. | A valid `<r><id>1</id></r>` against `application/xml`. | **partly**: a false failure | **partly**: reads it as JSON and reports invalid JSON | `TestCheck_ResponseBodyFormat` (**KnownGap**) |
+| CS-RESP-012 | Body media type that cannot be read | The declared media type has no decoder (for example `application/xml`). The body is **not checked and not reported** (CS-NC-009); before 0.6.0 it was reported as a violation whatever the body was. | A valid `<r><id>1</id></r>` against `application/xml`. | **not checked** | **not checked** | `TestCheck_ResponseBodyFormat` |
 
 Media types that are read: `application/json`, any `+json` type such as `application/problem+json`, and `text/plain` (checked against its schema). Parameters such as `charset` are ignored when matching. (`TestCheck_ResponseMediaTypes`.)
 
@@ -54,6 +54,7 @@ These never fail the run and never count as passing a check. Scenario results sh
 | CS-NC-006 | The step did not complete * | The request failed before a response arrived (network error). | `TestRunner_SpecCheckStates` |
 | CS-NC-007 | Operation skipped by a filter or read-only | `--tags`, `--paths` or `--read-only` left it out: not sent, shown as skipped, counted as not covered. | `TestRunner_Run_TagFilter`, `TestRunConformance_ReadOnlySendsNoWrites`, `TestConformReadOnlySendsNoWrites` |
 | CS-NC-008 | Response without a Content-Type | A body with no `Content-Type` header is read as JSON (lenient), not reported. | `TestCheck_ResponseMediaTypes` |
+| CS-NC-009 | Declared media type without a decoder | The spec declares `application/xml`, `text/csv` or another type the validator cannot read: the body is not compared with the schema and nothing is reported. Status, headers and Content-Type are still checked. | `TestCheck_ResponseBodyFormat` |
 
 ## 2. Spec Conformance Testing: does the API do what the whole spec says?
 
@@ -101,7 +102,7 @@ These tell you what has **not** been proven yet. They are signals, not failures:
 | CS-DIFF-001 | Breaking change | A change that can break existing clients (oasdiff level **ERR**). | caught | `TestDiff_FailOnThresholds`; example from the shipped specs: `api-removed-without-deprecation` |
 | CS-DIFF-002 | Warning-level change | A change that may matter (oasdiff level **WARN**). | caught (passed through) | `TestDiff_FailOnThresholds` |
 | CS-DIFF-003 | Informational change | A change that is safe to ship (oasdiff level **INFO**). | caught (passed through) | `TestDiff_FailOnThresholds`; examples: `endpoint-added`, `api-version-changed` |
-| CS-IMP-001 | Scenario step hits a breaking change | A step's method and path match an operation that has a breaking change. Only changes that name a method and a path are matched. | caught | `TestImpactPathMatches_PathParam` |
+| CS-IMP-001 | Scenario step hits a breaking change | A step's method and path match an operation that has a breaking change. Only changes that name a method and a path are matched. A placeholder in the step URL (`{{baseUrl}}/users/{{userId}}`) stands for one path segment. | caught | `TestImpactPathMatches_PathParam`, `TestImpact_PlaceholderInThePathIsMatched` |
 
 `diff` uses [oasdiff](https://github.com/oasdiff/oasdiff)'s rules and levels as they are (rule IDs such as `endpoint-added`); this file does not copy its list. `--fail-on breaking|warning|info` sets which level fails the run.
 
@@ -112,10 +113,9 @@ These tell you what has **not** been proven yet. They are signals, not failures:
 | CS-GAP-001 | Formats other than `date-time` | `format: email`, `uuid` and other formats are not validated: `"mail": "nope"` passes. | The validation library only checks the formats it knows by default. Registering more is possible. | `TestCheck_ResponseBody` (**KnownGap** rows) |
 | CS-GAP-002 | Extra properties on open schemas | See CS-RESP-010: not a violation under the OpenAPI default. A strict mode could warn about them. | By design of OpenAPI; a warning level (B-050) would be the place. | `TestCheck_ResponseBody` (**KnownGap**) |
 | CS-GAP-003 | Undeclared response headers | A header the spec does not mention is never reported. | Not implemented; low value until warnings exist (B-050). | `TestCheck_ResponseHeaders` (**KnownGap**) |
-| CS-GAP-004 | Non-JSON response bodies | XML and other media types are not validated; they are reported as a violation (CS-RESP-012). | No decoder for them; should be "not checked" instead. | `TestCheck_ResponseBodyFormat` (**KnownGap**) |
+| CS-GAP-004 | Non-JSON response bodies | XML and other media types are not validated (CS-NC-009). Status, headers and the Content-Type are still checked. | No decoder for them. | `TestCheck_ResponseBodyFormat` |
 | CS-GAP-005 | Response time | Nothing is measured against a time limit. | Not implemented; scenario assertions are `status`, `header`, `jsonpath` and `schema` only. | no check exists |
 | CS-GAP-006 | Non-JSON request bodies | Operations that take a form, multipart or XML body are generated **without** a body. | Only `application/json` request bodies are generated. | `TestCheck_OnlyJSONRequestBodiesAreGenerated_KnownGap` |
-| CS-GAP-007 | `impact` and placeholders in the path | A step whose URL path contains a placeholder (`{{baseUrl}}/users/{{userId}}`) is never matched, and `.../{{userId}}/orders` is read as `/orders`, so a breaking change can be missed or matched to the wrong operation. | Bug: the path is read after the last `}}`. Backlog B-051. | `TestImpact_PlaceholderInThePathIsNotMatched_KnownGap` |
 | CS-GAP-008 | Security beyond "no credentials" | Wrong, expired or under-privileged credentials are not probed; only their absence is (CS-PROBE-004). | Not implemented. | no check exists |
 | CS-GAP-009 | More negative probes | Wrong header or path-parameter types, boundary values, enum violations, unknown fields. | Not implemented; only four kinds are generated. | `TestGenerateNegativeProbes_ExpectedKinds` |
 | CS-GAP-010 | Callbacks, webhooks and links | Operations that are not under `paths` are not exercised. | Only `paths` are generated. | no check exists |

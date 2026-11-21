@@ -22,18 +22,18 @@ type User struct {
 }
 
 const (
-	rateLimitMax    = 2             // failed login attempts before 429
+	rateLimitMax    = 2 // failed login attempts before 429
 	rateLimitWindow = time.Minute
 )
 
 var (
-	mu      sync.Mutex
-	users   = []User{
-		{ID: 1, Name: "Alice Smith",   Email: "alice@example.com",   CreatedAt: "2026-01-01T00:00:00Z"},
-		{ID: 2, Name: "Bob Jones",     Email: "bob@example.com",     CreatedAt: "2026-01-02T00:00:00Z"},
-		{ID: 3, Name: "Carol White",   Email: "carol@example.com",   CreatedAt: "2026-01-03T00:00:00Z"},
-		{ID: 4, Name: "David Brown",   Email: "david@example.com",   CreatedAt: "2026-01-04T00:00:00Z"},
-		{ID: 5, Name: "Eva Green",     Email: "eva@example.com",     CreatedAt: "2026-01-05T00:00:00Z"},
+	mu    sync.Mutex
+	users = []User{
+		{ID: 1, Name: "Alice Smith", Email: "alice@example.com", CreatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Name: "Bob Jones", Email: "bob@example.com", CreatedAt: "2026-01-02T00:00:00Z"},
+		{ID: 3, Name: "Carol White", Email: "carol@example.com", CreatedAt: "2026-01-03T00:00:00Z"},
+		{ID: 4, Name: "David Brown", Email: "david@example.com", CreatedAt: "2026-01-04T00:00:00Z"},
+		{ID: 5, Name: "Eva Green", Email: "eva@example.com", CreatedAt: "2026-01-05T00:00:00Z"},
 	}
 	nextID     = 6
 	validToken = "demo-token-12345"

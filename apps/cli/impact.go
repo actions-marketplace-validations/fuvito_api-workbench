@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -229,13 +228,17 @@ type impactStep struct {
 	Changes []openapi.DiffChange
 }
 
+var placeholderRe = regexp.MustCompile(`\{\{[^}]*\}\}`)
+
 // impactPathMatches returns true if the OpenAPI path pattern (e.g. /users/{id})
 // matches the path component of a scenario step URL (e.g. {{baseUrl}}/users/42).
+// A placeholder inside the path stands for one path segment.
 func impactPathMatches(specPath, scenarioURL string) bool {
 	urlPath := impactExtractPath(scenarioURL)
 	if urlPath == "" {
 		return false
 	}
+	urlPath = placeholderRe.ReplaceAllString(urlPath, "_")
 	// Convert /users/{id} → ^/users/[^/]+$
 	escaped := regexp.QuoteMeta(specPath)
 	pattern := regexp.MustCompile(`\\\{[^}]+\\\}`).ReplaceAllString(escaped, `[^/]+`)
@@ -243,36 +246,30 @@ func impactPathMatches(specPath, scenarioURL string) bool {
 	return matched
 }
 
-// impactExtractPath strips the scheme+host (or {{variable}} prefix) from a URL
-// and returns the path component only.
+// impactExtractPath strips the scheme+host (or a leading {{baseUrl}}-style placeholder) from a
+// step URL and returns the path, keeping any placeholders inside the path (for example /users/{{id}}).
 func impactExtractPath(rawURL string) string {
-	if strings.Contains(rawURL, "{{") {
-		// Find the end of the last template placeholder
-		idx := strings.LastIndex(rawURL, "}}")
-		if idx < 0 {
+	rest := rawURL
+	if i := strings.IndexAny(rest, "?#"); i >= 0 {
+		rest = rest[:i]
+	}
+	switch {
+	case strings.HasPrefix(rest, "http://") || strings.HasPrefix(rest, "https://"):
+		rest = rest[strings.Index(rest, "://")+3:]
+		slash := strings.IndexByte(rest, '/')
+		if slash < 0 {
 			return ""
 		}
-		rest := rawURL[idx+2:]
-		if !strings.HasPrefix(rest, "/") {
+		rest = rest[slash:]
+	case strings.HasPrefix(rest, "{{"):
+		end := strings.Index(rest, "}}")
+		if end < 0 {
 			return ""
 		}
-		if q := strings.IndexByte(rest, '?'); q >= 0 {
-			rest = rest[:q]
-		}
-		return rest
+		rest = rest[end+2:]
 	}
-	if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
-		u, err := url.Parse(rawURL)
-		if err != nil {
-			return ""
-		}
-		return u.Path
+	if !strings.HasPrefix(rest, "/") {
+		return ""
 	}
-	if strings.HasPrefix(rawURL, "/") {
-		if q := strings.IndexByte(rawURL, '?'); q >= 0 {
-			return rawURL[:q]
-		}
-		return rawURL
-	}
-	return ""
+	return rest
 }

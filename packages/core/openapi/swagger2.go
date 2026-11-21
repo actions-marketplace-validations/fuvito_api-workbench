@@ -197,11 +197,11 @@ func buildSwagger2Request(
 			req.URL = strings.ReplaceAll(req.URL, "{"+p.Name+"}", "{{"+p.Name+"}}")
 		case "query":
 			if p.Required {
-				req.QueryParams = append(req.QueryParams, domain.QueryParam{Name: p.Name})
+				req.QueryParams = append(req.QueryParams, domain.QueryParam{Name: p.Name, Value: "{{" + p.Name + "}}"})
 			}
 		case "header":
 			if p.Required {
-				req.Headers = append(req.Headers, domain.Header{Name: p.Name})
+				req.Headers = append(req.Headers, domain.Header{Name: p.Name, Value: "{{" + p.Name + "}}"})
 			}
 		case "body":
 			if p.Schema != nil {

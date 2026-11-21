@@ -220,13 +220,13 @@ func TestCheck_ResponseBodyFormat(t *testing.T) {
 	if byOperation(spec, "open", 200, js, ``) != 0 {
 		t.Error("CS-RESP-008 KnownGap: the schema assertion does not check an empty body")
 	}
-	// CS-RESP-012: XML and other media types without a decoder are reported as a violation, whatever the body is.
+	// CS-RESP-012: a media type without a decoder (XML, ...) is not checked; it is not a violation.
 	xml := ctype("application/xml")
-	if byPath(spec, "/xml", 200, xml, `<r><id>1</id></r>`) == 0 {
-		t.Error("CS-RESP-012 KnownGap: a valid XML body is reported as unsupported, so XML APIs always fail")
+	if byPath(spec, "/xml", 200, xml, `<r><id>1</id></r>`) != 0 {
+		t.Error("CS-RESP-012: a valid XML body must not be reported as a violation")
 	}
-	if byOperation(spec, "xml", 200, xml, `<r><id>1</id></r>`) == 0 {
-		t.Error("CS-RESP-012 KnownGap: the schema assertion reads every body as JSON, so a valid XML body is reported as invalid JSON")
+	if byOperation(spec, "xml", 200, xml, `<r><id>1</id></r>`) != 0 {
+		t.Error("CS-RESP-012: the schema assertion must not read an XML body as JSON")
 	}
 }
 

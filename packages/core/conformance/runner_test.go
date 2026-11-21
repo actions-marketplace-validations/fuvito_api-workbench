@@ -91,10 +91,10 @@ func TestOperationResult_Passed(t *testing.T) {
 func TestCounts_Mixed(t *testing.T) {
 	r := &conformance.ConformResult{
 		Operations: []conformance.OperationResult{
-			{Method: "GET", Path: "/a", StatusCode: 200},                    // passed
-			{Method: "GET", Path: "/b", Error: "refused"},                   // failed
-			{Method: "GET", Path: "/c", Skipped: true},                      // skipped
-			{Method: "POST", Path: "/d", StatusCode: 201},                   // passed
+			{Method: "GET", Path: "/a", StatusCode: 200},  // passed
+			{Method: "GET", Path: "/b", Error: "refused"}, // failed
+			{Method: "GET", Path: "/c", Skipped: true},    // skipped
+			{Method: "POST", Path: "/d", StatusCode: 201}, // passed
 		},
 	}
 	passed, failed, skipped := r.Counts()

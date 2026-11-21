@@ -90,12 +90,12 @@ func TestComputeQuality_SecuredNeverAuthed(t *testing.T) {
 		[]string{"GET /protected", "DELETE /items/{id}"},
 		nil,
 		map[string]coverage.OperationResult{
-			"GET /protected":    {HadAuth: false, StatusCodes: []int{200}},
+			"GET /protected":     {HadAuth: false, StatusCodes: []int{200}},
 			"DELETE /items/{id}": {HadAuth: true, StatusCodes: []int{204}},
 		},
 	)
 	secured := map[string]bool{
-		"GET /protected":    true,
+		"GET /protected":     true,
 		"DELETE /items/{id}": true,
 	}
 	q := coverage.ComputeQuality(report, nil, secured)

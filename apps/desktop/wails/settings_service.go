@@ -11,9 +11,9 @@ import (
 
 // SettingsService persists user preferences to ~/.clrsig/settings.json.
 type SettingsService struct {
-	ctx             context.Context
-	settings        domain.Settings
-	onSave          func() // called after each successful save; wired to RequestService.RebuildExecutor
+	ctx      context.Context
+	settings domain.Settings
+	onSave   func() // called after each successful save; wired to RequestService.RebuildExecutor
 }
 
 func NewSettingsService() *SettingsService {

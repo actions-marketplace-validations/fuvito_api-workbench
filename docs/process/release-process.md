@@ -25,17 +25,16 @@ Clear Signal ships from five places simultaneously. This doc covers what to do b
 
 ## 2. Before — prep work (local)
 
-### 2a. Bump the version in three files
+### 2a. Bump the version in two files
 
 ```
 apps/desktop/frontend/src/components/AboutDialog.tsx   ← version string + RELEASE_NOTES entry
-docs/user-guide.md                                     ← version in header
 apps/desktop/wails/help/user-guide.md                  ← same
 ```
 
 `RELEASE_NOTES` in `AboutDialog.tsx` is an array — prepend a new entry for this release; don't edit old ones.
 
-- [ ] Version bumped in all three files
+- [ ] Version bumped in both files (also the two version tests: `AboutDialog.test.tsx`, `App.test.tsx`)
 - [ ] Release notes entry added in `AboutDialog.tsx`
 
 ### 2b. Run the pre-release checks

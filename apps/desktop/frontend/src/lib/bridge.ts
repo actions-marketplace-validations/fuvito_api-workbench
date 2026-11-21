@@ -811,6 +811,8 @@ export interface ConformRunOutput {
   missingValues?: string[]
   blockedOperations?: number
   coverageNote?: string
+  // the run's verdict, as the CLI's exit code 1
+  failed?: boolean
 }
 
 export type ConformReportFormat = 'html' | 'junit' | 'json' | 'markdown'
