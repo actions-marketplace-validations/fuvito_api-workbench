@@ -1,4 +1,6 @@
+# api-workbench-sandbox project notes
 # Test-target APIs — a separate project that Clear Signal is tested against
+
 
 **Status:** Draft v0.2. This is a working document; we will keep editing it. Open questions are in section 9.
 **Written:** 2026-11-20. **v0.2:** runs locally first, then on Google Cloud Run (section 10); adds latency, timeout and light business-rule cases (sections 3.4, 3.5, 5.4, 5.9).
