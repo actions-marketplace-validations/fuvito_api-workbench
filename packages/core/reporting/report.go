@@ -726,13 +726,16 @@ func NegativeText(result *conformance.NegativeResult) string {
 	total := passed + failed + errored
 
 	verdict := "PASSED"
-	if failed > 0 {
+	if failed > 0 || errored > 0 {
 		verdict = "FAILED"
 	}
 	fmt.Fprintf(&b, "%s  %d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms\n",
 		verdict, total, passed, failed, skipped, errored, result.Duration.Milliseconds())
 	if failed > 0 {
 		fmt.Fprintf(&b, "       %d operation(s) accepted requests they should have rejected — fix server validation\n", failed)
+	}
+	if errored > 0 {
+		fmt.Fprintf(&b, "       %d probe(s) got no answer, so they could not be judged — check that the server is running and the base URL is right\n", errored)
 	}
 
 	return b.String()

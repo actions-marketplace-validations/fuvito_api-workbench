@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -13,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -172,13 +174,62 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 		},
 	}
 
+	var violations []ValidationError
 	if err := openapi3filter.ValidateResponse(context.Background(), input); err != nil {
 		if me, ok := err.(*openapi3filter.ResponseError); ok {
-			return responseViolations(route, statusCode, ct, me)
+			violations = responseViolations(route, statusCode, ct, me)
+		} else {
+			violations = []ValidationError{{Message: err.Error()}}
 		}
-		return []ValidationError{{Message: err.Error()}}
 	}
-	return nil
+	// The library's JSON decoder is lenient (it repairs bytes that are not UTF-8 and stops after
+	// the first value), so a body that is not strictly JSON is checked here. A problem with the
+	// status or a header comes first, as before.
+	if len(violations) == 0 || violations[0].Kind == KindBody {
+		if why := strictJSONProblem(body, ct, route, statusCode); why != "" {
+			return []ValidationError{{Kind: KindBodyNotJSON,
+				Message: fmt.Sprintf("%s %s %d: the response body is not valid JSON (%s)", route.Method, route.Path, statusCode, why)}}
+		}
+	}
+	return violations
+}
+
+// strictJSONProblem says why a body the spec declares as JSON is not valid JSON text, or returns
+// "". Only what the library would let through is looked for: bytes that are not UTF-8 (RFC 8259
+// section 8.1) and text after the value.
+func strictJSONProblem(body []byte, sentType string, route *routers.Route, status int) string {
+	if len(body) == 0 || !strings.Contains(strings.ToLower(sentType), "json") {
+		return ""
+	}
+	declaresJSON := false
+	for _, ct := range declaredContentTypes(route, status) {
+		if strings.Contains(strings.ToLower(ct), "json") {
+			declaresJSON = true
+		}
+	}
+	if !declaresJSON {
+		return ""
+	}
+	if !utf8.Valid(body) {
+		i := 0
+		for i < len(body) {
+			r, size := utf8.DecodeRune(body[i:])
+			if r == utf8.RuneError && size <= 1 {
+				break
+			}
+			i += size
+		}
+		return fmt.Sprintf("byte 0x%02x at offset %d is not UTF-8", body[i], i)
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	var v json.RawMessage
+	if err := dec.Decode(&v); err != nil {
+		return "" // the library reports a syntax error in its own words
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return "text after the JSON value"
+	}
+	return ""
 }
 
 var quotedName = regexp.MustCompile(`"([^"]+)"`)

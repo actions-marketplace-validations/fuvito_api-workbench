@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Timing holds per-phase latency for a single HTTP request, measured via httptrace.
 // Zero values mean the phase did not occur (e.g. TLSMs is 0 for plain HTTP).
@@ -32,6 +35,22 @@ type Response struct {
 	// first part; ContentLength is what the server announced (-1 when it did not say).
 	Truncated     bool
 	ContentLength int64
+}
+
+// HeaderValue returns the value of a response header (case-insensitive). A header the server sent
+// more than once is one list: its values are joined with ", " in the order they arrived (RFC 9110
+// section 5.3), so an assertion or an extraction can see every one of them.
+func (r *Response) HeaderValue(name string) (string, bool) {
+	var vals []string
+	for _, h := range r.Headers {
+		if strings.EqualFold(h.Name, name) {
+			vals = append(vals, h.Value)
+		}
+	}
+	if len(vals) == 0 {
+		return "", false
+	}
+	return strings.Join(vals, ", "), true
 }
 
 func (r *Response) IsSuccess() bool {

@@ -2,7 +2,6 @@ package scenario
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -324,7 +323,13 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 	for _, ex := range step.Extractions {
 		val, err := extractValue(ex, resp)
 		if err != nil {
-			sr.Error = fmt.Sprintf("extraction %q: %v", ex.Name, err)
+			// A value the next steps rely on was not found: the step fails, like a failed assertion.
+			msg := fmt.Sprintf("extraction %q: %v", ex.Name, err)
+			if sr.Error != "" {
+				msg = sr.Error + "; " + msg
+			}
+			sr.Error = msg
+			sr.Passed = false
 			continue
 		}
 		extracted[ex.Name] = val
@@ -341,11 +346,8 @@ func extractValue(ex domain.Extraction, resp *domain.Response) (string, error) {
 		return fmt.Sprintf("%d", resp.StatusCode), nil
 
 	case domain.ExtractHeader:
-		name := strings.ToLower(ex.Path)
-		for _, h := range resp.Headers {
-			if strings.ToLower(h.Name) == name {
-				return h.Value, nil
-			}
+		if v, ok := resp.HeaderValue(ex.Path); ok {
+			return v, nil
 		}
 		return "", fmt.Errorf("header %q not found in response", ex.Path)
 
@@ -354,15 +356,15 @@ func extractValue(ex domain.Extraction, resp *domain.Response) (string, error) {
 		if body == "" {
 			return "", fmt.Errorf("response body is empty")
 		}
-		var data interface{}
-		if err := json.Unmarshal([]byte(body), &data); err != nil {
+		data, err := assertions.DecodeJSON(body)
+		if err != nil {
 			return "", fmt.Errorf("response body is not valid JSON: %w", err)
 		}
 		val, err := jsonpath.Get(ex.Path, data)
 		if err != nil {
 			return "", fmt.Errorf("jsonpath %q: %w", ex.Path, err)
 		}
-		return fmt.Sprintf("%v", val), nil
+		return assertions.FormatValue(val), nil
 
 	default:
 		return "", fmt.Errorf("unknown extraction source %q", ex.Source)

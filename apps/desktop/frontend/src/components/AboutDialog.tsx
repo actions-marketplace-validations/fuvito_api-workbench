@@ -3,6 +3,16 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.5',
+    date: '2026-11-22',
+    items: [
+      'A failed extraction (a JSONPath or header that is not in the response) now fails the step and the run (exit 1). Before, the run exited 0 with PASSED next to "1 failed"',
+      'conform now rejects a JSON response body that is not strictly valid: bytes that are not UTF-8, or text after the JSON value',
+      'jsonpath assertions and extractions keep an integer above 2^53 exactly, write numbers in full (1234567, not 1.234567e+06), and see every value of a repeated header (joined with a comma)',
+      'A number beyond a 64-bit float (1e400) has its own finding (CS-RESP-015); the --negative summary says FAILED when probes got no answer',
+    ],
+  },
+  {
     version: '0.8.4',
     date: '2026-11-22',
     items: [
@@ -234,7 +244,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.4</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.5</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

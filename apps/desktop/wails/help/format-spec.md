@@ -328,6 +328,8 @@ Every assertion may also carry an optional `name:` label. It is saved with the a
   expected: application/json
 ```
 
+A header the server sent more than once (`Set-Cookie`, a repeated `X-Dup`) is read as one list joined with `, `, so `contains` sees every value.
+
 ### `type: schema` — OpenAPI schema validation
 
 Requires `specFile` set at the scenario level.
@@ -362,7 +364,7 @@ Compares the time the request took, in milliseconds (from sending it to the end 
 
 ## Extractions Reference
 
-Capture a value from a response to use as a variable in later steps.
+Capture a value from a response to use as a variable in later steps. An extraction that finds nothing (a JSONPath that is not in the body, a header that was not sent) **fails the step** and the run, like a failed assertion; a header the server sent more than once is one value joined with `, `, and an integer above 2^53 keeps all its digits.
 
 ### `source: jsonpath` — from JSON response body
 

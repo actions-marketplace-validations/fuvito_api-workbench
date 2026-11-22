@@ -824,3 +824,13 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **F-024:** `--seed` no longer depends on how the scenario file is spelled. The random values of a scenario come from the seed and a key made of its title (file name without extension when it has none; a repeated title gets `#2`, `#3` in run order), `seedKeys` in `apps/cli/run.go`; before, the key was the path as typed. **Behaviour change:** the values a given `--seed` produces differ from 0.8.3's (they now match the desktop, which already keyed by title). `bundle run` keys by the bundle's own file name, as before.
 - **F-025:** `TRACE` is a valid method (`domain.MethodTRACE`, format spec) and an OpenAPI 3 path item's `trace` operation is generated, run by `conform`, probed and counted like the others; it is not read-only, so `--read-only` lists it as skipped. Swagger 2.0 has no `trace`.
 - **Tests:** `TestRun_StepWithAMissingValueIsNotSent`, `TestRun_SeedGivesTheSameValuesForEverySpellingOfThePath`, `TestConform_RunsTraceOperations`.
+
+### 2026-11-22 — Findings F-026 to F-032 (0.8.5)
+
+- **F-026, F-027 (false passes):** `ValidateResponseByPath` checks a JSON body strictly after the library does (`strictJSONProblem`): bytes that are not UTF-8 and text after the value are `body-not-json` (`invalid-body`, CS-RESP-008). A status or header problem still comes first. `jsonpath` assertions already rejected trailing text and still do.
+- **F-028:** a number beyond a 64-bit float (`1e400`) has its own finding, `number-out-of-range`, CS-RESP-015, that names the number and says it is a Clear Signal limit (it was kind `other` with a Go error text). A large integer for `type: integer` passes.
+- **F-029:** the `--negative` summary says `FAILED` when any probe errored (CS-PROBE-006), as the exit code did, and says why.
+- **F-030:** `domain.Response.HeaderValue` joins every value of a repeated header with `, `; header assertions and header extractions use it.
+- **F-031:** `assertions.DecodeJSON` / `FormatValue`: jsonpath assertions and extractions keep an integer above 2^53 (or beyond int64) as its digits, and print a number in full (`1234567`, not `1.234567e+06`; this also fixes plain numbers of 7 or more digits).
+- **F-032 (behaviour change):** a failed extraction fails the step and the run (exit 1, `passed: false`, headline FAILED). **Risk:** a scenario whose extraction silently found nothing used to exit 0 and now exits 1.
+- **Tests:** `hostile_test.go`, `edge_assertions_test.go`, `TestNegativeText_ErroredProbesAreNotPassed`; catalog rows CS-RESP-015, CS-RUN-008, CS-RUN-009, CS-PROBE-006.

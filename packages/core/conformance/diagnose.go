@@ -29,6 +29,7 @@ const (
 	FindingConstraint       = "constraint"           // a value breaks an enum, range, length, pattern or format
 	FindingExtraProperty    = "unexpected-property"  // the body has a property the schema does not allow
 	FindingWriteOnly        = "write-only-property"  // the response carries a property the spec marks writeOnly
+	FindingNumberRange      = "number-out-of-range"  // a number is valid JSON but beyond what a 64-bit float holds
 	FindingOther            = "other"                // a violation this package does not recognise
 )
 
@@ -73,13 +74,14 @@ func (f Finding) WhereText() string {
 }
 
 var (
-	reMissing    = regexp.MustCompile(`Error at "([^"]*)": property "([^"]+)" is missing`)
-	reWrongType  = regexp.MustCompile(`(?:Error at "([^"]*)": )?value must be (an? [A-Za-z ]+?)(?:\n|$)`)
-	reConstraint = regexp.MustCompile(`(?i)allowed values|must be (at least|at most|more than|less than|a multiple)|minimum|maximum|doesn't match the (regular expression|format|pattern)|duplicate items|not nullable|exclusive`)
-	reWriteOnly  = regexp.MustCompile(`writeOnly property "([^"]+)" in response`)
-	reExtra      = regexp.MustCompile(`property "([^"]+)" is unsupported`)
-	reGotValue   = regexp.MustCompile(`(?s)\nValue:\s*\n\s*(.+?)\s*$`)
-	reAtPath     = regexp.MustCompile(`Error at "([^"]*)": ([^\n]+)`)
+	reMissing     = regexp.MustCompile(`Error at "([^"]*)": property "([^"]+)" is missing`)
+	reWrongType   = regexp.MustCompile(`(?:Error at "([^"]*)": )?value must be (an? [A-Za-z ]+?)(?:\n|$)`)
+	reConstraint  = regexp.MustCompile(`(?i)allowed values|must be (at least|at most|more than|less than|a multiple)|minimum|maximum|doesn't match the (regular expression|format|pattern)|duplicate items|not nullable|exclusive`)
+	reNumberRange = regexp.MustCompile(`strconv\.ParseFloat: parsing "([^"]+)": value out of range`)
+	reWriteOnly   = regexp.MustCompile(`writeOnly property "([^"]+)" in response`)
+	reExtra       = regexp.MustCompile(`property "([^"]+)" is unsupported`)
+	reGotValue    = regexp.MustCompile(`(?s)\nValue:\s*\n\s*(.+?)\s*$`)
+	reAtPath      = regexp.MustCompile(`Error at "([^"]*)": ([^\n]+)`)
 )
 
 // Diagnose turns an operation's failure into findings. A passing or skipped operation has none.
@@ -139,6 +141,8 @@ func checkIDFor(f Finding) string {
 		return "CS-RESP-010"
 	case FindingWriteOnly:
 		return "CS-RESP-011"
+	case FindingNumberRange:
+		return "CS-RESP-015"
 	case FindingBodyTooLarge:
 		return "CS-RESP-013"
 	case FindingSlowResponse:
@@ -427,6 +431,24 @@ func diagnoseResponse(msg string) Finding {
 			Why:      fmt.Sprintf("The server sent %s where the spec declares %s.", describeGot(gotType, got), indefinite(want)),
 			Fix:      fmt.Sprintf("Send %s from the server (for example without quotes for a number), or change the type in the spec if the server is right.", indefinite(want)),
 			Detail:   msg,
+		}
+	}
+	if m := reNumberRange.FindStringSubmatch(msg); m != nil {
+		where := ""
+		if at := reAtPath.FindStringSubmatch(msg); at != nil {
+			where = displayPath(at[1])
+		}
+		label := where
+		if label == "" {
+			label = "the response body"
+		}
+		return Finding{
+			Kind: FindingNumberRange, Where: where,
+			Summary:  fmt.Sprintf("%s holds the number %s, which Clear Signal cannot represent", quoteField(label), m[1]),
+			Expected: "a number within the range of a 64-bit float (about 1.8e308)", Got: m[1],
+			Why:    "The number is valid JSON, but it is larger (or smaller) than a 64-bit float can hold, so it could not be compared with the schema. This is a limit of Clear Signal, not necessarily a mistake in the response.",
+			Fix:    "Send a number within the float range, or declare the field as a string if it must carry digits beyond it. Check this operation another way if the value is correct.",
+			Detail: msg,
 		}
 	}
 	if m := reWriteOnly.FindStringSubmatch(msg); m != nil {

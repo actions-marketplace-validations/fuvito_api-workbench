@@ -1,7 +1,6 @@
 package assertions
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -63,13 +62,7 @@ func evalStatus(a domain.Assertion, resp *domain.Response) (actual string, passe
 }
 
 func evalHeader(a domain.Assertion, resp *domain.Response) (actual string, passed bool, msg string) {
-	headerName := strings.ToLower(a.Path)
-	for _, h := range resp.Headers {
-		if strings.ToLower(h.Name) == headerName {
-			actual = h.Value
-			break
-		}
-	}
+	actual, _ = resp.HeaderValue(a.Path)
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
 	return
@@ -97,15 +90,15 @@ func evalJSONPath(a domain.Assertion, resp *domain.Response) (actual string, pas
 	if body == "" {
 		return "", false, "response body is empty"
 	}
-	var data interface{}
-	if err := json.Unmarshal([]byte(body), &data); err != nil {
+	data, err := DecodeJSON(body)
+	if err != nil {
 		return "", false, fmt.Sprintf("response body is not valid JSON: %v", err)
 	}
 	val, err := jsonpath.Get(a.Path, data)
 	if err != nil {
 		return "", false, fmt.Sprintf("jsonpath %q: %v", a.Path, err)
 	}
-	actual = fmt.Sprintf("%v", val)
+	actual = FormatValue(val)
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
 	return
