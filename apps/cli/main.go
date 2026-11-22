@@ -416,6 +416,7 @@ func conformCmd() *cobra.Command {
 	var format string
 	var outputFile string
 	var requestTimeout int
+	var maxResponseTime int
 	var failFast bool
 	var readOnly bool
 	var explain bool
@@ -491,18 +492,19 @@ only new ones fail the run; --write-baseline records the current violations.`,
 
 			exec := newExecutor()
 			out := application.RunConformance(context.Background(), application.ConformInput{
-				Exec:             exec,
-				Spec:             spec,
-				BaseURL:          baseURL,
-				Env:              env,
-				Tags:             application.SplitList(tagsCSV),
-				Paths:            application.SplitList(pathsCSV),
-				FailFast:         failFast,
-				ReadOnly:         readOnly,
-				RequestTimeoutMs: requestTimeout,
-				Coverage:         showCoverage,
-				Negative:         runNegative,
-				Baseline:         base,
+				Exec:              exec,
+				Spec:              spec,
+				BaseURL:           baseURL,
+				Env:               env,
+				Tags:              application.SplitList(tagsCSV),
+				Paths:             application.SplitList(pathsCSV),
+				FailFast:          failFast,
+				ReadOnly:          readOnly,
+				RequestTimeoutMs:  requestTimeout,
+				MaxResponseTimeMs: maxResponseTime,
+				Coverage:          showCoverage,
+				Negative:          runNegative,
+				Baseline:          base,
 			})
 			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
@@ -591,6 +593,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
+	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail an operation whose response takes longer than this many milliseconds (the response is still compared with the spec; 0 = no limit)")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")

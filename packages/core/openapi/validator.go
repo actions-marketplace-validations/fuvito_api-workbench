@@ -32,6 +32,7 @@ const (
 	KindRequestParameter = "request-parameter"  // a path, query or header value in the request does not fit its parameter
 	KindRequestBody      = "request-body"       // the request body does not fit the spec
 	KindBodyTooLarge     = "body-too-large"     // the response is longer than the read limit and was cut off
+	KindSlowResponse     = "slow-response"      // the response took longer than the limit given for the run
 	KindBodyEmpty        = "body-empty"         // the response body is empty where the spec declares a schema
 	KindBodyNotJSON      = "body-not-json"      // the response body cannot be parsed as JSON
 	KindBodyBranch       = "body-branch"        // the body fits none (Subject "none") or several (Subject "several") of the oneOf/anyOf shapes

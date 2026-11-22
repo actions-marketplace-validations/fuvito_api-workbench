@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -152,6 +153,9 @@ type Options struct {
 	FailFast bool
 	// RequestTimeoutMs overrides the per-request timeout. 0 = use executor default.
 	RequestTimeoutMs int
+	// MaxResponseTimeMs fails an operation whose response took longer than this many milliseconds.
+	// The response is kept and compared with the spec as usual. 0 = no limit.
+	MaxResponseTimeMs int
 	// ReadOnly runs only GET and HEAD operations; every other operation is reported as skipped
 	// and never sent.
 	ReadOnly bool
@@ -263,6 +267,15 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		or.StatusCode = resp.StatusCode
 		or.DurationMs = resp.Duration.Milliseconds()
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
+		if limit := opts.MaxResponseTimeMs; limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
+			// The message holds the limit, not the measured time, so a baseline stays stable
+			// between runs; the time is in DurationMs and in the finding's Got.
+			or.Violations = append(or.Violations, openapi.ValidationError{
+				Kind: openapi.KindSlowResponse, Subject: strconv.Itoa(limit),
+				Expected: fmt.Sprintf("within %d ms", limit), Got: fmt.Sprintf("%d ms", resp.Duration.Milliseconds()),
+				Message: fmt.Sprintf("%s %s %d: the response was slower than the %d ms limit", or.Method, specPathOr(or), resp.StatusCode, limit),
+			})
+		}
 
 		result.Operations = append(result.Operations, or)
 		handled()
@@ -359,4 +372,11 @@ func invalidBodyValues(template, resolved *domain.Request, resolver *variables.R
 		})
 	}
 	return out
+}
+
+func specPathOr(or OperationResult) string {
+	if or.SpecPath != "" {
+		return or.SpecPath
+	}
+	return or.Path
 }

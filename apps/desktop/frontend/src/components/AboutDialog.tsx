@@ -3,6 +3,14 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.1',
+    date: '2026-11-22',
+    items: [
+      'clrsig conform --max-response-time <ms>: fail an operation whose response is slower than the limit. The response is still compared with the spec. Also in the Check Conformance page (Slowest acceptable response), the CLI Command Builder and the GitHub Action (max-response-time)',
+      'Limits are wall-clock: leave a margin, a busy machine is slower',
+    ],
+  },
+  {
     version: '0.8.0',
     date: '2026-11-22',
     items: [
@@ -202,7 +210,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.1</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

@@ -83,6 +83,7 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 | `baseline`, `write-baseline` | conform | fail only on violations not in the baseline file / record the current ones |
 | `tags`, `paths` | conform | comma-separated OpenAPI tags and path prefixes to include |
 | `request-timeout` | conform | per-request timeout in milliseconds |
+| `max-response-time` | conform | fail an operation slower than this many milliseconds (the response is still compared with the spec) |
 | `var` | run, conform | environment overrides, one `name=value` per line (not for secrets) |
 | `report` | run, conform, diff | extra reports, one `format=file` per line |
 | `version` | all | `clrsig` release to use (default: latest) |

@@ -144,6 +144,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [tagsText, setTagsText] = useState('')
   const [pathsText, setPathsText] = useState('')
   const [timeoutText, setTimeoutText] = useState('')
+  const [maxResponseText, setMaxResponseText] = useState('')
   const [varsText, setVarsText] = useState('')
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [negative, setNegative] = useState(false)
@@ -200,8 +201,10 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const filtered = splitList(tagsText).length > 0 || splitList(pathsText).length > 0
   const timeoutMs = Number.parseInt(timeoutText, 10)
   const timeoutBad = timeoutText !== '' && !(timeoutMs > 0)
+  const maxResponseMs = Number.parseInt(maxResponseText, 10)
+  const maxResponseBad = maxResponseText !== '' && !(maxResponseMs > 0)
   const parsedVars = parseVars(varsText)
-  const canRun = !timeoutBad && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
+  const canRun = !timeoutBad && !maxResponseBad && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
 
   async function run() {
     setRunning(true)
@@ -212,6 +215,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
         specPath, baseUrl, envPath, allowWrites, confirmedRemote,
         tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
+        maxResponseTimeMs: maxResponseBad || !maxResponseText ? 0 : maxResponseMs,
         recordCoverage: recordCoverage && !filtered,
         vars: parsedVars.vars,
       }))
@@ -239,7 +243,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
             type="button"
             onClick={() => onOpenCliBuilder(cliValues({
               specPath, baseUrl, envPath, activeEnvironment: ctx.activeEnvironment ?? '',
-              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, allowWrites,
+              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, maxResponseText, allowWrites,
             }))}
             title="Open the CLI Command Builder with the choices on this page"
             className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
@@ -328,6 +332,13 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               <label htmlFor="conf-timeout" className="text-xs font-medium">Request timeout (ms)</label>
               <input id="conf-timeout" value={timeoutText} onChange={e => setTimeoutText(e.target.value)} placeholder="10000" inputMode="numeric" className={cn(inputClass, 'font-mono')} />
               {timeoutBad && <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="conf-max-response" className="text-xs font-medium">Slowest acceptable response (ms)</label>
+              <input id="conf-max-response" value={maxResponseText} onChange={e => setMaxResponseText(e.target.value)} placeholder="no limit" inputMode="numeric" className={cn(inputClass, 'font-mono')} />
+              {maxResponseBad
+                ? <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>
+                : <p className="text-[11px] text-[var(--color-muted-foreground)]">A slower operation fails; its response is still compared with the spec. Leave a margin.</p>}
             </div>
           </div>
           <div className="mt-3 flex flex-col gap-1">

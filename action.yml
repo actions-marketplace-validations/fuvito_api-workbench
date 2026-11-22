@@ -89,6 +89,9 @@ inputs:
   request-timeout:
     description: 'Per-request timeout in milliseconds (conform)'
     required: false
+  max-response-time:
+    description: 'Fail an operation whose response takes longer than this many milliseconds; the response is still compared with the spec (conform)'
+    required: false
   var:
     description: 'Environment variable overrides, one name=value per line (run, conform). Do not put secrets here; use env: on the step and ${NAME} in the environment file'
     required: false
@@ -184,6 +187,7 @@ runs:
         IN_TAGS: ${{ inputs.tags }}
         IN_PATHS: ${{ inputs.paths }}
         IN_REQUEST_TIMEOUT: ${{ inputs.request-timeout }}
+        IN_MAX_RESPONSE_TIME: ${{ inputs.max-response-time }}
         IN_VAR: ${{ inputs.var }}
         IN_REPORT: ${{ inputs.report }}
       run: |
@@ -226,6 +230,7 @@ runs:
             [ -n "$IN_TAGS"           ] && ARGS+=( --tags "$IN_TAGS" )
             [ -n "$IN_PATHS"          ] && ARGS+=( --paths "$IN_PATHS" )
             [ -n "$IN_REQUEST_TIMEOUT" ] && ARGS+=( --request-timeout "$IN_REQUEST_TIMEOUT" )
+            [ -n "$IN_MAX_RESPONSE_TIME" ] && ARGS+=( --max-response-time "$IN_MAX_RESPONSE_TIME" )
             repeat --var "$IN_VAR"
             repeat --report "$IN_REPORT"
             ;;

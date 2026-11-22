@@ -244,6 +244,13 @@ var catalog = []Command{
 				Group:   GroupAdvanced,
 			},
 			{
+				Name: "max-response-time", Kind: KindInt, Default: "0",
+				Label:   "Slowest acceptable response (ms)",
+				Help:    "Fail an operation whose response takes longer than this. The response is still compared with the spec. 0 means no limit. Limits are wall-clock: leave a margin.",
+				Example: "500",
+				Group:   GroupAdvanced,
+			},
+			{
 				Name: "format", Short: "f", Kind: KindEnum, Enum: reportFormats, Default: "text",
 				Label: "Report format", Help: formatHelp, Group: GroupEssential,
 			},

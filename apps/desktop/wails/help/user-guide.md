@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.8.0
+**Version:** 0.8.1
 
 ---
 
@@ -818,6 +818,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--coverage` | Append a coverage summary. |
 | `--fail-fast` | Stop after the first violation or execution error. |
 | `--request-timeout` | Per-request timeout in milliseconds (default `10000`). |
+| `--max-response-time` | Fail an operation whose response takes longer than this many milliseconds (default: no limit). The response is still compared with the spec, so a slow response with a wrong body reports both. Limits are wall-clock: leave a margin. |
 | `--format`, `-f` / `--output`, `-o` | `text`, `json`, `junit`, `html` or `markdown`; write the report to a file. |
 | `--report` | `format=file`, repeatable: also write a report in another format from the same run. |
 | `--var` | `name=value`, repeatable: set or override an environment variable for this run. |

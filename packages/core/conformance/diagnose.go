@@ -24,6 +24,7 @@ const (
 	FindingNoBranch         = "no-branch-matched"    // the body fits none (or several) of the oneOf / anyOf shapes
 	FindingInvalidBody      = "invalid-body"         // the response body is not valid JSON
 	FindingEmptyBody        = "empty-body"           // the response body is empty where the spec declares a schema
+	FindingSlowResponse     = "slow-response"        // the response took longer than the limit
 	FindingBodyTooLarge     = "body-too-large"       // the response is longer than the read limit
 	FindingConstraint       = "constraint"           // a value breaks an enum, range, length, pattern or format
 	FindingExtraProperty    = "unexpected-property"  // the body has a property the schema does not allow
@@ -136,6 +137,8 @@ func checkIDFor(f Finding) string {
 		return "CS-RESP-010"
 	case FindingBodyTooLarge:
 		return "CS-RESP-013"
+	case FindingSlowResponse:
+		return "CS-RESP-014"
 	case FindingMissingValue:
 		return "CS-RUN-001"
 	case FindingDynamicValue:
@@ -229,6 +232,15 @@ func diagnoseViolation(op OperationResult, v openapi.ValidationError) Finding {
 	}
 	bodySpec := specLocation(op, "response "+status+" → body schema")
 	switch v.Kind {
+	case openapi.KindSlowResponse:
+		return Finding{
+			Kind: FindingSlowResponse, Part: "response time", Spec: specLocation(op, ""),
+			Summary:  fmt.Sprintf("The response took %s, over the limit of %s ms", v.Got, v.Subject),
+			Expected: v.Expected, Got: v.Got,
+			Why:    "The run was given a response-time limit and this operation answered more slowly. The response itself was still compared with the spec.",
+			Fix:    "Make the operation faster, or raise the limit (--max-response-time) if the limit was too strict for this operation or this machine.",
+			Detail: msg,
+		}
 	case openapi.KindBodyEmpty:
 		return Finding{
 			Kind: FindingEmptyBody, Part: "response body", Spec: bodySpec,

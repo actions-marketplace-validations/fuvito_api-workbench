@@ -152,6 +152,8 @@ type ConformRunInput struct {
 	FailFast bool `json:"failFast"`
 	// TimeoutMs is the per-request timeout; 0 uses the shared default.
 	TimeoutMs int `json:"timeoutMs"`
+	// MaxResponseTimeMs fails an operation that answers more slowly than this; 0 = no limit.
+	MaxResponseTimeMs int `json:"maxResponseTimeMs"`
 	// RecordCoverage adds the run to the Contracts coverage store. Only unfiltered runs are
 	// recorded, so a run limited by tags or paths cannot skew the accumulated totals.
 	RecordCoverage bool `json:"recordCoverage"`
@@ -318,17 +320,18 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	}()
 
 	out := application.RunConformance(ctx, application.ConformInput{
-		Exec:             buildExecutor(s.settings),
-		Spec:             spec,
-		BaseURL:          baseURL,
-		Env:              env,
-		Tags:             in.Tags,
-		Paths:            in.Paths,
-		FailFast:         in.FailFast,
-		RequestTimeoutMs: in.TimeoutMs,
-		Coverage:         true,
-		Negative:         in.Negative,
-		ReadOnly:         !in.AllowWrites,
+		Exec:              buildExecutor(s.settings),
+		Spec:              spec,
+		BaseURL:           baseURL,
+		Env:               env,
+		Tags:              in.Tags,
+		Paths:             in.Paths,
+		FailFast:          in.FailFast,
+		RequestTimeoutMs:  in.TimeoutMs,
+		MaxResponseTimeMs: in.MaxResponseTimeMs,
+		Coverage:          true,
+		Negative:          in.Negative,
+		ReadOnly:          !in.AllowWrites,
 		Progress: func(done, total int, op conformance.OperationResult) {
 			if s.emit != nil {
 				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.Path})

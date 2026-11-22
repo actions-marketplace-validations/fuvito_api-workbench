@@ -24,11 +24,12 @@ type ConformInput struct {
 	BaseURL string
 	Env     *domain.Environment
 
-	Tags             []string
-	Paths            []string
-	FailFast         bool
-	RequestTimeoutMs int  // 0 means DefaultConformRequestTimeoutMs
-	ReadOnly         bool // send only GET and HEAD operations
+	Tags              []string
+	Paths             []string
+	FailFast          bool
+	RequestTimeoutMs  int  // 0 means DefaultConformRequestTimeoutMs
+	MaxResponseTimeMs int  // 0 means no response-time limit
+	ReadOnly          bool // send only GET and HEAD operations
 
 	// Progress, when set, is called after each operation with how many are done out of how many
 	// and the operation just handled.
@@ -69,12 +70,13 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		timeout = DefaultConformRequestTimeoutMs
 	}
 	opts := conformance.Options{
-		Tags:             in.Tags,
-		Paths:            in.Paths,
-		FailFast:         in.FailFast,
-		ReadOnly:         in.ReadOnly,
-		RequestTimeoutMs: timeout,
-		OnOperation:      in.Progress,
+		Tags:              in.Tags,
+		Paths:             in.Paths,
+		FailFast:          in.FailFast,
+		ReadOnly:          in.ReadOnly,
+		RequestTimeoutMs:  timeout,
+		MaxResponseTimeMs: in.MaxResponseTimeMs,
+		OnOperation:       in.Progress,
 	}
 
 	out := ConformOutput{}

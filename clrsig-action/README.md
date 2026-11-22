@@ -49,6 +49,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 | `write-baseline` | no | — | Record the current violations in this file and succeed (`conform`) |
 | `tags`, `paths` | no | — | Comma-separated OpenAPI tags and path prefixes to include (`conform`) |
 | `request-timeout` | no | — | Per-request timeout in milliseconds (`conform`) |
+| `max-response-time` | no | — | Fail an operation whose response takes longer than this many milliseconds; the response is still compared with the spec (`conform`) |
 | `var` | no | — | Environment overrides, one `name=value` per line (`run`, `conform`); not for secrets |
 | `report` | no | — | Extra reports, one `format=file` per line (`run`, `conform`, `diff`) |
 | `version` | no | `latest` | clrsig release tag, e.g. `v1.2.0` |

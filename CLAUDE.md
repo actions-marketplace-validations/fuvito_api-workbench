@@ -799,3 +799,9 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Desktop:** the step editor offers `duration` (numeric operators, a "max ms" hint). `format-spec.md`, the user guide, the AI prompt (only on request, with a margin) and the catalog (CS-GAP-005 now covers `conform` only) updated.
 - **Not built:** phase 2 (`conform --max-response-time`) and phase 3 (recording durations in the Contracts store and baselines).
 - **F-016 decision (owner):** a bad dynamic function in a scenario keeps stopping the run before any request (exit 2), documented as CS-RUN-007.
+
+### 2026-11-22 — Response-time assertions, phase 2 (0.8.1)
+
+- **`clrsig conform --max-response-time <ms>`** (default 0 = off): `conformance.Options.MaxResponseTimeMs` / `application.ConformInput.MaxResponseTimeMs`. An operation whose response took longer gets a `slow-response` violation **in addition to** its spec comparison (the response is kept). The violation's message holds the limit, not the measured time, so baselines stay stable; the measured time is in `DurationMs`, the finding's Got and the `--explain` text. Finding `slow-response`, check CS-RESP-014. Probes are not timed.
+- **Wired through:** the CLI flag, the CLI Command Builder catalog (`max-response-time`, parity test), the GitHub Action input `max-response-time`, `ConformanceService` (`maxResponseTimeMs`), and the Check Conformance page (*Slowest acceptable response*, carried into Get CLI command).
+- **Not built:** a per-operation limit (shape left open in the proposal) and recording durations in the Contracts store and baselines (phase 3). The MCP `conform` tool does not take the limit yet.

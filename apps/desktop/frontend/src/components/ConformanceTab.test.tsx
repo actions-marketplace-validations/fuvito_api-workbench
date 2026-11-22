@@ -65,7 +65,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, recordCoverage: false, vars: [],
+      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, maxResponseTimeMs: 0, recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -168,7 +168,7 @@ describe('ConformanceTab options and export', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /Stop after the first failure/ }))
     fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
     await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({
-      tags: ['users', 'orders'], paths: ['/users'], timeoutMs: 3000, negative: true, failFast: true, recordCoverage: false,
+      tags: ['users', 'orders'], paths: ['/users'], timeoutMs: 3000, maxResponseTimeMs: 0, negative: true, failFast: true, recordCoverage: false,
     })))
   })
 
@@ -262,6 +262,11 @@ describe('cliValues', () => {
     const v = cliValues({ ...base, activeEnvironment: '/ws/environments/local.yaml', timeoutText: 'abc', allowWrites: true })
     expect(v['env']).toBe('/ws/environments/local.yaml')
     expect(v).not.toHaveProperty('request-timeout')
+  })
+
+  it('carries the response-time limit and ignores a bad one', () => {
+    expect(cliValues({ ...base, maxResponseText: '500', allowWrites: true })['max-response-time']).toBe('500')
+    expect(cliValues({ ...base, maxResponseText: 'fast', allowWrites: true })).not.toHaveProperty('max-response-time')
   })
 })
 
