@@ -196,7 +196,7 @@ runs:
         repeat() {
           local flag="$1" lines="$2" line
           while IFS= read -r line; do
-            line="${line%$''}"
+            line="${line%$'\r'}"
             [ -n "$line" ] && ARGS+=( "$flag" "$line" )
           done <<< "$lines"
         }

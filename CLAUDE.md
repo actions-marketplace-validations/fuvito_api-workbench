@@ -750,6 +750,11 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Tag `v0.7.0` on `2599620`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release with 13 files and the full notes; Docker `ghcr.io/fuvito/api-workbench:v0.7.0` prints `clrsig version v0.7.0`; Scoop updated to 0.7.0 by the `chore: bump tap to v0.7.0` commit and installed on Windows (`clrsig version v0.7.0`).
 - **Not verified:** the Homebrew install (no Mac) and a run of the Action at `@v0.7.0` (its `action.yml` parses and its script was tested locally). **Open:** B-080 and code signing (B-035); see `docs/planning/next_steps/2026-11-21-next-steps-after-0.7.0.md`.
 
+### 2026-11-21 — Defect in the released Action (found after tagging 0.7.0)
+
+- **What:** `action.yml` as tagged in `v0.7.0` (and on `main` since the B-058 commit) contained a lone carriage return inside a shell script. YAML reads it as a line break, so the file was not valid YAML and `uses: fuvito/api-workbench@v0.7.0` could not run. The binaries, Docker image, Scoop manifest and desktop builds are not affected. It came from my own scripted edit; the earlier local test ran the extracted script, not the YAML.
+- **Fixed on `main`** (the character is now the two characters `` in the script) and **guarded:** `apps/cli/action_test.go` (`TestActionFileIsValid`) rejects a lone carriage return, parses the YAML, checks that the inputs the script reads are declared and runs `bash -n` on every script; it fails on the released file.
+
 ### 2026-11-21 — 0.7.0 prepared
 
 - Version 0.7.0 in `AboutDialog.tsx` (with its complete release notes), its two tests and the user guide; the user guide says the Check Conformance page reads only workspace files. Release notes for the GitHub Release are drafted. **Not tagged yet:** waiting for the owner's check of the desktop app and a green CI on the final commit.
