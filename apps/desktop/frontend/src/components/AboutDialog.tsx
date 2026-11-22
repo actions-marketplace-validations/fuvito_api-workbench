@@ -3,6 +3,13 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.7',
+    date: '2026-11-22',
+    items: [
+      'The MCP conform tool accepts maxResponseTime (milliseconds), like clrsig conform --max-response-time',
+    ],
+  },
+  {
     version: '0.8.6',
     date: '2026-11-22',
     items: [
@@ -253,7 +260,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.6</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.7</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

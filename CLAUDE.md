@@ -813,7 +813,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Baselines:** unchanged on purpose; a `slow-response` violation holds the limit, not the measured time.
 - **Not built:** a per-operation response-time limit, and any failure on a trend (the proposal's non-goals). The proposal is complete otherwise.
 
-### 2026-11-22 — Findings F-022 (writeOnly finding classified) and F-016 (bad function in a step) (0.8.3, not yet released)
+### 2026-11-22 — Findings F-022 (writeOnly finding classified) and F-016 (bad function in a step) (0.8.3)
 
 - A `writeOnly` property in a response (CS-RESP-011) was reported as kind `other` with no `checkId` and the generic "does not match what the spec declares". `conformance.Diagnose` now matches the validator message and gives it kind `write-only-property`, check ID CS-RESP-011, `where` (the property path), and its own why and fix (a write-only value may leak). Test: `TestFindings_WriteOnlyLeakHasItsOwnKindAndCheckID`; the catalog row cites it. Additive: the new kind value appears in JSON `findings` and the desktop finding view.
 - **F-016 (reverses the earlier decision; owner request):** a bad `{{$function}}` in a scenario *step* no longer stops `clrsig run` before any request. That step fails when it is reached (not sent, error in the report, exit 1) and the others run per their fail policy; a folder run still runs the other scenarios. Problems in a scenario's own `variables:` still stop it before anything is sent (exit 2): `scenario.ScenarioLevel` filters `CheckDynamic`'s issues (Step 0). `clrsig validate` still reports every kind. Catalog CS-RUN-007 rewritten; tests `TestRun_UnknownFunctionInAStepFailsThatStepOnly`, `TestRun_BadFunctionInAScenarioVariableStopsBeforeAnythingIsSent`. **Risk:** a CI job that expected exit 2 for a typo in a step now sees exit 1.
@@ -842,6 +842,6 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **F-035:** the "no credentials" probe also removes an API key carried in a cookie (`dropCookiePair`), keeping other cookies; before, `Cookie: session=...` stayed and a correct server failed the probe.
 - **Tests:** `TestConform_NDJSONIsNotOneDocument`, `TestParse_AcceptsAnExampleForANonJSONMediaType`, `TestParse_StillRejectsAWrongJSONExample`, `TestProbes_NoCredentialsDropsACookieAPIKey`; catalog rows CS-NC-009 and CS-PROBE-004 updated.
 
-### 2026-11-22 — MCP `conform` takes `maxResponseTime` (not yet released)
+### 2026-11-22 — MCP `conform` takes `maxResponseTime` (0.8.7)
 
 - The MCP `conform` tool accepts `maxResponseTime` (milliseconds, 0 = off, negative is an error) and passes it to `application.ConformInput.MaxResponseTimeMs`, like `clrsig conform --max-response-time`. Test: `TestMCP_ConformMaxResponseTime`.
