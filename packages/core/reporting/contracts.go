@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,10 +31,11 @@ func specLabel(spec string) string {
 }
 
 type contractsOp struct {
-	Op, Method, Path string
-	Covered          bool
-	Result           string // "Pass", "Fail" or ""
-	LastRunAt        time.Time
+	Op, Method, Path  string
+	Covered           bool
+	Result            string // "Pass", "Fail" or ""
+	LastRunAt         time.Time
+	LastMs, SlowestMs int64 // response times in milliseconds; 0 when none was recorded
 }
 
 // contractsOps lists every operation of the spec, covered or not, sorted by path then method.
@@ -53,6 +55,7 @@ func contractsOps(r coverage.Report) []contractsOp {
 				c.Result = "Pass"
 			}
 			c.LastRunAt = res.LastRunAt
+			c.LastMs, c.SlowestMs = res.LastDurationMs, res.SlowestDurationMs
 		}
 		out = append(out, c)
 	}
@@ -166,7 +169,7 @@ func isoOrEmpty(t time.Time) string {
 // ContractsCSV renders one spec's operations and quality flags as CSV.
 func ContractsCSV(r coverage.Report, q *coverage.QualityReport) []byte {
 	var b strings.Builder
-	b.WriteString("Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes,Status\n")
+	b.WriteString("Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes,Status,Last ms,Slowest ms\n")
 	for _, op := range contractsOps(r) {
 		covered := "Not Covered"
 		result := ""
@@ -175,7 +178,7 @@ func ContractsCSV(r coverage.Report, q *coverage.QualityReport) []byte {
 			result = op.Result
 		}
 		flags, missing := qualityColumns(op, q)
-		cells := []string{op.Method, op.Path, covered, result, isoOrEmpty(op.LastRunAt), flags, missing, statusLabel(op)}
+		cells := []string{op.Method, op.Path, covered, result, isoOrEmpty(op.LastRunAt), flags, missing, statusLabel(op), msOrEmpty(op.LastMs), msOrEmpty(op.SlowestMs)}
 		for i, c := range cells {
 			cells[i] = csvCell(c)
 		}
@@ -238,7 +241,7 @@ func ContractsMarkdown(spec string, r coverage.Report, q *coverage.QualityReport
 		add(fmt.Sprintf("| Last run | %s |", r.LastRunAt.Format("2006-01-02 15:04")))
 	}
 	add("", "## Operations", "",
-		"| Method | Path | Coverage | Last Result | Last Run |", "|--------|------|----------|-------------|---------|")
+		"| Method | Path | Coverage | Last Result | Last Run | Last ms | Slowest ms |", "|--------|------|----------|-------------|---------|---------|------------|")
 	for _, op := range contractsOps(r) {
 		cov, result := "—", "—"
 		if op.Covered {
@@ -247,7 +250,7 @@ func ContractsMarkdown(spec string, r coverage.Report, q *coverage.QualityReport
 		if op.Result != "" {
 			result = op.Result
 		}
-		add(fmt.Sprintf("| `%s` | `%s` | %s | %s | %s |", op.Method, op.Path, cov, result, relTime(op.LastRunAt, now)))
+		add(fmt.Sprintf("| `%s` | `%s` | %s | %s | %s | %s | %s |", op.Method, op.Path, cov, result, relTime(op.LastRunAt, now), msOrDash(op.LastMs), msOrDash(op.SlowestMs)))
 	}
 
 	if q != nil {
@@ -291,6 +294,8 @@ type contractsHTMLOp struct {
 	Covered      bool
 	Result       string
 	When         string
+	LastMs       string
+	SlowestMs    string
 }
 
 type contractsHTMLView struct {
@@ -358,7 +363,7 @@ ul{margin:0;padding-left:1.5rem}li{font-family:monospace;font-size:12px;padding:
 </div>
 <h2>Operations</h2>
 <table>
-<thead><tr><th>Method</th><th>Path</th><th>Coverage</th><th>Last Result</th><th>Last Run</th></tr></thead>
+<thead><tr><th>Method</th><th>Path</th><th>Coverage</th><th>Last Result</th><th>Last Run</th><th>Last ms</th><th>Slowest ms</th></tr></thead>
 <tbody>
 {{range .Ops}}<tr>
 <td><span class="badge" style="color:{{.Color}};background:{{.Bg}}">{{.Method}}</span></td>
@@ -366,6 +371,8 @@ ul{margin:0;padding-left:1.5rem}li{font-family:monospace;font-size:12px;padding:
 <td>{{if .Covered}}<span class="pass">✓ Covered</span>{{else}}<span class="none">—</span>{{end}}</td>
 <td>{{if eq .Result "Pass"}}<span class="pass">✓ Pass</span>{{else if eq .Result "Fail"}}<span class="fail">✗ Fail</span>{{else}}<span class="none">—</span>{{end}}</td>
 <td style="color:#6b7280;font-size:12px">{{.When}}</td>
+<td class="mono">{{.LastMs}}</td>
+<td class="mono">{{.SlowestMs}}</td>
 </tr>
 {{end}}</tbody>
 </table>
@@ -406,6 +413,7 @@ func ContractsHTML(spec string, r coverage.Report, q *coverage.QualityReport, no
 		v.Ops = append(v.Ops, contractsHTMLOp{
 			Method: op.Method, Path: op.Path, Covered: op.Covered, Result: op.Result,
 			Color: template.CSS(color), Bg: template.CSS(color + "18"), When: relTime(op.LastRunAt, now),
+			LastMs: msOrDash(op.LastMs), SlowestMs: msOrDash(op.SlowestMs),
 		})
 	}
 	if q != nil {
@@ -501,4 +509,18 @@ func ContractsListHTML(reports []coverage.Report, now time.Time) ([]byte, error)
 		Rows      []row
 	}{now.Format("2006-01-02 15:04"), rows})
 	return buf.Bytes(), err
+}
+
+func msOrEmpty(ms int64) string {
+	if ms <= 0 {
+		return ""
+	}
+	return strconv.FormatInt(ms, 10)
+}
+
+func msOrDash(ms int64) string {
+	if ms <= 0 {
+		return "—"
+	}
+	return strconv.FormatInt(ms, 10)
 }

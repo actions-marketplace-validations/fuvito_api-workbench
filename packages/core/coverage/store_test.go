@@ -140,3 +140,13 @@ func TestListAll(t *testing.T) {
 		t.Fatalf("unexpected list: %+v", got)
 	}
 }
+
+func TestMergeDuration_KeepsTheStoredTimeWhenNoResponseArrived(t *testing.T) {
+	prev := OperationResult{LastDurationMs: 80, SlowestDurationMs: 200}
+	if got := MergeDuration(prev, 0, 0); got != 80 {
+		t.Errorf("no response this run keeps the stored time, got %d", got)
+	}
+	if got := MergeDuration(prev, 150, 300); got != 150 {
+		t.Errorf("a response this run replaces it, got %d", got)
+	}
+}

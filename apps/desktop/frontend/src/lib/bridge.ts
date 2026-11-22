@@ -1054,7 +1054,7 @@ export interface AccumulatedCoverage {
   lastRunAt?: string
   exercised: string[]
   missed: string[]
-  operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string }>
+  operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string; lastDurationMs?: number; slowestDurationMs?: number }>
   quality?: QualityReport
 }
 

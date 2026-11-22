@@ -3,6 +3,13 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.2',
+    date: '2026-11-22',
+    items: [
+      'Contracts now records the response time of every operation a run got an answer for: the last one and the slowest ever. They show in the operation table (Last / slowest) and in the CSV, Markdown and HTML exports (Last ms, Slowest ms), so a run that gets slower can be seen. Data written before this shows a dash',
+    ],
+  },
+  {
     version: '0.8.1',
     date: '2026-11-22',
     items: [
@@ -210,7 +217,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.1</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.2</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

@@ -50,3 +50,22 @@ func TestServersBasePathIsHonoured(t *testing.T) {
 		t.Errorf("coverage = %+v, want 1 covered", res)
 	}
 }
+
+// Response times are kept per operation: the last one that got a response, and the slowest of the run.
+func TestScenarioCoverage_RecordsResponseTimes(t *testing.T) {
+	spec, err := openapi.ParseBytes([]byte(serversSpec), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := spec.ScenarioCoverage([]openapi.ExecutedRequest{
+		{Method: "GET", URL: "http://x/base/cases/a", StatusCode: 200, DurationMs: 300},
+		{Method: "GET", URL: "http://x/base/cases/b", StatusCode: 200, DurationMs: 120},
+		{Method: "GET", URL: "http://x/base/cases/c", StatusCode: 0, DurationMs: 9000}, // no response: not counted
+	})
+	if res == nil || len(res.ExercisedResults) != 1 {
+		t.Fatalf("%+v", res)
+	}
+	if r := res.ExercisedResults[0]; r.LastDurationMs != 120 || r.SlowestDurationMs != 300 {
+		t.Errorf("last/slowest = %d/%d, want 120/300", r.LastDurationMs, r.SlowestDurationMs)
+	}
+}

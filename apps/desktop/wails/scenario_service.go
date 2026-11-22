@@ -963,8 +963,10 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 				continue
 			}
 			statusCode := 0
+			var durationMs int64
 			if sr.Response != nil {
 				statusCode = sr.Response.StatusCode
+				durationMs = sr.Response.Duration.Milliseconds()
 			}
 			executed = append(executed, openapi.ExecutedRequest{
 				Method:     string(sr.Request.Method),
@@ -972,6 +974,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 				StatusCode: statusCode,
 				HadAuth:    sr.Request.Auth != nil,
 				Passed:     sr.Passed,
+				DurationMs: durationMs,
 			})
 		}
 		if cr := loadedSpec.ScenarioCoverage(executed); cr != nil {

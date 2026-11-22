@@ -376,7 +376,7 @@ func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Sp
 			continue
 		}
 		executed = append(executed, openapi.ExecutedRequest{
-			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: op.Passed(),
+			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: op.Passed(), DurationMs: op.DurationMs,
 		})
 	}
 	cr := spec.ScenarioCoverage(executed)

@@ -469,9 +469,10 @@ func nopCloser(data []byte) *nopCloserReader {
 type ExecutedRequest struct {
 	Method     string
 	URL        string
-	StatusCode int  // HTTP status code returned by the server
-	HadAuth    bool // whether the request carried any auth credentials
-	Passed     bool // whether this step's assertions all passed
+	StatusCode int   // HTTP status code returned by the server
+	HadAuth    bool  // whether the request carried any auth credentials
+	Passed     bool  // whether this step's assertions all passed
+	DurationMs int64 // response time of the request, in milliseconds (counted only when a response arrived)
 }
 
 // ExercisedResult pairs a matched spec operation with the last-run pass/fail outcome.
@@ -480,6 +481,10 @@ type ExercisedResult struct {
 	Passed      bool
 	StatusCodes []int // all unique status codes observed across matching executions
 	HadAuth     bool  // whether at least one execution carried auth credentials
+	// LastDurationMs is the response time of the last execution that got a response, SlowestDurationMs
+	// the slowest in this run (both in milliseconds; 0 when none got a response).
+	LastDurationMs    int64
+	SlowestDurationMs int64
 }
 
 // CoveredOperation identifies a spec operation (method + path pattern) exercised or missed.
@@ -540,6 +545,8 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 	exercisedPassed := make(map[opKey]bool)
 	exercisedCodes := make(map[opKey]map[int]struct{})
 	exercisedHadAuth := make(map[opKey]bool)
+	exercisedLastMs := make(map[opKey]int64)
+	exercisedSlowestMs := make(map[opKey]int64)
 	for _, ex := range executed {
 		matchPath := ex.URL
 		if u, err := url.Parse(ex.URL); err == nil && u.Path != "" {
@@ -561,6 +568,10 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 				exercisedCodes[k] = make(map[int]struct{})
 			}
 			exercisedCodes[k][ex.StatusCode] = struct{}{}
+			exercisedLastMs[k] = ex.DurationMs
+			if ex.DurationMs > exercisedSlowestMs[k] {
+				exercisedSlowestMs[k] = ex.DurationMs
+			}
 		}
 		if ex.HadAuth {
 			exercisedHadAuth[k] = true
@@ -579,10 +590,12 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 			}
 			sort.Ints(codes)
 			cr.ExercisedResults = append(cr.ExercisedResults, ExercisedResult{
-				CoveredOperation: op,
-				Passed:           exercisedPassed[k],
-				StatusCodes:      codes,
-				HadAuth:          exercisedHadAuth[k],
+				CoveredOperation:  op,
+				Passed:            exercisedPassed[k],
+				StatusCodes:       codes,
+				HadAuth:           exercisedHadAuth[k],
+				LastDurationMs:    exercisedLastMs[k],
+				SlowestDurationMs: exercisedSlowestMs[k],
 			})
 		}
 	}

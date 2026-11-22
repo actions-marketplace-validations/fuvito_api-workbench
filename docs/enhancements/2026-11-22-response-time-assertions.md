@@ -1,6 +1,6 @@
 # Response-time assertions
 
-**Status:** Accepted (2026-11-22); phase 1 built in 0.8.0, phase 2 in 0.8.1. **Source:** external finding F-018 (the sandbox's `docs/clrsig-findings.md`), catalog gap CS-GAP-005, backlog B-082.
+**Status:** Accepted (2026-11-22); phases 1 to 3 built in 0.8.0 to 0.8.2 (a per-operation limit is not built). **Source:** external finding F-018 (the sandbox's `docs/clrsig-findings.md`), catalog gap CS-GAP-005, backlog B-082.
 
 ## 1. Summary
 
@@ -82,5 +82,6 @@ User guide (assertions, `conform`), `format-spec.md`, AI prompt (guard test), `w
 |---|---|---|
 | 2026-11-22 | Proposal written from finding F-018; nothing built. | Claude |
 | 2026-11-22 | Accepted; build phase 1 first (owner: "yes"). | Owner |
+| 2026-11-22 | Phase 3 built in 0.8.2: the Contracts store records `lastDurationMs` and `slowestDurationMs` per operation (additive, absent in older data); the Contracts page and the CSV, Markdown and HTML exports show them. Baselines needed no change: a `slow-response` violation already holds the limit, not the time. | Claude |
 | 2026-11-22 | Phase 2 built in 0.8.1: `conform --max-response-time <ms>` (one limit for every operation; the page, the builder, the Action and `application.ConformInput` carry it). A per-operation override is **not** built: the proposal left its shape open, and a second limit can be added without changing this one. | Claude |
 | 2026-11-22 | Phase 1 built in 0.8.0. The operator set stays the existing `eq ne gt lt` (no `lte`/`gte`, which would be new operators for every assertion type); `lt` covers the limit use. | Claude |

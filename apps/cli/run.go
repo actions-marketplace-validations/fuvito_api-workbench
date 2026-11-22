@@ -279,6 +279,7 @@ func executeScenario(cmd *cobra.Command, scenarioPath string, s *domain.Scenario
 					StatusCode: sr.Response.StatusCode,
 					HadAuth:    sr.Request.Auth != nil,
 					Passed:     sr.Passed,
+					DurationMs: sr.Response.Duration.Milliseconds(),
 				})
 			}
 		}
@@ -316,10 +317,12 @@ func accumulateCoverage(cmd *cobra.Command, workspacePath, specRef string, resul
 	for _, er := range cov.ExercisedResults {
 		prev := stored.OperationResults[er.String()]
 		stored.OperationResults[er.String()] = coverage.OperationResult{
-			LastPassed:  er.Passed,
-			LastRunAt:   now,
-			StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
-			HadAuth:     prev.HadAuth || er.HadAuth,
+			LastPassed:        er.Passed,
+			LastRunAt:         now,
+			StatusCodes:       coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
+			HadAuth:           prev.HadAuth || er.HadAuth,
+			LastDurationMs:    coverage.MergeDuration(prev, er.LastDurationMs, er.SlowestDurationMs),
+			SlowestDurationMs: max(prev.SlowestDurationMs, er.SlowestDurationMs),
 		}
 	}
 	if err := coverage.Save(workspacePath, stored); err != nil {
