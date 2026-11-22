@@ -171,21 +171,56 @@ steps:
 	}
 }
 
-func TestRun_UnknownFunctionStopsBeforeAnythingIsSent(t *testing.T) {
+func TestRun_UnknownFunctionInAStepFailsThatStepOnly(t *testing.T) {
 	srv, n := dynServer(t)
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
 		"good.yaml": fmt.Sprintf(orderScenarioYAML, "Good"),
-		"typo.yaml": "schemaVersion: \"1\"\ntitle: Typo\nsteps:\n  - label: a\n    request: {method: GET, url: \"{{base}}/x?e={{$randomIntt 1 5}}\"}\n",
+		"typo.yaml": `schemaVersion: "1"
+title: Typo
+steps:
+  - label: fine
+    request: {method: GET, url: "{{base}}/x"}
+  - label: typo
+    failPolicy: continue
+    request: {method: GET, url: "{{base}}/x?e={{$randomIntt 1 5}}"}
+  - label: after
+    request: {method: GET, url: "{{base}}/y"}
+`,
 	})
 
-	_, err := exec(t, "run", "--var", "base="+srv.URL, filepath.Join(root, "typo.yaml"))
-	if err == nil || exitCode(err) == 1 || !strings.Contains(err.Error(), "unknown function $randomIntt") {
-		t.Errorf("a typo in one file is a configuration error (exit 2): %v", err)
+	out, err := exec(t, "run", "--var", "base="+srv.URL, "-f", "json", filepath.Join(root, "typo.yaml"))
+	if err == nil || exitCode(err) != 1 {
+		t.Errorf("a bad function in a step is a failed step (exit 1), got %v", err)
 	}
+	if !strings.Contains(out, "unknown function $randomIntt") {
+		t.Errorf("the report names the bad function: %s", out)
+	}
+	if got := n.Load(); got != 2 {
+		t.Errorf("the other two steps run, the bad one is not sent: %d requests", got)
+	}
+
+	// A folder run runs the good scenario as well; the exit code is 1, not 2.
 	_, err = exec(t, "run", "--var", "base="+srv.URL, root)
-	if err == nil || !strings.Contains(err.Error(), "nothing was run") || !strings.Contains(err.Error(), "typo.yaml") {
-		t.Errorf("a folder run stops before any request: %v", err)
+	if err == nil || exitCode(err) != 1 {
+		t.Errorf("a folder run reports the failed step with exit 1: %v", err)
+	}
+}
+
+func TestRun_BadFunctionInAScenarioVariableStopsBeforeAnythingIsSent(t *testing.T) {
+	srv, n := dynServer(t)
+	sc := writeTempFile(t, "v.yaml", `schemaVersion: "1"
+title: V
+variables:
+  - name: x
+    value: "{{$nope}}"
+steps:
+  - label: a
+    request: {method: GET, url: "{{base}}/x"}
+`)
+	_, err := exec(t, "run", "--var", "base="+srv.URL, sc)
+	if err == nil || exitCode(err) == 1 || !strings.Contains(err.Error(), "unknown function $nope") {
+		t.Errorf("a bad scenario variable is a configuration error (exit 2): %v", err)
 	}
 	if n.Load() != 0 {
 		t.Errorf("no request may be sent, got %d", n.Load())

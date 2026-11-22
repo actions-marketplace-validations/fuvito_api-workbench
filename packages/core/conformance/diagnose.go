@@ -28,6 +28,7 @@ const (
 	FindingBodyTooLarge     = "body-too-large"       // the response is longer than the read limit
 	FindingConstraint       = "constraint"           // a value breaks an enum, range, length, pattern or format
 	FindingExtraProperty    = "unexpected-property"  // the body has a property the schema does not allow
+	FindingWriteOnly        = "write-only-property"  // the response carries a property the spec marks writeOnly
 	FindingOther            = "other"                // a violation this package does not recognise
 )
 
@@ -75,6 +76,7 @@ var (
 	reMissing    = regexp.MustCompile(`Error at "([^"]*)": property "([^"]+)" is missing`)
 	reWrongType  = regexp.MustCompile(`(?:Error at "([^"]*)": )?value must be (an? [A-Za-z ]+?)(?:\n|$)`)
 	reConstraint = regexp.MustCompile(`(?i)allowed values|must be (at least|at most|more than|less than|a multiple)|minimum|maximum|doesn't match the (regular expression|format|pattern)|duplicate items|not nullable|exclusive`)
+	reWriteOnly  = regexp.MustCompile(`writeOnly property "([^"]+)" in response`)
 	reExtra      = regexp.MustCompile(`property "([^"]+)" is unsupported`)
 	reGotValue   = regexp.MustCompile(`(?s)\nValue:\s*\n\s*(.+?)\s*$`)
 	reAtPath     = regexp.MustCompile(`Error at "([^"]*)": ([^\n]+)`)
@@ -135,6 +137,8 @@ func checkIDFor(f Finding) string {
 		return "CS-RESP-009"
 	case FindingExtraProperty:
 		return "CS-RESP-010"
+	case FindingWriteOnly:
+		return "CS-RESP-011"
 	case FindingBodyTooLarge:
 		return "CS-RESP-013"
 	case FindingSlowResponse:
@@ -423,6 +427,23 @@ func diagnoseResponse(msg string) Finding {
 			Why:      fmt.Sprintf("The server sent %s where the spec declares %s.", describeGot(gotType, got), indefinite(want)),
 			Fix:      fmt.Sprintf("Send %s from the server (for example without quotes for a number), or change the type in the spec if the server is right.", indefinite(want)),
 			Detail:   msg,
+		}
+	}
+	if m := reWriteOnly.FindStringSubmatch(msg); m != nil {
+		where := m[1]
+		if at := reAtPath.FindStringSubmatch(msg); at != nil && at[1] != "" {
+			where = displayPath(at[1])
+			if !strings.HasSuffix(where, m[1]) {
+				where += "." + m[1]
+			}
+		}
+		return Finding{
+			Kind: FindingWriteOnly, Where: where,
+			Summary:  fmt.Sprintf("%q is a write-only property but the response contains it", m[1]),
+			Expected: fmt.Sprintf("a response without %q", m[1]), Got: fmt.Sprintf("the property %q", m[1]),
+			Why:    fmt.Sprintf("The spec marks %q as writeOnly: it may be sent in a request but must never come back in a response (typically a password or secret), so returning it can leak it.", m[1]),
+			Fix:    fmt.Sprintf("Stop returning %q from the server, or remove writeOnly from it in the spec if it is meant to be returned.", m[1]),
+			Detail: msg,
 		}
 	}
 	if m := reExtra.FindStringSubmatch(msg); m != nil {

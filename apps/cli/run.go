@@ -124,7 +124,7 @@ func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 	for i, p := range paths {
 		s, err := loadScenario(p, o.timeoutMs)
 		if err == nil {
-			if issues := scenario.CheckDynamic(s); len(issues) > 0 {
+			if issues := scenario.ScenarioLevel(scenario.CheckDynamic(s)); len(issues) > 0 {
 				msgs := make([]string, len(issues))
 				for j, iss := range issues {
 					msgs[j] = iss.String()

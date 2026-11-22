@@ -85,7 +85,9 @@ func stepStrings(step *domain.ScenarioStep) []string {
 
 // CheckDynamic reports only the problems with variables and {{$function}} calls: the checks that
 // can be done before a run starts and that would otherwise make a scenario fail or send a wrong
-// request. clrsig run uses it to stop before sending anything.
+// request. Issues with Step 0 are about the scenario's own variables (a duplicate, a cycle, a bad
+// function in a value): the scenario cannot start. Issues with a step number are about one step;
+// that step fails when it is reached, and clrsig run does not stop the others for it.
 func CheckDynamic(sc *domain.Scenario) []Issue {
 	var issues []Issue
 	add := func(step int, name, msg string) {
@@ -100,4 +102,16 @@ func CheckDynamic(sc *domain.Scenario) []Issue {
 		}
 	}
 	return issues
+}
+
+// ScenarioLevel returns the issues that stop a scenario from starting: the ones about its own
+// variables, not about one step.
+func ScenarioLevel(issues []Issue) []Issue {
+	var out []Issue
+	for _, i := range issues {
+		if i.Step == 0 {
+			out = append(out, i)
+		}
+	}
+	return out
 }

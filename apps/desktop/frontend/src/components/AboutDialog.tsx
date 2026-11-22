@@ -3,6 +3,14 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.3',
+    date: '2026-11-22',
+    items: [
+      'A bad {{$function}} in a scenario step now fails only that step (it is not sent and the error is shown); the other steps run as their fail policy says, and clrsig run exits 1 instead of 2. A mistake in the scenario variables still stops the scenario before any request',
+      'A writeOnly property in a response is now reported as its own finding (write-only-property, check CS-RESP-011) with why and how to fix, instead of a generic one without a check ID',
+    ],
+  },
+  {
     version: '0.8.2',
     date: '2026-11-22',
     items: [
@@ -217,7 +225,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.2</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.3</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
