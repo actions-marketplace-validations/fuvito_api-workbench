@@ -175,6 +175,8 @@ type ConformProbeIO struct {
 // that fails and what to change. Detail is the validator's own message.
 type ConformFindingIO struct {
 	Kind string `json:"kind"`
+	// CheckID is the check's ID in the catalog (Help, What We Check), for example CS-RESP-005.
+	CheckID string `json:"checkId,omitempty"`
 	// Part and Where say where in the response (or request) the problem is: the header name, the
 	// status, a body field. Spec says where the expectation comes from in the spec.
 	Part     string `json:"part,omitempty"`
@@ -193,7 +195,7 @@ func findingsIO(fs []conformance.Finding) []ConformFindingIO {
 	out := make([]ConformFindingIO, 0, len(fs))
 	for _, f := range fs {
 		out = append(out, ConformFindingIO{
-			Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
+			Kind: f.Kind, CheckID: f.CheckID, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
 			Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
 		})
 	}

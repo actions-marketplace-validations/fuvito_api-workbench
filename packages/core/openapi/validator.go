@@ -32,6 +32,9 @@ const (
 	KindRequestParameter = "request-parameter"  // a path, query or header value in the request does not fit its parameter
 	KindRequestBody      = "request-body"       // the request body does not fit the spec
 	KindBodyTooLarge     = "body-too-large"     // the response is longer than the read limit and was cut off
+	KindBodyEmpty        = "body-empty"         // the response body is empty where the spec declares a schema
+	KindBodyNotJSON      = "body-not-json"      // the response body cannot be parsed as JSON
+	KindBodyBranch       = "body-branch"        // the body fits none (Subject "none") or several (Subject "several") of the oneOf/anyOf shapes
 )
 
 // ValidationError is a single violation.
@@ -43,8 +46,13 @@ type ValidationError struct {
 	// Subject is what the violation is about when Kind says so: the status code, the Content-Type
 	// that was sent, or the header or parameter name.
 	Subject string
-	// In is where a request parameter lives: "path", "query", "header" or "cookie".
+	// In is where a request parameter lives: "path", "query", "header", "cookie" or "body".
 	In string
+	// Expected, Got and Variable describe a request body field whose value is not valid JSON:
+	// the type the spec declares, the value that was inserted and the {{variable}} it came from.
+	Expected string
+	Got      string
+	Variable string
 }
 
 func (e ValidationError) Error() string {
@@ -212,6 +220,9 @@ func responseViolations(route *routers.Route, status int, sentType string, me *o
 	case me.Err != nil && strings.HasPrefix(me.Err.Error(), "unsupported content type"):
 		return nil // no decoder for the declared media type: the body is not checked, not a violation
 	case me.Err != nil:
+		if v, ok := bodyShapeViolation(route, status, where, me.Err); ok {
+			return []ValidationError{v}
+		}
 		errs := parseSchemaErrors(me.Err)
 		for i := range errs {
 			errs[i].Kind = KindBody
@@ -675,4 +686,69 @@ func isOpaqueMediaType(ct string) bool {
 		}
 	}
 	return false
+}
+
+// bodyShapeViolation classifies a body problem that is about the body as a whole, not a field: no
+// body at all, a body that is not JSON, or a body that fits none (or several) of the oneOf / anyOf
+// shapes. The library reports these in its own words ("EOF", "invalid character ...", the first
+// failing branch); the messages here say what is wrong.
+func bodyShapeViolation(route *routers.Route, status int, where string, err error) (ValidationError, bool) {
+	text := err.Error()
+	switch {
+	case text == "EOF":
+		return ValidationError{Kind: KindBodyEmpty, Message: fmt.Sprintf("%s %d: the response body is empty, but the spec declares a schema for it", where, status)}, true
+	case strings.HasPrefix(text, "invalid character") || text == "unexpected EOF" || strings.HasPrefix(text, "unexpected end of JSON"):
+		return ValidationError{Kind: KindBodyNotJSON, Message: fmt.Sprintf("%s %d: the response body is not valid JSON (%s)", where, status, firstLineOf(text))}, true
+	}
+	keyword, n := bodyComposition(route, status)
+	if n == 0 {
+		return ValidationError{}, false
+	}
+	switch {
+	case strings.HasPrefix(text, "doesn't match schema due to"), strings.HasPrefix(text, "doesn't match any schema from"):
+		closest := ""
+		if rest := strings.TrimSpace(strings.TrimPrefix(firstLineOf(text), "doesn't match schema due to:")); rest != "" && !strings.HasPrefix(text, "doesn't match any schema from") {
+			closest = "; the first shape fails because: " + rest
+		}
+		return ValidationError{Kind: KindBodyBranch, Subject: "none",
+			Message: fmt.Sprintf("%s %d: the response body matches none of the %d shapes the spec allows (%s)%s", where, status, n, keyword, closest)}, true
+	case strings.Contains(text, "matches more than one"):
+		return ValidationError{Kind: KindBodyBranch, Subject: "several",
+			Message: fmt.Sprintf("%s %d: the response body fits more than one of the %d shapes the spec allows (%s), so it is ambiguous", where, status, n, keyword)}, true
+	}
+	return ValidationError{}, false
+}
+
+// bodyComposition says whether the response's JSON schema is a oneOf or anyOf, and how many shapes
+// it lists.
+func bodyComposition(route *routers.Route, status int) (string, int) {
+	if route.Operation == nil || route.Operation.Responses == nil {
+		return "", 0
+	}
+	r := route.Operation.Responses.Value(strconv.Itoa(status))
+	if r == nil {
+		r = route.Operation.Responses.Value("default")
+	}
+	if r == nil || r.Value == nil {
+		return "", 0
+	}
+	for ct, mt := range r.Value.Content {
+		if !strings.Contains(ct, "json") || mt.Schema == nil || mt.Schema.Value == nil {
+			continue
+		}
+		if n := len(mt.Schema.Value.OneOf); n > 0 {
+			return "oneOf", n
+		}
+		if n := len(mt.Schema.Value.AnyOf); n > 0 {
+			return "anyOf", n
+		}
+	}
+	return "", 0
+}
+
+func firstLineOf(s string) string {
+	if i := strings.Index(s, "\n"); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return strings.TrimSpace(s)
 }

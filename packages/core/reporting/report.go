@@ -509,6 +509,9 @@ type JSONConformOp struct {
 // JSONConformFinding is the machine-readable form of conformance.Finding.
 type JSONConformFinding struct {
 	Kind string `json:"kind"`
+	// CheckID is the check's ID in the catalog (for example CS-RESP-005); absent when the violation
+	// is not recognised.
+	CheckID string `json:"checkId,omitempty"`
 	// Part and Where say where in the response the problem is (a header name, the status, a body
 	// field); Spec says where the expectation comes from in the spec.
 	Part     string `json:"part,omitempty"`
@@ -577,7 +580,7 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		for _, f := range explain(op, x) {
 			jo.Findings = append(jo.Findings, JSONConformFinding{
-				Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
+				Kind: f.Kind, CheckID: f.CheckID, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
 			})
 		}
 		report.Operations = append(report.Operations, jo)

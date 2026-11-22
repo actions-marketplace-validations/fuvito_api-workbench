@@ -766,7 +766,9 @@ export interface ConformProbe {
 }
 
 export interface ConformFinding {
-  kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'request' | 'no-response' | 'other'
+  kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'dynamic-value-failed' | 'no-branch-matched' | 'invalid-body' | 'empty-body' | 'body-too-large' | 'constraint' | 'unexpected-property' | 'request' | 'no-response' | 'other'
+  // the check's ID in the catalog (Help, What We Check), for example CS-RESP-005
+  checkId?: string
   // where the problem is: the part (response body, response status, response header, request,
   // network) and what in it (a field path, a header name, the status code)
   part?: string

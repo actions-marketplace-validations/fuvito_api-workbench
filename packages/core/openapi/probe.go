@@ -332,3 +332,33 @@ func removeHeader(headers []domain.Header, name string) []domain.Header {
 	}
 	return out
 }
+
+// BodyFieldType is the declared type of a top-level field of an operation's JSON request body
+// ("number", "integer", "boolean", "array", "object", "string"), or "" when the spec does not say.
+// specPath is the path as the spec writes it. The first oneOf / anyOf branch is looked at too.
+func (s *Spec) BodyFieldType(method, specPath, field string) string {
+	item := s.doc.Paths.Value(specPath)
+	if item == nil {
+		return ""
+	}
+	op := opFromItem(item, strings.ToUpper(method))
+	if op == nil || op.RequestBody == nil || op.RequestBody.Value == nil {
+		return ""
+	}
+	mt := firstJSONMediaType(op.RequestBody.Value)
+	if mt == nil || mt.Schema == nil || mt.Schema.Value == nil {
+		return ""
+	}
+	candidates := []*openapi3.Schema{mt.Schema.Value}
+	for _, br := range append(append([]*openapi3.SchemaRef(nil), mt.Schema.Value.OneOf...), mt.Schema.Value.AnyOf...) {
+		if br != nil && br.Value != nil {
+			candidates = append(candidates, br.Value)
+		}
+	}
+	for _, sc := range candidates {
+		if ref := sc.Properties[field]; ref != nil && ref.Value != nil {
+			return firstSchemaType(ref.Value)
+		}
+	}
+	return ""
+}

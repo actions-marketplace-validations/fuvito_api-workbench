@@ -11,16 +11,23 @@ import (
 
 // Finding kinds, from the most to the least specific.
 const (
-	FindingMissingField     = "missing-field"      // the response omits a field the spec requires
-	FindingWrongType        = "wrong-type"         // a field has a different type than the spec declares
-	FindingUndeclaredStatus = "undeclared-status"  // the status code is not one the spec declares
-	FindingWrongContentType = "wrong-content-type" // the Content-Type is not one the spec declares
-	FindingMissingHeader    = "missing-header"     // a header the spec requires was not sent
-	FindingBadHeader        = "bad-header"         // a declared header has a value that does not fit
-	FindingMissingValue     = "missing-value"      // the request was not sent: a value it needs is missing
-	FindingRequest          = "request"            // the request built from the spec was itself invalid
-	FindingNoResponse       = "no-response"        // the server never answered
-	FindingOther            = "other"              // a violation this package does not recognise
+	FindingMissingField     = "missing-field"        // the response omits a field the spec requires
+	FindingWrongType        = "wrong-type"           // a field has a different type than the spec declares
+	FindingUndeclaredStatus = "undeclared-status"    // the status code is not one the spec declares
+	FindingWrongContentType = "wrong-content-type"   // the Content-Type is not one the spec declares
+	FindingMissingHeader    = "missing-header"       // a header the spec requires was not sent
+	FindingBadHeader        = "bad-header"           // a declared header has a value that does not fit
+	FindingMissingValue     = "missing-value"        // the request was not sent: a value it needs is missing
+	FindingRequest          = "request"              // the request built from the spec was itself invalid
+	FindingNoResponse       = "no-response"          // the server never answered
+	FindingDynamicValue     = "dynamic-value-failed" // the request was not sent: a {{$function}} failed
+	FindingNoBranch         = "no-branch-matched"    // the body fits none (or several) of the oneOf / anyOf shapes
+	FindingInvalidBody      = "invalid-body"         // the response body is not valid JSON
+	FindingEmptyBody        = "empty-body"           // the response body is empty where the spec declares a schema
+	FindingBodyTooLarge     = "body-too-large"       // the response is longer than the read limit
+	FindingConstraint       = "constraint"           // a value breaks an enum, range, length, pattern or format
+	FindingExtraProperty    = "unexpected-property"  // the body has a property the schema does not allow
+	FindingOther            = "other"                // a violation this package does not recognise
 )
 
 // Finding explains one violation in plain language, so the person reading it can find the problem,
@@ -28,6 +35,9 @@ const (
 // the response, Spec in the spec), why that counts as a failure (Why) and what to change (Fix).
 type Finding struct {
 	Kind string
+	// CheckID is the ID of the check in the catalog of what Clear Signal checks (Help, What We
+	// Check), for example CS-RESP-005. Empty for a violation this package does not recognise.
+	CheckID string
 	// Part is the part of the exchange the finding is about: "response body", "response status",
 	// "response header" (also used for Content-Type), "request" or "network".
 	Part string
@@ -61,10 +71,12 @@ func (f Finding) WhereText() string {
 }
 
 var (
-	reMissing   = regexp.MustCompile(`Error at "([^"]*)": property "([^"]+)" is missing`)
-	reWrongType = regexp.MustCompile(`Error at "([^"]*)": value must be (an? [A-Za-z ]+?)(?:\n|$)`)
-	reGotValue  = regexp.MustCompile(`(?s)\nValue:\s*\n\s*(.+?)\s*$`)
-	reAtPath    = regexp.MustCompile(`Error at "([^"]*)": ([^\n]+)`)
+	reMissing    = regexp.MustCompile(`Error at "([^"]*)": property "([^"]+)" is missing`)
+	reWrongType  = regexp.MustCompile(`(?:Error at "([^"]*)": )?value must be (an? [A-Za-z ]+?)(?:\n|$)`)
+	reConstraint = regexp.MustCompile(`(?i)allowed values|must be (at least|at most|more than|less than|a multiple)|minimum|maximum|doesn't match the (regular expression|format|pattern)|duplicate items|not nullable|exclusive`)
+	reExtra      = regexp.MustCompile(`property "([^"]+)" is unsupported`)
+	reGotValue   = regexp.MustCompile(`(?s)\nValue:\s*\n\s*(.+?)\s*$`)
+	reAtPath     = regexp.MustCompile(`Error at "([^"]*)": ([^\n]+)`)
 )
 
 // Diagnose turns an operation's failure into findings. A passing or skipped operation has none.
@@ -93,7 +105,52 @@ func Diagnose(op OperationResult) []Finding {
 	for _, v := range op.Violations {
 		out = append(out, diagnoseViolation(op, v))
 	}
+	for i := range out {
+		out[i].CheckID = checkIDFor(out[i])
+	}
 	return out
+}
+
+// checkIDFor maps a finding to its ID in the catalog of checks.
+func checkIDFor(f Finding) string {
+	switch f.Kind {
+	case FindingUndeclaredStatus:
+		return "CS-RESP-001"
+	case FindingWrongContentType:
+		return "CS-RESP-002"
+	case FindingMissingHeader:
+		return "CS-RESP-003"
+	case FindingBadHeader:
+		return "CS-RESP-004"
+	case FindingMissingField:
+		return "CS-RESP-005"
+	case FindingWrongType:
+		return "CS-RESP-006"
+	case FindingConstraint:
+		return "CS-RESP-007"
+	case FindingInvalidBody, FindingEmptyBody:
+		return "CS-RESP-008"
+	case FindingNoBranch:
+		return "CS-RESP-009"
+	case FindingExtraProperty:
+		return "CS-RESP-010"
+	case FindingBodyTooLarge:
+		return "CS-RESP-013"
+	case FindingMissingValue:
+		return "CS-RUN-001"
+	case FindingDynamicValue:
+		return "CS-RUN-002"
+	case FindingNoResponse:
+		return "CS-RUN-003"
+	case FindingRequest:
+		switch {
+		case strings.HasPrefix(f.Part, "request body"):
+			return "CS-REQ-002"
+		case strings.Contains(f.Part, "parameter"):
+			return "CS-REQ-001"
+		}
+	}
+	return ""
 }
 
 // specLocation names where in the spec an expectation lives: the operation, then the part.
@@ -170,10 +227,57 @@ func diagnoseViolation(op OperationResult, v openapi.ValidationError) Finding {
 			Detail: msg,
 		}
 	}
+	bodySpec := specLocation(op, "response "+status+" → body schema")
+	switch v.Kind {
+	case openapi.KindBodyEmpty:
+		return Finding{
+			Kind: FindingEmptyBody, Part: "response body", Spec: bodySpec,
+			Summary: "The response body is empty", Expected: "a body matching the declared schema", Got: "nothing",
+			Why:    fmt.Sprintf("The spec declares a body for response %s, but the server sent none, so no field could be compared.", status),
+			Fix:    "Return the body from the server, or declare response " + status + " without content in the spec.",
+			Detail: msg,
+		}
+	case openapi.KindBodyNotJSON:
+		return Finding{
+			Kind: FindingInvalidBody, Part: "response body", Spec: bodySpec,
+			Summary: "The response body is not valid JSON", Expected: "valid JSON", Got: lastParen(msg),
+			Why:    fmt.Sprintf("The spec declares a JSON body for response %s, but what arrived cannot be parsed, so no field was compared.", status),
+			Fix:    "Make the server send valid JSON (check for a truncated, HTML or plain-text error page), or correct the declared media type in the spec.",
+			Detail: msg,
+		}
+	case openapi.KindBodyBranch:
+		summary, why := "The response body fits none of the allowed shapes", "The spec allows several shapes for this body (oneOf / anyOf) and the response fits none of them."
+		if v.Subject == "several" {
+			summary, why = "The response body fits more than one of the allowed shapes", "The spec says the body must fit exactly one of its oneOf shapes, and this response fits several, so it is ambiguous."
+		}
+		return Finding{
+			Kind: FindingNoBranch, Part: "response body", Spec: bodySpec,
+			Summary: summary, Expected: "exactly one of the declared shapes", Got: "see the detail",
+			Why:    why,
+			Fix:    "Make the response match one declared shape (for a discriminator, send its property), or add the shape the server really sends to the spec.",
+			Detail: msg,
+		}
+	case openapi.KindBodyTooLarge:
+		return Finding{
+			Kind: FindingBodyTooLarge, Part: "response body", Spec: bodySpec,
+			Summary: "The response body is longer than Clear Signal reads", Expected: "a body within the read limit", Got: "a body cut at the limit",
+			Why:    "Clear Signal reads at most 50 MB of a response; the rest was cut off, so the body could not be compared with the schema (the JSON was incomplete).",
+			Fix:    "Test an operation that returns less data (a smaller page or filter), or check this operation another way.",
+			Detail: msg,
+		}
+	}
 	f := diagnoseResponse(msg)
 	f.Part = "response body"
-	f.Spec = specLocation(op, "response "+status+" → body schema")
+	f.Spec = bodySpec
 	return f
+}
+
+func lastParen(msg string) string {
+	i, j := strings.LastIndex(msg, "("), strings.LastIndex(msg, ")")
+	if i >= 0 && j > i {
+		return msg[i+1 : j]
+	}
+	return ""
 }
 
 // diagnoseRequest explains a problem in the request clrsig built from the spec. The request is
@@ -194,6 +298,21 @@ func diagnoseRequest(op OperationResult, v openapi.ValidationError) Finding {
 			Expected: "a value of the declared type", Got: detail,
 			Why:    fmt.Sprintf("The request clrsig built from the spec has a %s value for %q that does not match the parameter's declared type, so the server was not tested with a valid request.", v.In, v.Subject),
 			Fix:    fmt.Sprintf("Give %q a value of the declared type in the environment, or with an override (for example %s=…).", v.Subject, v.Subject),
+			Detail: msg,
+		}
+	}
+	if v.Kind == openapi.KindRequestBody && v.Variable != "" {
+		want := v.Expected
+		if want == "" {
+			want = "a valid JSON value"
+		}
+		return Finding{
+			Kind: FindingRequest, Part: "request body", Where: v.Subject, Spec: body,
+			Summary:  fmt.Sprintf("The request body field %q takes %q from {{%s}}, which is not valid JSON", v.Subject, v.Got, v.Variable),
+			Expected: want, Got: v.Got,
+			Why: fmt.Sprintf("The value is put into the body as it is, so the body is not valid JSON and the server was not tested with a valid request. The spec declares %q as %s.",
+				v.Subject, indefinite(strings.TrimPrefix(want, "a "))),
+			Fix:    fmt.Sprintf("Set %s in the environment, or with an override, to %s (a number is written without quotes, for example %s=9.99; text needs quotes inside the value).", v.Variable, indefinite(strings.TrimPrefix(want, "a ")), v.Variable),
 			Detail: msg,
 		}
 	}
@@ -292,6 +411,25 @@ func diagnoseResponse(msg string) Finding {
 			Why:      fmt.Sprintf("The server sent %s where the spec declares %s.", describeGot(gotType, got), indefinite(want)),
 			Fix:      fmt.Sprintf("Send %s from the server (for example without quotes for a number), or change the type in the spec if the server is right.", indefinite(want)),
 			Detail:   msg,
+		}
+	}
+	if m := reExtra.FindStringSubmatch(msg); m != nil {
+		return Finding{
+			Kind: FindingExtraProperty, Where: m[1],
+			Summary: fmt.Sprintf("%q is not allowed in the response", m[1]),
+			Why:     fmt.Sprintf("The schema forbids properties it does not declare (additionalProperties: false) and the response has %q.", m[1]),
+			Fix:     fmt.Sprintf("Stop sending %q, or declare it in the schema.", m[1]),
+			Detail:  msg,
+		}
+	}
+	if m := reAtPath.FindStringSubmatch(msg); m != nil && reConstraint.MatchString(m[2]) {
+		field := displayPath(m[1])
+		return Finding{
+			Kind: FindingConstraint, Where: field,
+			Summary: strings.TrimSpace(m[2]),
+			Why:     "A value breaks a rule the schema sets (an allowed set, a range, a length, a pattern or a format).",
+			Fix:     "Send a value the rule allows, or relax the rule in the spec if the server is right.",
+			Detail:  msg,
 		}
 	}
 	if m := reAtPath.FindStringSubmatch(msg); m != nil {
@@ -400,7 +538,7 @@ func blockedFinding(op OperationResult) Finding {
 	}
 	if len(op.Missing) == 0 {
 		return Finding{
-			Kind:    FindingMissingValue,
+			Kind:    FindingDynamicValue,
 			Part:    "request",
 			Summary: "The request was not sent",
 			Got:     op.Blocked,

@@ -12,6 +12,7 @@ export function FindingView({ f }: { f: ConformFinding }) {
         {f.got && <><dt className="text-[var(--color-muted-foreground)]">Got</dt><dd className="font-mono break-all">{f.got}</dd></>}
         {findingWhere(f) && <><dt className="text-[var(--color-muted-foreground)]">Where</dt><dd data-testid="finding-where" className="font-mono break-all">{findingWhere(f)}</dd></>}
         {f.spec && <><dt className="text-[var(--color-muted-foreground)]">In the spec</dt><dd data-testid="finding-spec" className="font-mono break-all">{f.spec}</dd></>}
+        {f.checkId && <><dt className="text-[var(--color-muted-foreground)]">Check</dt><dd data-testid="finding-check" className="font-mono">{f.checkId}</dd></>}
         <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd>{f.why}</dd>
         <dt className="text-[var(--color-muted-foreground)]">Fix</dt><dd>{f.fix}</dd>
       </dl>

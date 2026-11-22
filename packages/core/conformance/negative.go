@@ -75,6 +75,9 @@ func NewNegative(exec *executor.Executor) *NegativeRunner {
 // Run generates and executes all negative probes derived from the spec.
 func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, env *domain.Environment, opts Options) *NegativeResult {
 	title, version := spec.Info()
+	if baseURL == "" {
+		baseURL = spec.FirstServerURL()
+	}
 	result := &NegativeResult{
 		SpecTitle:   title,
 		SpecVersion: version,

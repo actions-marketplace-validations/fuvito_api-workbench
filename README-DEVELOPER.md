@@ -377,11 +377,11 @@ clrsig validate scenarios/*.yaml
 
 ```bash
 clrsig coverage list    --workspace <dir> [--format text|json|csv|markdown|html] [--output <file>]
-clrsig coverage quality <spec-file-or-url> --workspace <dir> [--format text|json|csv|markdown|html] [--output <file>]
+clrsig coverage quality <spec-file-or-url> --workspace <dir> [--format text|json|csv|markdown|html] [--output <file>] [--fail-on-gaps]
 clrsig coverage reset   <spec-file-or-url> --workspace <dir>
 ```
 
-`list` shows every spec with recorded runs; `quality` reports the four quality signals (never exercised, happy-path only, secured never authed, untested error paths); `reset` deletes a spec's accumulated data. `quality` exits `1` when gaps are found. The data is the same one the desktop Contracts page shows.
+`list` shows every spec with recorded runs; `quality` reports the four quality signals (never exercised, happy-path only, secured never authed, untested error paths); `reset` deletes a spec's accumulated data. `quality` reports gaps without failing; `--fail-on-gaps` makes it exit `1` when it finds one. The data is the same one the desktop Contracts page shows.
 
 ---
 

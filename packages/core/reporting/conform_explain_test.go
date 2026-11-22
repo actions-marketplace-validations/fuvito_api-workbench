@@ -32,7 +32,7 @@ func TestConformText_ExplanationIsOptIn(t *testing.T) {
 		t.Fatalf("the default text output must not change:\n%s", plain)
 	}
 	explained := ConformTextExplained(r, nil, true)
-	if !strings.Contains(explained, `→ "token" is text, the spec says number. Why:`) || !strings.Contains(explained, "Fix:") {
+	if !strings.Contains(explained, `→ [CS-RESP-006] "token" is text, the spec says number. Why:`) || !strings.Contains(explained, "Fix:") {
 		t.Fatalf("explanation missing:\n%s", explained)
 	}
 	if ConformTextExplained(r, nil, false) != plain {

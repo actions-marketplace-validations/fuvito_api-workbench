@@ -3,6 +3,16 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.7.4',
+    date: '2026-11-22',
+    items: [
+      'Behaviour change: clrsig coverage quality exits 0 when it finds gaps (they are signals); add --fail-on-gaps to fail on them',
+      'Every finding in conform reports (JSON checkId, --explain text, the Check Conformance page) carries the ID of its check in What We Check (for example CS-RESP-005)',
+      'Clearer findings: a oneOf / anyOf mismatch, an empty body, a body that is not JSON and a type mismatch at the root each have their own kind; a text value where a number is declared names the field, the variable and the declared type; a failed dynamic function is not reported as a missing value',
+      'conform prints the spec server as the base URL when none is given',
+    ],
+  },
+  {
     version: '0.7.3',
     date: '2026-11-22',
     items: [
@@ -184,7 +194,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.3</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.4</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

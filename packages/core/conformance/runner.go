@@ -2,8 +2,10 @@ package conformance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -178,6 +180,9 @@ func New(exec *executor.Executor) *Runner {
 // Run executes matching operations and returns the aggregate conformance result.
 func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, env *domain.Environment, opts Options) *ConformResult {
 	title, version := spec.Info()
+	if baseURL == "" {
+		baseURL = spec.FirstServerURL()
+	}
 	result := &ConformResult{
 		SpecTitle:   title,
 		SpecVersion: version,
@@ -237,7 +242,11 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		// An unresolved {{placeholder}} in the URL means the request will fail
 		// for the wrong reason; the server error should not be attributed to us.
 		if !strings.Contains(resolved.URL, "{{") {
-			or.RequestViolations = openapi.ValidateRequest(spec, resolved)
+			if bad := invalidBodyValues(gr.Request, resolved, resolver, spec, gr.Path); len(bad) > 0 {
+				or.RequestViolations = bad
+			} else {
+				or.RequestViolations = openapi.ValidateRequest(spec, resolved)
+			}
 		}
 
 		resp, execErr := r.exec.Execute(ctx, resolved)
@@ -313,4 +322,41 @@ func matchesPathPrefix(opPath string, prefixes []string) bool {
 		}
 	}
 	return false
+}
+
+var bareBodyPlaceholder = regexp.MustCompile(`"([^"]+)"\s*:\s*\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}`)
+
+// invalidBodyValues explains a JSON body that stopped being JSON because an environment value was
+// put in unquoted (a number or boolean field written as text, "cheap" for a price). The library
+// only says "invalid character 'c'"; this names the field, the variable, the value and the type the
+// spec declares. It returns nothing when the body is valid or no placeholder explains the problem.
+func invalidBodyValues(template, resolved *domain.Request, resolver *variables.Resolver, spec *openapi.Spec, specPath string) []openapi.ValidationError {
+	if template.Body == nil || resolved.Body == nil || template.Body.Type != domain.BodyJSON || json.Valid([]byte(resolved.Body.Content)) {
+		return nil
+	}
+	var out []openapi.ValidationError
+	for _, m := range bareBodyPlaceholder.FindAllStringSubmatch(template.Body.Content, -1) {
+		field, name := m[1], m[2]
+		if strings.HasPrefix(name, "$") {
+			continue
+		}
+		val := resolver.Interpolate("{{" + name + "}}")
+		if json.Valid([]byte(val)) {
+			continue
+		}
+		declared := spec.BodyFieldType(string(template.Method), specPath, field)
+		if declared == "" {
+			declared = "a valid JSON value"
+		} else {
+			declared = "a " + declared
+			if declared == "a integer" {
+				declared = "an integer"
+			}
+		}
+		out = append(out, openapi.ValidationError{
+			Kind: openapi.KindRequestBody, Subject: field, In: "body", Expected: declared, Got: val, Variable: name,
+			Message: fmt.Sprintf("%s %s: the request body field %q takes its value from {{%s}}, which is %q; that is not a valid JSON value (the spec declares %s)", template.Method, specPath, field, name, val, declared),
+		})
+	}
+	return out
 }

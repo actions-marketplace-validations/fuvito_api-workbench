@@ -782,3 +782,13 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Reports:** `ConformJSON` and `ConformJUnit` take the negative result (the CLI and the desktop export pass it): JSON gets a `probes` array and `passed` is false when a probe failed; JUnit gets one test case per probe, counted in tests and failures.
 - **F-019:** `domain.Response` has `Truncated` and `ContentLength`; the executor trims the body to the limit and sets them; the response check reports kind `body-too-large` (limit and announced size) before any schema comparison, except for binary media types. Catalog: CS-RESP-013 and CS-PROBE-005 added, CS-PROBE-001 and 003 widened.
 - **Open:** batch 3 (F-011, F-012, F-016, F-017, F-007) and the decisions F-018 and F-020 (B-082).
+
+### 2026-11-22 — Findings from external testing, batch 3 (0.7.4)
+
+- **Finding kinds (F-011):** the response check classifies body problems that are about the body as a whole: `body-empty`, `body-not-json`, `body-branch` (none or several `oneOf` / `anyOf` shapes, with the count; before it was reported as a missing field of the first shape) in `openapi`, and `conformance.Diagnose` turns them into `empty-body`, `invalid-body`, `no-branch-matched`; a type mismatch at the root is `wrong-type` like one at a field; value-rule breaks are `constraint`, `additionalProperties: false` breaks are `unexpected-property`; a failed `{{$function}}` is `dynamic-value-failed`, no longer `missing-value`. `body-too-large` has a finding too.
+- **Check IDs (F-012):** `conformance.Finding.CheckID` (mapped from the kind in `checkIDFor`) appears as `checkId` in the JSON report, as `[CS-…]` at the start of the `--explain`, HTML, Markdown and JUnit explanation lines, and as a Check row in the desktop finding view. The default text output is unchanged. `other` findings have no ID.
+- **F-017:** `conformance.invalidBodyValues` explains a JSON body made invalid by an unquoted environment value: field, `{{variable}}`, value and declared type (`Spec.BodyFieldType`); `ValidationError` gained `Expected`, `Got`, `Variable`.
+- **F-007:** the runners use the spec's first server as the base URL when none is given, so the report and the "no operation got an answer" line name it.
+- **F-016 (documented, not changed):** a bad dynamic function in a scenario is found before any request is sent (exit 2) by design; it is now CS-RUN-007 in the catalog, next to CS-RUN-002 for `conform`.
+- **F-020 (behaviour change):** `clrsig coverage quality` exits 0 whether or not it finds gaps; `--fail-on-gaps` restores exit 1. CI steps that relied on the exit code must add the flag.
+- **F-018:** a design proposal, `docs/enhancements/2026-11-22-response-time-assertions.md` (status Proposed); nothing built.

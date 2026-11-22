@@ -788,6 +788,7 @@ func coverageQualityCmd() *cobra.Command {
 	var workspacePath string
 	var format string
 	var outputFile string
+	var failOnGaps bool
 
 	cmd := &cobra.Command{
 		Use:   "quality <spec-file-or-url>",
@@ -801,9 +802,12 @@ Reports four quality signals:
   SECURED NEVER AUTHED   — auth-required ops never tested with credentials
   UNTESTED ERROR PATHS   — declared 4xx/5xx responses never triggered
 
+The gaps are signals, not failures: the command exits 0 whether or not it found any. Add
+--fail-on-gaps to make a gap fail the step (for example to keep a coverage bar in CI).
+
 Exit codes:
-  0  no quality gaps found
-  1  one or more gaps detected
+  0  the report was produced (and, with --fail-on-gaps, no gap was found)
+  1  --fail-on-gaps was given and one or more gaps were detected
   2  spec parse or configuration error`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -966,7 +970,7 @@ Exit codes:
 				fmt.Fprintf(cmd.OutOrStdout(), "%d gap(s) found — add scenarios that trigger error paths and test authenticated+unauthenticated flows\n", total)
 			}
 
-			if hasGaps {
+			if hasGaps && failOnGaps {
 				return &exitError{1}
 			}
 			return nil
@@ -975,6 +979,7 @@ Exit codes:
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", contractsFormatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
+	cmd.Flags().BoolVar(&failOnGaps, "fail-on-gaps", false, "Exit 1 when the report finds a gap (by default the gaps are only reported)")
 	return cmd
 }
 

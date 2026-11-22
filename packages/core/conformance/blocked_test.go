@@ -161,7 +161,7 @@ func TestDiagnose_Blocked(t *testing.T) {
 		t.Fatalf("%+v", f[0])
 	}
 	dyn := conformance.Diagnose(conformance.OperationResult{Blocked: "not sent: unknown function $nope"})
-	if len(dyn) != 1 || dyn[0].Kind != conformance.FindingMissingValue || !strings.Contains(dyn[0].Got, "unknown function") {
+	if len(dyn) != 1 || dyn[0].Kind != conformance.FindingDynamicValue || dyn[0].CheckID != "CS-RUN-002" || !strings.Contains(dyn[0].Got, "unknown function") {
 		t.Fatalf("%+v", dyn)
 	}
 }

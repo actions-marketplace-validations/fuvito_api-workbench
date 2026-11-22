@@ -30,7 +30,7 @@ func coverageWorkspace(t *testing.T) (ws, spec string) {
 func TestCoverageQuality_FileFormats(t *testing.T) {
 	ws, spec := coverageWorkspace(t)
 
-	csv, err := execFull(t, "coverage", "quality", "-w", ws, "-f", "csv", spec)
+	csv, err := execFull(t, "coverage", "quality", "--fail-on-gaps", "-w", ws, "-f", "csv", spec)
 	if exitCode(err) != 1 {
 		t.Fatalf("gaps exit 1 in every format, got %v", err)
 	}
@@ -128,7 +128,7 @@ func TestCoverageQuality_TextAndJSONCarryTheFourTotals(t *testing.T) {
 		t.Errorf("text:\n%s", text)
 	}
 
-	out, _ := execFull(t, "coverage", "quality", "-w", ws, "-f", "json", spec)
+	out, _ := execFull(t, "coverage", "quality", "--fail-on-gaps", "-w", ws, "-f", "json", spec)
 	var got struct {
 		Totals struct {
 			Total, Covered, NotCovered, Passing, Failing, NoResult int
