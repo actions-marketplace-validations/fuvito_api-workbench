@@ -35,11 +35,22 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 | `revision-spec` | for `diff` | — | Path or URL to the revised (newer) spec |
 | `env` | no | — | Path to environment YAML/JSON file |
 | `base-url` | no | — | Override base URL from spec (`conform`) |
-| `format` | no | `text` | Output format: `text`, `json`, or `junit` |
+| `format` | no | `text` | Output format: `text`, `json`, `junit`, `html` or `markdown` |
 | `output` | no | — | Write report to this file |
 | `fail-fast` | no | `false` | Stop after the first failure (`conform`) |
 | `coverage` | no | `false` | Append operation coverage summary (`conform`) |
 | `breaking-only` | no | `false` | Report only breaking changes (`diff`) |
+| `fail-on` | no | — | `breaking`, `warning` or `info`: how serious a change must be to fail (`diff`) |
+| `against` | no | — | Compare `base-spec` with the spec at this git ref (`diff`; checkout with `fetch-depth: 0`) |
+| `read-only` | no | `false` | Send only GET and HEAD requests (`conform`) |
+| `negative` | no | `false` | Also run negative probes (`conform`) |
+| `explain` | no | `false` | Explain each failure in the text report (`conform`) |
+| `baseline` | no | — | Accept violations recorded in this file; only new ones fail (`conform`) |
+| `write-baseline` | no | — | Record the current violations in this file and succeed (`conform`) |
+| `tags`, `paths` | no | — | Comma-separated OpenAPI tags and path prefixes to include (`conform`) |
+| `request-timeout` | no | — | Per-request timeout in milliseconds (`conform`) |
+| `var` | no | — | Environment overrides, one `name=value` per line (`run`, `conform`); not for secrets |
+| `report` | no | — | Extra reports, one `format=file` per line (`run`, `conform`, `diff`) |
 | `version` | no | `latest` | clrsig release tag, e.g. `v1.2.0` |
 
 ## Outputs
