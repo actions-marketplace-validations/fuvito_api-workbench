@@ -171,9 +171,10 @@ func mcpToolList() []map[string]interface{} {
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"spec":    prop("Path or URL to OpenAPI spec (YAML or JSON)"),
-					"baseUrl": prop("Base URL of the API under test, e.g. http://localhost:8080"),
-					"envFile": prop("Path to environment YAML/JSON file for variable resolution (optional)"),
+					"spec":            prop("Path or URL to OpenAPI spec (YAML or JSON)"),
+					"baseUrl":         prop("Base URL of the API under test, e.g. http://localhost:8080"),
+					"envFile":         prop("Path to environment YAML/JSON file for variable resolution (optional)"),
+					"maxResponseTime": map[string]interface{}{"type": "integer", "description": "Slowest acceptable response in milliseconds; a slower response is a violation (optional, 0 = off)"},
 				},
 				"required": []string{"spec"},
 			},
@@ -225,9 +226,14 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		Spec    string `json:"spec"`
 		BaseURL string `json:"baseUrl"`
 		EnvFile string `json:"envFile"`
+
+		MaxResponseTime int `json:"maxResponseTime"`
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return "", fmt.Errorf("invalid arguments: %w", err)
+	}
+	if args.MaxResponseTime < 0 {
+		return "", fmt.Errorf("maxResponseTime must not be negative")
 	}
 	if args.Spec == "" {
 		return "", fmt.Errorf("spec is required")
@@ -252,6 +258,8 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		Spec:    spec,
 		BaseURL: args.BaseURL,
 		Env:     env,
+
+		MaxResponseTimeMs: args.MaxResponseTime,
 	})
 	return reporting.ConformText(out.Result, nil), nil
 }

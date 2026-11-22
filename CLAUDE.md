@@ -841,3 +841,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **F-034:** `ParseBytes` sets aside the `example` / `examples` of media types that are not JSON while the library validates the document (`setAsideNonJSONExamples`), so a valid XML example string no longer makes the spec invalid (exit 2); they are put back afterwards. A wrong example for a JSON media type is still rejected.
 - **F-035:** the "no credentials" probe also removes an API key carried in a cookie (`dropCookiePair`), keeping other cookies; before, `Cookie: session=...` stayed and a correct server failed the probe.
 - **Tests:** `TestConform_NDJSONIsNotOneDocument`, `TestParse_AcceptsAnExampleForANonJSONMediaType`, `TestParse_StillRejectsAWrongJSONExample`, `TestProbes_NoCredentialsDropsACookieAPIKey`; catalog rows CS-NC-009 and CS-PROBE-004 updated.
+
+### 2026-11-22 — MCP `conform` takes `maxResponseTime` (not yet released)
+
+- The MCP `conform` tool accepts `maxResponseTime` (milliseconds, 0 = off, negative is an error) and passes it to `application.ConformInput.MaxResponseTimeMs`, like `clrsig conform --max-response-time`. Test: `TestMCP_ConformMaxResponseTime`.
