@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 
 vi.mock('@/lib/bridge', () => ({
   getCliCatalog: vi.fn(), getCliContext: vi.fn(), buildCliCommand: vi.fn(),
@@ -29,6 +29,14 @@ const catalog: CliCommand[] = [
       { name: 'output', short: 'o', positional: false, required: false, kind: 'outputFile', role: '', accepts: [], enum: [], default: '', label: 'Save report to', help: 'Write the report to this file.', example: 'reports/run.html', group: 'essential' },
     ],
     outputs: ['A report of every step.'], exitCodes,
+  },
+  {
+    name: 'conform', goal: 'Check an API against its spec', summary: 'Sends a request per operation.', when: 'To prove an API matches its spec.',
+    inputs: [
+      { name: 'spec', short: '', positional: true, required: true, kind: 'fileOrURL', role: 'spec', accepts: [], enum: [], default: '', label: 'OpenAPI spec', help: 'The spec.', example: '', group: 'essential' },
+      { name: 'base-url', short: 'b', positional: false, required: false, kind: 'url', role: '', accepts: [], enum: [], default: '', label: 'Server address', help: 'Where the API is running.', example: 'http://localhost:8080', group: 'essential' },
+    ],
+    outputs: ['A pass/fail line per operation.'], exitCodes,
   },
   {
     name: 'diff', goal: 'Detect breaking changes between two specs', summary: 'Compares specs.', when: 'Before shipping.',
@@ -76,8 +84,8 @@ beforeEach(() => {
   Object.assign(navigator, { clipboard: { writeText: vi.fn(() => Promise.resolve()) } })
 })
 
-async function ready() {
-  render(<CliBuilderTab />)
+async function ready(servers?: { label: string; url: string }[]) {
+  render(<CliBuilderTab runningServers={servers} />)
   await screen.findByRole('radiogroup', { name: /what do you want to do/i })
 }
 
@@ -278,5 +286,48 @@ describe('CliBuilderTab', () => {
     b.getCliCatalog.mockRejectedValue(new Error('boom'))
     render(<CliBuilderTab />)
     expect(await screen.findByRole('alert')).toHaveTextContent('boom')
+  })
+})
+
+describe('Server address from a running server', () => {
+  const server = [{ label: 'Conformance Server', url: 'http://localhost:8120' }]
+  const addressBox = () => screen.getByLabelText(/Server address/, { selector: 'input' })
+
+  it('fills an empty Server address with the running server and says where it came from', async () => {
+    await ready(server)
+    fireEvent.click(screen.getByRole('radio', { name: /Check an API against its spec/ }))
+    await waitFor(() => expect(addressBox()).toHaveValue('http://localhost:8120'))
+    expect(screen.getByText('Filled in from the running Conformance Server.')).toBeInTheDocument()
+    await waitFor(() => expect(b.buildCliCommand).toHaveBeenLastCalledWith(expect.objectContaining({
+      command: 'conform', values: { 'base-url': 'http://localhost:8120' },
+    })))
+  })
+
+  it('leaves the box alone when no server is running, and does not refill what the user cleared', async () => {
+    await ready()
+    fireEvent.click(screen.getByRole('radio', { name: /Check an API against its spec/ }))
+    expect(addressBox()).toHaveValue('')
+
+    cleanup()
+    await ready(server)
+    fireEvent.click(screen.getByRole('radio', { name: /Check an API against its spec/ }))
+    await waitFor(() => expect(addressBox()).toHaveValue('http://localhost:8120'))
+    fireEvent.change(addressBox(), { target: { value: '' } })
+    await new Promise(r => setTimeout(r, 50))
+    expect(addressBox()).toHaveValue('')
+  })
+
+  it('never overwrites an address the user typed, and drops its own address when the server stops', async () => {
+    const view = render(<CliBuilderTab runningServers={server} />)
+    await screen.findByRole('radiogroup', { name: /what do you want to do/i })
+    fireEvent.click(screen.getByRole('radio', { name: /Check an API against its spec/ }))
+    await waitFor(() => expect(addressBox()).toHaveValue('http://localhost:8120'))
+    view.rerender(<CliBuilderTab runningServers={[]} />)
+    await waitFor(() => expect(addressBox()).toHaveValue(''))
+
+    fireEvent.change(addressBox(), { target: { value: 'https://api.example.com' } })
+    view.rerender(<CliBuilderTab runningServers={server} />)
+    await new Promise(r => setTimeout(r, 50))
+    expect(addressBox()).toHaveValue('https://api.example.com')
   })
 })

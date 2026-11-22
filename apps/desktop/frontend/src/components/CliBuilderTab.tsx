@@ -18,6 +18,9 @@ type Props = {
   preset?: CliBuilderPreset | null
   // Tells the app which command the page has selected, for the CLI Builder sidebar.
   onCommandChange?: (command: string) => void
+  // Servers running in this app (the Demo and Conformance Servers). The first one fills an empty
+  // Server address box.
+  runningServers?: { label: string; url: string }[]
 }
 
 const SHELL_LABELS: Record<CliShell, string> = { bash: 'bash', powershell: 'PowerShell', cmd: 'cmd' }
@@ -55,10 +58,11 @@ type FieldProps = {
   messages: CliMessage[]
   suggestion?: CliSuggestion
   runFrom: string
+  note?: string
   onChange: (v: string) => void
 }
 
-function Field({ input, value, files, messages, suggestion, runFrom, onChange }: FieldProps) {
+function Field({ input, value, files, messages, suggestion, runFrom, note, onChange }: FieldProps) {
   const id = `cli-${input.name}`
   const isPath = input.kind === 'file' || input.kind === 'fileOrURL' || input.kind === 'dir' || input.kind === 'path'
 
@@ -166,6 +170,7 @@ function Field({ input, value, files, messages, suggestion, runFrom, onChange }:
       )}
       {control}
       <p className="text-[11px] leading-snug text-[var(--color-muted-foreground)]">{input.help}</p>
+      {note && <p className="text-[11px] leading-snug text-emerald-400">{note}</p>}
       {messages.map((m, i) => <MessageLine key={i} m={m} />)}
       {suggestion && (
         <button
@@ -181,7 +186,7 @@ function Field({ input, value, files, messages, suggestion, runFrom, onChange }:
   )
 }
 
-export function CliBuilderTab({ preset, onCommandChange }: Props) {
+export function CliBuilderTab({ preset, onCommandChange, runningServers }: Props) {
   const [catalog, setCatalog] = useState<CliCommand[] | null>(null)
   const [ctx, setCtx] = useState<CliContext | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -193,6 +198,10 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   const [result, setResult] = useState<CliBuildOutput | null>(null)
   const [copied, setCopied] = useState(false)
   const buildSeq = useRef(0)
+  // What the Server address box was filled with from a running server, and for which command and
+  // server it was last filled, so clearing the box by hand is not undone.
+  const [filledFrom, setFilledFrom] = useState<{ url: string; label: string } | null>(null)
+  const filledKey = useRef('')
 
   useEffect(() => {
     let cancelled = false
@@ -231,6 +240,26 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   }, [command, values, runFrom])
 
   const current = catalog?.find(c => c.name === command) ?? null
+  const runningServer = runningServers?.[0] ?? null
+  const hasServerBox = !!current?.inputs.some(i => i.name === 'base-url')
+  useEffect(() => {
+    if (!hasServerBox) return
+    const shown = values['base-url'] ?? ''
+    if (!runningServer) {
+      // The server stopped: drop the address we put there, but never one the user typed.
+      filledKey.current = ''
+      if (filledFrom && shown === filledFrom.url) setValue('base-url', '')
+      if (filledFrom) setFilledFrom(null)
+      return
+    }
+    const key = `${command}|${runningServer.url}`
+    if (filledKey.current === key) return
+    filledKey.current = key
+    if (shown === '') {
+      setValue('base-url', runningServer.url)
+      setFilledFrom(runningServer)
+    }
+  }, [command, hasServerBox, runningServer?.url]) // eslint-disable-line react-hooks/exhaustive-deps
   const rendering = result?.renderings.find(r => r.shell === shell)
   const text = rendering ? (oneline ? rendering.oneline : rendering.multiline) : ''
 
@@ -246,6 +275,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   function chooseCommand(name: string) {
     setCommand(name)
     setValues({})
+    filledKey.current = ''
   }
 
   async function copy() {
@@ -290,6 +320,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
       messages={forField(input.name)}
       suggestion={result?.suggestions.find(s => s.field === input.name)}
       runFrom={runFrom}
+      note={input.name === 'base-url' && filledFrom && values['base-url'] === filledFrom.url ? `Filled in from the running ${filledFrom.label}.` : undefined}
       onChange={v => setValue(input.name, v)}
     />
   )

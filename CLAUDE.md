@@ -859,3 +859,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 ### 2026-11-22 — CLI Builder: browse buttons open where the field points (not yet released)
 
 - The file and folder buttons next to a path field now open their dialog in the workspace when the field is empty, otherwise in the folder shown or the folder that holds the file shown (`pickerStart`: a relative value is read from the run-from folder; a value that does not exist yet opens its nearest existing parent; a web address opens the workspace). The run-from button does the same with its own value. `PickCliFile` and `PickCliFolder` take the current value and the run-from folder (Wails bindings regenerated). Tests: `TestPickerStart` and the builder tests.
+
+### 2026-11-22 — CLI Builder: Server address from a running server (not yet released)
+
+- When the Demo Server or the Conformance Server is running in the app, an empty **Server address** box (`base-url`) is filled with `http://localhost:<port>` and says where it came from. It is filled once per command and server, so a box the user clears or types in is never refilled or overwritten; the address is dropped again when the server stops, but only if it is still the one the builder wrote. `App` passes `runningServers` to `CliBuilderTab`. Tests: `Server address from a running server` in `CliBuilderTab.test.tsx`.
