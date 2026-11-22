@@ -13,13 +13,14 @@ import (
 // ReportsDir is the folder suggested for generated report files.
 const ReportsDir = "reports"
 
-var formatExt = map[string]string{"html": "html", "junit": "xml", "json": "json", "text": "txt"}
+var formatExt = map[string]string{"html": "html", "junit": "xml", "json": "json", "markdown": "md", "text": "txt"}
 
 var formatNote = map[string]string{
-	"text":  "a plain-text report",
-	"json":  "a machine-readable JSON report",
-	"junit": "a JUnit XML report for CI test dashboards",
-	"html":  "a self-contained HTML report you can open in a browser",
+	"text":     "a plain-text report",
+	"json":     "a machine-readable JSON report",
+	"junit":    "a JUnit XML report for CI test dashboards",
+	"html":     "a self-contained HTML report you can open in a browser",
+	"markdown": "a Markdown report for pull-request comments and the GitHub job summary",
 }
 
 var slugRe = regexp.MustCompile(`[^a-z0-9]+`)

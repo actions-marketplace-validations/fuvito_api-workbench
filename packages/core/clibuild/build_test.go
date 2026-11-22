@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/clibuild"
+	"github.com/fuvito/api-workbench/packages/core/clispec"
 )
 
 const scenarioYAML = `schemaVersion: "1"
@@ -371,6 +372,7 @@ func TestSuggestOutputAndSlug(t *testing.T) {
 		{"diff", "", "html", "reports/diff.html"},
 		{"run", "run.yaml", "html", "reports/run.html"},
 		{"run", "x.yaml", "text", "reports/run-x.txt"},
+		{"conform", "conformance-openapi.yaml", "markdown", "reports/conform-conformance-openapi.md"},
 		{"run", "ünï.yaml", "html", "reports/run-n.html"},
 	}
 	for _, c := range cases {
@@ -470,5 +472,25 @@ func TestDefaultRunFrom(t *testing.T) {
 	plain := t.TempDir()
 	if got := clibuild.DefaultRunFrom(plain); got != plain {
 		t.Errorf("without .git the workspace itself is used, got %s", got)
+	}
+}
+
+// Every report format the CLI offers must give a file name with its own extension (markdown once
+// fell back to .txt) and a description for the output note.
+func TestEveryReportFormatHasAnExtension(t *testing.T) {
+	for _, cmd := range clispec.All() {
+		in, ok := cmd.Input("format")
+		if !ok {
+			continue
+		}
+		for _, f := range in.Enum {
+			if f == "text" {
+				continue
+			}
+			got := clibuild.SuggestOutput(cmd.Name, "", f)
+			if strings.HasSuffix(got, ".txt") {
+				t.Errorf("%s --format %s suggests %s", cmd.Name, f, got)
+			}
+		}
 	}
 }
