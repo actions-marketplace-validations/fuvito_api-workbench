@@ -3,6 +3,14 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.7.1',
+    date: '2026-11-21',
+    items: [
+      'Fix: the GitHub Action in 0.7.0 could not run (action.yml contained a stray character that made it invalid YAML). Use fuvito/api-workbench@v0.7.1; the desktop app, the CLI binaries, the Docker image and the Scoop and Homebrew packages of 0.7.0 were not affected',
+      'A test now loads action.yml, checks that it is valid YAML with the inputs its scripts read, and runs bash -n on every script',
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-11-21',
     items: [
@@ -157,7 +165,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.1</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

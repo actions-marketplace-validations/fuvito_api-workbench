@@ -759,3 +759,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 
 - Version 0.7.0 in `AboutDialog.tsx` (with its complete release notes), its two tests and the user guide; the user guide says the Check Conformance page reads only workspace files. Release notes for the GitHub Release are drafted. **Not tagged yet:** waiting for the owner's check of the desktop app and a green CI on the final commit.
 - **Left open on purpose:** B-080 (Contracts store keys; needs a decision, see the pre-release batch entry), B-006/B-007/B-008 and the other older items, code signing (B-035). **Not verified:** the Homebrew install and the GitHub Action at the new tag (they can only be tried after the release exists).
+
+### 2026-11-21 — 0.7.1 prepared
+
+- Version 0.7.1 in `AboutDialog.tsx` (a 0.7.1 entry that says what was fixed), its two tests and the user guide. Release notes for the GitHub Release are drafted. Decision (owner): a patch release instead of moving the `v0.7.0` tag. The 0.7.0 release page gets a note that the Action must be used at `@v0.7.1`.
