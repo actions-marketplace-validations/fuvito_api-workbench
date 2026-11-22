@@ -84,6 +84,9 @@ func textScenario(result *scenario.Result, showSeed bool) string {
 	}
 
 	fmt.Fprintln(&b)
+	if line := notComparedLine(result); line != "" {
+		fmt.Fprintln(&b, line)
+	}
 	passed, failed, skipped := result.Counts()
 	apassed, afailed := result.AssertionCounts()
 
@@ -95,6 +98,34 @@ func textScenario(result *scenario.Result, showSeed bool) string {
 		verdict, passed, failed, skipped, apassed, apassed+afailed, result.Duration.Milliseconds())
 
 	return b.String()
+}
+
+// notComparedLine names the steps whose response was not compared with the scenario's spec and
+// why, so a run that checked nothing cannot be read as a run that found nothing. It is empty when
+// every step was compared (or the scenario has no spec).
+func notComparedLine(result *scenario.Result) string {
+	reasons := map[string]int{}
+	total := 0
+	for _, sr := range result.Steps {
+		if sr.Spec.State == "" {
+			continue
+		}
+		total++
+		if sr.Spec.State == scenario.SpecNotChecked {
+			reasons[sr.Spec.Reason]++
+		}
+	}
+	if len(reasons) == 0 {
+		return ""
+	}
+	names := make([]string, 0, len(reasons))
+	n := 0
+	for r, c := range reasons {
+		names = append(names, fmt.Sprintf("%s: %d", r, c))
+		n += c
+	}
+	sort.Strings(names)
+	return fmt.Sprintf("Spec: %d of %d responses were not compared with the spec (%s)", n, total, strings.Join(names, "; "))
 }
 
 func assertionLabel(a domain.Assertion) string {

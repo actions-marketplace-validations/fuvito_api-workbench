@@ -768,3 +768,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 ### 2026-11-21 — 0.7.1 prepared
 
 - Version 0.7.1 in `AboutDialog.tsx` (a 0.7.1 entry that says what was fixed), its two tests and the user guide. Release notes for the GitHub Release are drafted. Decision (owner): a patch release instead of moving the `v0.7.0` tag. The 0.7.0 release page gets a note that the Action must be used at `@v0.7.1`.
+
+### 2026-11-22 — Findings from external testing, batch 1 (0.7.2)
+
+- **Source:** the sandbox repository's `docs/clrsig-findings.md` (F-001 to F-021, found with v0.7.1); the whole list is tracked as B-082. F-001 and F-002 were already fixed in 0.7.x.
+- **F-010 (false pass, the serious one):** a spec with `servers` matched nothing by path, so conformance skipped every response check, scenario steps were "not checked" and coverage showed 0%. `Spec.pathRouter` now builds the router without the servers and `Spec.relativePath` removes a server's base path (`/v1`) from the path, in the response check, the request check, `HasOperation` and coverage. The text run report adds `Spec: N of M responses were not compared with the spec (reason: n)` when any step was not compared. **Risk:** runs that were green because nothing was compared can now fail.
+- **Generated requests (F-005, F-008, F-009, F-015, F-003, F-021):** credentials follow the operation's security scheme (`{{token}}`, `{{basicUser}}` / `{{basicPass}}`, `{{apiKey}}`; optional security adds none; global security is honoured), required cookie parameters become a `Cookie` header, array parameters follow `style` and `explode`, a media-type or schema-level `example` (and 3.1 `examples`) is the body, and form and multipart bodies are generated (the request check builds a real multipart document). Catalog: CS-REQ-003 added, CS-GAP-006 narrowed to XML bodies, CS-NC-001 notes the base path.
+- **Not in this release:** batches 2 and 3 and the two decisions (F-018, F-020); see B-082.

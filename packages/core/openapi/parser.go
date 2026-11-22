@@ -107,7 +107,7 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 				continue
 			}
 
-			req := buildRequest(base, method, path, withPathParameters(item, op))
+			req := buildRequest(s.doc, base, method, path, withPathParameters(item, op))
 			gr := GeneratedRequest{
 				Request:     req,
 				OperationID: op.OperationID,
@@ -150,27 +150,142 @@ func withPathParameters(item *openapi3.PathItem, op *openapi3.Operation) *openap
 	return &copied
 }
 
-// parameterValue is the value a generated request carries for a required query or header
-// parameter: the spec's own example, default or first enum value, otherwise a {{name}} placeholder
-// so a run that has no value for it is reported as "not sent" instead of sending an empty value.
-func parameterValue(p *openapi3.Parameter) string {
-	if p.Example != nil {
-		return fmt.Sprint(p.Example)
-	}
-	if sc := p.Schema; sc != nil && sc.Value != nil {
-		switch {
-		case sc.Value.Example != nil:
-			return fmt.Sprint(sc.Value.Example)
-		case sc.Value.Default != nil:
-			return fmt.Sprint(sc.Value.Default)
-		case len(sc.Value.Enum) > 0:
-			return fmt.Sprint(sc.Value.Enum[0])
+// parameterValues are the values a generated request carries for a required parameter: the spec's
+// own example, default or first enum value, otherwise a {{name}} placeholder so a run that has no
+// value for it is reported as "not sent" instead of sending an empty value. An array is written
+// the way the parameter's style and explode say (a,b,c in one value, or one value per item).
+func parameterValues(p *openapi3.Parameter) []string {
+	var v any
+	switch {
+	case p.Example != nil:
+		v = p.Example
+	case len(p.Examples) > 0:
+		names := make([]string, 0, len(p.Examples))
+		for n := range p.Examples {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		if ref := p.Examples[names[0]]; ref != nil && ref.Value != nil {
+			v = ref.Value.Value
 		}
 	}
-	return "{{" + p.Name + "}}"
+	if v == nil && p.Schema != nil && p.Schema.Value != nil {
+		sc := p.Schema.Value
+		switch {
+		case schemaExample(sc) != nil:
+			v = schemaExample(sc)
+		case sc.Default != nil:
+			v = sc.Default
+		case len(sc.Enum) > 0:
+			v = sc.Enum[0]
+		}
+	}
+	if v == nil {
+		return []string{"{{" + p.Name + "}}"}
+	}
+	switch x := v.(type) {
+	case []any:
+		items := make([]string, len(x))
+		for i, it := range x {
+			items[i] = fmt.Sprint(it)
+		}
+		explode := p.In == "query" || p.In == "cookie"
+		if p.Explode != nil {
+			explode = *p.Explode
+		}
+		if p.In == "query" && explode && (p.Style == "" || p.Style == "form") {
+			return items
+		}
+		sep := ","
+		switch p.Style {
+		case "spaceDelimited":
+			sep = " "
+		case "pipeDelimited":
+			sep = "|"
+		}
+		return []string{strings.Join(items, sep)}
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			parts = append(parts, k, fmt.Sprint(x[k]))
+		}
+		return []string{strings.Join(parts, ",")}
+	}
+	return []string{fmt.Sprint(v)}
 }
 
-func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Request {
+// securityRequirements is what the operation needs: its own list, or the spec's when it has none
+// (an explicit empty list means no security).
+func securityRequirements(doc *openapi3.T, op *openapi3.Operation) openapi3.SecurityRequirements {
+	if op.Security != nil {
+		return *op.Security
+	}
+	return doc.Security
+}
+
+// authFor builds the credentials a generated request carries for the first security scheme it can
+// express, with {{placeholders}} for the values: {{token}} (bearer and OAuth2), {{basicUser}} and
+// {{basicPass}} (basic), {{apiKey}} (API keys). An alternative that needs no credentials (an empty
+// requirement) means authentication is optional, so none is added. A cookie API key comes back as
+// a cookie pair.
+func authFor(doc *openapi3.T, op *openapi3.Operation) (*domain.Auth, string) {
+	reqs := securityRequirements(doc, op)
+	for _, r := range reqs {
+		if len(r) == 0 {
+			return nil, ""
+		}
+	}
+	for _, r := range reqs {
+		names := make([]string, 0, len(r))
+		for n := range r {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			var scheme *openapi3.SecurityScheme
+			if doc.Components != nil {
+				if ref := doc.Components.SecuritySchemes[name]; ref != nil {
+					scheme = ref.Value
+				}
+			}
+			if scheme == nil {
+				lower := strings.ToLower(name)
+				if strings.Contains(lower, "bearer") || strings.Contains(lower, "auth") {
+					return &domain.Auth{Type: domain.AuthBearer, Bearer: &domain.BearerAuth{Token: "{{token}}"}}, ""
+				}
+				continue
+			}
+			switch strings.ToLower(scheme.Type) {
+			case "http":
+				switch strings.ToLower(scheme.Scheme) {
+				case "basic":
+					return &domain.Auth{Type: domain.AuthBasic, Basic: &domain.BasicAuth{Username: "{{basicUser}}", Password: "{{basicPass}}"}}, ""
+				case "bearer":
+					return &domain.Auth{Type: domain.AuthBearer, Bearer: &domain.BearerAuth{Token: "{{token}}"}}, ""
+				}
+			case "oauth2", "openidconnect":
+				return &domain.Auth{Type: domain.AuthBearer, Bearer: &domain.BearerAuth{Token: "{{token}}"}}, ""
+			case "apikey":
+				switch scheme.In {
+				case "header":
+					return &domain.Auth{Type: domain.AuthAPIKey, APIKey: &domain.APIKeyAuth{Key: scheme.Name, Value: "{{apiKey}}", Location: domain.APIKeyInHeader}}, ""
+				case "query":
+					return &domain.Auth{Type: domain.AuthAPIKey, APIKey: &domain.APIKeyAuth{Key: scheme.Name, Value: "{{apiKey}}", Location: domain.APIKeyInQuery}}, ""
+				case "cookie":
+					return nil, scheme.Name + "={{apiKey}}"
+				}
+			}
+		}
+	}
+	return nil, ""
+}
+
+func buildRequest(doc *openapi3.T, base, method, path string, op *openapi3.Operation) *domain.Request {
 	name := op.Summary
 	if name == "" {
 		name = op.OperationID
@@ -187,6 +302,8 @@ func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Req
 		URL:    url,
 	}
 
+	var cookies []string
+
 	// Path parameters → keep as {{paramName}} placeholders
 	for _, pRef := range op.Parameters {
 		if pRef == nil || pRef.Value == nil {
@@ -199,47 +316,55 @@ func buildRequest(base, method, path string, op *openapi3.Operation) *domain.Req
 			req.URL = strings.ReplaceAll(req.URL, placeholder, "{{"+p.Name+"}}")
 		case "query":
 			if p.Required {
-				req.QueryParams = append(req.QueryParams, domain.QueryParam{
-					Name:  p.Name,
-					Value: parameterValue(p),
-				})
+				for _, v := range parameterValues(p) {
+					req.QueryParams = append(req.QueryParams, domain.QueryParam{Name: p.Name, Value: v})
+				}
 			}
 		case "header":
 			if p.Required {
 				req.Headers = append(req.Headers, domain.Header{
 					Name:  p.Name,
-					Value: parameterValue(p),
+					Value: strings.Join(parameterValues(p), ","),
 				})
+			}
+		case "cookie":
+			if p.Required {
+				cookies = append(cookies, p.Name+"="+strings.Join(parameterValues(p), ","))
 			}
 		}
 	}
 
-	// Security → set auth type hint if bearer is required
-	if op.Security != nil {
-		for _, req2 := range *op.Security {
-			for name := range req2 {
-				if strings.Contains(strings.ToLower(name), "bearer") ||
-					strings.Contains(strings.ToLower(name), "auth") {
-					req.Auth = &domain.Auth{
-						Type:   domain.AuthBearer,
-						Bearer: &domain.BearerAuth{Token: "{{token}}"},
-					}
-					break
-				}
-			}
-		}
+	auth, authCookie := authFor(doc, op)
+	req.Auth = auth
+	if authCookie != "" {
+		cookies = append(cookies, authCookie)
+	}
+	if len(cookies) > 0 {
+		req.Headers = append(req.Headers, domain.Header{Name: "Cookie", Value: strings.Join(cookies, "; ")})
 	}
 
 	// Request body → set body type to json when requestBody has application/json
 	if op.RequestBody != nil && op.RequestBody.Value != nil {
-		for ct, mt := range op.RequestBody.Value.Content {
-			if strings.Contains(ct, "json") {
-				req.Body = &domain.RequestBody{
-					Type:    domain.BodyJSON,
-					Content: buildBodyStub(mt),
+		content := op.RequestBody.Value.Content
+		cts := make([]string, 0, len(content))
+		for ct := range content {
+			cts = append(cts, ct)
+		}
+		sort.Strings(cts)
+		pick := func(match string) *openapi3.MediaType {
+			for _, ct := range cts {
+				if strings.Contains(ct, match) {
+					return content[ct]
 				}
-				break
 			}
+			return nil
+		}
+		if mt := pick("json"); mt != nil {
+			req.Body = &domain.RequestBody{Type: domain.BodyJSON, Content: buildBodyStub(mt)}
+		} else if mt := pick("x-www-form-urlencoded"); mt != nil {
+			req.Body = &domain.RequestBody{Type: domain.BodyFormURLEncoded, Content: buildOASFormStub(mt)}
+		} else if mt := pick("multipart/form-data"); mt != nil {
+			req.Body = &domain.RequestBody{Type: domain.BodyMultipart, Content: buildOASFormStub(mt)}
 		}
 	}
 

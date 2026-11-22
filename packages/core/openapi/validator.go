@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -106,12 +107,12 @@ func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []Vali
 // ValidateResponseByPath validates a response against the spec using the HTTP method and path
 // directly, without needing an operationID.
 func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *domain.Response) []ValidationError {
-	router, err := gorillamux.NewRouter(s.doc)
+	router, err := s.pathRouter()
 	if err != nil {
 		return []ValidationError{{Message: "building router: " + err.Error()}}
 	}
 
-	httpReq, err := http.NewRequest(method, path, nil)
+	httpReq, err := http.NewRequest(method, s.relativePath(path), nil)
 	if err != nil {
 		return []ValidationError{{Message: "building request: " + err.Error()}}
 	}
@@ -256,11 +257,11 @@ func declaredContentTypes(route *routers.Route, status int) []string {
 // can tell "matches the spec" apart from "nothing to check" (ValidateResponseByPath returns no
 // violations in both cases).
 func (s *Spec) HasOperation(method, path string) bool {
-	router, err := gorillamux.NewRouter(s.doc)
+	router, err := s.pathRouter()
 	if err != nil {
 		return false
 	}
-	httpReq, err := http.NewRequest(method, path, nil)
+	httpReq, err := http.NewRequest(method, s.relativePath(path), nil)
 	if err != nil {
 		return false
 	}
@@ -271,7 +272,7 @@ func (s *Spec) HasOperation(method, path string) bool {
 // ValidateRequest checks that req conforms to the spec's declared request schema
 // for the matching operation. Returns nil if valid or if the path is not in the spec.
 func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
-	router, err := gorillamux.NewRouter(s.doc)
+	router, err := s.pathRouter()
 	if err != nil {
 		return []ValidationError{{Message: "building router: " + err.Error()}}
 	}
@@ -279,6 +280,11 @@ func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
 	rawURL := req.URL
 	if idx := strings.Index(rawURL, "?"); idx >= 0 {
 		rawURL = rawURL[:idx]
+	}
+	if u, perr := url.Parse(rawURL); perr == nil {
+		u.Path = s.relativePath(u.Path)
+		u.RawPath = ""
+		rawURL = u.String()
 	}
 
 	httpReq, err := http.NewRequestWithContext(context.Background(), string(req.Method), rawURL, nil)
@@ -304,8 +310,11 @@ func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
 
 	if req.Body != nil && req.Body.Content != "" {
 		ct := bodyContentType(req.Body.Type)
-		httpReq.Header.Set("Content-Type", ct)
 		b := []byte(req.Body.Content)
+		if req.Body.Type == domain.BodyMultipart {
+			b, ct = multipartForValidation(req.Body.Content)
+		}
+		httpReq.Header.Set("Content-Type", ct)
 		httpReq.Body = io.NopCloser(bytes.NewReader(b))
 		httpReq.ContentLength = int64(len(b))
 	}
@@ -488,7 +497,7 @@ type ScenarioCoverageResult struct {
 // ScenarioCoverage matches each executed request against the spec's declared operations
 // and returns a coverage summary.
 func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageResult {
-	router, err := gorillamux.NewRouter(s.doc)
+	router, err := s.pathRouter()
 	if err != nil {
 		return nil
 	}
@@ -502,27 +511,16 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 		}
 	}
 
-	// Use the spec's first server URL as the base for path matching.
-	// This normalises executed URLs so FindRoute succeeds regardless of
-	// which actual host the requests were sent to (e.g. an httptest server
-	// on a random port vs. the host declared in the spec's servers list).
-	specBase := ""
-	if len(s.doc.Servers) > 0 {
-		specBase = strings.TrimRight(s.doc.Servers[0].URL, "/")
-	}
-
 	exercised := make(map[opKey]struct{})
 	exercisedPassed := make(map[opKey]bool)
 	exercisedCodes := make(map[opKey]map[int]struct{})
 	exercisedHadAuth := make(map[opKey]bool)
 	for _, ex := range executed {
-		matchURL := ex.URL
-		if specBase != "" {
-			if u, err := url.Parse(ex.URL); err == nil && u.Path != "" {
-				matchURL = specBase + u.Path
-			}
+		matchPath := ex.URL
+		if u, err := url.Parse(ex.URL); err == nil && u.Path != "" {
+			matchPath = u.Path
 		}
-		req, err := http.NewRequest(strings.ToUpper(ex.Method), matchURL, nil)
+		req, err := http.NewRequest(strings.ToUpper(ex.Method), s.relativePath(matchPath), nil)
 		if err != nil {
 			continue
 		}
@@ -572,4 +570,84 @@ func (s *Spec) ScenarioCoverage(executed []ExecutedRequest) *ScenarioCoverageRes
 		cr.Percent = float64(cr.Covered) / float64(cr.Total) * 100
 	}
 	return cr
+}
+
+// pathRouter matches paths the way the spec declares them: relative to a server's base path and
+// whatever the host. Building the router with the servers in place would only match requests to
+// the declared host and base path, so a bare path (what a report or a step carries) matched
+// nothing and was silently skipped.
+func (s *Spec) pathRouter() (routers.Router, error) {
+	d := *s.doc
+	d.Servers = nil
+	return gorillamux.NewRouter(&d)
+}
+
+// serverBasePaths lists the base paths of the spec's servers (for example "/v1" for
+// https://api.example.com/v1). Servers with variables in the path are left out.
+func (s *Spec) serverBasePaths() []string {
+	var out []string
+	for _, sv := range s.doc.Servers {
+		if sv == nil {
+			continue
+		}
+		raw := sv.URL
+		if i := strings.Index(raw, "://"); i >= 0 {
+			raw = raw[i+3:]
+			if j := strings.Index(raw, "/"); j >= 0 {
+				raw = raw[j:]
+			} else {
+				raw = ""
+			}
+		}
+		raw = strings.TrimRight(raw, "/")
+		if raw == "" || !strings.HasPrefix(raw, "/") || strings.ContainsAny(raw, "{}") {
+			continue
+		}
+		out = append(out, raw)
+	}
+	return out
+}
+
+// relativePath removes a server's base path from the front of path, so a path taken from a real
+// URL (/v1/users) compares with the paths the spec declares (/users). A path already relative to
+// the spec is returned as it is.
+func (s *Spec) relativePath(path string) string {
+	for _, base := range s.serverBasePaths() {
+		if path == base {
+			return "/"
+		}
+		if strings.HasPrefix(path, base+"/") {
+			return path[len(base):]
+		}
+	}
+	return path
+}
+
+// multipartForValidation turns the name=value pairs of a multipart body into a real multipart
+// document, so the validator can read the fields (a bare "a=1&b=2" has no boundary and cannot be
+// decoded). Fields given in the desktop's JSON form are written as text fields too.
+func multipartForValidation(content string) ([]byte, string) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if strings.HasPrefix(content, "[") {
+		var fields []struct{ N, V string }
+		if json.Unmarshal([]byte(content), &fields) == nil {
+			for _, f := range fields {
+				_ = mw.WriteField(f.N, f.V)
+			}
+		}
+	} else if values, err := url.ParseQuery(content); err == nil {
+		names := make([]string, 0, len(values))
+		for n := range values {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, n := range names {
+			for _, v := range values[n] {
+				_ = mw.WriteField(n, v)
+			}
+		}
+	}
+	_ = mw.Close()
+	return buf.Bytes(), mw.FormDataContentType()
 }

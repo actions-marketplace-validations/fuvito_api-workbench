@@ -76,7 +76,7 @@ func GenerateNegativeProbes(s *Spec, baseURL string) ([]NegativeProbe, error) {
 			if gr, ok := happyByOp[op.OperationID]; ok {
 				baseReq = gr.Request
 			} else {
-				baseReq = buildRequest(base, method, path, op)
+				baseReq = buildRequest(s.doc, base, method, path, op)
 			}
 
 			// 1. Missing auth — when operation (or global spec) declares security.

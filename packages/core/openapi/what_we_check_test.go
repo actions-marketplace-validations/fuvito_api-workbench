@@ -314,19 +314,19 @@ func TestCheck_NotChecked(t *testing.T) {
 	}
 }
 
-// CS-GAP-006: requests are only generated with a JSON body; an operation that takes a form,
-// multipart or XML body is generated without one.
-func TestCheck_OnlyJSONRequestBodiesAreGenerated_KnownGap(t *testing.T) {
+// CS-GAP-006: requests are generated with a JSON, form or multipart body; an operation that takes
+// an XML body is generated without one.
+func TestCheck_XMLRequestBodiesAreNotGenerated_KnownGap(t *testing.T) {
 	spec, err := openapi.ParseBytes([]byte(`
 openapi: "3.0.3"
 info: {title: f, version: "1"}
 paths:
-  /form:
+  /xml:
     post:
-      operationId: form
+      operationId: xml
       requestBody:
         content:
-          application/x-www-form-urlencoded:
+          application/xml:
             schema: {type: object, required: [a], properties: {a: {type: string}}}
       responses: {"201": {description: ok}}
 `), "yaml")
@@ -338,6 +338,6 @@ paths:
 		t.Fatalf("%v %d", err, len(reqs))
 	}
 	if reqs[0].Request.Body != nil {
-		t.Errorf("CS-GAP-006: no body is generated for a form request body today, got %+v", reqs[0].Request.Body)
+		t.Errorf("CS-GAP-006: no body is generated for an XML request body today, got %+v", reqs[0].Request.Body)
 	}
 }

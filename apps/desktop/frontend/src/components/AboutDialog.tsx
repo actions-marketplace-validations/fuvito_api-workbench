@@ -3,6 +3,16 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.7.2',
+    date: '2026-11-22',
+    items: [
+      'Fix: a spec that lists its servers (servers: [{url: https://host/v1}]) is now matched by path, so responses are compared with it. Before, such a spec matched nothing, every response passed unchecked and coverage showed 0%',
+      'Fix: a run report says when responses were not compared with the spec and why',
+      'Generated requests now carry the credentials of the security scheme an operation names (basic and API key as well as bearer), required cookie parameters, array query parameters written by style and explode, schema-level and OpenAPI 3.1 examples as bodies, and form and multipart fields',
+      'Runs that passed only because nothing was compared can now fail. Record the current state with clrsig conform --write-baseline and adopt the rest gradually',
+    ],
+  },
+  {
     version: '0.7.1',
     date: '2026-11-21',
     items: [
@@ -165,7 +175,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.1</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.2</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
