@@ -663,12 +663,14 @@ export async function buildCliCommand(input: CliBuildInput): Promise<CliBuildOut
   return (await WailsBuildCliCommand(input as never)) as unknown as CliBuildOutput
 }
 
-export async function pickCliFile(title: string): Promise<string> {
-  return WailsPickCliFile(title)
+// `current` is what the field holds now and `runFrom` the folder relative paths are read from: the
+// dialog opens in the workspace for an empty field, otherwise where the field points.
+export async function pickCliFile(title: string, current = '', runFrom = ''): Promise<string> {
+  return WailsPickCliFile(title, current, runFrom)
 }
 
-export async function pickCliFolder(title: string): Promise<string> {
-  return WailsPickCliFolder(title)
+export async function pickCliFolder(title: string, current = '', runFrom = ''): Promise<string> {
+  return WailsPickCliFolder(title, current, runFrom)
 }
 
 // ---- Settings ----

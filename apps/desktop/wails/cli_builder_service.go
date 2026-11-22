@@ -209,13 +209,50 @@ func (s *CliBuilderService) BuildCliCommand(in CliBuildInput) CliBuildOutput {
 	return out
 }
 
+// pickerStart is the folder a file or folder picker opens in: the workspace when the field is
+// empty, otherwise the folder shown in the field or the folder that holds the file shown there. A
+// relative value is read from the run-from folder (as the command will read it), and a value that
+// does not exist yet opens in its nearest existing parent. A web address opens the workspace.
+func pickerStart(value, workspace, runFrom string) string {
+	v := strings.TrimSpace(value)
+	if v == "" || strings.HasPrefix(v, "http://") || strings.HasPrefix(v, "https://") {
+		return workspace
+	}
+	if !filepath.IsAbs(v) {
+		base := runFrom
+		if base == "" {
+			base = workspace
+		}
+		if base == "" {
+			return ""
+		}
+		v = filepath.Join(base, filepath.FromSlash(v))
+	}
+	for p := filepath.Clean(v); ; {
+		if info, err := os.Stat(p); err == nil {
+			if info.IsDir() {
+				return p
+			}
+			return filepath.Dir(p)
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return workspace
+		}
+		p = parent
+	}
+}
+
 // PickCliFile opens a file picker for a file the command should use; it returns "" if cancelled.
-func (s *CliBuilderService) PickCliFile(title string) string {
+// current is what the field holds now and runFrom the folder relative paths are read from; the
+// dialog opens where pickerStart says.
+func (s *CliBuilderService) PickCliFile(title, current, runFrom string) string {
 	if s.ctx == nil {
 		return ""
 	}
 	path, err := runtime.OpenFileDialog(s.ctx, runtime.OpenDialogOptions{
-		Title: title,
+		Title:            title,
+		DefaultDirectory: pickerStart(current, s.ws.GetWorkspacePath(), runFrom),
 		Filters: []runtime.FileFilter{
 			{DisplayName: "YAML / JSON (*.yaml, *.yml, *.json)", Pattern: "*.yaml;*.yml;*.json"},
 		},
@@ -226,12 +263,16 @@ func (s *CliBuilderService) PickCliFile(title string) string {
 	return path
 }
 
-// PickCliFolder opens a folder picker; it returns "" if cancelled.
-func (s *CliBuilderService) PickCliFolder(title string) string {
+// PickCliFolder opens a folder picker; it returns "" if cancelled. The dialog opens where
+// pickerStart says.
+func (s *CliBuilderService) PickCliFolder(title, current, runFrom string) string {
 	if s.ctx == nil {
 		return ""
 	}
-	path, err := runtime.OpenDirectoryDialog(s.ctx, runtime.OpenDialogOptions{Title: title})
+	path, err := runtime.OpenDirectoryDialog(s.ctx, runtime.OpenDialogOptions{
+		Title:            title,
+		DefaultDirectory: pickerStart(current, s.ws.GetWorkspacePath(), runFrom),
+	})
 	if err != nil {
 		return ""
 	}

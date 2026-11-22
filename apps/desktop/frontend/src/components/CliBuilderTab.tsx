@@ -54,15 +54,16 @@ type FieldProps = {
   files: CliFile[]
   messages: CliMessage[]
   suggestion?: CliSuggestion
+  runFrom: string
   onChange: (v: string) => void
 }
 
-function Field({ input, value, files, messages, suggestion, onChange }: FieldProps) {
+function Field({ input, value, files, messages, suggestion, runFrom, onChange }: FieldProps) {
   const id = `cli-${input.name}`
   const isPath = input.kind === 'file' || input.kind === 'fileOrURL' || input.kind === 'dir' || input.kind === 'path'
 
   async function browse(folder: boolean) {
-    const picked = folder ? await pickCliFolder(input.label) : await pickCliFile(input.label)
+    const picked = folder ? await pickCliFolder(input.label, value, runFrom) : await pickCliFile(input.label, value, runFrom)
     if (picked) onChange(picked)
   }
 
@@ -259,7 +260,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   }
 
   async function browseRunFrom() {
-    const picked = await pickCliFolder('Folder you will run the command from')
+    const picked = await pickCliFolder('Folder you will run the command from', runFrom, '')
     if (picked) setRunFrom(picked)
   }
 
@@ -288,6 +289,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
       files={filesFor(input.role, ctx)}
       messages={forField(input.name)}
       suggestion={result?.suggestions.find(s => s.field === input.name)}
+      runFrom={runFrom}
       onChange={v => setValue(input.name, v)}
     />
   )

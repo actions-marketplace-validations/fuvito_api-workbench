@@ -14,10 +14,10 @@ export function GetCliContext() {
   return window['go']['main']['CliBuilderService']['GetCliContext']();
 }
 
-export function PickCliFile(arg1) {
-  return window['go']['main']['CliBuilderService']['PickCliFile'](arg1);
+export function PickCliFile(arg1, arg2, arg3) {
+  return window['go']['main']['CliBuilderService']['PickCliFile'](arg1, arg2, arg3);
 }
 
-export function PickCliFolder(arg1) {
-  return window['go']['main']['CliBuilderService']['PickCliFolder'](arg1);
+export function PickCliFolder(arg1, arg2, arg3) {
+  return window['go']['main']['CliBuilderService']['PickCliFolder'](arg1, arg2, arg3);
 }

@@ -136,8 +136,10 @@ describe('CliBuilderTab', () => {
     await waitFor(() => expect(screen.getByLabelText(/Scenario or folder/, { selector: 'input' })).toHaveValue('/elsewhere/s.yaml'))
     fireEvent.click(screen.getByRole('button', { name: 'Browse for Scenario or folder (folder)' }))
     await waitFor(() => expect(screen.getByLabelText(/Scenario or folder/, { selector: 'input' })).toHaveValue('/elsewhere/suite'))
-    expect(b.pickCliFile).toHaveBeenCalledWith('Scenario or folder')
-    expect(b.pickCliFolder).toHaveBeenCalledWith('Scenario or folder')
+    // The dialogs open where the field points: empty opens the workspace, so the first browse passes
+    // nothing; the second sees the file the first one chose.
+    expect(b.pickCliFile).toHaveBeenCalledWith('Scenario or folder', '', '/repo')
+    expect(b.pickCliFolder).toHaveBeenCalledWith('Scenario or folder', '/elsewhere/s.yaml', '/repo')
   })
 
   it('browses for a file', async () => {
@@ -145,7 +147,7 @@ describe('CliBuilderTab', () => {
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Browse for Environment' }))
     await waitFor(() => expect(screen.getByLabelText(/Environment/, { selector: 'input' })).toHaveValue('/elsewhere/x.yaml'))
-    expect(b.pickCliFile).toHaveBeenCalledWith('Environment')
+    expect(b.pickCliFile).toHaveBeenCalledWith('Environment', '', '/repo')
   })
 
   it('switching the goal builds that command from scratch', async () => {
@@ -239,6 +241,7 @@ describe('CliBuilderTab', () => {
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Browse for the run-from folder' }))
     await waitFor(() => expect(screen.getByLabelText('Run from folder')).toHaveValue('/repo/ws'))
+    expect(b.pickCliFolder).toHaveBeenCalledWith('Folder you will run the command from', '/repo', '')
     await waitFor(() => expect(b.buildCliCommand).toHaveBeenLastCalledWith(expect.objectContaining({ runFrom: '/repo/ws' })))
   })
 

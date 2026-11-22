@@ -855,3 +855,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 ### 2026-11-22 — CLI Builder: file name for the markdown format (not yet released)
 
 - The builder's suggested report file (`clibuild.SuggestOutput`) had no extension for `markdown` and fell back to `.txt`; it now suggests `.md` and describes the format in the output note. `TestEveryReportFormatHasAnExtension` fails for any format the CLI offers that would fall back to `.txt`.
+
+### 2026-11-22 — CLI Builder: browse buttons open where the field points (not yet released)
+
+- The file and folder buttons next to a path field now open their dialog in the workspace when the field is empty, otherwise in the folder shown or the folder that holds the file shown (`pickerStart`: a relative value is read from the run-from folder; a value that does not exist yet opens its nearest existing parent; a web address opens the workspace). The run-from button does the same with its own value. `PickCliFile` and `PickCliFolder` take the current value and the run-from folder (Wails bindings regenerated). Tests: `TestPickerStart` and the builder tests.
