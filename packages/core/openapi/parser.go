@@ -37,7 +37,10 @@ func ParseBytes(data []byte, format string) (*Spec, error) {
 		return nil, fmt.Errorf("loading spec: %w", err)
 	}
 
-	if err := doc.Validate(context.Background()); err != nil {
+	restore := setAsideNonJSONExamples(doc)
+	err = doc.Validate(context.Background())
+	restore()
+	if err != nil {
 		return nil, fmt.Errorf("invalid OpenAPI spec: %w", err)
 	}
 
@@ -370,4 +373,67 @@ func buildRequest(doc *openapi3.T, base, method, path string, op *openapi3.Opera
 	}
 
 	return req
+}
+
+// setAsideNonJSONExamples removes, until the returned function puts them back, the examples of
+// media types that are not JSON. The library checks every example against the media type's schema
+// as a JSON value, so a valid XML example string ("<note>...</note>") made the whole document
+// invalid. The examples stay in the document for everything else.
+func setAsideNonJSONExamples(doc *openapi3.T) func() {
+	type saved struct {
+		mt       *openapi3.MediaType
+		example  any
+		examples openapi3.Examples
+	}
+	var stash []saved
+	visit := func(content openapi3.Content) {
+		for ct, mt := range content {
+			if mt == nil || isJSONDocumentType(ct) || (mt.Example == nil && len(mt.Examples) == 0) {
+				continue
+			}
+			stash = append(stash, saved{mt, mt.Example, mt.Examples})
+			mt.Example, mt.Examples = nil, nil
+		}
+	}
+	visitResponses := func(r *openapi3.Responses) {
+		if r == nil {
+			return
+		}
+		for _, ref := range r.Map() {
+			if ref != nil && ref.Value != nil {
+				visit(ref.Value.Content)
+			}
+		}
+	}
+	visitBody := func(ref *openapi3.RequestBodyRef) {
+		if ref != nil && ref.Value != nil {
+			visit(ref.Value.Content)
+		}
+	}
+	if doc.Paths != nil {
+		for _, item := range doc.Paths.Map() {
+			if item == nil {
+				continue
+			}
+			for _, op := range item.Operations() {
+				visitBody(op.RequestBody)
+				visitResponses(op.Responses)
+			}
+		}
+	}
+	if c := doc.Components; c != nil {
+		for _, rb := range c.RequestBodies {
+			visitBody(rb)
+		}
+		for _, r := range c.Responses {
+			if r != nil && r.Value != nil {
+				visit(r.Value.Content)
+			}
+		}
+	}
+	return func() {
+		for _, s := range stash {
+			s.mt.Example, s.mt.Examples = s.example, s.examples
+		}
+	}
 }

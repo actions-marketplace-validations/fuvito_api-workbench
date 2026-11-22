@@ -834,3 +834,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **F-031:** `assertions.DecodeJSON` / `FormatValue`: jsonpath assertions and extractions keep an integer above 2^53 (or beyond int64) as its digits, and print a number in full (`1234567`, not `1.234567e+06`; this also fixes plain numbers of 7 or more digits).
 - **F-032 (behaviour change):** a failed extraction fails the step and the run (exit 1, `passed: false`, headline FAILED). **Risk:** a scenario whose extraction silently found nothing used to exit 0 and now exits 1.
 - **Tests:** `hostile_test.go`, `edge_assertions_test.go`, `TestNegativeText_ErroredProbesAreNotPassed`; catalog rows CS-RESP-015, CS-RUN-008, CS-RUN-009, CS-PROBE-006.
+
+### 2026-11-22 — Findings F-033, F-034, F-035 (0.8.6)
+
+- **F-033 (a 0.8.5 regression):** the strict single-document check added for F-026/F-027 only applies to `application/json` and `+json` (`isJSONDocumentType`); `application/x-ndjson`, `application/json-seq` and other types that merely contain "json" are not parsed as one document. A `+json` body with text after the value still fails.
+- **F-034:** `ParseBytes` sets aside the `example` / `examples` of media types that are not JSON while the library validates the document (`setAsideNonJSONExamples`), so a valid XML example string no longer makes the spec invalid (exit 2); they are put back afterwards. A wrong example for a JSON media type is still rejected.
+- **F-035:** the "no credentials" probe also removes an API key carried in a cookie (`dropCookiePair`), keeping other cookies; before, `Cookie: session=...` stayed and a correct server failed the probe.
+- **Tests:** `TestConform_NDJSONIsNotOneDocument`, `TestParse_AcceptsAnExampleForANonJSONMediaType`, `TestParse_StillRejectsAWrongJSONExample`, `TestProbes_NoCredentialsDropsACookieAPIKey`; catalog rows CS-NC-009 and CS-PROBE-004 updated.

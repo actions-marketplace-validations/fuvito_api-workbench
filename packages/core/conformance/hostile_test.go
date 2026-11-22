@@ -91,3 +91,54 @@ func TestConform_AcceptsAnIntegerBeyondInt64(t *testing.T) {
 		}
 	}
 }
+
+const ndjsonSpec = `openapi: "3.0.3"
+info: {title: nd, version: "1"}
+servers: [{url: "%s"}]
+paths:
+  /events:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/x-ndjson: {schema: {type: string}}
+  /problem:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/problem+json: {schema: {type: object}}
+`
+
+// F-033: a media type that only contains "json" is not read as one JSON document, but +json is.
+func TestConform_NDJSONIsNotOneDocument(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/events" {
+			w.Header().Set("Content-Type", "application/x-ndjson")
+			_, _ = w.Write([]byte("{\"a\":1}\n{\"a\":2}\n{\"a\":3}\n"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/problem+json")
+		_, _ = w.Write([]byte(`{"a":1} trailing`))
+	}))
+	defer srv.Close()
+	spec, err := openapi.ParseBytes([]byte(fmt.Sprintf(ndjsonSpec, srv.URL)), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := conformance.New(executor.New(executor.Options{})).Run(context.Background(), spec, "", domain.NewEnvironment("e"), conformance.Options{})
+	for _, op := range res.Operations {
+		switch op.Path {
+		case "/events":
+			if !op.Passed() {
+				t.Errorf("NDJSON must not fail as a single document: %+v", op.Violations)
+			}
+		case "/problem":
+			if op.Passed() {
+				t.Error("a +json body with text after the value still fails")
+			}
+		}
+	}
+}

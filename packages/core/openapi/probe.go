@@ -85,6 +85,9 @@ func GenerateNegativeProbes(s *Spec, baseURL string) ([]NegativeProbe, error) {
 			if hasSecurityRequirement(s.doc, op) {
 				req := cloneRequest(baseReq)
 				req.Auth = nil
+				if _, authCookie := authFor(s.doc, op); authCookie != "" {
+					dropCookiePair(req, authCookie)
+				}
 				probes = append(probes, NegativeProbe{
 					Request:     req,
 					OperationID: op.OperationID,
@@ -363,4 +366,27 @@ func (s *Spec) BodyFieldType(method, specPath, field string) string {
 		}
 	}
 	return ""
+}
+
+// dropCookiePair removes one "name=value" pair from the request's Cookie header (the whole header
+// when it was the only pair): a credential carried in a cookie must not stay in the request that
+// is meant to have none.
+func dropCookiePair(req *domain.Request, pair string) {
+	for i, h := range req.Headers {
+		if !strings.EqualFold(h.Name, "Cookie") {
+			continue
+		}
+		var keep []string
+		for _, p := range strings.Split(h.Value, "; ") {
+			if p != pair {
+				keep = append(keep, p)
+			}
+		}
+		if len(keep) == 0 {
+			req.Headers = append(req.Headers[:i:i], req.Headers[i+1:]...)
+		} else {
+			req.Headers[i].Value = strings.Join(keep, "; ")
+		}
+		return
+	}
 }

@@ -3,6 +3,15 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.6',
+    date: '2026-11-22',
+    items: [
+      'Fixes a 0.8.5 regression: a response declared application/x-ndjson (or another type that only contains "json") is no longer read as one JSON document and reported as invalid; application/json and +json types are still checked strictly',
+      'A valid OpenAPI document with an XML example string no longer fails to load (exit 2); examples for media types that are not JSON are not checked against the JSON schema',
+      'The "no credentials" negative probe now also removes an API key sent in a cookie, so a correct server no longer fails it',
+    ],
+  },
+  {
     version: '0.8.5',
     date: '2026-11-22',
     items: [
@@ -244,7 +253,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.5</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.6</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

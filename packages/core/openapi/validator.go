@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -194,16 +195,27 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 	return violations
 }
 
+// isJSONDocumentType is true for a media type whose body is one JSON document: application/json
+// and any +json type (application/problem+json). A type that only contains "json" is not one:
+// application/x-ndjson is one JSON value per line, application/json-seq is a record sequence.
+func isJSONDocumentType(ct string) bool {
+	mt, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		mt = strings.ToLower(strings.TrimSpace(strings.SplitN(ct, ";", 2)[0]))
+	}
+	return mt == "application/json" || strings.HasSuffix(mt, "+json")
+}
+
 // strictJSONProblem says why a body the spec declares as JSON is not valid JSON text, or returns
 // "". Only what the library would let through is looked for: bytes that are not UTF-8 (RFC 8259
 // section 8.1) and text after the value.
 func strictJSONProblem(body []byte, sentType string, route *routers.Route, status int) string {
-	if len(body) == 0 || !strings.Contains(strings.ToLower(sentType), "json") {
+	if len(body) == 0 || !isJSONDocumentType(sentType) {
 		return ""
 	}
 	declaresJSON := false
 	for _, ct := range declaredContentTypes(route, status) {
-		if strings.Contains(strings.ToLower(ct), "json") {
+		if isJSONDocumentType(ct) {
 			declaresJSON = true
 		}
 	}
