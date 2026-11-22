@@ -760,6 +760,11 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - Version 0.7.0 in `AboutDialog.tsx` (with its complete release notes), its two tests and the user guide; the user guide says the Check Conformance page reads only workspace files. Release notes for the GitHub Release are drafted. **Not tagged yet:** waiting for the owner's check of the desktop app and a green CI on the final commit.
 - **Left open on purpose:** B-080 (Contracts store keys; needs a decision, see the pre-release batch entry), B-006/B-007/B-008 and the other older items, code signing (B-035). **Not verified:** the Homebrew install and the GitHub Action at the new tag (they can only be tried after the release exists).
 
+### 2026-11-21 — v0.7.1 released
+
+- **Tag `v0.7.1` on `71e6d46`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) is the latest release and carries the notes; the `v0.7.0` page has a "superseded" note about the Action. Docker `ghcr.io/fuvito/api-workbench:v0.7.1` prints `clrsig version v0.7.1`; Scoop updated to 0.7.1 by the tap-bump commit and installed on Windows (`clrsig version v0.7.1`); `action.yml` at the tag parses (25 inputs) and `TestActionFileIsValid` passed in CI on that commit.
+- **Still not verified:** the Homebrew install (no Mac) and a real workflow run of the Action at `@v0.7.1` (the file is validated, the script was run locally). **Open:** B-080 and code signing (B-035); see `docs/planning/next_steps/2026-11-21-next-steps-after-0.7.0.md`.
+
 ### 2026-11-21 — 0.7.1 prepared
 
 - Version 0.7.1 in `AboutDialog.tsx` (a 0.7.1 entry that says what was fixed), its two tests and the user guide. Release notes for the GitHub Release are drafted. Decision (owner): a patch release instead of moving the `v0.7.0` tag. The 0.7.0 release page gets a note that the Action must be used at `@v0.7.1`.
