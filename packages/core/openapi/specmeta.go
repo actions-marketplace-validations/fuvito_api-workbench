@@ -23,7 +23,7 @@ func ExtractSpecMeta(s *Spec) SpecMeta {
 	}
 
 	for path, item := range s.doc.Paths.Map() {
-		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"} {
+		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"} {
 			op := opFromItem(item, method)
 			if op == nil {
 				continue

@@ -15,11 +15,12 @@ const (
 	MethodDELETE  HTTPMethod = "DELETE"
 	MethodHEAD    HTTPMethod = "HEAD"
 	MethodOPTIONS HTTPMethod = "OPTIONS"
+	MethodTRACE   HTTPMethod = "TRACE"
 )
 
 func (m HTTPMethod) IsValid() bool {
 	switch m {
-	case MethodGET, MethodPOST, MethodPUT, MethodPATCH, MethodDELETE, MethodHEAD, MethodOPTIONS:
+	case MethodGET, MethodPOST, MethodPUT, MethodPATCH, MethodDELETE, MethodHEAD, MethodOPTIONS, MethodTRACE:
 		return true
 	}
 	return false

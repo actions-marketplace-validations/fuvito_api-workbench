@@ -160,8 +160,9 @@ func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 
 	loader := newSpecLoader(cmd)
 	var runs []*scenarioRun
+	keys := seedKeys(paths, scenarios)
 	for i, p := range paths {
-		r := executeScenario(cmd, p, scenarios[i], env, loader, o)
+		r := executeScenario(cmd, p, keys[i], scenarios[i], env, loader, o)
 		runs = append(runs, r)
 		if o.failFast && !r.result.Passed {
 			if left := len(paths) - i - 1; left > 0 {
@@ -241,7 +242,7 @@ func loadRunEnvironment(envFile string) (*domain.Environment, error) {
 
 // executeScenario runs one scenario, computes its spec coverage and, with --workspace,
 // accumulates that coverage.
-func executeScenario(cmd *cobra.Command, scenarioPath string, s *domain.Scenario, env *domain.Environment, loader *specLoader, o runOptions) *scenarioRun {
+func executeScenario(cmd *cobra.Command, scenarioPath, seedKey string, s *domain.Scenario, env *domain.Environment, loader *specLoader, o runOptions) *scenarioRun {
 	// --spec overrides specFile: from the scenario. A --spec path is relative to the current
 	// directory; a specFile: inside the scenario is relative to the scenario file.
 	// specRef stays as written because it is also the key coverage is accumulated under.
@@ -253,7 +254,7 @@ func executeScenario(cmd *cobra.Command, scenarioPath string, s *domain.Scenario
 	}
 
 	loadedSpec := loader.load(loadSrc, filepath.Dir(scenarioPath))
-	runner := newScenarioRunner(loadedSpec).WithEngine(o.engine, scenarioPath)
+	runner := newScenarioRunner(loadedSpec).WithEngine(o.engine, seedKey)
 
 	// Steps that use requestRef need their request files loaded first. Look next to the
 	// scenario, then in the requests/ folder beside its scenarios/ folder, then in the
@@ -473,4 +474,26 @@ func expandScenarioArgs(cmd *cobra.Command, args []string, noRecursive bool) ([]
 			n, plural(n), map[bool]string{true: "is", false: "are"}[n == 1], listNames(found.Skipped, 5))
 	}
 	return found.Files, nil
+}
+
+// seedKeys names each scenario for --seed. The random values of a scenario come from the seed and
+// this key, so the key must not depend on how the file was spelled on the command line (relative,
+// absolute, from another folder): the title is used, the file name without extension when there is
+// none, and a second scenario with the same name is told apart by its position among them.
+func seedKeys(paths []string, scenarios []*domain.Scenario) []string {
+	keys := make([]string, len(paths))
+	seen := map[string]int{}
+	for i, p := range paths {
+		key := strings.TrimSpace(scenarios[i].Title)
+		if key == "" {
+			base := filepath.Base(p)
+			key = strings.TrimSuffix(base, filepath.Ext(base))
+		}
+		seen[key]++
+		if n := seen[key]; n > 1 {
+			key = fmt.Sprintf("%s#%d", key, n)
+		}
+		keys[i] = key
+	}
+	return keys
 }

@@ -10,7 +10,7 @@ import (
 func TestHTTPMethodIsValid(t *testing.T) {
 	valid := []domain.HTTPMethod{
 		domain.MethodGET, domain.MethodPOST, domain.MethodPUT,
-		domain.MethodPATCH, domain.MethodDELETE, domain.MethodHEAD, domain.MethodOPTIONS,
+		domain.MethodPATCH, domain.MethodDELETE, domain.MethodHEAD, domain.MethodOPTIONS, domain.MethodTRACE,
 	}
 	for _, m := range valid {
 		if !m.IsValid() {
@@ -18,7 +18,7 @@ func TestHTTPMethodIsValid(t *testing.T) {
 		}
 	}
 
-	invalid := []domain.HTTPMethod{"", "get", "CONNECT", "TRACE"}
+	invalid := []domain.HTTPMethod{"", "get", "CONNECT"}
 	for _, m := range invalid {
 		if m.IsValid() {
 			t.Errorf("expected %q to be invalid", m)

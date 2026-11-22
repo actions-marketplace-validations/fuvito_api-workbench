@@ -3,6 +3,15 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.4',
+    date: '2026-11-22',
+    items: [
+      'A scenario step whose {{name}} has no value is no longer sent with the braces in the URL: it fails with "not sent: no value for {{name}}", like an operation in clrsig conform. A scenario that relied on a literal {{...}} being sent now fails',
+      'clrsig run --seed N now gives the same random values however the scenario path is written (relative, absolute, another folder, a copy under another name); the values come from the seed and the scenario title. The values a given seed produces differ from 0.8.3',
+      'TRACE operations in an OpenAPI 3 spec are now generated and checked by conform like the other methods (--read-only lists them as skipped)',
+    ],
+  },
+  {
     version: '0.8.3',
     date: '2026-11-22',
     items: [
@@ -225,7 +234,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.3</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.4</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

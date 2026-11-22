@@ -332,3 +332,59 @@ scenarios:
 		t.Errorf("a bundle run replays with --seed:\n%s\n%s", a, b)
 	}
 }
+
+// F-023: a step whose {{name}} has no value is not sent with its braces in the URL.
+func TestRun_StepWithAMissingValueIsNotSent(t *testing.T) {
+	srv, n := dynServer(t)
+	sc := writeTempFile(t, "missing.yaml", `schemaVersion: "1"
+title: Missing
+steps:
+  - label: ok
+    request: {method: GET, url: "{{base}}/ok"}
+  - label: missing path
+    failPolicy: continue
+    request: {method: GET, url: "{{base}}/items/{{nothing}}"}
+  - label: missing query
+    failPolicy: continue
+    request: {method: GET, url: "{{base}}/health?x={{alsoNothing}}"}
+`)
+	out, err := exec(t, "run", "--var", "base="+srv.URL, "-f", "json", sc)
+	if err == nil || exitCode(err) != 1 {
+		t.Fatalf("a step that could not be sent fails the run (exit 1): %v", err)
+	}
+	if !strings.Contains(out, "no value for {{nothing}}") || !strings.Contains(out, "no value for {{alsoNothing}}") {
+		t.Errorf("the report names each missing value:\n%s", out)
+	}
+	if got := n.Load(); got != 1 {
+		t.Errorf("only the step with all its values is sent, got %d requests", got)
+	}
+}
+
+// F-024: --seed fixes the values whatever way the scenario file is spelled or named.
+func TestRun_SeedGivesTheSameValuesForEverySpellingOfThePath(t *testing.T) {
+	srv, _ := dynServer(t)
+	sc := orderScenarioFile(t, "Seeded")
+	run := func(args ...string) string {
+		out, err := exec(t, append([]string{"run", "--var", "base=" + srv.URL, "--seed", "7"}, args...)...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return find(t, emailRe, out)
+	}
+	want := run(sc)
+	dir, name := filepath.Dir(sc), filepath.Base(sc)
+	t.Chdir(dir)
+	if got := run(name); got != want {
+		t.Errorf("a path from inside the folder: %s, want %s", got, want)
+	}
+	if got := run("." + string(filepath.Separator) + name); got != want {
+		t.Errorf("a ./ path: %s, want %s", got, want)
+	}
+	other := writeTempFile(t, "copy-with-another-name.yaml", fmt.Sprintf(orderScenarioYAML, "Seeded"))
+	if got := run(other); got != want {
+		t.Errorf("the same scenario in another file: %s, want %s", got, want)
+	}
+	if got := run(sc, "--seed", "8"); got == want {
+		t.Errorf("another seed must give other values")
+	}
+}

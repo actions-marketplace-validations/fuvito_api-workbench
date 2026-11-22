@@ -257,6 +257,17 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 		sr.Error = strings.Join(msgs, "; ")
 		return sr
 	}
+	// A {{name}} nothing gave a value to would go out with its braces in the URL, header or body,
+	// so the step is not sent, as an operation is not in clrsig conform.
+	if missing := variables.UnresolvedPlaceholders(resolved); len(missing) > 0 {
+		refs := make([]string, len(missing))
+		for i, n := range missing {
+			refs[i] = "{{" + n + "}}"
+		}
+		sr.Error = "not sent: no value for " + strings.Join(refs, ", ") +
+			" (set it in the environment, with --var, in the scenario's variables, or extract it in an earlier step)"
+		return sr
+	}
 
 	if step.TimeoutMs > 0 {
 		resolved.Timeout = time.Duration(step.TimeoutMs) * time.Millisecond

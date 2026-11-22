@@ -67,7 +67,7 @@ func GenerateNegativeProbes(s *Spec, baseURL string) ([]NegativeProbe, error) {
 		if item == nil {
 			continue
 		}
-		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"} {
+		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"} {
 			op := opFromItem(item, method)
 			if op == nil {
 				continue
@@ -188,6 +188,8 @@ func opFromItem(item *openapi3.PathItem, method string) *openapi3.Operation {
 		return item.Head
 	case "OPTIONS":
 		return item.Options
+	case "TRACE":
+		return item.Trace
 	}
 	return nil
 }

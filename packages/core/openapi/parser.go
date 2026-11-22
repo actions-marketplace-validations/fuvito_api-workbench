@@ -100,8 +100,9 @@ func GenerateRequests(s *Spec, baseURL string) ([]GeneratedRequest, error) {
 			"DELETE":  item.Delete,
 			"HEAD":    item.Head,
 			"OPTIONS": item.Options,
+			"TRACE":   item.Trace,
 		}
-		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"} {
+		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE"} {
 			op := ops[method]
 			if op == nil {
 				continue

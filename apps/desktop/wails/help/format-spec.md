@@ -47,7 +47,7 @@ Dynamic values also work in environment variable values and in assertion `expect
 - A scenario `variables` entry is generated **once per scenario run**; `{{email}}` is identical in every step and assertion of that run.
 - An inline call (`{{$guid}}` in a URL) is generated **every time it appears**, so two inline calls differ.
 - An environment variable that uses a function is generated **once per command** and shared by all scenarios run by that command (the desktop app generates it per scenario run).
-- Random values come from a seed. The report prints it (`seed: N`) when random values were used; `clrsig run --seed N` (or `CLRSIG_SEED=N`) replays the same values. Date and time functions read the clock and are not affected by the seed.
+- Random values come from a seed. The report prints it (`seed: N`) when random values were used; `clrsig run --seed N` (or `CLRSIG_SEED=N`) replays the same values. The values of a scenario come from the seed and its title (the file name when it has no title), not from how the file is written on the command line, so a relative path, an absolute path and a copy under another name give the same values; two scenarios with the same title in one run are told apart by their order. Date and time functions read the clock and are not affected by the seed.
 
 ---
 
@@ -59,7 +59,7 @@ A single HTTP request saved as a `.yaml` or `.json` file.
 schemaVersion: "1"           # required — always "1" (quoted string)
 title: Get User              # required — display name
 
-method: GET                  # required — GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS
+method: GET                  # required — GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS | TRACE
 url: "{{baseUrl}}/users/{{userId}}"  # required
 
 headers:                     # optional
