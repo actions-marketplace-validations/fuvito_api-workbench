@@ -1,6 +1,6 @@
 # Response-time assertions
 
-**Status:** Proposed (2026-11-22). **Source:** external finding F-018 (the sandbox's `docs/clrsig-findings.md`), catalog gap CS-GAP-005, backlog B-082.
+**Status:** Accepted (2026-11-22); phase 1 built in 0.8.0. **Source:** external finding F-018 (the sandbox's `docs/clrsig-findings.md`), catalog gap CS-GAP-005, backlog B-082.
 
 ## 1. Summary
 
@@ -31,7 +31,7 @@ A response that takes four seconds, or that gets slower with every call, passes 
 ```yaml
 assertions:
   - type: duration
-    operator: lt        # lt, lte, gt, gte, eq are accepted; lt and lte are the useful ones
+    operator: lt        # eq, ne, gt, lt (the existing operator set); lt is the useful one
     expected: 500       # milliseconds; {{variables}} work as in other assertions
 ```
 
@@ -81,3 +81,5 @@ User guide (assertions, `conform`), `format-spec.md`, AI prompt (guard test), `w
 | Date | Decision | By |
 |---|---|---|
 | 2026-11-22 | Proposal written from finding F-018; nothing built. | Claude |
+| 2026-11-22 | Accepted; build phase 1 first (owner: "yes"). | Owner |
+| 2026-11-22 | Phase 1 built in 0.8.0. The operator set stays the existing `eq ne gt lt` (no `lte`/`gte`, which would be new operators for every assertion type); `lt` covers the limit use. | Claude |

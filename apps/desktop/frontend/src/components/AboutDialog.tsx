@@ -3,6 +3,14 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.0',
+    date: '2026-11-22',
+    items: [
+      'New assertion type duration: fail a step that answers slower than a limit (type: duration, operator: lt, expected: 500 milliseconds). In the step editor: Assertions, type duration. A scenario that uses it cannot be read by an older clrsig',
+      'Limits are wall-clock: leave a margin, a busy machine is slower',
+    ],
+  },
+  {
     version: '0.7.4',
     date: '2026-11-22',
     items: [
@@ -194,7 +202,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.4</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

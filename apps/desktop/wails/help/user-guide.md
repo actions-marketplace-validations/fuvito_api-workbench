@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.7.4
+**Version:** 0.8.0
 
 ---
 
@@ -448,6 +448,7 @@ Keep the client secret out of the file: in the environment, give `clientSecret` 
 | `header` | Response header value | `path` (header name), `operator`, `expected` |
 | `jsonpath` | JSON value at a JSONPath expression | `path` (JSONPath), `operator`, `expected` |
 | `schema` | Validates the response body against an OpenAPI response schema | `schema` (`"#/components/schemas/Name"` or inline JSON Schema) |
+| `duration` | Response time of the step in milliseconds (use `lt`; leave a margin, a busy machine is slower) | `operator` (`eq`, `ne`, `gt`, `lt`), `expected` (milliseconds) |
 
 ### Operators
 

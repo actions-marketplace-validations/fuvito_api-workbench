@@ -792,3 +792,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **F-016 (documented, not changed):** a bad dynamic function in a scenario is found before any request is sent (exit 2) by design; it is now CS-RUN-007 in the catalog, next to CS-RUN-002 for `conform`.
 - **F-020 (behaviour change):** `clrsig coverage quality` exits 0 whether or not it finds gaps; `--fail-on-gaps` restores exit 1. CI steps that relied on the exit code must add the flag.
 - **F-018:** a design proposal, `docs/enhancements/2026-11-22-response-time-assertions.md` (status Proposed); nothing built.
+
+### 2026-11-22 — Response-time assertions, phase 1 (0.8.0; design: `docs/enhancements/2026-11-22-response-time-assertions.md`, accepted)
+
+- **New scenario assertion `type: duration`** (additive, `schemaVersion` stays "1"; an older clrsig rejects a file that uses it): compares the response time in milliseconds (`Response.Duration`, the attempt that produced the response when `retry` is used) with `expected` using `eq`, `ne`, `gt` or `lt`; the failure says `the response took N ms; expected < L ms`. `scenario.Validate` requires a number of milliseconds (or a `{{variable}}`) and rejects `contains` / `matches`. Evaluated by `assertions.Evaluator`; reports label it `duration lt 500 ms`.
+- **Desktop:** the step editor offers `duration` (numeric operators, a "max ms" hint). `format-spec.md`, the user guide, the AI prompt (only on request, with a margin) and the catalog (CS-GAP-005 now covers `conform` only) updated.
+- **Not built:** phase 2 (`conform --max-response-time`) and phase 3 (recording durations in the Contracts store and baselines).
+- **F-016 decision (owner):** a bad dynamic function in a scenario keeps stopping the run before any request (exit 2), documented as CS-RUN-007.

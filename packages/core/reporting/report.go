@@ -142,6 +142,8 @@ func assertionLabel(a domain.Assertion) string {
 		return fmt.Sprintf("jsonpath %s %s %v", a.Path, op, a.Expected)
 	case domain.AssertionSchema:
 		return "schema"
+	case domain.AssertionDuration:
+		return fmt.Sprintf("duration %s %v ms", op, a.Expected)
 	default:
 		if a.Name != "" {
 			return a.Name

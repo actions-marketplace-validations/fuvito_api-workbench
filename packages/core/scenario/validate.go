@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -101,7 +103,7 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 
 		validTypes := map[domain.AssertionType]bool{
 			domain.AssertionStatus: true, domain.AssertionHeader: true,
-			domain.AssertionJSONPath: true, domain.AssertionSchema: true,
+			domain.AssertionJSONPath: true, domain.AssertionSchema: true, domain.AssertionDuration: true,
 		}
 		validOps := map[domain.Operator]bool{
 			domain.OperatorEq: true, domain.OperatorNe: true,
@@ -119,6 +121,17 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 			}
 			if (a.Type == domain.AssertionHeader || a.Type == domain.AssertionJSONPath) && a.Path == "" {
 				add(num, name, fmt.Sprintf("%s assertion requires a path", a.Type))
+			}
+			if a.Type == domain.AssertionDuration {
+				switch a.Operator {
+				case "", domain.OperatorEq, domain.OperatorNe, domain.OperatorGt, domain.OperatorLt:
+				default:
+					add(num, name, fmt.Sprintf("a duration assertion takes eq, ne, gt or lt, not %q", a.Operator))
+				}
+				text := strings.TrimSpace(fmt.Sprint(a.Expected))
+				if _, err := strconv.ParseFloat(text, 64); err != nil && !strings.Contains(text, "{{") {
+					add(num, name, fmt.Sprintf("a duration assertion needs a number of milliseconds as expected, not %q", text))
+				}
 			}
 		}
 

@@ -35,6 +35,8 @@ func (e *Evaluator) Evaluate(a domain.Assertion, resp *domain.Response) domain.A
 		res.Actual, res.Passed, res.Message = evalJSONPath(a, resp)
 	case domain.AssertionSchema:
 		res.Actual, res.Passed, res.Message = e.evalSchema(a, resp)
+	case domain.AssertionDuration:
+		res.Actual, res.Passed, res.Message = evalDuration(a, resp)
 	default:
 		res.Passed = false
 		res.Message = fmt.Sprintf("unknown assertion type %q", a.Type)
@@ -70,6 +72,23 @@ func evalHeader(a domain.Assertion, resp *domain.Response) (actual string, passe
 	}
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
+	return
+}
+
+// evalDuration compares the response time of the request (milliseconds, from sending it to the end
+// of the body) with the expected limit. With a retry it is the attempt that produced the response.
+func evalDuration(a domain.Assertion, resp *domain.Response) (actual string, passed bool, msg string) {
+	ms := resp.Duration.Milliseconds()
+	actual = strconv.FormatInt(ms, 10)
+	expected := expectedStr(a.Expected)
+	passed, msg = compare(a.Operator, actual, expected)
+	if !passed && msg != "" && !strings.HasPrefix(msg, "invalid") {
+		op := a.Operator
+		if op == "" {
+			op = domain.OperatorEq
+		}
+		msg = fmt.Sprintf("the response took %d ms; expected %s %s ms", ms, opLabel(op), expected)
+	}
 	return
 }
 

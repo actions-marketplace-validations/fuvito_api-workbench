@@ -135,6 +135,7 @@ Create a reusable request only when two or more scenarios use exactly the same c
 
 - **status**: the status code the document declares for the operation (201 for creates, 204 for deletes with no body, and so on).
 - **jsonpath**: required fields of the response schema. To assert a field is present, use `operator: ne` with `expected: ""`; a missing path fails the assertion. To check a value, use `eq` with the literal you know. Use `gt`/`lt` only on numeric fields, and `matches` (a Go regular expression) for formats.
+- **duration**: only when the user asks for a response-time limit: `type: duration`, `operator: lt`, `expected` in milliseconds, with a generous margin.
 - **header**: `Content-Type` `contains` `json` for JSON responses; other headers only when the document declares them.
 - **schema**: one `type: schema` assertion with the **exact `operationId`** on the main successful step of an operation — only when the document defines that `operationId`, and only for OpenAPI 3.x. Never invent an `operationId`.
 - Never assert on volatile values (timestamps, generated IDs, counts that other data can change) with `eq`; assert presence or format instead.

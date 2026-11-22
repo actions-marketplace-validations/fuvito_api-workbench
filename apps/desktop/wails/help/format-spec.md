@@ -337,14 +337,24 @@ Requires `specFile` set at the scenario level.
   schema: getUserById       # operationId from the linked OpenAPI spec
 ```
 
+### `type: duration` — response time
+
+```yaml
+- type: duration
+  operator: lt              # eq | ne | gt | lt   (lt is the useful one)
+  expected: 500             # milliseconds; {{variables}} are allowed
+```
+
+Compares the time the request took, in milliseconds (from sending it to the end of the body), with the limit. With `retry`, it is the attempt that produced the response. Wall-clock limits fail on a busy machine: leave a margin. A file that uses it cannot be read by a `clrsig` older than 0.8.0.
+
 ### Operator reference
 
 | Operator | Applies to | Meaning |
 |---|---|---|
-| `eq` | status, jsonpath, header | Equal |
-| `ne` | status, jsonpath, header | Not equal |
-| `gt` | status, jsonpath, header | Greater than (numeric) |
-| `lt` | status, jsonpath, header | Less than (numeric) |
+| `eq` | status, jsonpath, header, duration | Equal |
+| `ne` | status, jsonpath, header, duration | Not equal |
+| `gt` | status, jsonpath, header, duration | Greater than (numeric) |
+| `lt` | status, jsonpath, header, duration | Less than (numeric) |
 | `contains` | jsonpath, header | String contains substring |
 | `matches` | jsonpath, header | Matches regular expression |
 

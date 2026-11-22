@@ -5,7 +5,7 @@ import { AboutDialog } from './AboutDialog'
 describe('AboutDialog', () => {
   it('opens on the About tab with version and stack', () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(screen.getByText('Version 0.7.4')).toBeInTheDocument()
+    expect(screen.getByText('Version 0.8.0')).toBeInTheDocument()
     expect(screen.getByText('Go 1.26 + Wails v2')).toBeInTheDocument()
     expect(screen.getByText('MIT')).toBeInTheDocument()
   })

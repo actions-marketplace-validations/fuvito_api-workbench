@@ -13,7 +13,7 @@ import { authPayloadToState, authStateToPayload } from '@/lib/httpUtils'
 import { inputCls as baseInputCls, selectCls as baseSelectCls } from '@/lib/styles'
 import type { StepDetail, AssertionDetail, ExtractionDetail } from '@/lib/bridge'
 
-const ASSERTION_TYPES = ['status', 'jsonpath', 'header', 'schema']
+const ASSERTION_TYPES = ['status', 'jsonpath', 'header', 'schema', 'duration']
 const STATUS_OPERATORS = ['eq', 'ne', 'gt', 'lt']
 const ALL_OPERATORS = ['eq', 'ne', 'gt', 'lt', 'contains', 'matches']
 const EXTRACTION_SOURCES = ['jsonpath', 'header', 'status']
@@ -30,14 +30,14 @@ export function AssertionRow({ assertion, onChange, onRemove }: {
 }) {
   const needsPath = assertion.type === 'jsonpath' || assertion.type === 'header'
   const isSchema = assertion.type === 'schema'
-  const availableOperators = assertion.type === 'status' ? STATUS_OPERATORS : ALL_OPERATORS
+  const availableOperators = assertion.type === 'status' || assertion.type === 'duration' ? STATUS_OPERATORS : ALL_OPERATORS
 
   return (
     <div className="flex items-center gap-1 mb-1 flex-wrap">
       <select
         aria-label="Assertion type"
         value={assertion.type}
-        onChange={e => onChange({ type: e.target.value, path: '', expected: '', schema: '', operator: 'eq' })}
+        onChange={e => onChange({ type: e.target.value, path: '', expected: '', schema: '', operator: e.target.value === 'duration' ? 'lt' : 'eq' })}
         className={selectCls}
       >
         {ASSERTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -75,7 +75,7 @@ export function AssertionRow({ assertion, onChange, onRemove }: {
               const num = Number(raw)
               onChange({ expected: raw === '' ? '' : (!isNaN(num) && raw.trim() !== '' ? num : raw) })
             }}
-            placeholder="expected"
+            placeholder={assertion.type === 'duration' ? 'max ms' : 'expected'}
             className={cn(inputCls, 'w-24 flex-1 min-w-[4rem]')}
           />
         </>
