@@ -417,6 +417,7 @@ func conformCmd() *cobra.Command {
 	var outputFile string
 	var requestTimeout int
 	var maxResponseTime int
+	var timeLimits []string
 	var failFast bool
 	var readOnly bool
 	var explain bool
@@ -446,6 +447,10 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			src := args[0]
 
 			plan, err := planReports(format, reports, outputFile)
+			if err != nil {
+				return err
+			}
+			pathLimits, err := conformance.ParsePathLimits(timeLimits)
 			if err != nil {
 				return err
 			}
@@ -502,6 +507,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				ReadOnly:          readOnly,
 				RequestTimeoutMs:  requestTimeout,
 				MaxResponseTimeMs: maxResponseTime,
+				PathLimits:        pathLimits,
 				Coverage:          showCoverage,
 				Negative:          runNegative,
 				Baseline:          base,
@@ -594,6 +600,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail an operation whose response takes longer than this many milliseconds (the response is still compared with the spec; 0 = no limit)")
+	cmd.Flags().StringArrayVar(&timeLimits, "max-response-time-for", nil, "A different response-time limit for the operations under a path prefix: /prefix=ms, for example /reports=2000 (repeatable; the longest prefix wins; 0 turns the limit off there)")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")

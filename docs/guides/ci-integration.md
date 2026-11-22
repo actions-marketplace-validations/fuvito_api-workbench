@@ -84,6 +84,7 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 | `tags`, `paths` | conform | comma-separated OpenAPI tags and path prefixes to include |
 | `request-timeout` | conform | per-request timeout in milliseconds |
 | `max-response-time` | conform | fail an operation slower than this many milliseconds (the response is still compared with the spec) |
+| `max-response-time-for` | conform | other limits for path prefixes, one `/prefix=ms` per line, for example `/reports=2000` (the longest prefix wins; `0` turns the limit off there) |
 | `var` | run, conform | environment overrides, one `name=value` per line (not for secrets) |
 | `report` | run, conform, diff | extra reports, one `format=file` per line |
 | `version` | all | `clrsig` release to use (default: latest) |

@@ -750,6 +750,7 @@ export interface ConformRunInput {
   negative: boolean
   failFast: boolean
   maxResponseTimeMs?: number
+  maxResponseTimeFor?: string[]
   timeoutMs: number
   recordCoverage: boolean
   vars: string[]

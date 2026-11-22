@@ -27,9 +27,10 @@ type ConformInput struct {
 	Tags              []string
 	Paths             []string
 	FailFast          bool
-	RequestTimeoutMs  int  // 0 means DefaultConformRequestTimeoutMs
-	MaxResponseTimeMs int  // 0 means no response-time limit
-	ReadOnly          bool // send only GET and HEAD operations
+	RequestTimeoutMs  int            // 0 means DefaultConformRequestTimeoutMs
+	MaxResponseTimeMs int            // 0 means no response-time limit
+	PathLimits        map[string]int // per path prefix; the longest prefix wins over MaxResponseTimeMs
+	ReadOnly          bool           // send only GET and HEAD operations
 
 	// Progress, when set, is called after each operation with how many are done out of how many
 	// and the operation just handled.
@@ -76,6 +77,7 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		ReadOnly:          in.ReadOnly,
 		RequestTimeoutMs:  timeout,
 		MaxResponseTimeMs: in.MaxResponseTimeMs,
+		PathLimits:        in.PathLimits,
 		OnOperation:       in.Progress,
 	}
 

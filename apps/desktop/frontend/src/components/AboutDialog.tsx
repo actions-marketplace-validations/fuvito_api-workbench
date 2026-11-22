@@ -3,6 +3,14 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.8',
+    date: '2026-11-22',
+    items: [
+      'clrsig conform --max-response-time-for /reports=2000: a different response-time limit for the operations under a path prefix (also in the GitHub Action, the MCP conform tool and the Check Conformance page)',
+      'Fixes the GitHub Action for repositories that have their own clrsig folder: it no longer writes the binary into the workspace',
+    ],
+  },
+  {
     version: '0.8.7',
     date: '2026-11-22',
     items: [
@@ -260,7 +268,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.7</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.8</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

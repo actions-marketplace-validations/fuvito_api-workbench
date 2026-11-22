@@ -251,6 +251,13 @@ var catalog = []Command{
 				Group:   GroupAdvanced,
 			},
 			{
+				Name: "max-response-time-for", Kind: KindString, Repeatable: true,
+				Label:   "Response-time limit for a path (ms)",
+				Help:    "/prefix=ms, repeatable: a different limit for the operations under a path prefix. The longest matching prefix wins over the general limit; 0 turns the limit off there.",
+				Example: "/reports=2000",
+				Group:   GroupAdvanced, Deferred: true,
+			},
+			{
 				Name: "format", Short: "f", Kind: KindEnum, Enum: reportFormats, Default: "text",
 				Label: "Report format", Help: formatHelp, Group: GroupEssential,
 			},

@@ -266,3 +266,21 @@ func TestMCP_LoadEnv(t *testing.T) {
 		t.Error("missing env should fail")
 	}
 }
+
+func TestMCP_ConformMaxResponseTimeFor(t *testing.T) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(60 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer slow.Close()
+	spec := writeTempFile(t, "spec.yaml", minimalSpec)
+	args := map[string]any{"spec": spec, "baseUrl": slow.URL, "maxResponseTimeFor": []string{"/ping=1"}}
+	if text, _ := toolText(t, rpcExchange(t, callTool("conform", args))[0]); !strings.Contains(text, "slow") && !strings.Contains(text, "limit") {
+		t.Errorf("a 1 ms limit for /ping must flag the response: %s", text)
+	}
+	args["maxResponseTimeFor"] = []string{"ping"}
+	if text, isErr := toolText(t, rpcExchange(t, callTool("conform", args))[0]); !isErr || !strings.Contains(text, "invalid time limit") {
+		t.Errorf("a bad limit must be an error: %q", text)
+	}
+}

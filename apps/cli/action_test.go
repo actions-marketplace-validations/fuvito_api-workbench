@@ -66,3 +66,20 @@ func TestActionFileIsValid(t *testing.T) {
 		}
 	}
 }
+
+// The install step must not write into the workspace: a repository with its own clrsig/ folder
+// (the sandbox has one) made curl fail with "client returned ERROR on write".
+func TestActionInstallsOutsideTheWorkspace(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "action.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range [][]byte{[]byte(`DEST="clrsig"`), []byte(`DEST="clrsig.exe"`), []byte(`echo "$PWD" >> "$GITHUB_PATH"`)} {
+		if bytes.Contains(data, bad) {
+			t.Errorf("action.yml installs into the workspace: %s", bad)
+		}
+	}
+	if !bytes.Contains(data, []byte(`$RUNNER_TEMP/clrsig-bin`)) {
+		t.Error("the binary must go to $RUNNER_TEMP/clrsig-bin")
+	}
+}

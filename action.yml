@@ -92,6 +92,9 @@ inputs:
   max-response-time:
     description: 'Fail an operation whose response takes longer than this many milliseconds; the response is still compared with the spec (conform)'
     required: false
+  max-response-time-for:
+    description: 'Different response-time limits for path prefixes, one /prefix=ms per line, for example /reports=2000; the longest prefix wins, 0 turns the limit off there (conform)'
+    required: false
   var:
     description: 'Environment variable overrides, one name=value per line (run, conform). Do not put secrets here; use env: on the step and ${NAME} in the environment file'
     required: false
@@ -143,12 +146,16 @@ runs:
           windows) OS=windows ;;
         esac
 
+        # Not the workspace: a repository may have its own clrsig/ folder or file.
+        BIN_DIR="$RUNNER_TEMP/clrsig-bin"
+        mkdir -p "$BIN_DIR"
+
         if [ "$OS" = "windows" ]; then
           BINARY="clrsig-windows-${ARCH}.exe"
-          DEST="clrsig.exe"
+          DEST="$BIN_DIR/clrsig.exe"
         else
           BINARY="clrsig-${OS}-${ARCH}"
-          DEST="clrsig"
+          DEST="$BIN_DIR/clrsig"
         fi
 
         URL="https://github.com/fuvito/api-workbench/releases/download/${VERSION}/${BINARY}"
@@ -156,7 +163,7 @@ runs:
         curl -fsSL -o "$DEST" "$URL"
         chmod +x "$DEST"
 
-        echo "$PWD" >> "$GITHUB_PATH"
+        echo "$BIN_DIR" >> "$GITHUB_PATH"
         echo "clrsig ${VERSION} installed."
 
     - name: Run clrsig
@@ -188,6 +195,7 @@ runs:
         IN_PATHS: ${{ inputs.paths }}
         IN_REQUEST_TIMEOUT: ${{ inputs.request-timeout }}
         IN_MAX_RESPONSE_TIME: ${{ inputs.max-response-time }}
+        IN_MAX_RESPONSE_TIME_FOR: ${{ inputs.max-response-time-for }}
         IN_VAR: ${{ inputs.var }}
         IN_REPORT: ${{ inputs.report }}
       run: |
@@ -211,6 +219,7 @@ runs:
             [ -n "$IN_ENV"    ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
             [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
+            repeat --max-response-time-for "$IN_MAX_RESPONSE_TIME_FOR"
             repeat --var "$IN_VAR"
             repeat --report "$IN_REPORT"
             ;;

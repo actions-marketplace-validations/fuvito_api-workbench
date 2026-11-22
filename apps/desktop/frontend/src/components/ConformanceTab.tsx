@@ -5,7 +5,7 @@ import {
   getConformContext, inspectConformSpec, runConformance, cancelConformance,
   exportConformReport, saveContentToFile, openInSystemViewer, onConformanceProgress,
 } from '@/lib/bridge'
-import { isLocalUrl, parseVars, splitList, cliValues } from '@/lib/conformHelpers'
+import { isLocalUrl, parseVars, parsePathLimits, splitList, cliValues } from '@/lib/conformHelpers'
 import { FindingView } from '@/components/FindingView'
 import type { ConformSummary } from '@/components/ConformanceSidebarPanel'
 import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat } from '@/lib/bridge'
@@ -145,6 +145,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [pathsText, setPathsText] = useState('')
   const [timeoutText, setTimeoutText] = useState('')
   const [maxResponseText, setMaxResponseText] = useState('')
+  const [pathLimitsText, setPathLimitsText] = useState('')
   const [varsText, setVarsText] = useState('')
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [negative, setNegative] = useState(false)
@@ -203,8 +204,9 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const timeoutBad = timeoutText !== '' && !(timeoutMs > 0)
   const maxResponseMs = Number.parseInt(maxResponseText, 10)
   const maxResponseBad = maxResponseText !== '' && !(maxResponseMs > 0)
+  const pathLimits = parsePathLimits(pathLimitsText)
   const parsedVars = parseVars(varsText)
-  const canRun = !timeoutBad && !maxResponseBad && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
+  const canRun = !timeoutBad && !maxResponseBad && pathLimits.bad.length === 0 && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
 
   async function run() {
     setRunning(true)
@@ -216,6 +218,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
         tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
         maxResponseTimeMs: maxResponseBad || !maxResponseText ? 0 : maxResponseMs,
+        maxResponseTimeFor: pathLimits.lines,
         recordCoverage: recordCoverage && !filtered,
         vars: parsedVars.vars,
       }))
@@ -340,6 +343,16 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                 ? <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>
                 : <p className="text-[11px] text-[var(--color-muted-foreground)]">A slower operation fails; its response is still compared with the spec. Leave a margin.</p>}
             </div>
+          </div>
+          <div className="mt-3 flex flex-col gap-1">
+            <label htmlFor="conf-path-limits" className="text-xs font-medium">Response-time limits for paths</label>
+            <textarea
+              id="conf-path-limits" value={pathLimitsText} onChange={e => setPathLimitsText(e.target.value)}
+              rows={2} placeholder="/reports=2000" spellCheck={false} className={cn(inputClass, 'font-mono')}
+            />
+            {pathLimits.bad.length > 0
+              ? <p role="alert" className="text-[11px] text-red-400">Use /path-prefix=milliseconds, one per line: {pathLimits.bad.join(', ')}</p>
+              : <p className="text-[11px] text-[var(--color-muted-foreground)]">One /prefix=ms per line. The longest matching prefix wins over the limit above; 0 turns the limit off there. Not carried into Get CLI command.</p>}
           </div>
           <div className="mt-3 flex flex-col gap-1">
             <label htmlFor="conf-vars" className="text-xs font-medium">Variable overrides</label>

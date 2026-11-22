@@ -40,6 +40,20 @@ export function splitList(text: string): string[] {
   return text.split(',').map(t => t.trim()).filter(Boolean)
 }
 
+// Reads the "/prefix=milliseconds" lines of the per-path response-time limits; `bad` lists the lines
+// that do not fit, so the page can say which.
+export function parsePathLimits(text: string): { lines: string[]; bad: string[] } {
+  const lines: string[] = []
+  const bad: string[] = []
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line) continue
+    if (/^\/\S*=\d+$/.test(line)) lines.push(line)
+    else bad.push(line)
+  }
+  return { lines, bad }
+}
+
 // The values of the page's current choices, as the CLI Command Builder takes them for `clrsig
 // conform`. Read-only is on unless writes were ticked, so the command does what the page does.
 export function cliValues(p: {

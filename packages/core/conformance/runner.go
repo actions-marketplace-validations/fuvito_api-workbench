@@ -156,6 +156,10 @@ type Options struct {
 	// MaxResponseTimeMs fails an operation whose response took longer than this many milliseconds.
 	// The response is kept and compared with the spec as usual. 0 = no limit.
 	MaxResponseTimeMs int
+	// PathLimits sets a response-time limit for the operations under a path prefix (the longest
+	// matching prefix wins over MaxResponseTimeMs). A limit of 0 under a prefix switches the limit
+	// off for those operations.
+	PathLimits map[string]int
 	// ReadOnly runs only GET and HEAD operations; every other operation is reported as skipped
 	// and never sent.
 	ReadOnly bool
@@ -267,7 +271,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		or.StatusCode = resp.StatusCode
 		or.DurationMs = resp.Duration.Milliseconds()
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
-		if limit := opts.MaxResponseTimeMs; limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
+		if limit := opts.limitFor(opPath); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
 			// The message holds the limit, not the measured time, so a baseline stays stable
 			// between runs; the time is in DurationMs and in the finding's Got.
 			or.Violations = append(or.Violations, openapi.ValidationError{
@@ -323,6 +327,38 @@ func matchesTags(opTags, filterTags []string) bool {
 		}
 	}
 	return false
+}
+
+// limitFor returns the response-time limit for an operation path: the longest matching
+// PathLimits prefix, otherwise MaxResponseTimeMs.
+func (o Options) limitFor(opPath string) int {
+	best, limit := -1, o.MaxResponseTimeMs
+	for prefix, ms := range o.PathLimits {
+		if strings.HasPrefix(opPath, prefix) && len(prefix) > best {
+			best, limit = len(prefix), ms
+		}
+	}
+	return limit
+}
+
+// ParsePathLimits reads repeated /prefix=ms values (for --max-response-time-for).
+func ParsePathLimits(values []string) (map[string]int, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	out := map[string]int{}
+	for _, v := range values {
+		i := strings.LastIndex(v, "=")
+		if i <= 0 || !strings.HasPrefix(v, "/") {
+			return nil, fmt.Errorf("invalid time limit %q: use /path-prefix=milliseconds, for example /reports=2000", v)
+		}
+		ms, err := strconv.Atoi(strings.TrimSpace(v[i+1:]))
+		if err != nil || ms < 0 {
+			return nil, fmt.Errorf("invalid time limit %q: the milliseconds must be a whole number, 0 or more", v)
+		}
+		out[strings.TrimSpace(v[:i])] = ms
+	}
+	return out, nil
 }
 
 func matchesPathPrefix(opPath string, prefixes []string) bool {

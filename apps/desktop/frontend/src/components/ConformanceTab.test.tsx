@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { ConformanceTab } from './ConformanceTab'
-import { isLocalUrl, splitList, parseVars, cliValues, findingWhere } from '@/lib/conformHelpers'
+import { isLocalUrl, splitList, parseVars, parsePathLimits, cliValues, findingWhere } from '@/lib/conformHelpers'
 
 const bridge = vi.hoisted(() => ({
   getConformContext: vi.fn(),
@@ -65,7 +65,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, maxResponseTimeMs: 0, recordCoverage: false, vars: [],
+      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -168,7 +168,7 @@ describe('ConformanceTab options and export', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /Stop after the first failure/ }))
     fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
     await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({
-      tags: ['users', 'orders'], paths: ['/users'], timeoutMs: 3000, maxResponseTimeMs: 0, negative: true, failFast: true, recordCoverage: false,
+      tags: ['users', 'orders'], paths: ['/users'], timeoutMs: 3000, maxResponseTimeMs: 0, maxResponseTimeFor: [], negative: true, failFast: true, recordCoverage: false,
     })))
   })
 
@@ -529,5 +529,12 @@ describe('where the problem is', () => {
     fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
     await screen.findByTestId('conform-headline')
     expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ specPath: '/ws/api.yaml', specTitle: 'Shop', total: 7, covered: 5, passing: 4, failing: 1 }))
+  })
+})
+
+describe('parsePathLimits', () => {
+  it('reads /prefix=ms lines and names the ones that do not fit', () => {
+    expect(parsePathLimits(['/reports=2000', '', ' /a/b=0 '].join('\n'))).toEqual({ lines: ['/reports=2000', '/a/b=0'], bad: [] })
+    expect(parsePathLimits(['reports=1', '/x=abc'].join('\n')).bad).toEqual(['reports=1', '/x=abc'])
   })
 })

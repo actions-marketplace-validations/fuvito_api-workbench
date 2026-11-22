@@ -154,6 +154,8 @@ type ConformRunInput struct {
 	TimeoutMs int `json:"timeoutMs"`
 	// MaxResponseTimeMs fails an operation that answers more slowly than this; 0 = no limit.
 	MaxResponseTimeMs int `json:"maxResponseTimeMs"`
+	// MaxResponseTimeFor sets other limits for path prefixes, each as /prefix=ms.
+	MaxResponseTimeFor []string `json:"maxResponseTimeFor"`
 	// RecordCoverage adds the run to the Contracts coverage store. Only unfiltered runs are
 	// recorded, so a run limited by tags or paths cannot skew the accumulated totals.
 	RecordCoverage bool `json:"recordCoverage"`
@@ -303,6 +305,11 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		}
 	}
 
+	pathLimits, err := conformance.ParsePathLimits(in.MaxResponseTimeFor)
+	if err != nil {
+		return ConformRunOutputIO{Error: "response-time limits: " + err.Error()}
+	}
+
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
 	if s.cancelRun != nil {
@@ -329,6 +336,7 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		FailFast:          in.FailFast,
 		RequestTimeoutMs:  in.TimeoutMs,
 		MaxResponseTimeMs: in.MaxResponseTimeMs,
+		PathLimits:        pathLimits,
 		Coverage:          true,
 		Negative:          in.Negative,
 		ReadOnly:          !in.AllowWrites,
