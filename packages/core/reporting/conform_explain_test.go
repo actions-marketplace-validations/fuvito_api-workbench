@@ -50,7 +50,7 @@ func TestConformReports_ExplanationsAreRedacted(t *testing.T) {
 	}
 	check("text", ConformTextExplained(r, nil, true))
 
-	js, err := ConformJSON(r, nil)
+	js, err := ConformJSON(r, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestConformReports_ExplanationsAreRedacted(t *testing.T) {
 		t.Fatal("a passing operation has no findings")
 	}
 
-	junit, err := ConformJUnit(r)
+	junit, err := ConformJUnit(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestConformReports_BlockedOperations(t *testing.T) {
 		t.Errorf("the missing names are listed once, not per operation:\n%s", text)
 	}
 
-	js, err := ConformJSON(r, nil)
+	js, err := ConformJSON(r, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestConformReports_BlockedOperations(t *testing.T) {
 		t.Errorf("json operation: %+v", b)
 	}
 
-	junit, err := ConformJUnit(r)
+	junit, err := ConformJUnit(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestConformReports_NameWhereTheProblemIs(t *testing.T) {
 	if !strings.Contains(string(html), "X-Total-Count") {
 		t.Error("html must name the header")
 	}
-	junit, err := ConformJUnit(r)
+	junit, err := ConformJUnit(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestConformReports_NameWhereTheProblemIs(t *testing.T) {
 		t.Errorf("junit:\n%s", junit)
 	}
 
-	js, err := ConformJSON(r, nil)
+	js, err := ConformJSON(r, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

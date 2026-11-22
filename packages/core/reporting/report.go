@@ -468,6 +468,23 @@ type JSONConformReport struct {
 	MissingValues []string        `json:"missingValues,omitempty"`
 	Operations    []JSONConformOp `json:"operations"`
 	Coverage      *JSONCoverage   `json:"coverage,omitempty"`
+	// Probes lists the negative probes (only with --negative): each one is a request that breaks
+	// the spec on purpose and should be answered with a 4xx.
+	Probes []JSONConformProbe `json:"probes,omitempty"`
+}
+
+// JSONConformProbe is one negative probe in a conformance JSON report.
+type JSONConformProbe struct {
+	OperationID string `json:"operationId,omitempty"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	Kind        string `json:"kind"`
+	Description string `json:"description"`
+	StatusCode  int    `json:"statusCode,omitempty"`
+	DurationMs  int64  `json:"durationMs,omitempty"`
+	Passed      bool   `json:"passed"`
+	Skipped     bool   `json:"skipped,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 type JSONConformOp struct {
@@ -522,9 +539,14 @@ type JSONCoverageOp struct {
 }
 
 // ConformJSON returns a machine-readable JSON conformance report.
-// Pass a non-nil coverage to include a coverage summary in the output.
-func ConformJSON(result *conformance.ConformResult, coverage *conformance.CoverageReport) ([]byte, error) {
+// Pass a non-nil coverage to include a coverage summary in the output and a non-nil neg to include
+// the negative probes (a failed probe makes the report not passed, as it does the exit code).
+func ConformJSON(result *conformance.ConformResult, coverage *conformance.CoverageReport, neg *conformance.NegativeResult) ([]byte, error) {
 	_, failed, _ := result.Counts()
+	if neg != nil {
+		_, negFailed, _, negErrored := neg.Counts()
+		failed += negFailed + negErrored
+	}
 	x := newRedactor(result.Secrets, false)
 	report := JSONConformReport{
 		SpecTitle:   result.SpecTitle,
@@ -560,6 +582,15 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		report.Operations = append(report.Operations, jo)
 	}
+	if neg != nil {
+		for _, p := range neg.Probes {
+			report.Probes = append(report.Probes, JSONConformProbe{
+				OperationID: p.OperationID, Method: p.Method, Path: p.Path, Kind: string(p.Kind), Description: x.text(p.Description),
+				StatusCode: p.StatusCode, DurationMs: p.DurationMs, Passed: !p.Skipped && p.Error == "" && p.Passed(),
+				Skipped: p.Skipped, Error: x.text(p.Error),
+			})
+		}
+	}
 	if coverage != nil {
 		jc := &JSONCoverage{
 			Total:         coverage.Total,
@@ -580,8 +611,9 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 	return json.MarshalIndent(report, "", "  ")
 }
 
-// ConformJUnit returns a JUnit XML conformance report.
-func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
+// ConformJUnit returns a JUnit XML conformance report. A non-nil neg adds one test case per
+// negative probe.
+func ConformJUnit(result *conformance.ConformResult, neg *conformance.NegativeResult) ([]byte, error) {
 	_, failed, _ := result.Counts()
 
 	suite := jUnitSuite{
@@ -626,6 +658,26 @@ func ConformJUnit(result *conformance.ConformResult) ([]byte, error) {
 			}
 		}
 		suite.Cases = append(suite.Cases, tc)
+	}
+
+	if neg != nil {
+		for _, p := range neg.Probes {
+			tc := jUnitCase{Name: "probe: " + x.text(p.Description), ClassName: result.SpecTitle, Time: secStr(p.DurationMs)}
+			suite.Tests++
+			switch {
+			case p.Skipped:
+				skipped := struct{}{}
+				tc.Skipped = &skipped
+			case p.Error != "":
+				suite.Errors++
+				tc.Error = &jUnitError{Message: x.text(p.Error), Text: x.text(p.Error)}
+			case !p.Passed():
+				suite.Failures++
+				msg := fmt.Sprintf("the server accepted an invalid request with %d", p.StatusCode)
+				tc.Failure = &jUnitFailure{Message: msg, Text: msg}
+			}
+			suite.Cases = append(suite.Cases, tc)
+		}
 	}
 
 	report := jUnitTestSuites{

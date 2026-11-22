@@ -400,13 +400,13 @@ func (s *ConformanceService) ExportConformReport(format string) RunReportIO {
 		}
 		return RunReportIO{Content: string(b)}
 	case "junit":
-		b, err := reporting.ConformJUnit(last.Result)
+		b, err := reporting.ConformJUnit(last.Result, last.Negative)
 		if err != nil {
 			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
 		}
 		return RunReportIO{Content: string(b)}
 	case "json":
-		b, err := reporting.ConformJSON(last.Result, last.Coverage)
+		b, err := reporting.ConformJSON(last.Result, last.Coverage, last.Negative)
 		if err != nil {
 			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
 		}

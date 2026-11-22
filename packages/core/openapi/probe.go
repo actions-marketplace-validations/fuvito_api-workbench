@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ const (
 type NegativeProbe struct {
 	Request     *domain.Request
 	OperationID string
+	Tags        []string
 	Method      string
 	Path        string
 	Kind        ProbeKind
@@ -86,6 +88,7 @@ func GenerateNegativeProbes(s *Spec, baseURL string) ([]NegativeProbe, error) {
 				probes = append(probes, NegativeProbe{
 					Request:     req,
 					OperationID: op.OperationID,
+					Tags:        op.Tags,
 					Method:      method,
 					Path:        path,
 					Kind:        ProbeMissingAuth,
@@ -93,72 +96,73 @@ func GenerateNegativeProbes(s *Spec, baseURL string) ([]NegativeProbe, error) {
 				})
 			}
 
-			// 2. JSON body probes — drop/corrupt required fields.
+			// 2. JSON body probes: drop and corrupt required fields. For a oneOf or anyOf body each
+			// branch is probed with its own fields; the body generated for the happy path only covers
+			// the first.
 			if op.RequestBody != nil && op.RequestBody.Value != nil {
 				jsonMT := firstJSONMediaType(op.RequestBody.Value)
 				if jsonMT != nil && jsonMT.Schema != nil && jsonMT.Schema.Value != nil {
-					schema := jsonMT.Schema.Value
-
-					// 2a. Drop each required field one at a time.
-					for _, field := range schema.Required {
-						req := cloneRequest(baseReq)
-						req.Body = &domain.RequestBody{
-							Type:    domain.BodyJSON,
-							Content: bodyWithoutField(schema, field),
+					top := jsonMT.Schema.Value
+					bodyProbes := func(schema *openapi3.Schema, suffix string) {
+						for _, field := range schema.Required {
+							req := cloneRequest(baseReq)
+							req.Body = &domain.RequestBody{Type: domain.BodyJSON, Content: bodyWithoutField(schema, field)}
+							probes = append(probes, NegativeProbe{
+								Request: req, OperationID: op.OperationID, Tags: op.Tags, Method: method, Path: path,
+								Kind:        ProbeDropRequiredField,
+								Description: method + " " + path + " — missing required field '" + field + "'" + suffix + " (expect 400/422)",
+							})
 						}
-						probes = append(probes, NegativeProbe{
-							Request:     req,
-							OperationID: op.OperationID,
-							Method:      method,
-							Path:        path,
-							Kind:        ProbeDropRequiredField,
-							Description: method + " " + path + " — missing required field '" + field + "' (expect 400/422)",
-						})
+						for _, field := range schema.Required {
+							propRef, ok := schema.Properties[field]
+							if !ok || propRef == nil || propRef.Value == nil {
+								continue
+							}
+							wrongVal := wrongTypeValue(propRef.Value)
+							if wrongVal == nil {
+								continue
+							}
+							req := cloneRequest(baseReq)
+							req.Body = &domain.RequestBody{Type: domain.BodyJSON, Content: bodyWithWrongField(schema, field, wrongVal)}
+							probes = append(probes, NegativeProbe{
+								Request: req, OperationID: op.OperationID, Tags: op.Tags, Method: method, Path: path,
+								Kind:        ProbeWrongFieldType,
+								Description: method + " " + path + " — wrong type for field '" + field + "'" + suffix + " (expect 400/422)",
+							})
+						}
 					}
-
-					// 2b. Wrong type for each required field that has a typed schema.
-					for _, field := range schema.Required {
-						propRef, ok := schema.Properties[field]
-						if !ok || propRef == nil || propRef.Value == nil {
-							continue
+					bodyProbes(top, "")
+					branches := append(append([]*openapi3.SchemaRef(nil), top.OneOf...), top.AnyOf...)
+					for i, br := range branches {
+						if br != nil && br.Value != nil {
+							bodyProbes(br.Value, fmt.Sprintf(" of branch %d", i+1))
 						}
-						wrongVal := wrongTypeValue(propRef.Value)
-						if wrongVal == nil {
-							continue
-						}
-						req := cloneRequest(baseReq)
-						req.Body = &domain.RequestBody{
-							Type:    domain.BodyJSON,
-							Content: bodyWithWrongField(schema, field, wrongVal),
-						}
-						probes = append(probes, NegativeProbe{
-							Request:     req,
-							OperationID: op.OperationID,
-							Method:      method,
-							Path:        path,
-							Kind:        ProbeWrongFieldType,
-							Description: method + " " + path + " — wrong type for field '" + field + "' (expect 400/422)",
-						})
 					}
 				}
 			}
 
-			// 3. Missing required query parameters.
+			// 3. Missing required query parameters and headers.
 			for _, pRef := range op.Parameters {
-				if pRef == nil || pRef.Value == nil {
+				if pRef == nil || pRef.Value == nil || !pRef.Value.Required {
 					continue
 				}
 				p := pRef.Value
-				if p.In == "query" && p.Required {
+				switch p.In {
+				case "query":
 					req := cloneRequest(baseReq)
 					req.QueryParams = removeQueryParam(req.QueryParams, p.Name)
 					probes = append(probes, NegativeProbe{
-						Request:     req,
-						OperationID: op.OperationID,
-						Method:      method,
-						Path:        path,
+						Request: req, OperationID: op.OperationID, Tags: op.Tags, Method: method, Path: path,
 						Kind:        ProbeMissingRequiredParam,
 						Description: method + " " + path + " — missing required query param '" + p.Name + "' (expect 400)",
+					})
+				case "header":
+					req := cloneRequest(baseReq)
+					req.Headers = removeHeader(req.Headers, p.Name)
+					probes = append(probes, NegativeProbe{
+						Request: req, OperationID: op.OperationID, Tags: op.Tags, Method: method, Path: path,
+						Kind:        ProbeMissingRequiredParam,
+						Description: method + " " + path + " — missing required header '" + p.Name + "' (expect 4xx)",
 					})
 				}
 			}
@@ -192,10 +196,16 @@ func opFromItem(item *openapi3.PathItem, method string) *openapi3.Operation {
 // declares at least one security scheme. An explicit empty list on the operation
 // overrides the global requirement.
 func hasSecurityRequirement(doc *openapi3.T, op *openapi3.Operation) bool {
-	if op.Security != nil {
-		return len(*op.Security) > 0
+	reqs := securityRequirements(doc, op)
+	if len(reqs) == 0 {
+		return false
 	}
-	return len(doc.Security) > 0
+	for _, r := range reqs {
+		if len(r) == 0 {
+			return false // an empty alternative makes authentication optional
+		}
+	}
+	return true
 }
 
 func firstJSONMediaType(rb *openapi3.RequestBody) *openapi3.MediaType {
@@ -308,6 +318,16 @@ func removeQueryParam(params []domain.QueryParam, name string) []domain.QueryPar
 	for _, p := range params {
 		if !strings.EqualFold(p.Name, name) {
 			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func removeHeader(headers []domain.Header, name string) []domain.Header {
+	out := make([]domain.Header, 0, len(headers))
+	for _, h := range headers {
+		if !strings.EqualFold(h.Name, name) {
+			out = append(out, h)
 		}
 	}
 	return out

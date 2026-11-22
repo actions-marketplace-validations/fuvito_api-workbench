@@ -516,13 +516,13 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			render := func(f string) ([]byte, error) {
 				switch f {
 				case "json":
-					b, err := reporting.ConformJSON(result, cov)
+					b, err := reporting.ConformJSON(result, cov, negResult)
 					if err != nil {
 						return nil, fmt.Errorf("generating JSON report: %w", err)
 					}
 					return append(b, '\n'), nil
 				case "junit":
-					b, err := reporting.ConformJUnit(result)
+					b, err := reporting.ConformJUnit(result, negResult)
 					if err != nil {
 						return nil, fmt.Errorf("generating JUnit report: %w", err)
 					}

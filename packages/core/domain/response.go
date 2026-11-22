@@ -28,6 +28,10 @@ type Response struct {
 	Duration   time.Duration
 	Size       int64
 	Timing     Timing
+	// Truncated is true when the body was longer than the executor reads, so Body holds only its
+	// first part; ContentLength is what the server announced (-1 when it did not say).
+	Truncated     bool
+	ContentLength int64
 }
 
 func (r *Response) IsSuccess() bool {

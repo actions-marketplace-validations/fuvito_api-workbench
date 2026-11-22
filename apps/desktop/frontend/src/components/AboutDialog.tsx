@@ -3,6 +3,15 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.7.3',
+    date: '2026-11-22',
+    items: [
+      'clrsig conform --negative: --tags and --paths now limit the probes to the selected operations; the JSON and JUnit reports list the probes (a failed probe fails them); a required header is probed (one request without it); every branch of a oneOf or anyOf body is probed',
+      'An operation whose authentication is optional is no longer probed with "no credentials"',
+      'A response longer than the 50 MB read limit is reported as cut off (with the size the server announced) instead of as a JSON syntax error',
+    ],
+  },
+  {
     version: '0.7.2',
     date: '2026-11-22',
     items: [
@@ -175,7 +184,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.2</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.7.3</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

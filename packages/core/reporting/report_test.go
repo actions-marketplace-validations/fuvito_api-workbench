@@ -380,7 +380,7 @@ func TestConformText_WithCoverage(t *testing.T) {
 // ---- ConformJSON ----
 
 func TestConformJSON_Passed(t *testing.T) {
-	raw, err := reporting.ConformJSON(makeConformResult(true), nil)
+	raw, err := reporting.ConformJSON(makeConformResult(true), nil, nil)
 	if err != nil {
 		t.Fatalf("ConformJSON: %v", err)
 	}
@@ -404,7 +404,7 @@ func TestConformJSON_WithCoverage(t *testing.T) {
 		Total: 1, Covered: 1, Percent: 100,
 		CoveredOps: []conformance.OperationResult{{Method: "GET", Path: "/health"}},
 	}
-	raw, _ := reporting.ConformJSON(makeConformResult(true), cov)
+	raw, _ := reporting.ConformJSON(makeConformResult(true), cov, nil)
 	var rep reporting.JSONConformReport
 	json.Unmarshal(raw, &rep)
 	if rep.Coverage == nil {
@@ -418,7 +418,7 @@ func TestConformJSON_WithCoverage(t *testing.T) {
 // ---- ConformJUnit ----
 
 func TestConformJUnit_Passed(t *testing.T) {
-	raw, err := reporting.ConformJUnit(makeConformResult(true))
+	raw, err := reporting.ConformJUnit(makeConformResult(true), nil)
 	if err != nil {
 		t.Fatalf("ConformJUnit: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestConformJUnit_Passed(t *testing.T) {
 }
 
 func TestConformJUnit_Failed(t *testing.T) {
-	raw, _ := reporting.ConformJUnit(makeConformResult(false))
+	raw, _ := reporting.ConformJUnit(makeConformResult(false), nil)
 	s := string(raw)
 	if !strings.Contains(s, "<failure") {
 		t.Error("missing <failure> element")
@@ -444,7 +444,7 @@ func TestConformJUnit_SkippedOp(t *testing.T) {
 		SpecTitle:  "api",
 		Operations: []conformance.OperationResult{{Method: "GET", Path: "/x", Skipped: true}},
 	}
-	raw, _ := reporting.ConformJUnit(r)
+	raw, _ := reporting.ConformJUnit(r, nil)
 	s := string(raw)
 	if !strings.Contains(s, "<skipped") {
 		t.Error("missing <skipped> element")
@@ -456,7 +456,7 @@ func TestConformJUnit_ErrorOp(t *testing.T) {
 		SpecTitle:  "api",
 		Operations: []conformance.OperationResult{{Method: "GET", Path: "/x", Error: "timeout"}},
 	}
-	raw, _ := reporting.ConformJUnit(r)
+	raw, _ := reporting.ConformJUnit(r, nil)
 	s := string(raw)
 	if !strings.Contains(s, "<error") {
 		t.Error("missing <error> element")

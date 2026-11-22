@@ -31,6 +31,7 @@ const (
 	KindBadHeader        = "bad-header"         // a declared header has a value of the wrong type
 	KindRequestParameter = "request-parameter"  // a path, query or header value in the request does not fit its parameter
 	KindRequestBody      = "request-body"       // the request body does not fit the spec
+	KindBodyTooLarge     = "body-too-large"     // the response is longer than the read limit and was cut off
 )
 
 // ValidationError is a single violation.
@@ -124,6 +125,18 @@ func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *
 
 	body := []byte(resp.BodyString())
 	ct := contentType(resp)
+
+	if resp.Truncated && !isOpaqueMediaType(ct) {
+		announced := ""
+		if resp.ContentLength > 0 {
+			announced = fmt.Sprintf(" (the server announced %d MB)", resp.ContentLength>>20)
+		}
+		return []ValidationError{{
+			Kind: KindBodyTooLarge,
+			Message: fmt.Sprintf("%s %s %d: the response body is larger than the %d MB Clear Signal reads%s, so it was cut off and not compared with the spec",
+				route.Method, route.Path, statusCode, len(resp.Body)>>20, announced),
+		}}
+	}
 
 	httpResp := &http.Response{
 		StatusCode: resp.StatusCode,
@@ -650,4 +663,16 @@ func multipartForValidation(content string) ([]byte, string) {
 	}
 	_ = mw.Close()
 	return buf.Bytes(), mw.FormDataContentType()
+}
+
+// isOpaqueMediaType is true for media types whose body is never compared with a schema (binary
+// downloads), where a body cut at the read limit changes nothing about the check.
+func isOpaqueMediaType(ct string) bool {
+	ct = strings.ToLower(ct)
+	for _, p := range []string{"application/octet-stream", "image/", "video/", "audio/"} {
+		if strings.HasPrefix(ct, p) {
+			return true
+		}
+	}
+	return false
 }

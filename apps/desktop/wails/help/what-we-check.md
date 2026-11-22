@@ -37,6 +37,7 @@ Every failure message follows the same shape: **what** is wrong, **where** it is
 | CS-RESP-010 | Undeclared extra property | The body has a property the schema does not declare. | `{"id":1,"extra":true}`. | **partly**: caught only when the schema sets `additionalProperties: false`. OpenAPI allows extra properties by default, so on an open schema this is not a violation. | same | `TestCheck_ResponseBody` (both rows, one is **KnownGap**) |
 | CS-RESP-011 | `writeOnly` property in a response | A property marked `writeOnly` (for example a password) appears in a response. | `{"secret":"x"}`. | caught | not caught | `TestCheck_ResponseOnlyRules` |
 | CS-RESP-012 | Body media type that cannot be read | The declared media type has no decoder (for example `application/xml`). The body is **not checked and not reported** (CS-NC-009); before 0.6.0 it was reported as a violation whatever the body was. | A valid `<r><id>1</id></r>` against `application/xml`. | **not checked** | **not checked** | `TestCheck_ResponseBodyFormat` |
+| CS-RESP-013 | Response longer than the read limit | The executor reads at most 50 MB of a response. A longer JSON (or other compared) body is reported as cut off, naming the limit and the size the server announced, instead of as a JSON syntax error. A binary download cut at the limit is not compared anyway. | A 51 MB JSON response. | caught | failure | `TestValidateResponse_BodyCutAtTheReadLimit`, `TestExecute_FlagsABodyCutAtTheReadLimit` |
 
 Media types that are read: `application/json`, any `+json` type such as `application/problem+json`, and `text/plain` (checked against its schema). Parameters such as `charset` are ignored when matching. (`TestCheck_ResponseMediaTypes`.)
 
@@ -78,10 +79,11 @@ Each probe sends a deliberately wrong request and **passes when the server answe
 
 | ID | Title | What is sent | State | Evidence |
 |---|---|---|---|---|
-| CS-PROBE-001 | Missing required field accepted | A body without one required field (expected `400` or `422`). | caught | `TestGenerateNegativeProbes_ExpectedKinds`, `TestNegativeRunner_LenientServer_ProbesFail` |
+| CS-PROBE-001 | Missing required field accepted | A body without one required field (expected `400` or `422`). For a `oneOf` or `anyOf` body every branch is probed with its own required fields. | caught | `TestGenerateNegativeProbes_ExpectedKinds`, `TestNegativeRunner_LenientServer_ProbesFail`, `TestProbes_EveryOneOfBranchIsProbed` |
 | CS-PROBE-002 | Wrong field type accepted | A body with one field of the wrong type (expected `400` or `422`). | caught | same |
-| CS-PROBE-003 | Missing required query parameter accepted | A request without a required query parameter (expected `400`). | caught | same |
-| CS-PROBE-004 | Missing credentials accepted | A request to a secured operation without credentials (expected `401` or `403`). | caught | same, `TestNegativeRunner_StrictServer_AllPass` |
+| CS-PROBE-003 | Missing required query parameter or header accepted | A request without a required query parameter or header (expected a `4xx`). | caught | same, `TestProbes_MissingRequiredHeader` |
+| CS-PROBE-004 | Missing credentials accepted | A request to a secured operation without credentials (not probed when authentication is optional) (expected `401` or `403`). | caught | same, `TestNegativeRunner_StrictServer_AllPass` |
+| CS-PROBE-005 | Probes follow the filters and reach the machine-readable reports | `--tags` and `--paths` limit the probes to the selected operations (before 0.7.3 every probe of the spec ran), and the JSON report (`probes`) and the JUnit report (one test case per probe) list the probes; a failed probe fails them as it does the exit code. | caught | `TestNegativeRunner_FiltersLimitTheProbes`, `TestReports_CarryTheNegativeProbes` |
 
 Only these four kinds are probed. Wrong header or path-parameter types, boundary values, enum violations, unknown fields and bad credentials (as opposed to none) are **not** probed (CS-GAP-009).
 
