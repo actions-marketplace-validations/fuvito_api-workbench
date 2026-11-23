@@ -75,6 +75,9 @@ func NewNegative(exec *executor.Executor) *NegativeRunner {
 // Run generates and executes all negative probes derived from the spec.
 func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, env *domain.Environment, opts Options) *NegativeResult {
 	title, version := spec.Info()
+	if baseURL == "" {
+		baseURL = spec.FirstServerURL()
+	}
 	result := &NegativeResult{
 		SpecTitle:   title,
 		SpecVersion: version,
@@ -92,6 +95,10 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 	resolver := variables.NewResolver(env)
 
 	for _, probe := range probes {
+		// A tag or path filter leaves an operation out, and its probes with it.
+		if !matchesTags(probe.Tags, opts.Tags) || !matchesPathPrefix(probe.Path, opts.Paths) {
+			continue
+		}
 		pr := NegativeProbeResult{
 			OperationID: probe.OperationID,
 			Method:      probe.Method,

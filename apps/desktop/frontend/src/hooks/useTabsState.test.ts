@@ -284,7 +284,7 @@ describe('opening things', () => {
     expect(b).toBe(a)
     expect(result.current.activeTabId).toBe(a)
     expect(result.current.tabs.filter(t => t.kind === 'cli')).toHaveLength(1)
-    expect(result.current.tabs.find(t => t.id === a)).toMatchObject({ name: 'CLI Builder', kind: 'cli' })
+    expect(result.current.tabs.find(t => t.id === a)).toMatchObject({ name: 'CLI Command Builder', kind: 'cli' })
   })
 
   it('the Workspace page opens as the leftmost tab and stays put when it is shown again', () => {

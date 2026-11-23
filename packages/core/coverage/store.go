@@ -18,6 +18,11 @@ type OperationResult struct {
 	LastRunAt   time.Time `json:"lastRunAt"`
 	StatusCodes []int     `json:"statusCodes,omitempty"` // all unique status codes observed across runs
 	HadAuth     bool      `json:"hadAuth,omitempty"`     // ever exercised with auth credentials
+	// LastDurationMs is the response time of the last run that got a response; SlowestDurationMs is
+	// the slowest response time ever recorded for the operation. Both are absent in data written
+	// before they existed.
+	LastDurationMs    int64 `json:"lastDurationMs,omitempty"`
+	SlowestDurationMs int64 `json:"slowestDurationMs,omitempty"`
 }
 
 // MergeStatusCodes merges two sorted, deduplicated status-code slices.
@@ -250,4 +255,13 @@ func ListAll(workspacePath string) []Report {
 		return result[i].LastRunAt.After(result[j].LastRunAt)
 	})
 	return result
+}
+
+// MergeDuration returns the last response time to store for an operation: the one from this run
+// when a response arrived, otherwise the one already stored.
+func MergeDuration(prev OperationResult, thisRunLastMs int64, thisRunSlowestMs int64) int64 {
+	if thisRunLastMs > 0 || thisRunSlowestMs > 0 {
+		return thisRunLastMs
+	}
+	return prev.LastDurationMs
 }

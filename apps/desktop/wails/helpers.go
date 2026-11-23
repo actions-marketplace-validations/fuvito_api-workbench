@@ -19,3 +19,20 @@ func atomicWrite(path string, data []byte) error {
 func outsideRel(rel string) bool {
 	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
+
+// pathInside reports whether p is root or inside it, after resolving symbolic links on both, so a link
+// inside the workspace that points elsewhere counts as outside. A path that does not exist yet is
+// judged by its cleaned absolute form.
+func pathInside(root, p string) bool {
+	resolve := func(x string) string {
+		if abs, err := filepath.Abs(x); err == nil {
+			x = abs
+		}
+		if real, err := filepath.EvalSymlinks(x); err == nil {
+			return real
+		}
+		return x
+	}
+	rel, err := filepath.Rel(resolve(root), resolve(p))
+	return err == nil && !outsideRel(rel)
+}

@@ -3,14 +3,129 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
-    version: '0.7.0',
-    date: 'unreleased',
+    version: '0.8.8',
+    date: '2026-11-22',
     items: [
-      'Every rail icon works the same way: Workspace, Requests, Scenarios, Contracts, Check Conformance and CLI Builder each open a sidebar, and clicking an icon brings back the tab you last had open under it (for this session). Clicking the lit icon collapses the sidebar; clicking a tab lights its icon and never opens or closes the sidebar, so a collapse you chose is kept',
+      'clrsig conform --max-response-time-for /reports=2000: a different response-time limit for the operations under a path prefix (also in the GitHub Action, the MCP conform tool and the Check Conformance page)',
+      'Fixes the GitHub Action for repositories that have their own clrsig folder: it no longer writes the binary into the workspace',
+    ],
+  },
+  {
+    version: '0.8.7',
+    date: '2026-11-22',
+    items: [
+      'The MCP conform tool accepts maxResponseTime (milliseconds), like clrsig conform --max-response-time',
+    ],
+  },
+  {
+    version: '0.8.6',
+    date: '2026-11-22',
+    items: [
+      'Fixes a 0.8.5 regression: a response declared application/x-ndjson (or another type that only contains "json") is no longer read as one JSON document and reported as invalid; application/json and +json types are still checked strictly',
+      'A valid OpenAPI document with an XML example string no longer fails to load (exit 2); examples for media types that are not JSON are not checked against the JSON schema',
+      'The "no credentials" negative probe now also removes an API key sent in a cookie, so a correct server no longer fails it',
+    ],
+  },
+  {
+    version: '0.8.5',
+    date: '2026-11-22',
+    items: [
+      'A failed extraction (a JSONPath or header that is not in the response) now fails the step and the run (exit 1). Before, the run exited 0 with PASSED next to "1 failed"',
+      'conform now rejects a JSON response body that is not strictly valid: bytes that are not UTF-8, or text after the JSON value',
+      'jsonpath assertions and extractions keep an integer above 2^53 exactly, write numbers in full (1234567, not 1.234567e+06), and see every value of a repeated header (joined with a comma)',
+      'A number beyond a 64-bit float (1e400) has its own finding (CS-RESP-015); the --negative summary says FAILED when probes got no answer',
+    ],
+  },
+  {
+    version: '0.8.4',
+    date: '2026-11-22',
+    items: [
+      'A scenario step whose {{name}} has no value is no longer sent with the braces in the URL: it fails with "not sent: no value for {{name}}", like an operation in clrsig conform. A scenario that relied on a literal {{...}} being sent now fails',
+      'clrsig run --seed N now gives the same random values however the scenario path is written (relative, absolute, another folder, a copy under another name); the values come from the seed and the scenario title. The values a given seed produces differ from 0.8.3',
+      'TRACE operations in an OpenAPI 3 spec are now generated and checked by conform like the other methods (--read-only lists them as skipped)',
+    ],
+  },
+  {
+    version: '0.8.3',
+    date: '2026-11-22',
+    items: [
+      'A bad {{$function}} in a scenario step now fails only that step (it is not sent and the error is shown); the other steps run as their fail policy says, and clrsig run exits 1 instead of 2. A mistake in the scenario variables still stops the scenario before any request',
+      'A writeOnly property in a response is now reported as its own finding (write-only-property, check CS-RESP-011) with why and how to fix, instead of a generic one without a check ID',
+    ],
+  },
+  {
+    version: '0.8.2',
+    date: '2026-11-22',
+    items: [
+      'Contracts now records the response time of every operation a run got an answer for: the last one and the slowest ever. They show in the operation table (Last / slowest) and in the CSV, Markdown and HTML exports (Last ms, Slowest ms), so a run that gets slower can be seen. Data written before this shows a dash',
+    ],
+  },
+  {
+    version: '0.8.1',
+    date: '2026-11-22',
+    items: [
+      'clrsig conform --max-response-time <ms>: fail an operation whose response is slower than the limit. The response is still compared with the spec. Also in the Check Conformance page (Slowest acceptable response), the CLI Command Builder and the GitHub Action (max-response-time)',
+      'Limits are wall-clock: leave a margin, a busy machine is slower',
+    ],
+  },
+  {
+    version: '0.8.0',
+    date: '2026-11-22',
+    items: [
+      'New assertion type duration: fail a step that answers slower than a limit (type: duration, operator: lt, expected: 500 milliseconds). In the step editor: Assertions, type duration. A scenario that uses it cannot be read by an older clrsig',
+      'Limits are wall-clock: leave a margin, a busy machine is slower',
+    ],
+  },
+  {
+    version: '0.7.4',
+    date: '2026-11-22',
+    items: [
+      'Behaviour change: clrsig coverage quality exits 0 when it finds gaps (they are signals); add --fail-on-gaps to fail on them',
+      'Every finding in conform reports (JSON checkId, --explain text, the Check Conformance page) carries the ID of its check in What We Check (for example CS-RESP-005)',
+      'Clearer findings: a oneOf / anyOf mismatch, an empty body, a body that is not JSON and a type mismatch at the root each have their own kind; a text value where a number is declared names the field, the variable and the declared type; a failed dynamic function is not reported as a missing value',
+      'conform prints the spec server as the base URL when none is given',
+    ],
+  },
+  {
+    version: '0.7.3',
+    date: '2026-11-22',
+    items: [
+      'clrsig conform --negative: --tags and --paths now limit the probes to the selected operations; the JSON and JUnit reports list the probes (a failed probe fails them); a required header is probed (one request without it); every branch of a oneOf or anyOf body is probed',
+      'An operation whose authentication is optional is no longer probed with "no credentials"',
+      'A response longer than the 50 MB read limit is reported as cut off (with the size the server announced) instead of as a JSON syntax error',
+    ],
+  },
+  {
+    version: '0.7.2',
+    date: '2026-11-22',
+    items: [
+      'Fix: a spec that lists its servers (servers: [{url: https://host/v1}]) is now matched by path, so responses are compared with it. Before, such a spec matched nothing, every response passed unchecked and coverage showed 0%',
+      'Fix: a run report says when responses were not compared with the spec and why',
+      'Generated requests now carry the credentials of the security scheme an operation names (basic and API key as well as bearer), required cookie parameters, array query parameters written by style and explode, schema-level and OpenAPI 3.1 examples as bodies, and form and multipart fields',
+      'Runs that passed only because nothing was compared can now fail. Record the current state with clrsig conform --write-baseline and adopt the rest gradually',
+    ],
+  },
+  {
+    version: '0.7.1',
+    date: '2026-11-21',
+    items: [
+      'Fix: the GitHub Action in 0.7.0 could not run (action.yml contained a stray character that made it invalid YAML). Use fuvito/api-workbench@v0.7.1; the desktop app, the CLI binaries, the Docker image and the Scoop and Homebrew packages of 0.7.0 were not affected',
+      'A test now loads action.yml, checks that it is valid YAML with the inputs its scripts read, and runs bash -n on every script',
+    ],
+  },
+  {
+    version: '0.7.0',
+    date: '2026-11-21',
+    items: [
+      'Every rail icon works the same way: Workspace, Requests, Scenarios, Contracts, Check Conformance and CLI Command Builder each open a sidebar, and clicking an icon brings back the tab you last had open under it (for this session). Clicking the lit icon collapses the sidebar; clicking a tab lights its icon and never opens or closes the sidebar, so a collapse you chose is kept',
       'Workspace sidebar: an environment selector (the same choice as the status bar) with where it came from, the Needs attention list (click an item to see its card on the Workspace page), and counts of requests, scenarios and specs. It reads the same snapshot as the Workspace page, so the two always agree',
-      'Check Conformance sidebar: the workspace\'s specs and environments (click one to fill the matching field on the page), the choice marked, and a Last result card with Covered, Passing and Failing',
-      'CLI Builder sidebar: the commands (run, conform, diff, ...) with their goals; click one to select it on the page',
-      'The Workspace, Check Conformance and CLI Builder pages are no longer special: opening a workspace shows the Workspace tab with the Workspace sidebar open',
+      'Check Conformance sidebar: the workspace\'s specs and environments (click one to fill the matching field on the page), the choice marked, and a Last result card. CLI Command Builder sidebar: the commands with their goals; click one to select it on the page',
+      'A scenario result explains each spec violation the way the Check Conformance page does: what the spec expected, what came back, where, in the spec, why it fails and how to fix it (the validator\'s own text is under Technical detail)',
+      'Behaviour change: the Check Conformance page reads spec and environment files only from the open workspace (symbolic links are resolved), and says to copy a file into the workspace when it is not there. A spec that scenarios reach through a link out of the workspace is shown as outside',
+      'Dev servers: the Demo and Conformance Servers no longer send CORS headers and refuse requests that are not addressed to localhost or that come from another website; a second running copy of the app no longer loses its temporary workspace when you start a dev server',
+      'GitHub Action: inputs for the newer conform and diff flags (fail-on, against, read-only, negative, explain, baseline, write-baseline, tags, paths, request-timeout, var, report); inputs are passed as environment variables so a value cannot change what runs',
+      'One name per feature (Check Conformance, CLI Command Builder, Contracts) and tabs carry the rail\'s icons instead of three-letter codes; the request URL field keeps a usable width, with the timeout and redirect options wrapping under it',
+      'CLI Command Builder opens without a red error, unselected choices look clickable and the explanation stacks under its term; the Check Conformance Base URL hint waits for a spec; Settings shows Automatic for the dev server ports; a dismissed Workspace reminder stays dismissed',
     ],
   },
   {
@@ -153,7 +268,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.6.0</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.8</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

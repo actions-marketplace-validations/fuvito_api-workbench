@@ -249,7 +249,7 @@ async function openConformance(page: Page, theme: 'dark' | 'light') {
     { theme, result: RESULT },
   )
   await gotoApp(page)
-  await page.getByRole('button', { name: 'Check spec conformance' }).click()
+  await page.getByRole('button', { name: 'Check Conformance' }).click()
   await page.getByLabel(/^Spec/).selectOption('/workspace/specs/conformance-openapi.yaml')
   await page.getByLabel(/^Environment/).selectOption('/workspace/environments/local.yaml')
   await page.getByLabel(/Also send write requests/).check()
@@ -288,8 +288,24 @@ async function openScenarioResult(page: Page, theme: 'dark' | 'light') {
         title: 'Product lifecycle', error: '', passed: false, durationMs: 31,
         steps: [
           done('List products', 'matched'),
-          done('Get a product', 'violations', { specViolations: ['Error at "/price": value must be a number'] }),
-          done('List categories', 'violations', { specViolations: ['Error at "/0/name": property "name" is missing'] }),
+          done('Get a product', 'violations', {
+            specViolations: ['Error at "/price": value must be a number'],
+            specFindings: [{
+              kind: 'wrong-type', part: 'response body', where: 'price', spec: 'GET /products/{id} → response 200 → body schema',
+              summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+              why: 'The server sent text ("9.99") where the spec declares a number.', fix: 'Send a number from the server, or change the spec.',
+              detail: 'Error at "/price": value must be a number',
+            }],
+          }),
+          done('List categories', 'violations', {
+            specViolations: ['Error at "/0/name": property "name" is missing'],
+            specFindings: [{
+              kind: 'missing-field', part: 'response body', where: '[0].name', spec: 'GET /categories → response 200 → body schema',
+              summary: 'The field "name" is missing', expected: 'a "name" field', got: 'no "name" field',
+              why: 'The spec lists "name" as required in every category, but the server left it out.', fix: 'Send "name" with every category, or make it optional in the spec.',
+              detail: 'Error at "/0/name": property "name" is missing',
+            }],
+          }),
         ],
       }
     },

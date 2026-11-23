@@ -18,6 +18,9 @@ type Props = {
   preset?: CliBuilderPreset | null
   // Tells the app which command the page has selected, for the CLI Builder sidebar.
   onCommandChange?: (command: string) => void
+  // Servers running in this app (the Demo and Conformance Servers). The first one fills an empty
+  // Server address box.
+  runningServers?: { label: string; url: string }[]
 }
 
 const SHELL_LABELS: Record<CliShell, string> = { bash: 'bash', powershell: 'PowerShell', cmd: 'cmd' }
@@ -54,15 +57,17 @@ type FieldProps = {
   files: CliFile[]
   messages: CliMessage[]
   suggestion?: CliSuggestion
+  runFrom: string
+  note?: string
   onChange: (v: string) => void
 }
 
-function Field({ input, value, files, messages, suggestion, onChange }: FieldProps) {
+function Field({ input, value, files, messages, suggestion, runFrom, note, onChange }: FieldProps) {
   const id = `cli-${input.name}`
   const isPath = input.kind === 'file' || input.kind === 'fileOrURL' || input.kind === 'dir' || input.kind === 'path'
 
   async function browse(folder: boolean) {
-    const picked = folder ? await pickCliFolder(input.label) : await pickCliFile(input.label)
+    const picked = folder ? await pickCliFolder(input.label, value, runFrom) : await pickCliFile(input.label, value, runFrom)
     if (picked) onChange(picked)
   }
 
@@ -165,6 +170,7 @@ function Field({ input, value, files, messages, suggestion, onChange }: FieldPro
       )}
       {control}
       <p className="text-[11px] leading-snug text-[var(--color-muted-foreground)]">{input.help}</p>
+      {note && <p className="text-[11px] leading-snug text-emerald-400">{note}</p>}
       {messages.map((m, i) => <MessageLine key={i} m={m} />)}
       {suggestion && (
         <button
@@ -180,7 +186,7 @@ function Field({ input, value, files, messages, suggestion, onChange }: FieldPro
   )
 }
 
-export function CliBuilderTab({ preset, onCommandChange }: Props) {
+export function CliBuilderTab({ preset, onCommandChange, runningServers }: Props) {
   const [catalog, setCatalog] = useState<CliCommand[] | null>(null)
   const [ctx, setCtx] = useState<CliContext | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -192,6 +198,10 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   const [result, setResult] = useState<CliBuildOutput | null>(null)
   const [copied, setCopied] = useState(false)
   const buildSeq = useRef(0)
+  // What the Server address box was filled with from a running server, and for which command and
+  // server it was last filled, so clearing the box by hand is not undone.
+  const [filledFrom, setFilledFrom] = useState<{ url: string; label: string } | null>(null)
+  const filledKey = useRef('')
 
   useEffect(() => {
     let cancelled = false
@@ -230,6 +240,26 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   }, [command, values, runFrom])
 
   const current = catalog?.find(c => c.name === command) ?? null
+  const runningServer = runningServers?.[0] ?? null
+  const hasServerBox = !!current?.inputs.some(i => i.name === 'base-url')
+  useEffect(() => {
+    if (!hasServerBox) return
+    const shown = values['base-url'] ?? ''
+    if (!runningServer) {
+      // The server stopped: drop the address we put there, but never one the user typed.
+      filledKey.current = ''
+      if (filledFrom && shown === filledFrom.url) setValue('base-url', '')
+      if (filledFrom) setFilledFrom(null)
+      return
+    }
+    const key = `${command}|${runningServer.url}`
+    if (filledKey.current === key) return
+    filledKey.current = key
+    if (shown === '') {
+      setValue('base-url', runningServer.url)
+      setFilledFrom(runningServer)
+    }
+  }, [command, hasServerBox, runningServer?.url]) // eslint-disable-line react-hooks/exhaustive-deps
   const rendering = result?.renderings.find(r => r.shell === shell)
   const text = rendering ? (oneline ? rendering.oneline : rendering.multiline) : ''
 
@@ -245,6 +275,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   function chooseCommand(name: string) {
     setCommand(name)
     setValues({})
+    filledKey.current = ''
   }
 
   async function copy() {
@@ -259,7 +290,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   }
 
   async function browseRunFrom() {
-    const picked = await pickCliFolder('Folder you will run the command from')
+    const picked = await pickCliFolder('Folder you will run the command from', runFrom, '')
     if (picked) setRunFrom(picked)
   }
 
@@ -271,8 +302,12 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
   }
 
   const knownFields = new Set(current.inputs.map(i => i.name))
-  const forField = (name: string) => (result?.messages ?? []).filter(m => m.field === name)
-  const general = (result?.messages ?? []).filter(m => !knownFields.has(m.field) && m.severity !== 'info')
+  // Nothing is wrong with a form the user has not touched: required-field errors wait for the first
+  // value (a preset from another screen counts), so the page does not open with a red error.
+  const started = Object.keys(values).length > 0
+  const shown = (result?.messages ?? []).filter(m => started || m.severity !== 'error')
+  const forField = (name: string) => shown.filter(m => m.field === name)
+  const general = shown.filter(m => !knownFields.has(m.field) && m.severity !== 'info')
   const essential = current.inputs.filter(i => i.group === 'essential')
   const advanced = current.inputs.filter(i => i.group === 'advanced')
 
@@ -284,6 +319,8 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
       files={filesFor(input.role, ctx)}
       messages={forField(input.name)}
       suggestion={result?.suggestions.find(s => s.field === input.name)}
+      runFrom={runFrom}
+      note={input.name === 'base-url' && filledFrom && values['base-url'] === filledFrom.url ? `Filled in from the running ${filledFrom.label}.` : undefined}
       onChange={v => setValue(input.name, v)}
     />
   )
@@ -316,7 +353,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
                   'text-left rounded border px-3 py-2 text-xs transition-colors',
                   c.name === command
                     ? 'border-[var(--color-accent)] bg-[var(--color-muted)] text-[var(--color-foreground)]'
-                    : 'border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]',
+                    : 'border-[var(--color-border)] text-[var(--color-foreground)] hover:bg-[var(--color-muted)] hover:border-[var(--color-accent)]',
                 )}
               >
                 <span className="font-medium">{c.goal}</span>
@@ -409,7 +446,7 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
             >
               {text || 'Fill in the fields on the left to build the command.'}
             </pre>
-            {result && !result.valid && (
+            {started && result && !result.valid && (
               <p className="mt-1 text-[11px] text-red-400">Fix the problems below before using this command.</p>
             )}
           </section>
@@ -450,9 +487,9 @@ export function CliBuilderTab({ preset, onCommandChange }: Props) {
                 <h3 className="text-xs font-semibold text-[var(--color-foreground)] mb-1">Part by part</h3>
                 <dl className="flex flex-col gap-1.5">
                   {result.explanation.parts.map((p, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(8rem,16rem)_1fr] gap-3 text-xs">
+                    <div key={i} className="flex flex-col gap-0.5 text-xs">
                       <dt className="font-mono break-all text-[var(--color-foreground)]">{p.token}</dt>
-                      <dd className="text-[var(--color-muted-foreground)]">{p.meaning}</dd>
+                      <dd className="pl-3 text-[var(--color-muted-foreground)]">{p.meaning}</dd>
                     </div>
                   ))}
                 </dl>

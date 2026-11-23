@@ -2,6 +2,8 @@ package openapi
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -113,7 +115,7 @@ func stubFromOpenAPI(s *openapi3.Schema, depth int) *stubSchema {
 	out := &stubSchema{
 		Type:     firstSchemaType(s),
 		Required: append([]string(nil), s.Required...),
-		Example:  s.Example,
+		Example:  schemaExample(s),
 		Default:  s.Default,
 		Enum:     s.Enum,
 		ReadOnly: s.ReadOnly,
@@ -127,7 +129,7 @@ func stubFromOpenAPI(s *openapi3.Schema, depth int) *stubSchema {
 			}
 			// Properties are described shallowly: nested structure stays one placeholder.
 			prop := ref.Value
-			ps := &stubSchema{Type: firstSchemaType(prop), Example: prop.Example, Default: prop.Default, Enum: prop.Enum, ReadOnly: prop.ReadOnly}
+			ps := &stubSchema{Type: firstSchemaType(prop), Example: schemaExample(prop), Default: prop.Default, Enum: prop.Enum, ReadOnly: prop.ReadOnly}
 			if ps.Type == "" && len(prop.Properties) > 0 {
 				ps.Type = "object"
 			}
@@ -193,7 +195,93 @@ func buildBodyStub(mt *openapi3.MediaType) string {
 	if mt == nil || mt.Schema == nil || mt.Schema.Value == nil {
 		return "{}"
 	}
+	if ex := wholeBodyExample(mt); ex != nil {
+		if b, err := json.MarshalIndent(ex, "", "  "); err == nil {
+			return string(b)
+		}
+	}
 	return renderStub(stubFromOpenAPI(mt.Schema.Value, 0))
+}
+
+// buildOASFormStub generates the fields of a form or multipart body as name=value pairs: required
+// properties and ones with an example, each with its example or a {{name}} placeholder.
+func buildOASFormStub(mt *openapi3.MediaType) string {
+	if mt == nil || mt.Schema == nil || mt.Schema.Value == nil {
+		return ""
+	}
+	st := stubFromOpenAPI(mt.Schema.Value, 0)
+	required := make(map[string]bool, len(st.Required))
+	var names []string
+	for _, n := range st.Required {
+		required[n] = true
+		if p, ok := st.Props[n]; ok && !p.ReadOnly {
+			names = append(names, n)
+		}
+	}
+	var extra []string
+	for n, p := range st.Props {
+		if !required[n] && !p.ReadOnly && p.sample() != nil {
+			extra = append(extra, n)
+		}
+	}
+	sort.Strings(extra)
+	names = append(names, extra...)
+	pairs := make([]string, 0, len(names))
+	for _, n := range names {
+		v := "{{" + n + "}}"
+		if sv := st.Props[n].sample(); sv != nil {
+			v = url.QueryEscape(fmt.Sprint(sv))
+		}
+		pairs = append(pairs, url.QueryEscape(n)+"="+v)
+	}
+	return strings.Join(pairs, "&")
+}
+
+// schemaExample is a schema's example: `example` (3.0, and deprecated in 3.1) or, when that is
+// absent, the first entry of `examples` (3.1).
+func schemaExample(s *openapi3.Schema) any {
+	if s.Example != nil {
+		return s.Example
+	}
+	if len(s.Examples) > 0 {
+		return s.Examples[0]
+	}
+	return nil
+}
+
+// wholeBodyExample is a complete example the spec gives for the body, used as the body as it is:
+// the media type's `example`, else its first named `examples` entry, else the schema's own example
+// (this is what makes a oneOf body with an example on the schema work). Properties the server
+// assigns (readOnly) are dropped from an object example.
+func wholeBodyExample(mt *openapi3.MediaType) any {
+	var ex any
+	switch {
+	case mt.Example != nil:
+		ex = mt.Example
+	case len(mt.Examples) > 0:
+		names := make([]string, 0, len(mt.Examples))
+		for n := range mt.Examples {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		if ref := mt.Examples[names[0]]; ref != nil && ref.Value != nil {
+			ex = ref.Value.Value
+		}
+	}
+	if ex == nil && mt.Schema != nil && mt.Schema.Value != nil {
+		ex = schemaExample(mt.Schema.Value)
+	}
+	if obj, ok := ex.(map[string]any); ok && mt.Schema != nil && mt.Schema.Value != nil {
+		cleaned := make(map[string]any, len(obj))
+		for k, v := range obj {
+			if ref := mt.Schema.Value.Properties[k]; ref != nil && ref.Value != nil && ref.Value.ReadOnly {
+				continue
+			}
+			cleaned[k] = v
+		}
+		return cleaned
+	}
+	return ex
 }
 
 // ---- Swagger 2.0 ----

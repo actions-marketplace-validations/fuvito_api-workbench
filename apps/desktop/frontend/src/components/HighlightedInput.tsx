@@ -16,7 +16,7 @@ function renderVarTokens(text: string): React.ReactNode[] {
 }
 
 export function HighlightedInput({
-  value, onChange, onKeyDown, onPaste, placeholder, className, envVarNames, padding = 'px-3',
+  value, onChange, onKeyDown, onPaste, placeholder, className, wrapperClassName = 'min-w-0', envVarNames, padding = 'px-3',
 }: {
   value: string
   onChange: (v: string) => void
@@ -24,6 +24,8 @@ export function HighlightedInput({
   onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void
   placeholder?: string
   className?: string
+  // Classes for the element around the input (it is a flex child that takes the free width).
+  wrapperClassName?: string
   envVarNames?: string[]
   // horizontal padding of the field, so the highlight layer lines up with the typed text
   padding?: string
@@ -83,7 +85,7 @@ export function HighlightedInput({
   }
 
   return (
-    <div className="relative flex-1 min-w-0">
+    <div className={cn('relative flex-1', wrapperClassName)}>
       <input
         ref={inputRef}
         type="text"

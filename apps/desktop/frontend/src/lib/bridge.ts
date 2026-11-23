@@ -663,12 +663,14 @@ export async function buildCliCommand(input: CliBuildInput): Promise<CliBuildOut
   return (await WailsBuildCliCommand(input as never)) as unknown as CliBuildOutput
 }
 
-export async function pickCliFile(title: string): Promise<string> {
-  return WailsPickCliFile(title)
+// `current` is what the field holds now and `runFrom` the folder relative paths are read from: the
+// dialog opens in the workspace for an empty field, otherwise where the field points.
+export async function pickCliFile(title: string, current = '', runFrom = ''): Promise<string> {
+  return WailsPickCliFile(title, current, runFrom)
 }
 
-export async function pickCliFolder(title: string): Promise<string> {
-  return WailsPickCliFolder(title)
+export async function pickCliFolder(title: string, current = '', runFrom = ''): Promise<string> {
+  return WailsPickCliFolder(title, current, runFrom)
 }
 
 // ---- Settings ----
@@ -749,6 +751,8 @@ export interface ConformRunInput {
   paths: string[]
   negative: boolean
   failFast: boolean
+  maxResponseTimeMs?: number
+  maxResponseTimeFor?: string[]
   timeoutMs: number
   recordCoverage: boolean
   vars: string[]
@@ -766,7 +770,9 @@ export interface ConformProbe {
 }
 
 export interface ConformFinding {
-  kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'request' | 'no-response' | 'other'
+  kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'dynamic-value-failed' | 'no-branch-matched' | 'invalid-body' | 'empty-body' | 'body-too-large' | 'constraint' | 'unexpected-property' | 'write-only-property' | 'number-out-of-range' | 'request' | 'no-response' | 'other'
+  // the check's ID in the catalog (Help, What We Check), for example CS-RESP-005
+  checkId?: string
   // where the problem is: the part (response body, response status, response header, request,
   // network) and what in it (a field path, a header name, the status code)
   part?: string
@@ -1017,6 +1023,7 @@ export interface StepResult {
   specState?: 'matched' | 'violations' | 'not-checked'
   specReason?: string
   specViolations?: string[]
+  specFindings?: ConformFinding[]
 }
 
 export interface ScenarioCoverage {
@@ -1050,7 +1057,7 @@ export interface AccumulatedCoverage {
   lastRunAt?: string
   exercised: string[]
   missed: string[]
-  operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string }>
+  operationResults?: Record<string, { lastPassed: boolean; lastRunAt: string; lastDurationMs?: number; slowestDurationMs?: number }>
   quality?: QualityReport
 }
 

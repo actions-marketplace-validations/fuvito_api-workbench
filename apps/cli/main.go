@@ -416,6 +416,8 @@ func conformCmd() *cobra.Command {
 	var format string
 	var outputFile string
 	var requestTimeout int
+	var maxResponseTime int
+	var timeLimits []string
 	var failFast bool
 	var readOnly bool
 	var explain bool
@@ -445,6 +447,10 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			src := args[0]
 
 			plan, err := planReports(format, reports, outputFile)
+			if err != nil {
+				return err
+			}
+			pathLimits, err := conformance.ParsePathLimits(timeLimits)
 			if err != nil {
 				return err
 			}
@@ -491,18 +497,20 @@ only new ones fail the run; --write-baseline records the current violations.`,
 
 			exec := newExecutor()
 			out := application.RunConformance(context.Background(), application.ConformInput{
-				Exec:             exec,
-				Spec:             spec,
-				BaseURL:          baseURL,
-				Env:              env,
-				Tags:             application.SplitList(tagsCSV),
-				Paths:            application.SplitList(pathsCSV),
-				FailFast:         failFast,
-				ReadOnly:         readOnly,
-				RequestTimeoutMs: requestTimeout,
-				Coverage:         showCoverage,
-				Negative:         runNegative,
-				Baseline:         base,
+				Exec:              exec,
+				Spec:              spec,
+				BaseURL:           baseURL,
+				Env:               env,
+				Tags:              application.SplitList(tagsCSV),
+				Paths:             application.SplitList(pathsCSV),
+				FailFast:          failFast,
+				ReadOnly:          readOnly,
+				RequestTimeoutMs:  requestTimeout,
+				MaxResponseTimeMs: maxResponseTime,
+				PathLimits:        pathLimits,
+				Coverage:          showCoverage,
+				Negative:          runNegative,
+				Baseline:          base,
 			})
 			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
@@ -516,13 +524,13 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			render := func(f string) ([]byte, error) {
 				switch f {
 				case "json":
-					b, err := reporting.ConformJSON(result, cov)
+					b, err := reporting.ConformJSON(result, cov, negResult)
 					if err != nil {
 						return nil, fmt.Errorf("generating JSON report: %w", err)
 					}
 					return append(b, '\n'), nil
 				case "junit":
-					b, err := reporting.ConformJUnit(result)
+					b, err := reporting.ConformJUnit(result, negResult)
 					if err != nil {
 						return nil, fmt.Errorf("generating JUnit report: %w", err)
 					}
@@ -591,6 +599,8 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
+	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail an operation whose response takes longer than this many milliseconds (the response is still compared with the spec; 0 = no limit)")
+	cmd.Flags().StringArrayVar(&timeLimits, "max-response-time-for", nil, "A different response-time limit for the operations under a path prefix: /prefix=ms, for example /reports=2000 (repeatable; the longest prefix wins; 0 turns the limit off there)")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
@@ -788,6 +798,7 @@ func coverageQualityCmd() *cobra.Command {
 	var workspacePath string
 	var format string
 	var outputFile string
+	var failOnGaps bool
 
 	cmd := &cobra.Command{
 		Use:   "quality <spec-file-or-url>",
@@ -801,9 +812,12 @@ Reports four quality signals:
   SECURED NEVER AUTHED   — auth-required ops never tested with credentials
   UNTESTED ERROR PATHS   — declared 4xx/5xx responses never triggered
 
+The gaps are signals, not failures: the command exits 0 whether or not it found any. Add
+--fail-on-gaps to make a gap fail the step (for example to keep a coverage bar in CI).
+
 Exit codes:
-  0  no quality gaps found
-  1  one or more gaps detected
+  0  the report was produced (and, with --fail-on-gaps, no gap was found)
+  1  --fail-on-gaps was given and one or more gaps were detected
   2  spec parse or configuration error`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -966,7 +980,7 @@ Exit codes:
 				fmt.Fprintf(cmd.OutOrStdout(), "%d gap(s) found — add scenarios that trigger error paths and test authenticated+unauthenticated flows\n", total)
 			}
 
-			if hasGaps {
+			if hasGaps && failOnGaps {
 				return &exitError{1}
 			}
 			return nil
@@ -975,6 +989,7 @@ Exit codes:
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", contractsFormatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write the report to a file (parent directories created automatically)")
+	cmd.Flags().BoolVar(&failOnGaps, "fail-on-gaps", false, "Exit 1 when the report finds a gap (by default the gaps are only reported)")
 	return cmd
 }
 

@@ -733,3 +733,133 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **B-081 is done:** the model (phase 1), the Workspace sidebar (phase 2) and these two. Not changed: the environment selector also stays in the status bar. Screenshots of the new sidebars are not generated yet.
 - **Screenshots:** the whole gallery was regenerated for the rail with a sidebar on every icon; new `18-conformance-sidebar` and `19-cli-builder-sidebar` (dark and light, from `screenshots-workspace.spec.ts`), and `17-workspace-page` now shows the Workspace sidebar. README gallery updated.
 - **In-app release notes:** `AboutDialog.tsx` has a 0.7.0 entry marked `unreleased` (the rail sidebars). At release time set its date and bump the version text in `AboutDialog.tsx` (and its two tests) and `help/user-guide.md`.
+
+### 2026-11-21 — Pre-release batch for 0.7.0 (hardening and small items)
+
+- **GitHub Action (B-058):** new inputs `fail-on`, `against`, `read-only`, `negative`, `explain`, `baseline`, `write-baseline`, `tags`, `paths`, `request-timeout`, `var` and `report` (one value per line). Every input now reaches the script as an environment variable instead of being pasted into it, so a value with quotes or shell characters cannot change what runs. `action.yml` had mixed line endings and is now LF. The CI guide lists the inputs.
+- **Check Conformance reads only the open workspace (B-064, behaviour change):** `InspectConformSpec` and `RunConformance` refuse a spec or environment file that is outside the open workspace (links resolved) or when no workspace is open, with a message that says to copy the file into the workspace. The page only offers workspace files, so normal use is unchanged. `workspaceinfo.within` resolves symbolic links too (B-078): a link out of the workspace is reported as "outside".
+- **Dev servers (B-063):** the Demo and Conformance Servers no longer send CORS headers and refuse a `Host` that is not `localhost`, `127.0.0.1` or `[::1]` and an `Origin` that is not their own, so a web page in the browser cannot read or change their sample data.
+- **Temporary workspaces (B-061):** every temporary workspace carries `.clrsig-owner`, refreshed every 30 seconds by the copy of the app that opened it; startup and Start Demo Server remove only folders nobody has refreshed for 3 minutes (or, with no owner file, untouched for an hour). A second running copy no longer loses its workspace.
+- **Workspace page (B-079):** a dismissed opening reminder stays dismissed for the session, per workspace, when the tab is closed and reopened.
+- **Other:** `.gitattributes` (B-065); the screenshot gallery was regenerated (B-012).
+- **Scenario result explains violations (B-067):** `StepResultIO.specFindings` carries `conformance.Diagnose` findings for each step with spec violations (what the spec expected, what came back, where, in the spec, why, fix, raw detail under Technical detail); the Setup row's Result tab renders them with the same `FindingView` component the Check Conformance page uses (now its own file). The raw validator lines are the fallback when a step has no findings. No file format change.
+- **UI consistency and polish (B-068, B-069, B-070):** one name per feature (rail, tab and page say *Check Conformance* and *CLI Command Builder*; the tab and rail say *Contracts*, and its empty text names both sources); tabs carry the rail's icons instead of `SCN`/`CHK`/`CLI`/`WS`/`COV`/`RUN`; the request URL field keeps a usable width and the timeout and redirect options wrap beneath it (measured at 1280 px); the CLI Builder shows no required-field error before the first value, unselected choices look clickable and the explanation stacks under its term; the Check Conformance Base URL hint and asterisk wait for a spec; Settings shows *Automatic* for ports; the scenario toolbar line shows the file path instead of repeating the title; the step body-type dropdown is labelled; the `conform` goal in the CLI Builder reads *Spec Conformance Testing: check an API against its OpenAPI spec*. Test stability: Testing Library's async timeout is 5 s (the busy full suite made `findBy*` queries time out now and then). **Not done:** one entry point per place for Settings and Help, shorter Settings placeholders. **B-080 (Contracts store key collisions) left open on purpose:** a hash of the exact spelling would stop two spellings of one file from sharing a card, which is behaviour the demo relies on; the proper fix keys the store by the resolved file and needs your decision.
+
+### 2026-11-21 — v0.7.0 released
+
+- **Tag `v0.7.0` on `2599620`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release with 13 files and the full notes; Docker `ghcr.io/fuvito/api-workbench:v0.7.0` prints `clrsig version v0.7.0`; Scoop updated to 0.7.0 by the `chore: bump tap to v0.7.0` commit and installed on Windows (`clrsig version v0.7.0`).
+- **Not verified:** the Homebrew install (no Mac) and a run of the Action at `@v0.7.0` (its `action.yml` parses and its script was tested locally). **Open:** B-080 and code signing (B-035); see `docs/planning/next_steps/2026-11-21-next-steps-after-0.7.0.md`.
+
+### 2026-11-21 — Defect in the released Action (found after tagging 0.7.0)
+
+- **What:** `action.yml` as tagged in `v0.7.0` (and on `main` since the B-058 commit) contained a lone carriage return inside a shell script. YAML reads it as a line break, so the file was not valid YAML and `uses: fuvito/api-workbench@v0.7.0` could not run. The binaries, Docker image, Scoop manifest and desktop builds are not affected. It came from my own scripted edit; the earlier local test ran the extracted script, not the YAML.
+- **Fixed on `main`** (the character is now the two characters `` in the script) and **guarded:** `apps/cli/action_test.go` (`TestActionFileIsValid`) rejects a lone carriage return, parses the YAML, checks that the inputs the script reads are declared and runs `bash -n` on every script; it fails on the released file.
+
+### 2026-11-21 — 0.7.0 prepared
+
+- Version 0.7.0 in `AboutDialog.tsx` (with its complete release notes), its two tests and the user guide; the user guide says the Check Conformance page reads only workspace files. Release notes for the GitHub Release are drafted. **Not tagged yet:** waiting for the owner's check of the desktop app and a green CI on the final commit.
+- **Left open on purpose:** B-080 (Contracts store keys; needs a decision, see the pre-release batch entry), B-006/B-007/B-008 and the other older items, code signing (B-035). **Not verified:** the Homebrew install and the GitHub Action at the new tag (they can only be tried after the release exists).
+
+### 2026-11-21 — v0.7.1 released
+
+- **Tag `v0.7.1` on `71e6d46`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) is the latest release and carries the notes; the `v0.7.0` page has a "superseded" note about the Action. Docker `ghcr.io/fuvito/api-workbench:v0.7.1` prints `clrsig version v0.7.1`; Scoop updated to 0.7.1 by the tap-bump commit and installed on Windows (`clrsig version v0.7.1`); `action.yml` at the tag parses (25 inputs) and `TestActionFileIsValid` passed in CI on that commit.
+- **Still not verified:** the Homebrew install (no Mac) and a real workflow run of the Action at `@v0.7.1` (the file is validated, the script was run locally). **Open:** B-080 and code signing (B-035); see `docs/planning/next_steps/2026-11-21-next-steps-after-0.7.0.md`.
+
+### 2026-11-21 — 0.7.1 prepared
+
+- Version 0.7.1 in `AboutDialog.tsx` (a 0.7.1 entry that says what was fixed), its two tests and the user guide. Release notes for the GitHub Release are drafted. Decision (owner): a patch release instead of moving the `v0.7.0` tag. The 0.7.0 release page gets a note that the Action must be used at `@v0.7.1`.
+
+### 2026-11-22 — Findings from external testing, batch 1 (0.7.2)
+
+- **Source:** the sandbox repository's `docs/clrsig-findings.md` (F-001 to F-021, found with v0.7.1); the whole list is tracked as B-082. F-001 and F-002 were already fixed in 0.7.x.
+- **F-010 (false pass, the serious one):** a spec with `servers` matched nothing by path, so conformance skipped every response check, scenario steps were "not checked" and coverage showed 0%. `Spec.pathRouter` now builds the router without the servers and `Spec.relativePath` removes a server's base path (`/v1`) from the path, in the response check, the request check, `HasOperation` and coverage. The text run report adds `Spec: N of M responses were not compared with the spec (reason: n)` when any step was not compared. **Risk:** runs that were green because nothing was compared can now fail.
+- **Generated requests (F-005, F-008, F-009, F-015, F-003, F-021):** credentials follow the operation's security scheme (`{{token}}`, `{{basicUser}}` / `{{basicPass}}`, `{{apiKey}}`; optional security adds none; global security is honoured), required cookie parameters become a `Cookie` header, array parameters follow `style` and `explode`, a media-type or schema-level `example` (and 3.1 `examples`) is the body, and form and multipart bodies are generated (the request check builds a real multipart document). Catalog: CS-REQ-003 added, CS-GAP-006 narrowed to XML bodies, CS-NC-001 notes the base path.
+- **Not in this release:** batches 2 and 3 and the two decisions (F-018, F-020); see B-082.
+
+### 2026-11-22 — Findings from external testing, batch 2 (0.7.3)
+
+- **Negative probes:** `--tags` and `--paths` now limit the probes (a probe carries its operation's tags and path; filtered probes are left out, not listed as skipped); a required header gets a probe like a required query parameter; every `oneOf` / `anyOf` branch of a JSON body is probed with its own required fields (`... of branch N`); an operation whose authentication is optional (an empty security alternative) gets no "no credentials" probe. **Not changed:** the happy-path request still sends only the first `oneOf` branch.
+- **Reports:** `ConformJSON` and `ConformJUnit` take the negative result (the CLI and the desktop export pass it): JSON gets a `probes` array and `passed` is false when a probe failed; JUnit gets one test case per probe, counted in tests and failures.
+- **F-019:** `domain.Response` has `Truncated` and `ContentLength`; the executor trims the body to the limit and sets them; the response check reports kind `body-too-large` (limit and announced size) before any schema comparison, except for binary media types. Catalog: CS-RESP-013 and CS-PROBE-005 added, CS-PROBE-001 and 003 widened.
+- **Open:** batch 3 (F-011, F-012, F-016, F-017, F-007) and the decisions F-018 and F-020 (B-082).
+
+### 2026-11-22 — Findings from external testing, batch 3 (0.7.4)
+
+- **Finding kinds (F-011):** the response check classifies body problems that are about the body as a whole: `body-empty`, `body-not-json`, `body-branch` (none or several `oneOf` / `anyOf` shapes, with the count; before it was reported as a missing field of the first shape) in `openapi`, and `conformance.Diagnose` turns them into `empty-body`, `invalid-body`, `no-branch-matched`; a type mismatch at the root is `wrong-type` like one at a field; value-rule breaks are `constraint`, `additionalProperties: false` breaks are `unexpected-property`; a failed `{{$function}}` is `dynamic-value-failed`, no longer `missing-value`. `body-too-large` has a finding too.
+- **Check IDs (F-012):** `conformance.Finding.CheckID` (mapped from the kind in `checkIDFor`) appears as `checkId` in the JSON report, as `[CS-…]` at the start of the `--explain`, HTML, Markdown and JUnit explanation lines, and as a Check row in the desktop finding view. The default text output is unchanged. `other` findings have no ID.
+- **F-017:** `conformance.invalidBodyValues` explains a JSON body made invalid by an unquoted environment value: field, `{{variable}}`, value and declared type (`Spec.BodyFieldType`); `ValidationError` gained `Expected`, `Got`, `Variable`.
+- **F-007:** the runners use the spec's first server as the base URL when none is given, so the report and the "no operation got an answer" line name it.
+- **F-016 (documented, not changed):** a bad dynamic function in a scenario is found before any request is sent (exit 2) by design; it is now CS-RUN-007 in the catalog, next to CS-RUN-002 for `conform`.
+- **F-020 (behaviour change):** `clrsig coverage quality` exits 0 whether or not it finds gaps; `--fail-on-gaps` restores exit 1. CI steps that relied on the exit code must add the flag.
+- **F-018:** a design proposal, `docs/enhancements/2026-11-22-response-time-assertions.md` (status Proposed); nothing built.
+
+### 2026-11-22 — Response-time assertions, phase 1 (0.8.0; design: `docs/enhancements/2026-11-22-response-time-assertions.md`, accepted)
+
+- **New scenario assertion `type: duration`** (additive, `schemaVersion` stays "1"; an older clrsig rejects a file that uses it): compares the response time in milliseconds (`Response.Duration`, the attempt that produced the response when `retry` is used) with `expected` using `eq`, `ne`, `gt` or `lt`; the failure says `the response took N ms; expected < L ms`. `scenario.Validate` requires a number of milliseconds (or a `{{variable}}`) and rejects `contains` / `matches`. Evaluated by `assertions.Evaluator`; reports label it `duration lt 500 ms`.
+- **Desktop:** the step editor offers `duration` (numeric operators, a "max ms" hint). `format-spec.md`, the user guide, the AI prompt (only on request, with a margin) and the catalog (CS-GAP-005 now covers `conform` only) updated.
+- **Not built:** phase 2 (`conform --max-response-time`) and phase 3 (recording durations in the Contracts store and baselines).
+- **F-016 decision (owner):** a bad dynamic function in a scenario keeps stopping the run before any request (exit 2), documented as CS-RUN-007.
+
+### 2026-11-22 — Response-time assertions, phase 2 (0.8.1)
+
+- **`clrsig conform --max-response-time <ms>`** (default 0 = off): `conformance.Options.MaxResponseTimeMs` / `application.ConformInput.MaxResponseTimeMs`. An operation whose response took longer gets a `slow-response` violation **in addition to** its spec comparison (the response is kept). The violation's message holds the limit, not the measured time, so baselines stay stable; the measured time is in `DurationMs`, the finding's Got and the `--explain` text. Finding `slow-response`, check CS-RESP-014. Probes are not timed.
+- **Wired through:** the CLI flag, the CLI Command Builder catalog (`max-response-time`, parity test), the GitHub Action input `max-response-time`, `ConformanceService` (`maxResponseTimeMs`), and the Check Conformance page (*Slowest acceptable response*, carried into Get CLI command).
+- **Not built:** a per-operation limit (shape left open in the proposal) and recording durations in the Contracts store and baselines (phase 3). The MCP `conform` tool does not take the limit yet.
+
+### 2026-11-22 — Response-time assertions, phase 3 (0.8.2)
+
+- **Contracts store (additive):** `coverage.OperationResult` gains `lastDurationMs` and `slowestDurationMs` (omitted when zero, so older data and files stay valid and show a dash). `openapi.ExecutedRequest.DurationMs` feeds `ScenarioCoverage`, whose `ExercisedResult` carries the last and the slowest of the run (only requests that got a response count); the three producers (CLI `run`, desktop scenario runs, desktop conformance recording) pass the response time, and both accumulators merge with `coverage.MergeDuration` (last: this run's when a response arrived, else the stored one) and `max` for the slowest.
+- **Shown:** the Contracts operation table (*Last / slowest*), the CSV (trailing `Last ms,Slowest ms`; existing columns unchanged), and the Markdown and HTML operation tables. Not in `coverage list` or `quality` text/JSON.
+- **Baselines:** unchanged on purpose; a `slow-response` violation holds the limit, not the measured time.
+- **Not built:** a per-operation response-time limit, and any failure on a trend (the proposal's non-goals). The proposal is complete otherwise.
+
+### 2026-11-22 — Findings F-022 (writeOnly finding classified) and F-016 (bad function in a step) (0.8.3)
+
+- A `writeOnly` property in a response (CS-RESP-011) was reported as kind `other` with no `checkId` and the generic "does not match what the spec declares". `conformance.Diagnose` now matches the validator message and gives it kind `write-only-property`, check ID CS-RESP-011, `where` (the property path), and its own why and fix (a write-only value may leak). Test: `TestFindings_WriteOnlyLeakHasItsOwnKindAndCheckID`; the catalog row cites it. Additive: the new kind value appears in JSON `findings` and the desktop finding view.
+- **F-016 (reverses the earlier decision; owner request):** a bad `{{$function}}` in a scenario *step* no longer stops `clrsig run` before any request. That step fails when it is reached (not sent, error in the report, exit 1) and the others run per their fail policy; a folder run still runs the other scenarios. Problems in a scenario's own `variables:` still stop it before anything is sent (exit 2): `scenario.ScenarioLevel` filters `CheckDynamic`'s issues (Step 0). `clrsig validate` still reports every kind. Catalog CS-RUN-007 rewritten; tests `TestRun_UnknownFunctionInAStepFailsThatStepOnly`, `TestRun_BadFunctionInAScenarioVariableStopsBeforeAnythingIsSent`. **Risk:** a CI job that expected exit 2 for a typo in a step now sees exit 1.
+
+### 2026-11-22 — Findings F-023, F-024, F-025 
+
+- **F-023 (behaviour change):** a scenario step whose `{{name}}` has no value is **not sent** and fails with `not sent: no value for {{name}}` (URL, query, headers, auth and body, the same fields `conform` checks); later steps follow the fail policy. Before, the request went out with the braces in the URL. `variables.UnresolvedPlaceholders` is now the shared helper (`conformance.UnresolvedPlaceholders` wraps it). **Risk:** a scenario that relied on a literal `{{…}}` being sent (for example a body for a server-side template) now fails; a value that is meant literally can be given by a variable. The catalog row CS-RUN-001 now covers steps, and the user guide sentence ("a placeholder with no value is not sent") is now true for scenarios.
+- **F-024:** `--seed` no longer depends on how the scenario file is spelled. The random values of a scenario come from the seed and a key made of its title (file name without extension when it has none; a repeated title gets `#2`, `#3` in run order), `seedKeys` in `apps/cli/run.go`; before, the key was the path as typed. **Behaviour change:** the values a given `--seed` produces differ from 0.8.3's (they now match the desktop, which already keyed by title). `bundle run` keys by the bundle's own file name, as before.
+- **F-025:** `TRACE` is a valid method (`domain.MethodTRACE`, format spec) and an OpenAPI 3 path item's `trace` operation is generated, run by `conform`, probed and counted like the others; it is not read-only, so `--read-only` lists it as skipped. Swagger 2.0 has no `trace`.
+- **Tests:** `TestRun_StepWithAMissingValueIsNotSent`, `TestRun_SeedGivesTheSameValuesForEverySpellingOfThePath`, `TestConform_RunsTraceOperations`.
+
+### 2026-11-22 — Findings F-026 to F-032 (0.8.5)
+
+- **F-026, F-027 (false passes):** `ValidateResponseByPath` checks a JSON body strictly after the library does (`strictJSONProblem`): bytes that are not UTF-8 and text after the value are `body-not-json` (`invalid-body`, CS-RESP-008). A status or header problem still comes first. `jsonpath` assertions already rejected trailing text and still do.
+- **F-028:** a number beyond a 64-bit float (`1e400`) has its own finding, `number-out-of-range`, CS-RESP-015, that names the number and says it is a Clear Signal limit (it was kind `other` with a Go error text). A large integer for `type: integer` passes.
+- **F-029:** the `--negative` summary says `FAILED` when any probe errored (CS-PROBE-006), as the exit code did, and says why.
+- **F-030:** `domain.Response.HeaderValue` joins every value of a repeated header with `, `; header assertions and header extractions use it.
+- **F-031:** `assertions.DecodeJSON` / `FormatValue`: jsonpath assertions and extractions keep an integer above 2^53 (or beyond int64) as its digits, and print a number in full (`1234567`, not `1.234567e+06`; this also fixes plain numbers of 7 or more digits).
+- **F-032 (behaviour change):** a failed extraction fails the step and the run (exit 1, `passed: false`, headline FAILED). **Risk:** a scenario whose extraction silently found nothing used to exit 0 and now exits 1.
+- **Tests:** `hostile_test.go`, `edge_assertions_test.go`, `TestNegativeText_ErroredProbesAreNotPassed`; catalog rows CS-RESP-015, CS-RUN-008, CS-RUN-009, CS-PROBE-006.
+
+### 2026-11-22 — Findings F-033, F-034, F-035 (0.8.6)
+
+- **F-033 (a 0.8.5 regression):** the strict single-document check added for F-026/F-027 only applies to `application/json` and `+json` (`isJSONDocumentType`); `application/x-ndjson`, `application/json-seq` and other types that merely contain "json" are not parsed as one document. A `+json` body with text after the value still fails.
+- **F-034:** `ParseBytes` sets aside the `example` / `examples` of media types that are not JSON while the library validates the document (`setAsideNonJSONExamples`), so a valid XML example string no longer makes the spec invalid (exit 2); they are put back afterwards. A wrong example for a JSON media type is still rejected.
+- **F-035:** the "no credentials" probe also removes an API key carried in a cookie (`dropCookiePair`), keeping other cookies; before, `Cookie: session=...` stayed and a correct server failed the probe.
+- **Tests:** `TestConform_NDJSONIsNotOneDocument`, `TestParse_AcceptsAnExampleForANonJSONMediaType`, `TestParse_StillRejectsAWrongJSONExample`, `TestProbes_NoCredentialsDropsACookieAPIKey`; catalog rows CS-NC-009 and CS-PROBE-004 updated.
+
+### 2026-11-22 — MCP `conform` takes `maxResponseTime` (0.8.7)
+
+- The MCP `conform` tool accepts `maxResponseTime` (milliseconds, 0 = off, negative is an error) and passes it to `application.ConformInput.MaxResponseTimeMs`, like `clrsig conform --max-response-time`. Test: `TestMCP_ConformMaxResponseTime`.
+
+### 2026-11-22 — Per-path response-time limits; Action install fix (0.8.8)
+
+- **`clrsig conform --max-response-time-for /prefix=ms`** (repeatable): another limit for the operations under a path prefix. The longest matching prefix wins over `--max-response-time`; `0` switches the limit off there; a path limit works without a general limit. `conformance.Options.PathLimits`, `conformance.ParsePathLimits`, `application.ConformInput.PathLimits`. Carried by the GitHub Action (`max-response-time-for`, one per line), the MCP `conform` tool (`maxResponseTimeFor`, an array), the Check Conformance page (*Response-time limits for paths*) and the command catalog (deferred: the builder cannot express repeatable values yet, so Get CLI command does not carry it). The proposal's tag selectors are not built; the path prefix covers the stated need. Catalog: CS-RESP-014 extended, CS-GAP-005 is now only about trends.
+- **Fix — the Action wrote the binary into the workspace:** `uses: fuvito/api-workbench@v0.8.7` downloaded `clrsig` to the current directory, so a repository with its own `clrsig/` folder (the sandbox has one) failed with `curl: (23)`. Found by the first real run of the Action (the sandbox's `action-smoke.yml`). It now installs into `$RUNNER_TEMP/clrsig-bin`; `TestActionInstallsOutsideTheWorkspace` guards it.
+- **B-080 not built:** a hash in the Contracts store key would also split a spec that two scenarios spell differently (`../specs/api.yaml` and `../../specs/api.yaml`), which the Workspace page and the demo workspace rely on; waiting for the owner's choice (see the backlog).
+
+### 2026-11-22 — CLI Builder: file name for the markdown format (not yet released)
+
+- The builder's suggested report file (`clibuild.SuggestOutput`) had no extension for `markdown` and fell back to `.txt`; it now suggests `.md` and describes the format in the output note. `TestEveryReportFormatHasAnExtension` fails for any format the CLI offers that would fall back to `.txt`.
+
+### 2026-11-22 — CLI Builder: browse buttons open where the field points (not yet released)
+
+- The file and folder buttons next to a path field now open their dialog in the workspace when the field is empty, otherwise in the folder shown or the folder that holds the file shown (`pickerStart`: a relative value is read from the run-from folder; a value that does not exist yet opens its nearest existing parent; a web address opens the workspace). The run-from button does the same with its own value. `PickCliFile` and `PickCliFolder` take the current value and the run-from folder (Wails bindings regenerated). Tests: `TestPickerStart` and the builder tests.
+
+### 2026-11-22 — CLI Builder: Server address from a running server (not yet released)
+
+- When the Demo Server or the Conformance Server is running in the app, an empty **Server address** box (`base-url`) is filled with `http://localhost:<port>` and says where it came from. It is filled once per command and server, so a box the user clears or types in is never refilled or overwritten; the address is dropped again when the server stops, but only if it is still the one the builder wrote. `App` passes `runningServers` to `CliBuilderTab`. Tests: `Server address from a running server` in `CliBuilderTab.test.tsx`.

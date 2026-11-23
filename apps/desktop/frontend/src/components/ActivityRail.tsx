@@ -117,8 +117,8 @@ export function ActivityRail({
         )}
 
         {([
-          { icon: ShieldCheck, label: 'Conformance', title: 'Check spec conformance', onClick: () => onTabClick('conformance'), active: activeTab === 'conformance' },
-          { icon: Terminal, label: 'CLI Builder', title: 'CLI Command Builder', onClick: () => onTabClick('cli'), active: activeTab === 'cli' },
+          { icon: ShieldCheck, label: 'Check Conformance', title: 'Check Conformance', onClick: () => onTabClick('conformance'), active: activeTab === 'conformance' },
+          { icon: Terminal, label: 'CLI Command Builder', title: 'CLI Command Builder', onClick: () => onTabClick('cli'), active: activeTab === 'cli' },
           { icon: Settings,   label: 'Settings', title: 'Settings', onClick: onShowSettings },
           { icon: HelpCircle, label: 'Help',     title: 'Help',     onClick: onShowHelp },
         ] as { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; title: string; onClick: () => void; active?: boolean }[]).map(({ icon: Icon, label, title, onClick, active }) => (

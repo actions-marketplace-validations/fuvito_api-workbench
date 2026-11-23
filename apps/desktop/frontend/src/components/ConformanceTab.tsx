@@ -5,9 +5,10 @@ import {
   getConformContext, inspectConformSpec, runConformance, cancelConformance,
   exportConformReport, saveContentToFile, openInSystemViewer, onConformanceProgress,
 } from '@/lib/bridge'
-import { isLocalUrl, findingWhere, parseVars, splitList, cliValues } from '@/lib/conformHelpers'
+import { isLocalUrl, parseVars, parsePathLimits, splitList, cliValues } from '@/lib/conformHelpers'
+import { FindingView } from '@/components/FindingView'
 import type { ConformSummary } from '@/components/ConformanceSidebarPanel'
-import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformFinding, ConformReportFormat } from '@/lib/bridge'
+import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat } from '@/lib/bridge'
 
 const inputClass =
   'w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)]'
@@ -43,28 +44,6 @@ const KIND_LABEL: Record<string, string> = {
 function isWrite(method: string): boolean {
   const m = method.toUpperCase()
   return m !== 'GET' && m !== 'HEAD'
-}
-
-function FindingView({ f }: { f: ConformFinding }) {
-  return (
-    <div className="rounded border border-[var(--color-border)] bg-[var(--color-background)] p-2.5">
-      <p className="text-xs font-semibold text-[var(--color-foreground)]">{f.summary}</p>
-      <dl className="mt-1.5 grid grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1 text-xs">
-        {f.expected && <><dt className="text-[var(--color-muted-foreground)]">Expected</dt><dd className="font-mono">{f.expected}</dd></>}
-        {f.got && <><dt className="text-[var(--color-muted-foreground)]">Got</dt><dd className="font-mono break-all">{f.got}</dd></>}
-        {findingWhere(f) && <><dt className="text-[var(--color-muted-foreground)]">Where</dt><dd data-testid="finding-where" className="font-mono break-all">{findingWhere(f)}</dd></>}
-        {f.spec && <><dt className="text-[var(--color-muted-foreground)]">In the spec</dt><dd data-testid="finding-spec" className="font-mono break-all">{f.spec}</dd></>}
-        <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd>{f.why}</dd>
-        <dt className="text-[var(--color-muted-foreground)]">Fix</dt><dd>{f.fix}</dd>
-      </dl>
-      {f.detail && (
-        <details className="mt-1.5">
-          <summary className="cursor-pointer text-[11px] text-[var(--color-muted-foreground)]">Technical detail</summary>
-          <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--color-muted-foreground)]">{f.detail}</pre>
-        </details>
-      )}
-    </div>
-  )
 }
 
 function ProblemCard({ op }: { op: ConformOperation }) {
@@ -165,6 +144,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [tagsText, setTagsText] = useState('')
   const [pathsText, setPathsText] = useState('')
   const [timeoutText, setTimeoutText] = useState('')
+  const [maxResponseText, setMaxResponseText] = useState('')
+  const [pathLimitsText, setPathLimitsText] = useState('')
   const [varsText, setVarsText] = useState('')
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [negative, setNegative] = useState(false)
@@ -221,8 +202,11 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const filtered = splitList(tagsText).length > 0 || splitList(pathsText).length > 0
   const timeoutMs = Number.parseInt(timeoutText, 10)
   const timeoutBad = timeoutText !== '' && !(timeoutMs > 0)
+  const maxResponseMs = Number.parseInt(maxResponseText, 10)
+  const maxResponseBad = maxResponseText !== '' && !(maxResponseMs > 0)
+  const pathLimits = parsePathLimits(pathLimitsText)
   const parsedVars = parseVars(varsText)
-  const canRun = !timeoutBad && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
+  const canRun = !timeoutBad && !maxResponseBad && pathLimits.bad.length === 0 && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
 
   async function run() {
     setRunning(true)
@@ -233,6 +217,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
         specPath, baseUrl, envPath, allowWrites, confirmedRemote,
         tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
+        maxResponseTimeMs: maxResponseBad || !maxResponseText ? 0 : maxResponseMs,
+        maxResponseTimeFor: pathLimits.lines,
         recordCoverage: recordCoverage && !filtered,
         vars: parsedVars.vars,
       }))
@@ -260,7 +246,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
             type="button"
             onClick={() => onOpenCliBuilder(cliValues({
               specPath, baseUrl, envPath, activeEnvironment: ctx.activeEnvironment ?? '',
-              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, allowWrites,
+              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, maxResponseText, allowWrites,
             }))}
             title="Open the CLI Command Builder with the choices on this page"
             className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
@@ -294,10 +280,12 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           </div>
 
           <div className="flex flex-col gap-1 sm:col-span-2">
-            <label htmlFor="conf-base" className="text-xs font-medium">Base URL <span className="text-red-400">*</span></label>
+            <label htmlFor="conf-base" className="text-xs font-medium">Base URL{info && !info.serverUrl && <span className="text-red-400"> *</span>}</label>
             <input id="conf-base" value={baseUrl} onChange={e => { setBaseUrl(e.target.value); setConfirmedRemote(false) }} placeholder="http://localhost:8120" className={cn(inputClass, 'font-mono')} />
             <p className="text-[11px] text-[var(--color-muted-foreground)]">
-              {info?.serverUrl ? 'Starts as the first server in the spec; change it to test another deployment.' : 'The spec declares no server, so enter the address to test.'}
+              {!info ? 'Choose a spec first; the address starts as the first server it declares.'
+                : info.serverUrl ? 'Starts as the first server in the spec; change it to test another deployment.'
+                : 'The spec declares no server, so enter the address to test.'}
             </p>
           </div>
         </div>
@@ -348,6 +336,23 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               <input id="conf-timeout" value={timeoutText} onChange={e => setTimeoutText(e.target.value)} placeholder="10000" inputMode="numeric" className={cn(inputClass, 'font-mono')} />
               {timeoutBad && <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>}
             </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="conf-max-response" className="text-xs font-medium">Slowest acceptable response (ms)</label>
+              <input id="conf-max-response" value={maxResponseText} onChange={e => setMaxResponseText(e.target.value)} placeholder="no limit" inputMode="numeric" className={cn(inputClass, 'font-mono')} />
+              {maxResponseBad
+                ? <p role="alert" className="text-[11px] text-red-400">Enter a number above 0, or leave empty.</p>
+                : <p className="text-[11px] text-[var(--color-muted-foreground)]">A slower operation fails; its response is still compared with the spec. Leave a margin.</p>}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-col gap-1">
+            <label htmlFor="conf-path-limits" className="text-xs font-medium">Response-time limits for paths</label>
+            <textarea
+              id="conf-path-limits" value={pathLimitsText} onChange={e => setPathLimitsText(e.target.value)}
+              rows={2} placeholder="/reports=2000" spellCheck={false} className={cn(inputClass, 'font-mono')}
+            />
+            {pathLimits.bad.length > 0
+              ? <p role="alert" className="text-[11px] text-red-400">Use /path-prefix=milliseconds, one per line: {pathLimits.bad.join(', ')}</p>
+              : <p className="text-[11px] text-[var(--color-muted-foreground)]">One /prefix=ms per line. The longest matching prefix wins over the limit above; 0 turns the limit off there. Not carried into Get CLI command.</p>}
           </div>
           <div className="mt-3 flex flex-col gap-1">
             <label htmlFor="conf-vars" className="text-xs font-medium">Variable overrides</label>

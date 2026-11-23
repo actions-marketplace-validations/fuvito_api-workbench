@@ -73,7 +73,7 @@ function relTime(iso: string): string {
 function OpRow({ op, covered, lastResult }: {
   op: string
   covered: boolean
-  lastResult?: { lastPassed: boolean; lastRunAt: string }
+  lastResult?: { lastPassed: boolean; lastRunAt: string; lastDurationMs?: number; slowestDurationMs?: number }
 }) {
   const { method, path } = parseOp(op)
   return (
@@ -104,6 +104,13 @@ function OpRow({ op, covered, lastResult }: {
       <span className="w-24 shrink-0 text-right text-[var(--color-muted-foreground)] tabular-nums">
         {lastResult?.lastRunAt ? relTime(lastResult.lastRunAt) : '—'}
       </span>
+      <span
+        data-testid="op-times"
+        title="Response time of the last run, and the slowest ever recorded"
+        className="w-28 shrink-0 text-right text-[var(--color-muted-foreground)] tabular-nums"
+      >
+        {lastResult?.lastDurationMs ? `${lastResult.lastDurationMs} / ${lastResult.slowestDurationMs ?? lastResult.lastDurationMs} ms` : '—'}
+      </span>
     </div>
   )
 }
@@ -116,6 +123,7 @@ function TableHeader() {
       <span className="w-24 shrink-0 text-right">Coverage</span>
       <span className="w-24 shrink-0 text-right">Last Result</span>
       <span className="w-24 shrink-0 text-right">Last Run</span>
+      <span className="w-28 shrink-0 text-right" title="Response time of the last run / the slowest ever recorded">Last / slowest</span>
     </div>
   )
 }

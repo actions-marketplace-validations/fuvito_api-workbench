@@ -64,9 +64,9 @@ export function CoverageSidebarPanel({ workspacePath, selectedSpecFile, onSelect
         {entries.length === 0 && !loading ? (
           <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
             <BarChart2 size={20} className="text-[var(--color-muted-foreground)] opacity-30" />
-            <p className="text-xs text-[var(--color-muted-foreground)]">No coverage data yet</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Nothing recorded in Contracts yet</p>
             <p className="text-[11px] text-[var(--color-muted-foreground)] opacity-60">
-              Run a scenario with a specFile to track coverage
+              Run a scenario that names a specFile, or run Check Conformance with "Add to Contracts coverage", and the results appear here
             </p>
           </div>
         ) : entries.map(entry => {

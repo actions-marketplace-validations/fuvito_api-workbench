@@ -95,7 +95,7 @@ test.describe('Workspace page', () => {
     const sidebar = page.getByTestId('sidebar')
     const rail = { getByRole: (_: 'button', o: { name: string }) => page.locator(`button[aria-label="${o.name}"]`) }
     const icons: [string, string | null][] = [
-      ['Workspace', 'sidebar-workspace'], ['Check spec conformance', 'sidebar-conformance'], ['CLI Command Builder', 'sidebar-cli'],
+      ['Workspace', 'sidebar-workspace'], ['Check Conformance', 'sidebar-conformance'], ['CLI Command Builder', 'sidebar-cli'],
       ['Requests', null], ['Scenarios', null], ['Contracts', null],
     ]
     for (const [name, id] of icons) {
@@ -134,7 +134,7 @@ test.describe('Workspace page', () => {
 
     await rail.getByRole('button', { name: 'Scenarios' }).click()
     await selected(/User flow/)
-    await rail.getByRole('button', { name: 'Check spec conformance' }).click()
+    await rail.getByRole('button', { name: 'Check Conformance' }).click()
     await selected(/Conformance/)
     await rail.getByRole('button', { name: 'Workspace' }).click()
     await selected(/Workspace/)
@@ -173,7 +173,7 @@ test.describe('Workspace page', () => {
   // The Check Conformance and CLI Builder sidebars pick inputs on their pages.
   test('the Check Conformance sidebar picks the spec on the page and shows its last result', async ({ page }) => {
     await gotoApp(page)
-    await page.locator('button[aria-label="Check spec conformance"]').click()
+    await page.locator('button[aria-label="Check Conformance"]').click()
     const side = page.getByTestId('sidebar-conformance')
     await expect(side.getByRole('list', { name: 'Workspace specs' })).toContainText('specs/shop.yaml')
     await expect(side.getByRole('button', { name: 'Active environment' })).toHaveAttribute('aria-pressed', 'true')
@@ -196,7 +196,7 @@ test.describe('Workspace page', () => {
     await expect(side.getByRole('button', { name: /clrsig run/ })).toBeVisible()
     await expect(side.getByRole('button', { name: /clrsig run/ })).toHaveAttribute('aria-pressed', 'true')
     await side.getByRole('button', { name: /clrsig conform/ }).click()
-    await expect(page.getByRole('radio', { name: /Check an API against its OpenAPI spec/ })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('radio', { name: /check an API against its OpenAPI spec/i })).toHaveAttribute('aria-checked', 'true')
     await expect(side.getByRole('button', { name: /clrsig conform/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -235,9 +235,9 @@ test.describe('Workspace page', () => {
     await page.getByRole('tab', { name: /Workspace/ }).click()
     await lit('Workspace')
     await expect(sidebar).toHaveCount(0)
-    await page.getByRole('button', { name: 'Check spec conformance' }).click()
+    await page.getByRole('button', { name: 'Check Conformance' }).click()
     await expect(page.getByRole('tab', { name: /Check Conformance|Conformance/ }).first()).toBeVisible()
-    await lit('Check spec conformance')
+    await lit('Check Conformance')
     await notLit('Workspace')
     // Clicking an icon shows its sidebar; clicking a tab afterwards leaves it showing and re-points it.
     await expect(sidebar).toBeVisible()

@@ -32,12 +32,12 @@ func TestConformReportsRedactSecrets(t *testing.T) {
 		"text":     reporting.ConformText(res, nil) + reporting.NegativeText(neg),
 		"markdown": string(reporting.ConformMarkdown(res, nil, neg)),
 	}
-	if b, err := reporting.ConformJSON(res, nil); err == nil {
+	if b, err := reporting.ConformJSON(res, nil, nil); err == nil {
 		outputs["json"] = string(b)
 	} else {
 		t.Fatal(err)
 	}
-	if b, err := reporting.ConformJUnit(res); err == nil {
+	if b, err := reporting.ConformJUnit(res, nil); err == nil {
 		outputs["junit"] = string(b)
 	} else {
 		t.Fatal(err)

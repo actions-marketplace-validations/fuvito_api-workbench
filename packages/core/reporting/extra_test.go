@@ -127,3 +127,16 @@ func TestText_AssertionLabelsForEveryType(t *testing.T) {
 		}
 	}
 }
+
+// F-029: when every probe errored the headline says FAILED, as the exit code does.
+func TestNegativeText_ErroredProbesAreNotPassed(t *testing.T) {
+	out := reporting.NegativeText(&conformance.NegativeResult{Probes: []conformance.NegativeProbeResult{
+		{Description: "p1", Error: "connection refused"}, {Description: "p2", Error: "connection refused"},
+	}})
+	if !strings.Contains(out, "FAILED  2 probes  ·  0 passed  ·  0 failed  ·  0 skipped  ·  2 errors") || strings.Contains(out, "PASSED") {
+		t.Errorf("an all-errored run must not say PASSED:\n%s", out)
+	}
+	if !strings.Contains(out, "2 probe(s) got no answer") {
+		t.Errorf("the headline says why:\n%s", out)
+	}
+}

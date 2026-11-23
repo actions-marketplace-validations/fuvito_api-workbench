@@ -163,6 +163,20 @@ describe('CoverageTab — detail', () => {
       expect(await num('Not covered')).toContain('text-[var(--color-muted-foreground)]')
     })
 
+    it('shows the last and slowest response time of an operation, and a dash when none was recorded', async () => {
+      b.getAccumulatedCoverage.mockResolvedValue(cov({
+        covered: 2, total: 2, percent: 100, exercised: ['GET /users', 'POST /users'], missed: [],
+        operationResults: {
+          'GET /users': { lastPassed: true, lastRunAt: new Date().toISOString(), lastDurationMs: 120, slowestDurationMs: 340 },
+          'POST /users': { lastPassed: true, lastRunAt: new Date().toISOString() },
+        },
+      }))
+      render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
+      const cells = await screen.findAllByTestId('op-times')
+      expect(cells[0]).toHaveTextContent('120 / 340 ms')
+      expect(cells[1]).toHaveTextContent('—')
+    })
+
     it('colours not-covered operations amber when there are any', async () => {
       render(<CoverageTab workspacePath="/ws" specFile="api.yaml" />)
       expect((await tile('Not covered')).querySelector('span.text-3xl')!.className).toContain('text-amber-400')

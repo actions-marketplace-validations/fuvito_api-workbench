@@ -69,7 +69,7 @@ export function RequestEditor({
   return (
     <div className="flex flex-col h-full">
       {/* URL bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-muted)]">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-muted)]">
         <select
           value={method}
           onChange={e => onMethodChange(e.target.value as HttpMethod)}
@@ -93,6 +93,9 @@ export function RequestEditor({
           }}
           placeholder="https://api.example.com/endpoint"
           className={cn(inputCls, 'font-mono px-3 py-1')}
+          // The URL is the most important field: it keeps a usable width and the timeout and redirect
+          // options wrap to a second line when the window is narrow, instead of squeezing it.
+          wrapperClassName="min-w-[16rem]"
           envVarNames={envVarNames}
         />
 

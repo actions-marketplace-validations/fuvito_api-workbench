@@ -74,7 +74,7 @@ export function setupMockBridge() {
         ],
       },
       {
-        name: 'conform', goal: 'Check an API against its OpenAPI spec', summary: 'Calls every operation in the spec and checks each response against what the spec declares.', when: 'To confirm a running API still matches its specification, locally or as a CI gate.',
+        name: 'conform', goal: 'Spec Conformance Testing: check an API against its OpenAPI spec', summary: 'Calls every operation in the spec and checks each response against what the spec declares.', when: 'To confirm a running API still matches its specification, locally or as a CI gate.',
         inputs: [
           { name: 'spec', short: '', positional: true, required: true, kind: 'path', role: 'spec', accepts: ['.yaml'], enum: [], default: '', label: 'OpenAPI spec', help: 'The spec file to check against.', example: 'specs/openapi.yaml', group: 'essential' },
           { name: 'base-url', short: 'b', positional: false, required: false, kind: 'text', role: '', accepts: [], enum: [], default: '', label: 'Base URL', help: 'Where the API runs.', example: 'http://localhost:8120', group: 'essential' },

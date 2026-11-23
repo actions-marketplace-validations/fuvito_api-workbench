@@ -188,7 +188,8 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                   type="number"
                   min={0}
                   max={65535}
-                  value={local.demoServerPort ?? 0}
+                  value={local.demoServerPort || ''}
+                  placeholder="Automatic"
                   onChange={e => set('demoServerPort', Number.parseInt(e.target.value, 10) || 0)}
                   aria-label="Demo Server port"
                   className={inputCls}
@@ -199,14 +200,15 @@ export function SettingsPanel({ settings, onSave, onReset, onClose, onPreview }:
                   type="number"
                   min={0}
                   max={65535}
-                  value={local.conformanceServerPort ?? 0}
+                  value={local.conformanceServerPort || ''}
+                  placeholder="Automatic"
                   onChange={e => set('conformanceServerPort', Number.parseInt(e.target.value, 10) || 0)}
                   aria-label="Conformance Server port"
                   className={inputCls}
                 />
               </Row>
               <p className="text-[10px] text-[var(--color-muted-foreground)]">
-                0 picks a free port automatically (from 8090 and 8120). Set a port (1024–65535) to keep the same address every time; if it is taken, the server will not start and says so.
+                Leave a port empty to pick a free one automatically (from 8090 and 8120). Set a port (1024–65535) to keep the same address every time; if it is taken, the server will not start and says so.
               </p>
               {portError && <span role="alert" className="text-[10px] text-red-400">{portError}</span>}
             </div>

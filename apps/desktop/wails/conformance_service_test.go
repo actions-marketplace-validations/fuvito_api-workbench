@@ -7,21 +7,38 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 )
 
+// testWorkspaces gives each test one workspace folder, shared by the helpers below: the service reads
+// spec and environment files only from inside the open workspace.
+var testWorkspaces sync.Map
+
+func testWorkspaceDir(t *testing.T) string {
+	t.Helper()
+	if dir, ok := testWorkspaces.Load(t.Name()); ok {
+		return dir.(string)
+	}
+	dir := t.TempDir()
+	testWorkspaces.Store(t.Name(), dir)
+	return dir
+}
+
 func newTestConformanceService(t *testing.T) *ConformanceService {
 	t.Helper()
 	isolateHome(t)
-	return NewConformanceService(NewWorkspaceService(), NewSettingsService())
+	ws := NewWorkspaceService()
+	ws.workspacePath = testWorkspaceDir(t)
+	return NewConformanceService(ws, NewSettingsService())
 }
 
 func conformanceSpecFile(t *testing.T) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "conformance-openapi.yaml")
+	path := filepath.Join(testWorkspaceDir(t), "conformance-openapi.yaml")
 	if err := os.WriteFile(path, conformanceOpenAPIYAML, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -32,8 +49,12 @@ func conformanceSpecFile(t *testing.T) string {
 // body value the generated requests use as {{placeholders}}.
 func conformanceEnvFile(t *testing.T) string {
 	t.Helper()
-	path, err := filepath.Abs(filepath.Join("help", "conformance-environment.yaml"))
+	data, err := os.ReadFile(filepath.Join("help", "conformance-environment.yaml"))
 	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(testWorkspaceDir(t), "conformance-environment.yaml")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -151,8 +172,7 @@ func localConformanceServer(t *testing.T) *httptest.Server {
 func TestConformanceService_FiltersAndCoverageRecording(t *testing.T) {
 	srv := localConformanceServer(t)
 	svc := newTestConformanceService(t)
-	ws := t.TempDir()
-	svc.ws.workspacePath = ws
+	ws := testWorkspaceDir(t)
 	spec := filepath.Join(ws, "specs", "api.yaml")
 	if err := os.MkdirAll(filepath.Dir(spec), 0o755); err != nil {
 		t.Fatal(err)
@@ -253,7 +273,7 @@ func TestConformanceService_ContextNamesTheActiveEnvironment(t *testing.T) {
 func TestConformanceService_WarnsAboutUnsetEnvironmentReferences(t *testing.T) {
 	srv := localConformanceServer(t)
 	svc := newTestConformanceService(t)
-	envPath := filepath.Join(t.TempDir(), "env.yaml")
+	envPath := filepath.Join(testWorkspaceDir(t), "env.yaml")
 	env := "schemaVersion: \"1\"\nname: e\nvariables:\n  - name: id\n    value: \"1\"\n  - name: token\n    value: \"${CS_SURELY_UNSET_VAR}\"\n"
 	if err := os.WriteFile(envPath, []byte(env), 0o600); err != nil {
 		t.Fatal(err)
@@ -270,7 +290,7 @@ func TestConformanceService_WarnsAboutUnsetEnvironmentReferences(t *testing.T) {
 func TestConformanceService_VariableOverrides(t *testing.T) {
 	srv := localConformanceServer(t)
 	svc := newTestConformanceService(t)
-	envPath := filepath.Join(t.TempDir(), "env.yaml")
+	envPath := filepath.Join(testWorkspaceDir(t), "env.yaml")
 	if err := os.WriteFile(envPath, []byte("schemaVersion: \"1\"\nname: e\nvariables:\n  - name: name\n    value: Lamp\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -344,5 +364,57 @@ func TestConformanceService_EmitsProgressEvents(t *testing.T) {
 		if e.Done != i+1 || e.Total != 10 || e.Operation == "" {
 			t.Errorf("event %d = %+v", i, e)
 		}
+	}
+}
+
+func TestConformanceService_ReadsOnlyFilesInsideTheWorkspace(t *testing.T) {
+	svc := newTestConformanceService(t)
+	outside := filepath.Join(t.TempDir(), "elsewhere.yaml")
+	if err := os.WriteFile(outside, conformanceOpenAPIYAML, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	inside := conformanceSpecFile(t)
+
+	if info := svc.InspectConformSpec(outside); !strings.Contains(info.Error, "outside the open workspace") {
+		t.Fatalf("inspect outside: %+v", info)
+	}
+	out := svc.RunConformance(ConformRunInput{SpecPath: outside, BaseURL: "http://localhost:1"})
+	if !strings.Contains(out.Error, "outside the open workspace") || !strings.Contains(out.Error, "copy the file into the workspace") {
+		t.Fatalf("run with a spec outside: %q", out.Error)
+	}
+	out = svc.RunConformance(ConformRunInput{SpecPath: inside, EnvPath: outside, BaseURL: "http://localhost:1"})
+	if !strings.Contains(out.Error, "the environment") || !strings.Contains(out.Error, "outside the open workspace") {
+		t.Fatalf("run with an environment outside: %q", out.Error)
+	}
+	if info := svc.InspectConformSpec(inside); info.Error != "" {
+		t.Fatalf("inside the workspace must work: %+v", info)
+	}
+
+	closed := NewConformanceService(NewWorkspaceService(), NewSettingsService())
+	if info := closed.InspectConformSpec(inside); !strings.Contains(info.Error, "open a workspace first") {
+		t.Fatalf("no workspace: %+v", info)
+	}
+}
+
+func TestPathInside_FollowsSymbolicLinks(t *testing.T) {
+	ws := t.TempDir()
+	elsewhere := t.TempDir()
+	if err := os.WriteFile(filepath.Join(elsewhere, "spec.yaml"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "spec.yaml"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !pathInside(ws, filepath.Join(ws, "spec.yaml")) || !pathInside(ws, ws) {
+		t.Fatal("a file inside the workspace must count as inside")
+	}
+	if pathInside(ws, filepath.Join(elsewhere, "spec.yaml")) || pathInside(ws, filepath.Join(ws, "..", "x.yaml")) {
+		t.Fatal("a file outside must count as outside")
+	}
+	if err := os.Symlink(elsewhere, filepath.Join(ws, "link")); err != nil {
+		t.Skip("symbolic links are not available here:", err)
+	}
+	if pathInside(ws, filepath.Join(ws, "link", "spec.yaml")) {
+		t.Fatal("a link that points out of the workspace must count as outside")
 	}
 }

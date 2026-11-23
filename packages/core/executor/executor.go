@@ -324,13 +324,20 @@ func buildResponse(resp *http.Response, duration time.Duration, maxBodySize int6
 		}
 	}
 
+	truncated := int64(len(body)) > maxBodySize
+	if truncated {
+		body = body[:maxBodySize]
+	}
+
 	return &domain.Response{
-		StatusCode: resp.StatusCode,
-		Status:     resp.Status,
-		Headers:    headers,
-		Body:       body,
-		Duration:   duration,
-		Size:       int64(len(body)),
+		StatusCode:    resp.StatusCode,
+		Status:        resp.Status,
+		Headers:       headers,
+		Body:          body,
+		Duration:      duration,
+		Size:          int64(len(body)),
+		Truncated:     truncated,
+		ContentLength: resp.ContentLength,
 	}, nil
 }
 

@@ -2,8 +2,11 @@ package conformance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,6 +153,13 @@ type Options struct {
 	FailFast bool
 	// RequestTimeoutMs overrides the per-request timeout. 0 = use executor default.
 	RequestTimeoutMs int
+	// MaxResponseTimeMs fails an operation whose response took longer than this many milliseconds.
+	// The response is kept and compared with the spec as usual. 0 = no limit.
+	MaxResponseTimeMs int
+	// PathLimits sets a response-time limit for the operations under a path prefix (the longest
+	// matching prefix wins over MaxResponseTimeMs). A limit of 0 under a prefix switches the limit
+	// off for those operations.
+	PathLimits map[string]int
 	// ReadOnly runs only GET and HEAD operations; every other operation is reported as skipped
 	// and never sent.
 	ReadOnly bool
@@ -178,6 +188,9 @@ func New(exec *executor.Executor) *Runner {
 // Run executes matching operations and returns the aggregate conformance result.
 func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, env *domain.Environment, opts Options) *ConformResult {
 	title, version := spec.Info()
+	if baseURL == "" {
+		baseURL = spec.FirstServerURL()
+	}
 	result := &ConformResult{
 		SpecTitle:   title,
 		SpecVersion: version,
@@ -237,7 +250,11 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		// An unresolved {{placeholder}} in the URL means the request will fail
 		// for the wrong reason; the server error should not be attributed to us.
 		if !strings.Contains(resolved.URL, "{{") {
-			or.RequestViolations = openapi.ValidateRequest(spec, resolved)
+			if bad := invalidBodyValues(gr.Request, resolved, resolver, spec, gr.Path); len(bad) > 0 {
+				or.RequestViolations = bad
+			} else {
+				or.RequestViolations = openapi.ValidateRequest(spec, resolved)
+			}
 		}
 
 		resp, execErr := r.exec.Execute(ctx, resolved)
@@ -254,6 +271,15 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		or.StatusCode = resp.StatusCode
 		or.DurationMs = resp.Duration.Milliseconds()
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
+		if limit := opts.limitFor(opPath); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
+			// The message holds the limit, not the measured time, so a baseline stays stable
+			// between runs; the time is in DurationMs and in the finding's Got.
+			or.Violations = append(or.Violations, openapi.ValidationError{
+				Kind: openapi.KindSlowResponse, Subject: strconv.Itoa(limit),
+				Expected: fmt.Sprintf("within %d ms", limit), Got: fmt.Sprintf("%d ms", resp.Duration.Milliseconds()),
+				Message: fmt.Sprintf("%s %s %d: the response was slower than the %d ms limit", or.Method, specPathOr(or), resp.StatusCode, limit),
+			})
+		}
 
 		result.Operations = append(result.Operations, or)
 		handled()
@@ -303,6 +329,38 @@ func matchesTags(opTags, filterTags []string) bool {
 	return false
 }
 
+// limitFor returns the response-time limit for an operation path: the longest matching
+// PathLimits prefix, otherwise MaxResponseTimeMs.
+func (o Options) limitFor(opPath string) int {
+	best, limit := -1, o.MaxResponseTimeMs
+	for prefix, ms := range o.PathLimits {
+		if strings.HasPrefix(opPath, prefix) && len(prefix) > best {
+			best, limit = len(prefix), ms
+		}
+	}
+	return limit
+}
+
+// ParsePathLimits reads repeated /prefix=ms values (for --max-response-time-for).
+func ParsePathLimits(values []string) (map[string]int, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	out := map[string]int{}
+	for _, v := range values {
+		i := strings.LastIndex(v, "=")
+		if i <= 0 || !strings.HasPrefix(v, "/") {
+			return nil, fmt.Errorf("invalid time limit %q: use /path-prefix=milliseconds, for example /reports=2000", v)
+		}
+		ms, err := strconv.Atoi(strings.TrimSpace(v[i+1:]))
+		if err != nil || ms < 0 {
+			return nil, fmt.Errorf("invalid time limit %q: the milliseconds must be a whole number, 0 or more", v)
+		}
+		out[strings.TrimSpace(v[:i])] = ms
+	}
+	return out, nil
+}
+
 func matchesPathPrefix(opPath string, prefixes []string) bool {
 	if len(prefixes) == 0 {
 		return true
@@ -313,4 +371,48 @@ func matchesPathPrefix(opPath string, prefixes []string) bool {
 		}
 	}
 	return false
+}
+
+var bareBodyPlaceholder = regexp.MustCompile(`"([^"]+)"\s*:\s*\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}`)
+
+// invalidBodyValues explains a JSON body that stopped being JSON because an environment value was
+// put in unquoted (a number or boolean field written as text, "cheap" for a price). The library
+// only says "invalid character 'c'"; this names the field, the variable, the value and the type the
+// spec declares. It returns nothing when the body is valid or no placeholder explains the problem.
+func invalidBodyValues(template, resolved *domain.Request, resolver *variables.Resolver, spec *openapi.Spec, specPath string) []openapi.ValidationError {
+	if template.Body == nil || resolved.Body == nil || template.Body.Type != domain.BodyJSON || json.Valid([]byte(resolved.Body.Content)) {
+		return nil
+	}
+	var out []openapi.ValidationError
+	for _, m := range bareBodyPlaceholder.FindAllStringSubmatch(template.Body.Content, -1) {
+		field, name := m[1], m[2]
+		if strings.HasPrefix(name, "$") {
+			continue
+		}
+		val := resolver.Interpolate("{{" + name + "}}")
+		if json.Valid([]byte(val)) {
+			continue
+		}
+		declared := spec.BodyFieldType(string(template.Method), specPath, field)
+		if declared == "" {
+			declared = "a valid JSON value"
+		} else {
+			declared = "a " + declared
+			if declared == "a integer" {
+				declared = "an integer"
+			}
+		}
+		out = append(out, openapi.ValidationError{
+			Kind: openapi.KindRequestBody, Subject: field, In: "body", Expected: declared, Got: val, Variable: name,
+			Message: fmt.Sprintf("%s %s: the request body field %q takes its value from {{%s}}, which is %q; that is not a valid JSON value (the spec declares %s)", template.Method, specPath, field, name, val, declared),
+		})
+	}
+	return out
+}
+
+func specPathOr(or OperationResult) string {
+	if or.SpecPath != "" {
+		return or.SpecPath
+	}
+	return or.Path
 }

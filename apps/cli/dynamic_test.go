@@ -171,21 +171,56 @@ steps:
 	}
 }
 
-func TestRun_UnknownFunctionStopsBeforeAnythingIsSent(t *testing.T) {
+func TestRun_UnknownFunctionInAStepFailsThatStepOnly(t *testing.T) {
 	srv, n := dynServer(t)
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
 		"good.yaml": fmt.Sprintf(orderScenarioYAML, "Good"),
-		"typo.yaml": "schemaVersion: \"1\"\ntitle: Typo\nsteps:\n  - label: a\n    request: {method: GET, url: \"{{base}}/x?e={{$randomIntt 1 5}}\"}\n",
+		"typo.yaml": `schemaVersion: "1"
+title: Typo
+steps:
+  - label: fine
+    request: {method: GET, url: "{{base}}/x"}
+  - label: typo
+    failPolicy: continue
+    request: {method: GET, url: "{{base}}/x?e={{$randomIntt 1 5}}"}
+  - label: after
+    request: {method: GET, url: "{{base}}/y"}
+`,
 	})
 
-	_, err := exec(t, "run", "--var", "base="+srv.URL, filepath.Join(root, "typo.yaml"))
-	if err == nil || exitCode(err) == 1 || !strings.Contains(err.Error(), "unknown function $randomIntt") {
-		t.Errorf("a typo in one file is a configuration error (exit 2): %v", err)
+	out, err := exec(t, "run", "--var", "base="+srv.URL, "-f", "json", filepath.Join(root, "typo.yaml"))
+	if err == nil || exitCode(err) != 1 {
+		t.Errorf("a bad function in a step is a failed step (exit 1), got %v", err)
 	}
+	if !strings.Contains(out, "unknown function $randomIntt") {
+		t.Errorf("the report names the bad function: %s", out)
+	}
+	if got := n.Load(); got != 2 {
+		t.Errorf("the other two steps run, the bad one is not sent: %d requests", got)
+	}
+
+	// A folder run runs the good scenario as well; the exit code is 1, not 2.
 	_, err = exec(t, "run", "--var", "base="+srv.URL, root)
-	if err == nil || !strings.Contains(err.Error(), "nothing was run") || !strings.Contains(err.Error(), "typo.yaml") {
-		t.Errorf("a folder run stops before any request: %v", err)
+	if err == nil || exitCode(err) != 1 {
+		t.Errorf("a folder run reports the failed step with exit 1: %v", err)
+	}
+}
+
+func TestRun_BadFunctionInAScenarioVariableStopsBeforeAnythingIsSent(t *testing.T) {
+	srv, n := dynServer(t)
+	sc := writeTempFile(t, "v.yaml", `schemaVersion: "1"
+title: V
+variables:
+  - name: x
+    value: "{{$nope}}"
+steps:
+  - label: a
+    request: {method: GET, url: "{{base}}/x"}
+`)
+	_, err := exec(t, "run", "--var", "base="+srv.URL, sc)
+	if err == nil || exitCode(err) == 1 || !strings.Contains(err.Error(), "unknown function $nope") {
+		t.Errorf("a bad scenario variable is a configuration error (exit 2): %v", err)
 	}
 	if n.Load() != 0 {
 		t.Errorf("no request may be sent, got %d", n.Load())
@@ -295,5 +330,61 @@ scenarios:
 	idRe := regexp.MustCompile(`var id = (\S+)`)
 	if find(t, idRe, a) != find(t, idRe, b) || !strings.Contains(a, "seed: 8") {
 		t.Errorf("a bundle run replays with --seed:\n%s\n%s", a, b)
+	}
+}
+
+// F-023: a step whose {{name}} has no value is not sent with its braces in the URL.
+func TestRun_StepWithAMissingValueIsNotSent(t *testing.T) {
+	srv, n := dynServer(t)
+	sc := writeTempFile(t, "missing.yaml", `schemaVersion: "1"
+title: Missing
+steps:
+  - label: ok
+    request: {method: GET, url: "{{base}}/ok"}
+  - label: missing path
+    failPolicy: continue
+    request: {method: GET, url: "{{base}}/items/{{nothing}}"}
+  - label: missing query
+    failPolicy: continue
+    request: {method: GET, url: "{{base}}/health?x={{alsoNothing}}"}
+`)
+	out, err := exec(t, "run", "--var", "base="+srv.URL, "-f", "json", sc)
+	if err == nil || exitCode(err) != 1 {
+		t.Fatalf("a step that could not be sent fails the run (exit 1): %v", err)
+	}
+	if !strings.Contains(out, "no value for {{nothing}}") || !strings.Contains(out, "no value for {{alsoNothing}}") {
+		t.Errorf("the report names each missing value:\n%s", out)
+	}
+	if got := n.Load(); got != 1 {
+		t.Errorf("only the step with all its values is sent, got %d requests", got)
+	}
+}
+
+// F-024: --seed fixes the values whatever way the scenario file is spelled or named.
+func TestRun_SeedGivesTheSameValuesForEverySpellingOfThePath(t *testing.T) {
+	srv, _ := dynServer(t)
+	sc := orderScenarioFile(t, "Seeded")
+	run := func(args ...string) string {
+		out, err := exec(t, append([]string{"run", "--var", "base=" + srv.URL, "--seed", "7"}, args...)...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return find(t, emailRe, out)
+	}
+	want := run(sc)
+	dir, name := filepath.Dir(sc), filepath.Base(sc)
+	t.Chdir(dir)
+	if got := run(name); got != want {
+		t.Errorf("a path from inside the folder: %s, want %s", got, want)
+	}
+	if got := run("." + string(filepath.Separator) + name); got != want {
+		t.Errorf("a ./ path: %s, want %s", got, want)
+	}
+	other := writeTempFile(t, "copy-with-another-name.yaml", fmt.Sprintf(orderScenarioYAML, "Seeded"))
+	if got := run(other); got != want {
+		t.Errorf("the same scenario in another file: %s, want %s", got, want)
+	}
+	if got := run(sc, "--seed", "8"); got == want {
+		t.Errorf("another seed must give other values")
 	}
 }

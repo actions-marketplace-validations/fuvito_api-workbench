@@ -116,7 +116,7 @@ test.describe('Scenarios', () => {
     await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
     const tab = page.getByRole('tab').filter({ hasText: 'User flow' })
     await expect(tab).toBeVisible()
-    await expect(tab).toContainText('SCN')
+    await expect(tab.locator('[data-kind="scenario"]')).toBeVisible()
     await expect(tab).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -258,7 +258,7 @@ test.describe('Scenario management — create', () => {
     // A tab opens for the new scenario
     const tab = page.getByRole('tab').filter({ hasText: 'My Test Scenario' })
     await expect(tab).toBeVisible()
-    await expect(tab).toContainText('SCN')
+    await expect(tab.locator('[data-kind="scenario"]')).toBeVisible()
   })
 })
 
@@ -384,7 +384,7 @@ test.describe('Scenario management — duplicate', () => {
     await page.locator('aside').getByTitle('Duplicate scenario').click()
     const tab = page.getByRole('tab').filter({ hasText: 'user-flow-copy' })
     await expect(tab).toBeVisible()
-    await expect(tab).toContainText('SCN')
+    await expect(tab.locator('[data-kind="scenario"]')).toBeVisible()
   })
 })
 
@@ -1197,6 +1197,36 @@ test.describe('Scenario visual editor — assertions', () => {
     await expect(section.getByTestId('spec-conformance-summary')).toHaveText('1 of 2 match openapi.yaml, 1 step has violations')
     await expect(section).toContainText('Fetch user')
     await expect(section).toContainText('Error at "/name": value must be a string')
+  })
+
+  test('a violation in the scenario result is explained with what, where, why and fix', async ({ page }) => {
+    const detail = { ...SCENARIO_DETAIL, specFile: 'specs/openapi.yaml' }
+    const result = {
+      ...SCENARIO_RESULT,
+      passed: false,
+      steps: [
+        { ...SCENARIO_RESULT.steps[0], specState: 'matched' },
+        {
+          ...SCENARIO_RESULT.steps[1], passed: false, specState: 'violations', specViolations: ['Error at "/name": value must be a string'],
+          specFindings: [{
+            kind: 'wrong-type', part: 'response body', where: 'name', spec: 'GET /users/{id} → response 200 → body schema',
+            summary: '"name" is a number, the spec says string', expected: 'string', got: '42',
+            why: 'The server sent a number where the spec declares a string.', fix: 'Send a string from the server, or change the spec.', detail: 'Error at "/name": value must be a string',
+          }],
+        },
+      ],
+    }
+    await withScenarios(page, { detail, result })
+    await gotoApp(page)
+    await page.locator('aside').getByRole('button', { name: 'User flow' }).click()
+    await page.getByRole('button', { name: /^Run$/ }).click()
+    await page.getByRole('button', { name: 'Setup' }).click()
+    await page.getByRole('tab', { name: 'result' }).click()
+
+    const section = page.getByRole('region', { name: 'Spec conformance' })
+    await expect(section).toContainText('"name" is a number, the spec says string')
+    await expect(section.getByTestId('finding-spec')).toContainText('GET /users/{id}')
+    await expect(section).toContainText('Send a string from the server')
   })
 
   test('a scenario without a spec shows no conformance section', async ({ page }) => {

@@ -58,7 +58,7 @@ func TestCoverageQuality_Gaps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := execFull(t, "coverage", "quality", "--workspace", ws, spec)
+	out, err := execFull(t, "coverage", "quality", "--fail-on-gaps", "--workspace", ws, spec)
 	if exitCode(err) != 1 {
 		t.Fatalf("gaps should yield exit code 1, got err=%v", err)
 	}
@@ -74,6 +74,26 @@ func TestCoverageQuality_Gaps(t *testing.T) {
 	}
 }
 
+// Gaps are signals, not failures: without --fail-on-gaps the command exits 0 and still reports them.
+func TestCoverageQuality_GapsDoNotFailByDefault(t *testing.T) {
+	ws := t.TempDir()
+	spec := writeTempFile(t, "api.yaml", qualitySpec)
+	if err := coverage.Save(ws, coverage.StoredCoverage{
+		SpecFile: spec, TotalOps: 3, TotalRuns: 1, PassedRuns: 1,
+		Exercised:        []string{"GET /a"},
+		OperationResults: map[string]coverage.OperationResult{"GET /a": {LastPassed: true, StatusCodes: []int{200}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := execFull(t, "coverage", "quality", "--workspace", ws, spec)
+	if err != nil {
+		t.Fatalf("gaps must not fail by default: %v", err)
+	}
+	if !strings.Contains(out, "gap(s) found") {
+		t.Errorf("the gaps must still be reported:\n%s", out)
+	}
+}
+
 func TestCoverageQuality_JSON(t *testing.T) {
 	ws := t.TempDir()
 	spec := writeTempFile(t, "api.yaml", qualitySpec)
@@ -82,7 +102,7 @@ func TestCoverageQuality_JSON(t *testing.T) {
 		OperationResults: map[string]coverage.OperationResult{"GET /a": {StatusCodes: []int{200}}},
 	})
 
-	out, err := execFull(t, "coverage", "quality", "-w", ws, "-f", "json", spec)
+	out, err := execFull(t, "coverage", "quality", "--fail-on-gaps", "-w", ws, "-f", "json", spec)
 	if exitCode(err) != 1 {
 		t.Fatalf("expected exit 1, got %v", err)
 	}

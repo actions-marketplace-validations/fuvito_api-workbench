@@ -439,7 +439,7 @@ export function useTabsState(deps: {
     const newTab: TabState = {
       id,
       kind: 'cli',
-      name: 'CLI Builder',
+      name: 'CLI Command Builder',
       method: 'GET',
       url: '',
       queryParams: [],

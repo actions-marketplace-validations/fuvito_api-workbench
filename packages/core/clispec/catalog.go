@@ -140,7 +140,7 @@ var catalog = []Command{
 	},
 	{
 		Name:    "conform",
-		Goal:    "Check an API against its OpenAPI spec",
+		Goal:    "Spec Conformance Testing: check an API against its OpenAPI spec",
 		Summary: "Sends a request to every operation in an OpenAPI spec and checks each response against the schema the spec declares.",
 		When:    "To prove a running API matches its spec with no test files to write.",
 		Inputs: []Input{
@@ -242,6 +242,20 @@ var catalog = []Command{
 				Help:    "How long to wait for each request before giving up.",
 				Example: "10000",
 				Group:   GroupAdvanced,
+			},
+			{
+				Name: "max-response-time", Kind: KindInt, Default: "0",
+				Label:   "Slowest acceptable response (ms)",
+				Help:    "Fail an operation whose response takes longer than this. The response is still compared with the spec. 0 means no limit. Limits are wall-clock: leave a margin.",
+				Example: "500",
+				Group:   GroupAdvanced,
+			},
+			{
+				Name: "max-response-time-for", Kind: KindString, Repeatable: true,
+				Label:   "Response-time limit for a path (ms)",
+				Help:    "/prefix=ms, repeatable: a different limit for the operations under a path prefix. The longest matching prefix wins over the general limit; 0 turns the limit off there.",
+				Example: "/reports=2000",
+				Group:   GroupAdvanced, Deferred: true,
 			},
 			{
 				Name: "format", Short: "f", Kind: KindEnum, Enum: reportFormats, Default: "text",

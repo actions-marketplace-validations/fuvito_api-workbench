@@ -92,7 +92,7 @@ describe('App — workspace shell', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'History' }))
     expect(await screen.findByText('No requests yet')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Contracts' }))
-    expect(await screen.findByText('No coverage data yet')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing recorded in Contracts yet')).toBeInTheDocument()
     expect(localStorage.getItem('ui.railTab')).toBe('coverage')
   })
 
@@ -220,7 +220,7 @@ describe('App — menus and dialogs', () => {
     await screen.findByRole('button', { name: /New Workspace/ })
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'Help' }))
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'About Clear Signal' }))
-    expect(await screen.findByText('Version 0.6.0')).toBeInTheDocument()
+    expect(await screen.findByText('Version 0.8.8')).toBeInTheDocument()
   })
 
   it.each([

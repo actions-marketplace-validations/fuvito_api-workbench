@@ -62,28 +62,10 @@ func (d *DemoService) GetPort() int {
 	return d.port
 }
 
-// cleanupStaleDemoTempDirs removes any clrsig-demo-* directories left behind by
-// previous sessions that crashed before calling StopDemo.
+// cleanupStaleDemoTempDirs removes clrsig-demo-* directories left behind by a session that ended without
+// stopping its server. A folder another running copy of the app keeps alive is left alone.
 func cleanupStaleDemoTempDirs(currentTempDir string) {
-	base := os.TempDir()
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		if !strings.HasPrefix(name, "clrsig-demo-") {
-			continue
-		}
-		full := filepath.Join(base, name)
-		if full == currentTempDir {
-			continue
-		}
-		os.RemoveAll(full) //nolint:errcheck
-	}
+	removeStaleTempWorkspaces(os.TempDir(), currentTempDir, demoWorkspacePrefix)
 }
 
 // StartDemo starts the in-process mock server, extracts the demo workspace to a
@@ -116,6 +98,7 @@ func (d *DemoService) StartDemo() DemoResult {
 		return DemoResult{Error: "could not create temp directory: " + err.Error()}
 	}
 
+	claimTempWorkspace(tmpDir)
 	if err := extractDemoWorkspace(tmpDir, port); err != nil {
 		os.RemoveAll(tmpDir)
 		return DemoResult{Error: "could not extract demo workspace: " + err.Error()}

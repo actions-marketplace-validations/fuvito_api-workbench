@@ -58,7 +58,7 @@ func newConformanceMux() http.Handler {
 	mux.HandleFunc("/widgets", s.widgets)
 	mux.HandleFunc("/inventory", s.inventory)
 	mux.HandleFunc("/status", s.status)
-	return corsMiddleware(mux)
+	return localOnlyMiddleware(mux)
 }
 
 func (s *conformanceServer) health(w http.ResponseWriter, r *http.Request) {

@@ -1467,7 +1467,14 @@ export default function App() {
                     className="absolute inset-0 overflow-hidden"
                     style={{ display: t.id === activeTabId ? 'flex' : 'none', flexDirection: 'column' }}
                   >
-                    <CliBuilderTab preset={cliPreset} onCommandChange={setCliCommand} />
+                    <CliBuilderTab
+                      preset={cliPreset}
+                      onCommandChange={setCliCommand}
+                      runningServers={[
+                        ...(demo.demoRunning && demo.demoPort > 0 ? [{ label: 'Demo Server', url: `http://localhost:${demo.demoPort}` }] : []),
+                        ...(conformancePort > 0 ? [{ label: 'Conformance Server', url: `http://localhost:${conformancePort}` }] : []),
+                      ]}
+                    />
                   </div>
                 ))}
 

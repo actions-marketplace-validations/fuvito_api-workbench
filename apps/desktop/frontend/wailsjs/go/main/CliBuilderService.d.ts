@@ -8,6 +8,6 @@ export function GetCliCatalog():Promise<Array<main.CliCommandIO>>;
 
 export function GetCliContext():Promise<main.CliContextIO>;
 
-export function PickCliFile(arg1:string):Promise<string>;
+export function PickCliFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 
-export function PickCliFolder(arg1:string):Promise<string>;
+export function PickCliFolder(arg1:string,arg2:string,arg3:string):Promise<string>;

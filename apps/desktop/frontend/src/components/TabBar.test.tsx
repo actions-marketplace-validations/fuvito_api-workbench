@@ -30,16 +30,19 @@ describe('TabBar rendering', () => {
     expect(screen.getByText('New Request')).toBeInTheDocument()
     expect(screen.getByText('GET')).toBeInTheDocument()
     expect(screen.getByText('DEL')).toBeInTheDocument()
-    expect(screen.getByText('SCN')).toBeInTheDocument()
+    expect(document.querySelector('[data-kind="scenario"]')).not.toBeNull()
   })
 
   it.each([
-    ['coverage', 'COV', 'Coverage'],
-    ['runner', 'RUN', 'Run Results'],
-    ['scenario', 'SCN', 'Scenario'],
-  ] as const)('labels %s tabs with %s and a default name', (kind, badge, name) => {
+    ['coverage', 'Contracts', 'Contracts'],
+    ['runner', 'Run results', 'Run Results'],
+    ['scenario', 'Scenario', 'Scenario'],
+    ['conformance', 'Check Conformance', 'Check Conformance'],
+    ['cli', 'CLI Builder', 'CLI Command Builder'],
+    ['workspace', 'Workspace', 'Workspace'],
+  ] as const)('marks %s tabs with an icon named %s and a default name', (kind, iconName, name) => {
     setup({ tabs: [{ id: 'x', name: null, method: 'GET', isDirty: false, kind }], activeTabId: 'x' })
-    expect(screen.getByText(badge)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: iconName })).toHaveAttribute('data-kind', kind)
     expect(screen.getByText(name)).toBeInTheDocument()
   })
 

@@ -8,7 +8,8 @@ const (
 	AssertionStatus   AssertionType = "status"
 	AssertionHeader   AssertionType = "header"
 	AssertionJSONPath AssertionType = "jsonpath"
-	AssertionSchema   AssertionType = "schema" // JSON Schema / OpenAPI contract assertion
+	AssertionSchema   AssertionType = "schema"   // JSON Schema / OpenAPI contract assertion
+	AssertionDuration AssertionType = "duration" // response time of the step, in milliseconds
 )
 
 type Operator string

@@ -19,6 +19,15 @@ describe('AssertionRow', () => {
     expect(ops).toEqual(['eq', 'ne', 'gt', 'lt'])
   })
 
+  it('offers a response-time assertion with numeric operators and a millisecond hint', () => {
+    const { onChange } = setup({ type: 'duration', operator: 'lt', expected: 500 })
+    const ops = Array.from((screen.getByLabelText('Assertion operator') as HTMLSelectElement).options).map(o => o.value)
+    expect(ops).toEqual(['eq', 'ne', 'gt', 'lt'])
+    expect(screen.getByDisplayValue('500')).toHaveAttribute('placeholder', 'max ms')
+    fireEvent.change(screen.getByLabelText('Assertion type'), { target: { value: 'duration' } })
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ type: 'duration', operator: 'lt' }))
+  })
+
   it('offers contains and matches for other types', () => {
     setup({ type: 'header', path: 'X', operator: 'eq', expected: 'a' })
     const ops = Array.from((screen.getByLabelText('Assertion operator') as HTMLSelectElement).options).map(o => o.value)

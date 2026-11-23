@@ -143,6 +143,19 @@ describe('WorkspaceTab', () => {
     expect(screen.queryByTestId('workspace-reminder')).not.toBeInTheDocument()
   })
 
+  it('keeps a dismissed reminder dismissed when the tab is closed and opened again, per workspace', async () => {
+    const mine = { ...base, path: '/ws/remount', name: 'remount', attention: [] }
+    const first = show(mine)
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss reminder' }))
+    first.unmount()
+    const second = show(mine)
+    await screen.findByText('remount')
+    expect(screen.queryByTestId('workspace-reminder')).not.toBeInTheDocument()
+    second.unmount()
+    show({ ...mine, path: '/ws/other', name: 'other' })
+    expect(await screen.findByTestId('workspace-reminder')).toBeInTheDocument()
+  })
+
   it('marks a temporary workspace', async () => {
     show({ ...base, temporary: true, environmentSource: 'temporary' })
     expect(await screen.findByText('temporary')).toBeInTheDocument()

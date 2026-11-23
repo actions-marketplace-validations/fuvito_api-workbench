@@ -27,7 +27,7 @@ describe('ActivityRail', () => {
 
   it('renders all six icons, Workspace first', () => {
     setup()
-    for (const name of ['Workspace', 'Requests', 'Scenarios', 'Contracts', 'Check spec conformance', 'CLI Command Builder']) {
+    for (const name of ['Workspace', 'Requests', 'Scenarios', 'Contracts', 'Check Conformance', 'CLI Command Builder']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
     const first = screen.getByRole('navigation', { name: 'Activity' }).querySelector('button')
@@ -35,7 +35,7 @@ describe('ActivityRail', () => {
   })
 
   it('lights exactly the icon the app names, whatever kind it is', () => {
-    for (const [tab, name] of [['workspace', 'Workspace'], ['explorer', 'Requests'], ['scenarios', 'Scenarios'], ['coverage', 'Contracts'], ['conformance', 'Check spec conformance'], ['cli', 'CLI Command Builder']] as const) {
+    for (const [tab, name] of [['workspace', 'Workspace'], ['explorer', 'Requests'], ['scenarios', 'Scenarios'], ['coverage', 'Contracts'], ['conformance', 'Check Conformance'], ['cli', 'CLI Command Builder']] as const) {
       const { unmount } = setup({ activeTab: tab })
       expect(document.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-current', 'page')
@@ -50,7 +50,7 @@ describe('ActivityRail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Scenarios' }))
     fireEvent.click(screen.getByRole('button', { name: 'Contracts' }))
     fireEvent.click(screen.getByRole('button', { name: 'Workspace' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Check spec conformance' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check Conformance' }))
     fireEvent.click(screen.getByRole('button', { name: 'CLI Command Builder' }))
     expect(props.onTabClick).toHaveBeenNthCalledWith(1, 'scenarios')
     expect(props.onTabClick).toHaveBeenNthCalledWith(2, 'coverage')

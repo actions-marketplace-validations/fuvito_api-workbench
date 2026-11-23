@@ -16,6 +16,7 @@ function assertionSummary(a: { type: string; path?: string; operator?: string; e
   const exp = a.expected !== undefined && a.expected !== null ? String(a.expected) : ''
   if (a.type === 'status') return `status ${op} ${exp}`
   if (a.type === 'schema') return a.schema ? `schema: ${a.schema}` : 'schema'
+  if (a.type === 'duration') return `duration ${op} ${exp} ms`
   const path = a.path ? a.path.replace(/^\$\./, '') : ''
   return `${a.type === 'jsonpath' ? '$.'+path : path} ${op} ${exp}`.trim()
 }

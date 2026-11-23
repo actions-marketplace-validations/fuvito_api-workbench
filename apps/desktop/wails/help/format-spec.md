@@ -47,7 +47,7 @@ Dynamic values also work in environment variable values and in assertion `expect
 - A scenario `variables` entry is generated **once per scenario run**; `{{email}}` is identical in every step and assertion of that run.
 - An inline call (`{{$guid}}` in a URL) is generated **every time it appears**, so two inline calls differ.
 - An environment variable that uses a function is generated **once per command** and shared by all scenarios run by that command (the desktop app generates it per scenario run).
-- Random values come from a seed. The report prints it (`seed: N`) when random values were used; `clrsig run --seed N` (or `CLRSIG_SEED=N`) replays the same values. Date and time functions read the clock and are not affected by the seed.
+- Random values come from a seed. The report prints it (`seed: N`) when random values were used; `clrsig run --seed N` (or `CLRSIG_SEED=N`) replays the same values. The values of a scenario come from the seed and its title (the file name when it has no title), not from how the file is written on the command line, so a relative path, an absolute path and a copy under another name give the same values; two scenarios with the same title in one run are told apart by their order. Date and time functions read the clock and are not affected by the seed.
 
 ---
 
@@ -59,7 +59,7 @@ A single HTTP request saved as a `.yaml` or `.json` file.
 schemaVersion: "1"           # required — always "1" (quoted string)
 title: Get User              # required — display name
 
-method: GET                  # required — GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS
+method: GET                  # required — GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS | TRACE
 url: "{{baseUrl}}/users/{{userId}}"  # required
 
 headers:                     # optional
@@ -328,6 +328,8 @@ Every assertion may also carry an optional `name:` label. It is saved with the a
   expected: application/json
 ```
 
+A header the server sent more than once (`Set-Cookie`, a repeated `X-Dup`) is read as one list joined with `, `, so `contains` sees every value.
+
 ### `type: schema` — OpenAPI schema validation
 
 Requires `specFile` set at the scenario level.
@@ -337,14 +339,24 @@ Requires `specFile` set at the scenario level.
   schema: getUserById       # operationId from the linked OpenAPI spec
 ```
 
+### `type: duration` — response time
+
+```yaml
+- type: duration
+  operator: lt              # eq | ne | gt | lt   (lt is the useful one)
+  expected: 500             # milliseconds; {{variables}} are allowed
+```
+
+Compares the time the request took, in milliseconds (from sending it to the end of the body), with the limit. With `retry`, it is the attempt that produced the response. Wall-clock limits fail on a busy machine: leave a margin. A file that uses it cannot be read by a `clrsig` older than 0.8.0.
+
 ### Operator reference
 
 | Operator | Applies to | Meaning |
 |---|---|---|
-| `eq` | status, jsonpath, header | Equal |
-| `ne` | status, jsonpath, header | Not equal |
-| `gt` | status, jsonpath, header | Greater than (numeric) |
-| `lt` | status, jsonpath, header | Less than (numeric) |
+| `eq` | status, jsonpath, header, duration | Equal |
+| `ne` | status, jsonpath, header, duration | Not equal |
+| `gt` | status, jsonpath, header, duration | Greater than (numeric) |
+| `lt` | status, jsonpath, header, duration | Less than (numeric) |
 | `contains` | jsonpath, header | String contains substring |
 | `matches` | jsonpath, header | Matches regular expression |
 
@@ -352,7 +364,7 @@ Requires `specFile` set at the scenario level.
 
 ## Extractions Reference
 
-Capture a value from a response to use as a variable in later steps.
+Capture a value from a response to use as a variable in later steps. An extraction that finds nothing (a JSONPath that is not in the body, a header that was not sent) **fails the step** and the run, like a failed assertion; a header the server sent more than once is one value joined with `, `, and an integer above 2^53 keeps all its digits.
 
 ### `source: jsonpath` — from JSON response body
 

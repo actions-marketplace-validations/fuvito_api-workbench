@@ -40,11 +40,25 @@ export function splitList(text: string): string[] {
   return text.split(',').map(t => t.trim()).filter(Boolean)
 }
 
+// Reads the "/prefix=milliseconds" lines of the per-path response-time limits; `bad` lists the lines
+// that do not fit, so the page can say which.
+export function parsePathLimits(text: string): { lines: string[]; bad: string[] } {
+  const lines: string[] = []
+  const bad: string[] = []
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line) continue
+    if (/^\/\S*=\d+$/.test(line)) lines.push(line)
+    else bad.push(line)
+  }
+  return { lines, bad }
+}
+
 // The values of the page's current choices, as the CLI Command Builder takes them for `clrsig
 // conform`. Read-only is on unless writes were ticked, so the command does what the page does.
 export function cliValues(p: {
   specPath: string; baseUrl: string; envPath: string; activeEnvironment: string
-  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; timeoutText: string; allowWrites: boolean
+  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; timeoutText: string; maxResponseText?: string; allowWrites: boolean
 }): Record<string, string> {
   const v: Record<string, string> = {}
   if (p.specPath) v['spec'] = p.specPath
@@ -57,6 +71,8 @@ export function cliValues(p: {
   if (p.failFast) v['fail-fast'] = 'true'
   const timeout = Number.parseInt(p.timeoutText, 10)
   if (timeout > 0) v['request-timeout'] = String(timeout)
+  const slowest = Number.parseInt(p.maxResponseText ?? '', 10)
+  if (slowest > 0) v['max-response-time'] = String(slowest)
   if (!p.allowWrites) v['read-only'] = 'true'
   return v
 }

@@ -5,10 +5,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 )
@@ -150,6 +153,28 @@ func TestMCP_RunScenario(t *testing.T) {
 	}
 }
 
+func TestMCP_ConformMaxResponseTime(t *testing.T) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(60 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer slow.Close()
+	spec := writeTempFile(t, "spec.yaml", minimalSpec)
+	args := map[string]any{"spec": spec, "baseUrl": slow.URL}
+	if text, _ := toolText(t, rpcExchange(t, callTool("conform", args))[0]); strings.Contains(text, "slow") {
+		t.Errorf("no limit set, nothing may be reported slow: %s", text)
+	}
+	args["maxResponseTime"] = 1
+	if text, _ := toolText(t, rpcExchange(t, callTool("conform", args))[0]); !strings.Contains(text, "slow") && !strings.Contains(text, "took longer") {
+		t.Errorf("a 1 ms limit must flag a 60 ms response: %s", text)
+	}
+	args["maxResponseTime"] = -1
+	if text, isErr := toolText(t, rpcExchange(t, callTool("conform", args))[0]); !isErr || !strings.Contains(text, "negative") {
+		t.Errorf("negative limit must be an error: %q", text)
+	}
+}
+
 func TestMCP_Conform(t *testing.T) {
 	srv := pingServer(t)
 	spec := writeTempFile(t, "spec.yaml", minimalSpec)
@@ -239,5 +264,23 @@ func TestMCP_LoadEnv(t *testing.T) {
 	}
 	if _, err := mcpLoadEnv(filepath.Join(os.TempDir(), "definitely-missing-env.yaml")); err == nil {
 		t.Error("missing env should fail")
+	}
+}
+
+func TestMCP_ConformMaxResponseTimeFor(t *testing.T) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(60 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer slow.Close()
+	spec := writeTempFile(t, "spec.yaml", minimalSpec)
+	args := map[string]any{"spec": spec, "baseUrl": slow.URL, "maxResponseTimeFor": []string{"/ping=1"}}
+	if text, _ := toolText(t, rpcExchange(t, callTool("conform", args))[0]); !strings.Contains(text, "slow") && !strings.Contains(text, "limit") {
+		t.Errorf("a 1 ms limit for /ping must flag the response: %s", text)
+	}
+	args["maxResponseTimeFor"] = []string{"ping"}
+	if text, isErr := toolText(t, rpcExchange(t, callTool("conform", args))[0]); !isErr || !strings.Contains(text, "invalid time limit") {
+		t.Errorf("a bad limit must be an error: %q", text)
 	}
 }

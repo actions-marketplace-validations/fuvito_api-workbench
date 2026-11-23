@@ -26,7 +26,7 @@ describe('CoverageSidebarPanel', () => {
 
   it('shows an empty state with no data', async () => {
     render(<CoverageSidebarPanel workspacePath="/ws" selectedSpecFile={null} onSelectSpec={vi.fn()} />)
-    expect(await screen.findByText('No coverage data yet')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing recorded in Contracts yet')).toBeInTheDocument()
   })
 
   it('lists specs with percentage, ops and run summary', async () => {

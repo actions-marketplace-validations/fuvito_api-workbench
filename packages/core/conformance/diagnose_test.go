@@ -52,7 +52,7 @@ func TestDiagnose_WrongTypeNames(t *testing.T) {
 
 func TestDiagnose_OtherAndRequestAndNoResponse(t *testing.T) {
 	other := Diagnose(OperationResult{Violations: []openapi.ValidationError{ve(`Error at "/age": number must be at most 120`)}})[0]
-	if other.Kind != FindingOther || other.Where != "age" || other.Summary != "number must be at most 120" {
+	if other.Kind != FindingConstraint || other.CheckID != "CS-RESP-007" || other.Where != "age" || other.Summary != "number must be at most 120" {
 		t.Fatalf("%+v", other)
 	}
 	unknown := Diagnose(OperationResult{Violations: []openapi.ValidationError{ve("something unexpected\nmore")}})[0]

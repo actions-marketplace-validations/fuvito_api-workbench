@@ -80,6 +80,9 @@ type ConformSpecInfoIO struct {
 // InspectConformSpec reads a spec so the page can show its default base URL and how many
 // operations would send a write request.
 func (s *ConformanceService) InspectConformSpec(specPath string) ConformSpecInfoIO {
+	if err := s.insideWorkspace("spec", specPath); err != nil {
+		return ConformSpecInfoIO{Error: err.Error()}
+	}
 	spec, err := loadSpecFile(specPath)
 	if err != nil {
 		return ConformSpecInfoIO{Error: err.Error()}
@@ -94,6 +97,23 @@ func (s *ConformanceService) InspectConformSpec(specPath string) ConformSpecInfo
 		}
 	}
 	return info
+}
+
+// insideWorkspace refuses a file the page was asked to read when it is not in the open workspace: the page
+// only offers workspace files, so anything else is a request the interface did not make (CLAUDE.md
+// section 7: file operations stay inside the project).
+func (s *ConformanceService) insideWorkspace(what, path string) error {
+	if path == "" {
+		return nil
+	}
+	ws := s.ws.GetWorkspacePath()
+	if ws == "" {
+		return fmt.Errorf("open a workspace first: Clear Signal reads the %s only from the open workspace", what)
+	}
+	if !pathInside(ws, path) {
+		return fmt.Errorf("the %s %q is outside the open workspace %q, and Clear Signal reads only files inside it; copy the file into the workspace (for example into specs/) and choose it there", what, path, ws)
+	}
+	return nil
 }
 
 func loadSpecFile(path string) (*openapi.Spec, error) {
@@ -132,6 +152,10 @@ type ConformRunInput struct {
 	FailFast bool `json:"failFast"`
 	// TimeoutMs is the per-request timeout; 0 uses the shared default.
 	TimeoutMs int `json:"timeoutMs"`
+	// MaxResponseTimeMs fails an operation that answers more slowly than this; 0 = no limit.
+	MaxResponseTimeMs int `json:"maxResponseTimeMs"`
+	// MaxResponseTimeFor sets other limits for path prefixes, each as /prefix=ms.
+	MaxResponseTimeFor []string `json:"maxResponseTimeFor"`
 	// RecordCoverage adds the run to the Contracts coverage store. Only unfiltered runs are
 	// recorded, so a run limited by tags or paths cannot skew the accumulated totals.
 	RecordCoverage bool `json:"recordCoverage"`
@@ -155,6 +179,8 @@ type ConformProbeIO struct {
 // that fails and what to change. Detail is the validator's own message.
 type ConformFindingIO struct {
 	Kind string `json:"kind"`
+	// CheckID is the check's ID in the catalog (Help, What We Check), for example CS-RESP-005.
+	CheckID string `json:"checkId,omitempty"`
 	// Part and Where say where in the response (or request) the problem is: the header name, the
 	// status, a body field. Spec says where the expectation comes from in the spec.
 	Part     string `json:"part,omitempty"`
@@ -166,6 +192,18 @@ type ConformFindingIO struct {
 	Why      string `json:"why"`
 	Fix      string `json:"fix"`
 	Detail   string `json:"detail,omitempty"`
+}
+
+// findingsIO converts diagnosed findings for the frontend.
+func findingsIO(fs []conformance.Finding) []ConformFindingIO {
+	out := make([]ConformFindingIO, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, ConformFindingIO{
+			Kind: f.Kind, CheckID: f.CheckID, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
+			Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
+		})
+	}
+	return out
 }
 
 type ConformOperationIO struct {
@@ -228,6 +266,12 @@ func IsLocalBaseURL(raw string) bool {
 // refuses a non-local base URL that the user has not confirmed, including a URL that only came
 // from the spec's servers.
 func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutputIO {
+	if err := s.insideWorkspace("spec", in.SpecPath); err != nil {
+		return ConformRunOutputIO{Error: err.Error()}
+	}
+	if err := s.insideWorkspace("environment", in.EnvPath); err != nil {
+		return ConformRunOutputIO{Error: err.Error()}
+	}
 	spec, err := loadSpecFile(in.SpecPath)
 	if err != nil {
 		return ConformRunOutputIO{Error: err.Error()}
@@ -261,6 +305,11 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		}
 	}
 
+	pathLimits, err := conformance.ParsePathLimits(in.MaxResponseTimeFor)
+	if err != nil {
+		return ConformRunOutputIO{Error: "response-time limits: " + err.Error()}
+	}
+
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
 	if s.cancelRun != nil {
@@ -278,17 +327,19 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	}()
 
 	out := application.RunConformance(ctx, application.ConformInput{
-		Exec:             buildExecutor(s.settings),
-		Spec:             spec,
-		BaseURL:          baseURL,
-		Env:              env,
-		Tags:             in.Tags,
-		Paths:            in.Paths,
-		FailFast:         in.FailFast,
-		RequestTimeoutMs: in.TimeoutMs,
-		Coverage:         true,
-		Negative:         in.Negative,
-		ReadOnly:         !in.AllowWrites,
+		Exec:              buildExecutor(s.settings),
+		Spec:              spec,
+		BaseURL:           baseURL,
+		Env:               env,
+		Tags:              in.Tags,
+		Paths:             in.Paths,
+		FailFast:          in.FailFast,
+		RequestTimeoutMs:  in.TimeoutMs,
+		MaxResponseTimeMs: in.MaxResponseTimeMs,
+		PathLimits:        pathLimits,
+		Coverage:          true,
+		Negative:          in.Negative,
+		ReadOnly:          !in.AllowWrites,
 		Progress: func(done, total int, op conformance.OperationResult) {
 			if s.emit != nil {
 				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.Path})
@@ -333,7 +384,7 @@ func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Sp
 			continue
 		}
 		executed = append(executed, openapi.ExecutedRequest{
-			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: op.Passed(),
+			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: op.Passed(), DurationMs: op.DurationMs,
 		})
 	}
 	cr := spec.ScenarioCoverage(executed)
@@ -362,13 +413,13 @@ func (s *ConformanceService) ExportConformReport(format string) RunReportIO {
 		}
 		return RunReportIO{Content: string(b)}
 	case "junit":
-		b, err := reporting.ConformJUnit(last.Result)
+		b, err := reporting.ConformJUnit(last.Result, last.Negative)
 		if err != nil {
 			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
 		}
 		return RunReportIO{Content: string(b)}
 	case "json":
-		b, err := reporting.ConformJSON(last.Result, last.Coverage)
+		b, err := reporting.ConformJSON(last.Result, last.Coverage, last.Negative)
 		if err != nil {
 			return RunReportIO{Error: fmt.Sprintf("generating the report: %v", err)}
 		}
@@ -409,12 +460,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			Violations: []string{},
 			Findings:   []ConformFindingIO{},
 		}
-		for _, f := range conformance.Diagnose(op) {
-			item.Findings = append(item.Findings, ConformFindingIO{
-				Kind: f.Kind, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected,
-				Got: f.Got, Why: f.Why, Fix: f.Fix, Detail: f.Detail,
-			})
-		}
+		item.Findings = append(item.Findings, findingsIO(conformance.Diagnose(op))...)
 		for _, v := range op.RequestViolations {
 			item.Violations = append(item.Violations, "request: "+v.Error())
 		}

@@ -56,6 +56,51 @@ inputs:
     description: 'Report only breaking changes (diff)'
     required: false
     default: 'false'
+  fail-on:
+    description: 'Fail when a change is at least this serious: breaking | warning | info (diff)'
+    required: false
+  against:
+    description: 'Compare the spec in base-spec with the one at this git ref (diff; needs the full git history, so use fetch-depth: 0)'
+    required: false
+  read-only:
+    description: 'Send only GET and HEAD requests; every other operation is skipped and never sent (conform)'
+    required: false
+    default: 'false'
+  negative:
+    description: 'Also run negative probes: drop required fields, wrong types, missing auth, missing parameters (conform)'
+    required: false
+    default: 'false'
+  explain:
+    description: 'Explain each failure in plain language in the text report (conform)'
+    required: false
+    default: 'false'
+  baseline:
+    description: 'Accept the violations recorded in this baseline file; only new violations fail the run (conform)'
+    required: false
+  write-baseline:
+    description: 'Record the current violations in this file and succeed (conform)'
+    required: false
+  tags:
+    description: 'Comma-separated OpenAPI tags to include (conform)'
+    required: false
+  paths:
+    description: 'Comma-separated path prefixes to include (conform)'
+    required: false
+  request-timeout:
+    description: 'Per-request timeout in milliseconds (conform)'
+    required: false
+  max-response-time:
+    description: 'Fail an operation whose response takes longer than this many milliseconds; the response is still compared with the spec (conform)'
+    required: false
+  max-response-time-for:
+    description: 'Different response-time limits for path prefixes, one /prefix=ms per line, for example /reports=2000; the longest prefix wins, 0 turns the limit off there (conform)'
+    required: false
+  var:
+    description: 'Environment variable overrides, one name=value per line (run, conform). Do not put secrets here; use env: on the step and ${NAME} in the environment file'
+    required: false
+  report:
+    description: 'Extra reports, one format=file per line, for example junit=reports/conform.xml (run, conform, diff)'
+    required: false
   version:
     description: 'clrsig release tag to use, e.g. v1.2.0 (default: latest)'
     required: false
@@ -73,10 +118,11 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        IN_VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
 
-        VERSION="${{ inputs.version }}"
+        VERSION="$IN_VERSION"
 
         # Resolve 'latest' to an actual tag via the GitHub API
         if [ "$VERSION" = "latest" ]; then
@@ -100,12 +146,16 @@ runs:
           windows) OS=windows ;;
         esac
 
+        # Not the workspace: a repository may have its own clrsig/ folder or file.
+        BIN_DIR="$RUNNER_TEMP/clrsig-bin"
+        mkdir -p "$BIN_DIR"
+
         if [ "$OS" = "windows" ]; then
           BINARY="clrsig-windows-${ARCH}.exe"
-          DEST="clrsig.exe"
+          DEST="$BIN_DIR/clrsig.exe"
         else
           BINARY="clrsig-${OS}-${ARCH}"
-          DEST="clrsig"
+          DEST="$BIN_DIR/clrsig"
         fi
 
         URL="https://github.com/fuvito/api-workbench/releases/download/${VERSION}/${BINARY}"
@@ -113,49 +163,107 @@ runs:
         curl -fsSL -o "$DEST" "$URL"
         chmod +x "$DEST"
 
-        echo "$PWD" >> "$GITHUB_PATH"
+        echo "$BIN_DIR" >> "$GITHUB_PATH"
         echo "clrsig ${VERSION} installed."
 
     - name: Run clrsig
       id: run
       shell: bash
+      # Inputs reach the script as environment variables, never pasted into it, so a value with
+      # quotes or shell characters cannot change what runs.
+      env:
+        IN_COMMAND: ${{ inputs.command }}
+        IN_SCENARIO: ${{ inputs.scenario }}
+        IN_SPEC: ${{ inputs.spec }}
+        IN_BASE_SPEC: ${{ inputs.base-spec }}
+        IN_REVISION_SPEC: ${{ inputs.revision-spec }}
+        IN_ENV: ${{ inputs.env }}
+        IN_BASE_URL: ${{ inputs.base-url }}
+        IN_FORMAT: ${{ inputs.format }}
+        IN_OUTPUT: ${{ inputs.output }}
+        IN_FAIL_FAST: ${{ inputs.fail-fast }}
+        IN_COVERAGE: ${{ inputs.coverage }}
+        IN_BREAKING_ONLY: ${{ inputs.breaking-only }}
+        IN_FAIL_ON: ${{ inputs.fail-on }}
+        IN_AGAINST: ${{ inputs.against }}
+        IN_READ_ONLY: ${{ inputs.read-only }}
+        IN_NEGATIVE: ${{ inputs.negative }}
+        IN_EXPLAIN: ${{ inputs.explain }}
+        IN_BASELINE: ${{ inputs.baseline }}
+        IN_WRITE_BASELINE: ${{ inputs.write-baseline }}
+        IN_TAGS: ${{ inputs.tags }}
+        IN_PATHS: ${{ inputs.paths }}
+        IN_REQUEST_TIMEOUT: ${{ inputs.request-timeout }}
+        IN_MAX_RESPONSE_TIME: ${{ inputs.max-response-time }}
+        IN_MAX_RESPONSE_TIME_FOR: ${{ inputs.max-response-time-for }}
+        IN_VAR: ${{ inputs.var }}
+        IN_REPORT: ${{ inputs.report }}
       run: |
-        set +e   # don't exit on failure — we capture exit code
+        set +e   # don't exit on failure; we capture the exit code
 
-        CMD="${{ inputs.command }}"
+        CMD="$IN_COMMAND"
         ARGS=()
+
+        # One value per line -> repeated flag (--var name=value, --report format=file)
+        repeat() {
+          local flag="$1" lines="$2" line
+          while IFS= read -r line; do
+            line="${line%$'\r'}"
+            [ -n "$line" ] && ARGS+=( "$flag" "$line" )
+          done <<< "$lines"
+        }
 
         case "$CMD" in
           run)
-            ARGS+=( "${{ inputs.scenario }}" )
-            [ -n "${{ inputs.env }}"    ] && ARGS+=( -e "${{ inputs.env }}" )
-            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
-            [ -n "${{ inputs.output }}" ] && ARGS+=( -o "${{ inputs.output }}" )
+            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_ENV"    ] && ARGS+=( -e "$IN_ENV" )
+            [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
+            [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
+            repeat --max-response-time-for "$IN_MAX_RESPONSE_TIME_FOR"
+            repeat --var "$IN_VAR"
+            repeat --report "$IN_REPORT"
             ;;
           conform)
-            ARGS+=( "${{ inputs.spec }}" )
-            [ -n "${{ inputs.base-url }}" ] && ARGS+=( -b "${{ inputs.base-url }}" )
-            [ -n "${{ inputs.env }}"      ] && ARGS+=( -e "${{ inputs.env }}" )
-            [ -n "${{ inputs.format }}"   ] && ARGS+=( -f "${{ inputs.format }}" )
-            [ -n "${{ inputs.output }}"   ] && ARGS+=( -o "${{ inputs.output }}" )
-            [ "${{ inputs.fail-fast }}"  = "true" ] && ARGS+=( --fail-fast )
-            [ "${{ inputs.coverage }}"   = "true" ] && ARGS+=( --coverage )
+            ARGS+=( "$IN_SPEC" )
+            [ -n "$IN_BASE_URL" ] && ARGS+=( -b "$IN_BASE_URL" )
+            [ -n "$IN_ENV"      ] && ARGS+=( -e "$IN_ENV" )
+            [ -n "$IN_FORMAT"   ] && ARGS+=( -f "$IN_FORMAT" )
+            [ -n "$IN_OUTPUT"   ] && ARGS+=( -o "$IN_OUTPUT" )
+            [ "$IN_FAIL_FAST" = "true" ] && ARGS+=( --fail-fast )
+            [ "$IN_COVERAGE"  = "true" ] && ARGS+=( --coverage )
+            [ "$IN_READ_ONLY" = "true" ] && ARGS+=( --read-only )
+            [ "$IN_NEGATIVE"  = "true" ] && ARGS+=( --negative )
+            [ "$IN_EXPLAIN"   = "true" ] && ARGS+=( --explain )
+            [ -n "$IN_BASELINE"       ] && ARGS+=( --baseline "$IN_BASELINE" )
+            [ -n "$IN_WRITE_BASELINE" ] && ARGS+=( --write-baseline "$IN_WRITE_BASELINE" )
+            [ -n "$IN_TAGS"           ] && ARGS+=( --tags "$IN_TAGS" )
+            [ -n "$IN_PATHS"          ] && ARGS+=( --paths "$IN_PATHS" )
+            [ -n "$IN_REQUEST_TIMEOUT" ] && ARGS+=( --request-timeout "$IN_REQUEST_TIMEOUT" )
+            [ -n "$IN_MAX_RESPONSE_TIME" ] && ARGS+=( --max-response-time "$IN_MAX_RESPONSE_TIME" )
+            repeat --var "$IN_VAR"
+            repeat --report "$IN_REPORT"
             ;;
           diff)
-            ARGS+=( "${{ inputs.base-spec }}" "${{ inputs.revision-spec }}" )
-            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
-            [ -n "${{ inputs.output }}" ] && ARGS+=( -o "${{ inputs.output }}" )
-            [ "${{ inputs.breaking-only }}" = "true" ] && ARGS+=( --breaking-only )
+            if [ -n "$IN_AGAINST" ]; then
+              ARGS+=( "$IN_BASE_SPEC" --against "$IN_AGAINST" )
+            else
+              ARGS+=( "$IN_BASE_SPEC" "$IN_REVISION_SPEC" )
+            fi
+            [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
+            [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
+            [ "$IN_BREAKING_ONLY" = "true" ] && ARGS+=( --breaking-only )
+            [ -n "$IN_FAIL_ON" ] && ARGS+=( --fail-on "$IN_FAIL_ON" )
+            repeat --report "$IN_REPORT"
             ;;
           validate)
-            ARGS+=( "${{ inputs.scenario }}" )
-            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
-            [ -n "${{ inputs.output }}" ] && ARGS+=( -o "${{ inputs.output }}" )
+            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
+            [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
             ;;
           request)
-            ARGS+=( "${{ inputs.scenario }}" )
-            [ -n "${{ inputs.env }}"    ] && ARGS+=( -e "${{ inputs.env }}" )
-            [ -n "${{ inputs.format }}" ] && ARGS+=( -f "${{ inputs.format }}" )
+            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_ENV"    ] && ARGS+=( -e "$IN_ENV" )
+            [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
             ;;
           *)
             echo "::error::Unknown command '$CMD'. Use: run | conform | diff | request | validate"

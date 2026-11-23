@@ -18,7 +18,7 @@ func contractsFixture() (coverage.Report, *coverage.QualityReport) {
 		Exercised: []string{"GET /users", "POST /users"},
 		Missed:    []string{"DELETE /users/{id}", "GET /health"},
 		OperationResults: map[string]coverage.OperationResult{
-			"GET /users":  {LastPassed: true, LastRunAt: contractsNow.Add(-4 * time.Minute)},
+			"GET /users":  {LastPassed: true, LastRunAt: contractsNow.Add(-4 * time.Minute), LastDurationMs: 120, SlowestDurationMs: 340},
 			"POST /users": {LastPassed: false, LastRunAt: contractsNow.Add(-3 * time.Hour)},
 		},
 	}
@@ -34,14 +34,14 @@ func contractsFixture() (coverage.Report, *coverage.QualityReport) {
 func TestContractsCSV(t *testing.T) {
 	r, q := contractsFixture()
 	lines := strings.Split(strings.TrimSpace(string(reporting.ContractsCSV(r, q))), "\n")
-	if lines[0] != "Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes,Status" || len(lines) != 5 {
+	if lines[0] != "Method,Path,Coverage,Last Result,Last Run,Quality,Missing Codes,Status,Last ms,Slowest ms" || len(lines) != 5 {
 		t.Fatalf("header/rows: %q", lines)
 	}
 	want := []string{
-		"GET,/health,Not Covered,,,Never exercised,,Not covered",
-		"GET,/users,Covered,Pass,2026-11-17T11:56:00Z,Happy-path only,,Passing",
-		"POST,/users,Covered,Fail,2026-11-17T09:00:00Z,No auth tested; Errors never triggered,400 409,Failing",
-		"DELETE,/users/{id},Not Covered,,,Never exercised,,Not covered",
+		"GET,/health,Not Covered,,,Never exercised,,Not covered,,",
+		"GET,/users,Covered,Pass,2026-11-17T11:56:00Z,Happy-path only,,Passing,120,340",
+		"POST,/users,Covered,Fail,2026-11-17T09:00:00Z,No auth tested; Errors never triggered,400 409,Failing,,",
+		"DELETE,/users/{id},Not Covered,,,Never exercised,,Not covered,,",
 	}
 	for i, w := range want {
 		if lines[i+1] != w {
@@ -50,7 +50,7 @@ func TestContractsCSV(t *testing.T) {
 	}
 	r.Exercised = []string{"GET /users", "POST /users"}
 	r.Exercised, r.OperationResults = r.Exercised[:1], map[string]coverage.OperationResult{}
-	if got := string(reporting.ContractsCSV(r, nil)); !strings.Contains(got, "GET,/users,Covered,,,,,Covered (no result)") {
+	if got := string(reporting.ContractsCSV(r, nil)); !strings.Contains(got, "GET,/users,Covered,,,,,Covered (no result),,") {
 		t.Errorf("a covered operation without a result is labelled as such: %s", got)
 	}
 	r.Missed = []string{`GET /say,"hi"`}
@@ -177,5 +177,21 @@ func TestContractsList(t *testing.T) {
 	empty, _ := reporting.ContractsListHTML(nil, contractsNow)
 	if !strings.Contains(string(empty), "No coverage has been recorded yet.") {
 		t.Error("empty html")
+	}
+}
+
+// Response times recorded in the Contracts store show in the exports (last and slowest, in ms).
+func TestContractsExports_ShowResponseTimes(t *testing.T) {
+	r, q := contractsFixture()
+	md := string(reporting.ContractsMarkdown("users", r, q, contractsNow))
+	if !strings.Contains(md, "| Last ms | Slowest ms |") || !strings.Contains(md, "| 120 | 340 |") {
+		t.Errorf("markdown: %s", md)
+	}
+	html, err := reporting.ContractsHTML("users", r, q, contractsNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(html), "<th>Slowest ms</th>") || !strings.Contains(string(html), ">340<") {
+		t.Errorf("html has no response times")
 	}
 }

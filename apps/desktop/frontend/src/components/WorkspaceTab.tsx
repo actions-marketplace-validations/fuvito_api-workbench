@@ -57,8 +57,12 @@ function formatTime(iso?: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
 }
 
+// Workspaces whose opening reminder was dismissed in this session. Kept outside the component so closing
+// and reopening the Workspace tab does not bring the reminder back.
+const dismissedReminders = new Set<string>()
+
 export function WorkspaceTab({ overview, error, loading, onRefresh, focusAttention, onOpenScenario, onOpenContracts, onShowPanel, onCloseWorkspace }: Props) {
-  const [dismissedFor, setDismissedFor] = useState<string | null>(null)
+  const [, setDismissals] = useState(0)
   const page = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -76,7 +80,7 @@ export function WorkspaceTab({ overview, error, loading, onRefresh, focusAttenti
   }
 
   const attention = overview.attention
-  const showReminder = overview.open && dismissedFor !== overview.path
+  const showReminder = overview.open && !dismissedReminders.has(overview.path)
 
   return (
     <div ref={page} className="flex-1 overflow-auto" data-testid="workspace-page">
@@ -85,7 +89,7 @@ export function WorkspaceTab({ overview, error, loading, onRefresh, focusAttenti
           <div role="status" data-testid="workspace-reminder" className="flex items-center gap-2 rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-xs">
             <Info size={14} className="shrink-0 text-sky-400" aria-hidden />
             <span className="flex-1">{openSummary(overview)}</span>
-            <button type="button" aria-label="Dismiss reminder" onClick={() => setDismissedFor(overview.path)} className="shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
+            <button type="button" aria-label="Dismiss reminder" onClick={() => { dismissedReminders.add(overview.path); setDismissals(n => n + 1) }} className="shrink-0 text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]">
               <X size={14} />
             </button>
           </div>

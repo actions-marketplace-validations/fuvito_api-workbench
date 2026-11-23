@@ -67,7 +67,7 @@ func TestResponseChecks(t *testing.T) {
 		{"conforming response", "GET", "/a", 200, json, `{"id":1}`, "", nil},
 		// These two were silently accepted before: a declared header switched body checking off.
 		{"body violation with a declared header present", "GET", "/a", 200, json, `{"x":1}`, openapi.KindBody, []string{"id"}},
-		{"invalid JSON with a declared header present", "GET", "/a", 200, json, `{not json`, openapi.KindBody, nil},
+		{"invalid JSON with a declared header present", "GET", "/a", 200, json, `{not json`, openapi.KindBodyNotJSON, []string{"not valid JSON"}},
 		{"required header not sent", "GET", "/a", 200, map[string]string{"Content-Type": "application/json"}, `{"id":1}`,
 			openapi.KindMissingHeader, []string{"GET /a", "200", `"X-Total-Count"`, "required", "not sent"}},
 		{"header with the wrong type", "GET", "/a", 200, map[string]string{"Content-Type": "application/json", "X-Total-Count": "many"}, `{"id":1}`,

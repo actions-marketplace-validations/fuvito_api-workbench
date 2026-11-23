@@ -75,9 +75,34 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 | `fail-fast` | conform | stop at the first failure |
 | `coverage` | conform | append a coverage summary |
 | `breaking-only` | diff | show only breaking changes |
+| `fail-on` | diff | `breaking`, `warning` or `info`: how serious a change must be to fail |
+| `against` | diff | compare `base-spec` with the spec at this git ref (checkout with `fetch-depth: 0`) |
+| `read-only` | conform | send only GET and HEAD; other operations are skipped and never sent |
+| `negative` | conform | also run negative probes |
+| `explain` | conform | explain each failure in the text report |
+| `baseline`, `write-baseline` | conform | fail only on violations not in the baseline file / record the current ones |
+| `tags`, `paths` | conform | comma-separated OpenAPI tags and path prefixes to include |
+| `request-timeout` | conform | per-request timeout in milliseconds |
+| `max-response-time` | conform | fail an operation slower than this many milliseconds (the response is still compared with the spec) |
+| `max-response-time-for` | conform | other limits for path prefixes, one `/prefix=ms` per line, for example `/reports=2000` (the longest prefix wins; `0` turns the limit off there) |
+| `var` | run, conform | environment overrides, one `name=value` per line (not for secrets) |
+| `report` | run, conform, diff | extra reports, one `format=file` per line |
 | `version` | all | `clrsig` release to use (default: latest) |
 
-The step's `result` output is the exit code. The action does not expose `--read-only`, `--baseline`, `--var`, `--explain` or `--report`; to use them, install the CLI yourself (below) and call `clrsig` directly.
+The step's `result` output is the exit code. Inputs reach the script as environment variables, so a value with quotes or shell characters cannot change what runs. Secrets belong in the step's `env:` and in the environment file as `${NAME}`, not in `var`. For anything the action does not expose (`--seed`, `--show-extracted`, client certificates, `bundle`, `coverage`, `impact`), install the CLI yourself (below) and call `clrsig` directly.
+
+```yaml
+- uses: fuvito/api-workbench@v0.7.0
+  with:
+    command: conform
+    spec: specs/openapi.yaml
+    base-url: ${{ vars.API_BASE_URL }}
+    read-only: 'true'
+    baseline: conform-baseline.json
+    report: |
+      junit=reports/conform.xml
+      html=reports/conform.html
+```
 
 ### Calling the CLI directly (all options)
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, BarChart2, Play, Terminal, ShieldCheck, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContextMenu } from '@/components/ContextMenu'
 
@@ -140,18 +140,9 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               {tab.isDirty && (
                 <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
               )}
-              {tab.kind === 'coverage' ? (
-                <span className="shrink-0 font-mono font-bold text-label text-emerald-400">COV</span>
-              ) : tab.kind === 'runner' ? (
-                <span className="shrink-0 font-mono font-bold text-label text-violet-400">RUN</span>
-              ) : tab.kind === 'cli' ? (
-                <span className="shrink-0 font-mono font-bold text-label text-sky-400">CLI</span>
-              ) : tab.kind === 'conformance' ? (
-                <span className="shrink-0 font-mono font-bold text-label text-emerald-400">CHK</span>
-              ) : tab.kind === 'workspace' ? (
-                <span className="shrink-0 font-mono font-bold text-label text-sky-400">WS</span>
-              ) : tab.kind === 'scenario' ? (
-                <span className="shrink-0 font-mono font-bold text-label text-violet-400">SCN</span>
+              {tab.kind && tab.kind !== 'request' && TAB_KIND_ICON[tab.kind] ? (
+                // The same icons as the rail, so a tab and the icon it lights look alike.
+                <TabKindIcon kind={tab.kind} />
               ) : (
                 <span className={cn('shrink-0 font-mono font-bold text-label', TAB_METHOD_COLOR[tab.method] ?? '')}>
                   {TAB_METHOD_ABBR[tab.method] ?? tab.method.slice(0, 3)}
@@ -159,9 +150,9 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
               )}
               <span className="truncate flex-1 text-xs">
                 {tab.kind === 'coverage'
-                  ? (tab.name ?? 'Coverage')
+                  ? (tab.name ?? 'Contracts')
                   : tab.kind === 'cli'
-                    ? (tab.name ?? 'CLI Builder')
+                    ? (tab.name ?? 'CLI Command Builder')
                   : tab.kind === 'conformance'
                     ? (tab.name ?? 'Check Conformance')
                   : tab.kind === 'workspace'
@@ -258,4 +249,18 @@ export function TabBar({ tabs, activeTabId, onSelect, onClose, onNew, onSave, on
       )}
     </div>
   )
+}
+
+const TAB_KIND_ICON = {
+  coverage: { icon: BarChart2, color: 'text-emerald-400', label: 'Contracts' },
+  runner: { icon: Play, color: 'text-violet-400', label: 'Run results' },
+  scenario: { icon: Play, color: 'text-violet-400', label: 'Scenario' },
+  cli: { icon: Terminal, color: 'text-sky-400', label: 'CLI Builder' },
+  conformance: { icon: ShieldCheck, color: 'text-emerald-400', label: 'Check Conformance' },
+  workspace: { icon: LayoutDashboard, color: 'text-sky-400', label: 'Workspace' },
+} as const
+
+function TabKindIcon({ kind }: { kind: keyof typeof TAB_KIND_ICON }) {
+  const { icon: Icon, color, label } = TAB_KIND_ICON[kind]
+  return <Icon size={12} data-kind={kind} aria-label={label} role="img" className={cn('shrink-0', color)} />
 }

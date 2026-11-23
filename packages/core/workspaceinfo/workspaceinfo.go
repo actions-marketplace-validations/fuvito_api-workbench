@@ -421,8 +421,16 @@ func relTo(root, p string) string {
 	return p
 }
 
+// within reports whether p is inside root after resolving symbolic links on both, so a spec reached
+// through a link that points out of the workspace is reported as outside, not found.
 func within(root, p string) bool {
-	rel, err := filepath.Rel(root, p)
+	resolve := func(x string) string {
+		if real, err := filepath.EvalSymlinks(x); err == nil {
+			return real
+		}
+		return x
+	}
+	rel, err := filepath.Rel(resolve(root), resolve(p))
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 

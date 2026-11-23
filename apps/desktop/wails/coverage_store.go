@@ -11,6 +11,9 @@ import (
 type OperationResultIO struct {
 	LastPassed bool   `json:"lastPassed"`
 	LastRunAt  string `json:"lastRunAt,omitempty"`
+	// LastDurationMs and SlowestDurationMs are response times in milliseconds (absent when none was recorded).
+	LastDurationMs    int64 `json:"lastDurationMs,omitempty"`
+	SlowestDurationMs int64 `json:"slowestDurationMs,omitempty"`
 }
 
 // QualityGapIO is the Wails IPC representation of untested error responses for one operation.
@@ -89,7 +92,7 @@ func buildAccumulatedCoverageIO(stored coverage.StoredCoverage, spec *openapi.Sp
 	if len(r.OperationResults) > 0 {
 		opResults = make(map[string]OperationResultIO, len(r.OperationResults))
 		for k, v := range r.OperationResults {
-			or_ := OperationResultIO{LastPassed: v.LastPassed}
+			or_ := OperationResultIO{LastPassed: v.LastPassed, LastDurationMs: v.LastDurationMs, SlowestDurationMs: v.SlowestDurationMs}
 			if !v.LastRunAt.IsZero() {
 				or_.LastRunAt = v.LastRunAt.Format(time.RFC3339)
 			}
@@ -160,7 +163,7 @@ func reportToIO(r coverage.Report) AccumulatedCoverageIO {
 	if len(r.OperationResults) > 0 {
 		opResults = make(map[string]OperationResultIO, len(r.OperationResults))
 		for k, v := range r.OperationResults {
-			or_ := OperationResultIO{LastPassed: v.LastPassed}
+			or_ := OperationResultIO{LastPassed: v.LastPassed, LastDurationMs: v.LastDurationMs, SlowestDurationMs: v.SlowestDurationMs}
 			if !v.LastRunAt.IsZero() {
 				or_.LastRunAt = v.LastRunAt.Format(time.RFC3339)
 			}
@@ -207,10 +210,12 @@ func accumulateCoverage(wsPath, specFile string, spec *openapi.Spec, cr *openapi
 	for _, er := range cr.ExercisedResults {
 		prev := stored.OperationResults[er.String()]
 		stored.OperationResults[er.String()] = coverage.OperationResult{
-			LastPassed:  er.Passed,
-			LastRunAt:   now,
-			StatusCodes: coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
-			HadAuth:     prev.HadAuth || er.HadAuth,
+			LastPassed:        er.Passed,
+			LastRunAt:         now,
+			StatusCodes:       coverage.MergeStatusCodes(prev.StatusCodes, er.StatusCodes),
+			HadAuth:           prev.HadAuth || er.HadAuth,
+			LastDurationMs:    coverage.MergeDuration(prev, er.LastDurationMs, er.SlowestDurationMs),
+			SlowestDurationMs: max(prev.SlowestDurationMs, er.SlowestDurationMs),
 		}
 	}
 	if err := saveStoredCoverage(wsPath, stored); err != nil {
