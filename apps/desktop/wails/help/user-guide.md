@@ -736,6 +736,11 @@ Scenario: User lifecycle
 PASSED  3 passed, 0 failed, 0 skipped  (5/5 assertions passed)  72ms
 ```
 
+Two lines you may see under a step:
+
+- `skipped: step 1 (Login) failed and its failPolicy is stop; set failPolicy: continue to run the steps after a failure`. A skipped step always says why: a failed step with `failPolicy: stop`, a step before the start point, a disabled step, or a failed scenario setup.
+- `→ [CS-RESP-005] … Why: … Fix: …` under a failed `schema` assertion. It uses the same check IDs, why and fix text as `clrsig conform` (see What We Check), so the failure can be looked up.
+
 ### JSON output
 
 Use `--format json` for machine-readable output suitable for CI tooling:
