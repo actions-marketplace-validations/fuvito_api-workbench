@@ -560,6 +560,10 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				printCumulativeCoverage(cmd, specHash)
 			}
 
+			if out.NothingSelected != "" {
+				return fmt.Errorf("%s", out.NothingSelected)
+			}
+
 			runFailed := out.Failed
 			if writeBaseline != "" {
 				if err := conformance.WriteBaselineFile(writeBaseline, conformance.NewBaseline(out.Violations)); err != nil {
@@ -595,7 +599,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringArrayVar(&vars, "var", nil, "Set or override an environment variable for this run: name=value (repeatable)")
 	cmd.Flags().StringArrayVar(&reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/conform.xml (repeatable)")
 	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
-	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include")
+	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include; each matches the start of the path as the spec writes it (/latency/ also selects /latency/{ms})")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")

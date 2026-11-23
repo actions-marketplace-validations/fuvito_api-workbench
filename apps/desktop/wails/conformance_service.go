@@ -354,6 +354,9 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	for _, ref := range variables.MissingEnv(env) {
 		res.Warnings = append(res.Warnings, ref.Message())
 	}
+	if out.NothingSelected != "" {
+		res.Warnings = append(res.Warnings, "Nothing was checked: "+out.NothingSelected)
+	}
 	if in.RecordCoverage {
 		res.CoverageNote = s.recordCoverage(in, spec, baseURL, out)
 	}

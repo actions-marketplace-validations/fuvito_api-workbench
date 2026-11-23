@@ -29,6 +29,9 @@ func explanationLine(f conformance.Finding) string {
 	b.WriteString(f.Summary)
 	b.WriteString(". Why: ")
 	b.WriteString(strings.TrimSuffix(f.Why, "."))
+	if _, body, ok := strings.Cut(f.Got, ", body: "); ok && f.Part == "response status" {
+		b.WriteString(". The server's answer: " + body)
+	}
 	if where := f.WhereText(); where != "" {
 		b.WriteString(". Where: ")
 		b.WriteString(where)

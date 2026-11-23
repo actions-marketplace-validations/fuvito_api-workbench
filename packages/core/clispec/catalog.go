@@ -232,7 +232,7 @@ var catalog = []Command{
 			{
 				Name: "paths", Kind: KindString,
 				Label:   "Only these path prefixes",
-				Help:    "Only check operations whose path starts with one of these prefixes. Separate several with commas.",
+				Help:    "Only check operations whose path, as the spec writes it, starts with one of these prefixes (so /latency/ also selects /latency/{ms}). Separate several with commas. A prefix that matches nothing is an error, not a pass.",
 				Example: "/users,/orders",
 				Group:   GroupAdvanced,
 			},

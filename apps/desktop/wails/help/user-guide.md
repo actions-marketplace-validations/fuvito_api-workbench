@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.8.8
+**Version:** 0.8.9
 
 ---
 
@@ -736,6 +736,11 @@ Scenario: User lifecycle
 PASSED  3 passed, 0 failed, 0 skipped  (5/5 assertions passed)  72ms
 ```
 
+Two lines you may see under a step:
+
+- `skipped: step 1 (Login) failed and its failPolicy is stop; set failPolicy: continue to run the steps after a failure`. A skipped step always says why: a failed step with `failPolicy: stop`, a step before the start point, a disabled step, or a failed scenario setup.
+- `→ [CS-RESP-005] … Why: … Fix: …` under a failed `schema` assertion. It uses the same check IDs, why and fix text as `clrsig conform` (see What We Check), so the failure can be looked up.
+
 ### JSON output
 
 Use `--format json` for machine-readable output suitable for CI tooling:
@@ -811,7 +816,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 |---|---|
 | `--base-url`, `-b` | Server to send requests to (overrides the spec's `servers[0]`). |
 | `--env`, `-e` | Environment file for variable resolution (for example an auth token). |
-| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path starts with one of these prefixes. |
+| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path (as the spec writes it) starts with one of these prefixes, so `/latency/` also selects `/latency/{ms}`. A filter that matches no operation is an error (exit code 2), not a pass. On Windows Git Bash set `MSYS_NO_PATHCONV=1`, or the shell rewrites an argument that starts with `/`. |
 | `--negative` | Also send negative probes: dropped required fields, wrong types, missing auth, missing parameters. |
 | `--explain` | Under each failing operation, say in plain language what the spec expected, what the server sent, why that fails and what to change. Off by default, so existing logs do not change; the JSON (`findings`), HTML, Markdown and JUnit reports always include it. |
 | `--read-only` | Send only GET and HEAD requests. POST, PUT, PATCH and DELETE operations (and their negative probes) are skipped and never sent, so the check cannot create, change or delete data. Off by default: without it `conform` sends every operation. |
@@ -826,7 +831,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--write-baseline` | Record today's violations in a file (YAML, or JSON for a `.json` name) and exit `0`. |
 | `--baseline` | Accept the violations recorded in that file: only **new** ones fail the run, and fixed ones are reported. |
 
-Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error.
+Exit codes: `0` all operations conformed, `1` violations or execution failures, `2` spec parse or configuration error, or a `--tags` / `--paths` filter that matches no operation. A run that checked nothing (an empty spec, or every operation skipped) prints `NOTHING CHECKED`, never `PASSED`. With `--baseline`, a run whose only failures are known ones prints `PASSED with N known violations`.
 
 **What a response is checked against.** For every operation the response must match what the spec declares for the status the server answered: the **status** itself (a status the spec does not declare, other than through a `default` response, is a violation), the **Content-Type** (a type the spec does not declare is a violation, and the body is then not compared), every **header** the spec declares (a required header that was not sent, or a header whose value does not fit its type) and the **body** against its schema. Each violation says what is wrong, where it is (the part of the response, such as the header name, the status or the body field, and the matching place in the spec), why it counts as a failure and how to fix it; the screen output shows that explanation with `--explain`, the JSON, HTML, Markdown and JUnit reports always include it. The first problem found is reported: a response with both a header problem and a body problem shows the header problem first, so fix it and run again to see the next. The complete list of what is checked, with an ID, an example and the known gaps for each, is in the **What We Check** tab of this Help panel (menu Help, What We Check). Versions before this release did not look at declared headers at all, and a response whose operation declared any header could pass with a broken body; if a previously green run now fails, record the current state with `--write-baseline` and let `--baseline` fail only on new violations while you fix them.
 

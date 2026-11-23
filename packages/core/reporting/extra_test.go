@@ -30,8 +30,8 @@ func TestNegativeText(t *testing.T) {
 		"ERR   errored probe", "error: connection refused",
 		"PASS  good probe  401  7ms",
 		"FAIL  bad probe", "server accepted invalid request with 200",
-		"FAILED  3 probes  ·  1 passed  ·  1 failed  ·  1 skipped  ·  1 errors  120ms",
-		"1 operation(s) accepted requests they should have rejected",
+		"FAILED  3 probes  ·  1 passed  ·  1 failed  ·  1 skipped  ·  1 error  120ms",
+		"1 probe: the server accepted a request it should have rejected",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
@@ -41,7 +41,7 @@ func TestNegativeText(t *testing.T) {
 
 func TestNegativeText_AllPassed(t *testing.T) {
 	out := reporting.NegativeText(&conformance.NegativeResult{Probes: []conformance.NegativeProbeResult{{Description: "p", StatusCode: 400}}})
-	if !strings.Contains(out, "PASSED  1 probes") || strings.Contains(out, "should have rejected") {
+	if !strings.Contains(out, "PASSED  1 probe") || strings.Contains(out, "should have rejected") {
 		t.Errorf("unexpected output:\n%s", out)
 	}
 }

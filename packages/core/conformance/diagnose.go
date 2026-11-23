@@ -94,13 +94,14 @@ func Diagnose(op OperationResult) []Finding {
 		out = append(out, blockedFinding(op))
 	}
 	if op.Error != "" {
+		why, fix := networkAdvice(NetworkErrorKind(op.Error))
 		out = append(out, Finding{
 			Kind:    FindingNoResponse,
 			Part:    "network",
 			Summary: "The server did not answer",
 			Got:     op.Error,
-			Why:     "No response arrived, so the operation could not be compared with the spec.",
-			Fix:     "Check that the server is running, that the base URL is right, and that the request timeout is long enough.",
+			Why:     why,
+			Fix:     fix,
 			Detail:  op.Error,
 		})
 	}
@@ -201,9 +202,9 @@ func diagnoseViolation(op OperationResult, v openapi.ValidationError) Finding {
 			Kind: FindingUndeclaredStatus, Part: "response status", Where: v.Subject,
 			Spec:     specLocation(op, "responses"),
 			Summary:  fmt.Sprintf("Status %s is not declared for %s", v.Subject, specLocation(op, "")),
-			Expected: "one of: " + declared, Got: v.Subject,
-			Why:    fmt.Sprintf("The spec lists the responses %s may return (%s) and %s is not one of them: the server returned something the spec does not describe, or the spec is incomplete.", specLocation(op, ""), declared, v.Subject),
-			Fix:    fmt.Sprintf("Make the server answer a declared status, or add %s (or a default response) to %s in the spec.", v.Subject, specLocation(op, "responses")),
+			Expected: "one of: " + declared, Got: undeclaredGot(v.Subject, op.BodySnippet),
+			Why:    undeclaredWhy(specLocation(op, ""), declared, v.Subject),
+			Fix:    undeclaredFix(v.Subject, specLocation(op, "responses"), op.BodySnippet != ""),
 			Detail: msg,
 		}
 	case openapi.KindContentType:
@@ -479,12 +480,31 @@ func diagnoseResponse(msg string) Finding {
 	}
 	if m := reAtPath.FindStringSubmatch(msg); m != nil && reConstraint.MatchString(m[2]) {
 		field := displayPath(m[1])
+		rule, fix := describeConstraint(strings.TrimSpace(m[2]))
+		got := ""
+		if g := reGotValue.FindStringSubmatch(msg); g != nil {
+			got = strings.Join(strings.Fields(g[1]), " ")
+		}
+		label := field
+		if label == "" {
+			label = "the response body"
+		}
+		summary := fmt.Sprintf("%s %s", quoteField(label), rule)
+		if field == "" {
+			summary = "The response body " + rule
+		}
+		why := fmt.Sprintf("The schema sets a rule for %s: it %s.", label, rule)
+		if got != "" {
+			why = fmt.Sprintf("The schema sets a rule for %s: it %s. The server sent %s.", label, rule, got)
+		}
 		return Finding{
 			Kind: FindingConstraint, Where: field,
-			Summary: strings.TrimSpace(m[2]),
-			Why:     "A value breaks a rule the schema sets (an allowed set, a range, a length, a pattern or a format).",
-			Fix:     "Send a value the rule allows, or relax the rule in the spec if the server is right.",
-			Detail:  msg,
+			Summary:  summary,
+			Expected: "a value that " + rule,
+			Got:      got,
+			Why:      why,
+			Fix:      fix,
+			Detail:   msg,
 		}
 	}
 	if m := reAtPath.FindStringSubmatch(msg); m != nil {
@@ -613,4 +633,150 @@ func blockedFinding(op OperationResult) Finding {
 		Fix:    "Add " + strings.Join(op.Missing, ", ") + " to the environment, or give it as an override (" + strings.Join(overrides, ", ") + ").",
 		Detail: op.Blocked,
 	}
+}
+
+// Network error kinds, as NetworkErrorKind names them.
+const (
+	NetUnreachable  = "unreachable"   // nothing listens there, or the host name does not resolve
+	NetTimeout      = "timeout"       // no answer within the request timeout
+	NetRedirectLoop = "redirect-loop" // the server keeps redirecting
+	NetBrokenBody   = "broken-body"   // the connection closed early or the body could not be read
+	NetTLS          = "tls"           // the certificate or the TLS handshake failed
+	NetOther        = "other"
+)
+
+// NetworkErrorKind sorts the error of a request that got no response, so the explanation and the
+// fix can match the cause instead of always saying "check that the server is running".
+func NetworkErrorKind(msg string) string {
+	m := strings.ToLower(msg)
+	switch {
+	case strings.Contains(m, "stopped after") && strings.Contains(m, "redirect"):
+		return NetRedirectLoop
+	case strings.Contains(m, "deadline exceeded"), strings.Contains(m, "timeout"), strings.Contains(m, "timed out"):
+		return NetTimeout
+	case strings.Contains(m, "x509"), strings.Contains(m, "tls:"), strings.Contains(m, "certificate"):
+		return NetTLS
+	case strings.Contains(m, "connection refused"), strings.Contains(m, "actively refused"),
+		strings.Contains(m, "no such host"), strings.Contains(m, "no route to host"), strings.Contains(m, "network is unreachable"):
+		return NetUnreachable
+	case strings.Contains(m, "eof"), strings.Contains(m, "connection reset"), strings.Contains(m, "broken pipe"),
+		strings.Contains(m, "gzip"), strings.Contains(m, "flate"), strings.Contains(m, "malformed"), strings.Contains(m, "reading"):
+		return NetBrokenBody
+	}
+	return NetOther
+}
+
+func networkAdvice(kind string) (why, fix string) {
+	switch kind {
+	case NetUnreachable:
+		return "Nothing answered at the address, so the operation could not be compared with the spec.",
+			"Check that the server is running and that the base URL (host and port) is right."
+	case NetTimeout:
+		return "The server took longer than the request timeout to answer, so there was nothing to compare with the spec.",
+			"Find out why the server is slow or hangs on this operation; raise --request-timeout only if a slow answer is expected."
+	case NetRedirectLoop:
+		return "The server answered with redirects that never reach a final response, so there was nothing to compare with the spec.",
+			"Fix the redirect rule on the server (a redirect that points back to itself or to a chain longer than 10)."
+	case NetBrokenBody:
+		return "The connection closed early or the body could not be read (for example a Content-Length or Content-Encoding that does not match what was sent), so there was nothing to compare with the spec.",
+			"Fix how the server frames this response: the Content-Length, the Content-Encoding (such as gzip) and the connection handling."
+	case NetTLS:
+		return "The secure connection could not be set up, so no response arrived.",
+			"Check the server certificate (use --ca-cert for a private authority) and that the base URL uses the right scheme (http or https)."
+	}
+	return "No response arrived, so the operation could not be compared with the spec.",
+		"Check that the server is running, that the base URL is right, and that the request timeout is long enough."
+}
+
+func undeclaredGot(status, body string) string {
+	if body == "" {
+		return status
+	}
+	return status + ", body: " + body
+}
+
+func undeclaredWhy(where, declared, status string) string {
+	base := fmt.Sprintf("The spec lists the responses %s may return (%s) and %s is not one of them", where, declared, status)
+	switch status {
+	case "404":
+		return base + ". A 404 on an operation the spec declares usually means the route does not exist on the server (or the path in the spec is wrong), not that the spec is incomplete."
+	case "405":
+		return base + ". A 405 means the server does not accept this method on this path: the route may be missing for this method on the server, or the method in the spec is wrong."
+	}
+	if len(status) == 3 && status[0] == '4' {
+		return base + ". The server refused the request; the reason is usually in the response body (shown under Got), and it may be a missing header, a value it does not accept or a rule the spec does not describe."
+	}
+	return base + ": the server returned something the spec does not describe, or the spec is incomplete."
+}
+
+func undeclaredFix(status, responses string, hasBody bool) string {
+	switch status {
+	case "404":
+		return fmt.Sprintf("Check that the route exists on the server and that the spec's path is right. Add 404 to %s only when this operation is really meant to answer 404 (for example an id that does not exist).", responses)
+	case "405":
+		return fmt.Sprintf("Add the method to the server's route, or correct the method in the spec. Add 405 to %s only when the server is meant to refuse it.", responses)
+	}
+	if len(status) == 3 && status[0] == '4' {
+		hint := ""
+		if hasBody {
+			hint = "Read the response body under Got to see why the request was refused. "
+		}
+		return fmt.Sprintf("%sFix what the server objects to (the request this check sends is built from the spec and the environment), or add %s (or a default response) to %s in the spec if the refusal is expected.", hint, status, responses)
+	}
+	return fmt.Sprintf("Make the server answer a declared status, or add %s (or a default response) to %s in the spec.", status, responses)
+}
+
+var (
+	reAllowed   = regexp.MustCompile(`(?i)not one of the allowed values (\[.*\])`)
+	reFormat    = regexp.MustCompile(`(?i)doesn't match the format "([^"]+)"`)
+	rePattern   = regexp.MustCompile(`(?i)doesn't match (?:the regular expression|pattern) "(.*)"`)
+	reAtLeast   = regexp.MustCompile(`(?i)number must be at least (\S+)`)
+	reAtMost    = regexp.MustCompile(`(?i)number must be at most (\S+)`)
+	reMinLen    = regexp.MustCompile(`(?i)minimum string length is (\d+)`)
+	reMaxLen    = regexp.MustCompile(`(?i)maximum string length is (\d+)`)
+	reMinItems  = regexp.MustCompile(`(?i)minimum number of items is (\d+)`)
+	reMaxItems  = regexp.MustCompile(`(?i)maximum number of items is (\d+)`)
+	reMultiple  = regexp.MustCompile(`(?i)number must be a multiple of (\S+)`)
+	formatWords = map[string]string{
+		"date-time": "is an RFC 3339 date-time (for example 2026-11-22T10:00:00Z)",
+		"date":      "is a date written YYYY-MM-DD",
+		"email":     "is an email address",
+		"uuid":      "is a UUID",
+		"uri":       "is a URI",
+	}
+)
+
+// describeConstraint puts a validator message about a value rule into words that name the rule,
+// and says what to change.
+func describeConstraint(msg string) (rule, fix string) {
+	const generic = "Send a value the rule allows, or relax the rule in the spec if the server is right."
+	switch {
+	case reAllowed.MatchString(msg):
+		return "is one of " + reAllowed.FindStringSubmatch(msg)[1],
+			"Send one of the allowed values, or add the value to the enum in the spec if the server is right."
+	case reFormat.MatchString(msg):
+		f := reFormat.FindStringSubmatch(msg)[1]
+		if w, ok := formatWords[f]; ok {
+			return w, fmt.Sprintf("Send a value in the %s format, or change the field's format in the spec if the server is right.", f)
+		}
+		return fmt.Sprintf("matches the format %q", f), fmt.Sprintf("Send a value in the %s format, or change the field's format in the spec if the server is right.", f)
+	case rePattern.MatchString(msg):
+		return "matches the pattern " + rePattern.FindStringSubmatch(msg)[1],
+			"Send a value that matches the pattern, or change the pattern in the spec if the server is right."
+	case reAtLeast.MatchString(msg):
+		return "is at least " + reAtLeast.FindStringSubmatch(msg)[1], generic
+	case reAtMost.MatchString(msg):
+		return "is at most " + reAtMost.FindStringSubmatch(msg)[1], generic
+	case reMinLen.MatchString(msg):
+		return "has at least " + reMinLen.FindStringSubmatch(msg)[1] + " characters", generic
+	case reMaxLen.MatchString(msg):
+		return "has at most " + reMaxLen.FindStringSubmatch(msg)[1] + " characters", generic
+	case reMinItems.MatchString(msg):
+		return "has at least " + reMinItems.FindStringSubmatch(msg)[1] + " items", generic
+	case reMaxItems.MatchString(msg):
+		return "has at most " + reMaxItems.FindStringSubmatch(msg)[1] + " items", generic
+	case reMultiple.MatchString(msg):
+		return "is a multiple of " + reMultiple.FindStringSubmatch(msg)[1], generic
+	}
+	return "keeps to a rule the schema sets (" + msg + ")", generic
 }
