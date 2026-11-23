@@ -24,6 +24,9 @@ type StepResult struct {
 	Extracted  map[string]string // variables extracted from this step's response
 	Passed     bool
 	Skipped    bool
+	// SkipReason says why a step was not run (for example the step before it failed and its fail
+	// policy is stop), so a skipped step is never unexplained.
+	SkipReason string
 	Error      string
 	// Attempts is how many times the request was sent: 1 normally, more when the step's retry
 	// policy re-sent it after a transport error or a 5xx response.
@@ -155,7 +158,7 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 		result.SetupError = strings.Join(msgs, "; ")
 		result.Passed = false
 		for i := range s.Steps {
-			result.Steps = append(result.Steps, StepResult{Label: s.Steps[i].Label, Skipped: true})
+			result.Steps = append(result.Steps, StepResult{Label: s.Steps[i].Label, Skipped: true, SkipReason: "the scenario setup failed"})
 		}
 		result.UsedRandomness = eng.UsedRandomness()
 		result.Duration = time.Since(result.StartedAt)
@@ -166,7 +169,11 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 	for i := range s.Steps {
 		step := &s.Steps[i]
 		if i < fromStep || step.Disabled {
-			result.Steps = append(result.Steps, StepResult{Label: step.Label, Skipped: true})
+			reason := "the step is disabled"
+			if i < fromStep {
+				reason = "the run started at a later step"
+			}
+			result.Steps = append(result.Steps, StepResult{Label: step.Label, Skipped: true, SkipReason: reason})
 			continue
 		}
 		sr := r.runStep(ctx, step, resolver, prevFailed)
@@ -178,8 +185,9 @@ func (r *Runner) RunFrom(ctx context.Context, s *domain.Scenario, env *domain.En
 			if step.FailPolicy == domain.FailPolicyStop || step.FailPolicy == "" {
 				for j := i + 1; j < len(s.Steps); j++ {
 					result.Steps = append(result.Steps, StepResult{
-						Label:   s.Steps[j].Label,
-						Skipped: true,
+						Label:      s.Steps[j].Label,
+						Skipped:    true,
+						SkipReason: fmt.Sprintf("step %d (%s) failed and its failPolicy is stop; set failPolicy: continue to run the steps after a failure", i+1, step.Label),
 					})
 				}
 				break
@@ -223,6 +231,7 @@ func (r *Runner) runStep(ctx context.Context, step *domain.ScenarioStep, resolve
 
 	if prevFailed && step.FailPolicy == domain.FailPolicySkip {
 		sr.Skipped = true
+		sr.SkipReason = "the step before it failed and this step's failPolicy is skip"
 		return sr
 	}
 

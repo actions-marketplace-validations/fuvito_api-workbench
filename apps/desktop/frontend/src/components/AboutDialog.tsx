@@ -3,6 +3,16 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.8.9',
+    date: '2026-11-22',
+    items: [
+      'clrsig conform: a --tags or --paths filter that matches nothing is now an error (exit 2) and a run that checked nothing says NOTHING CHECKED instead of PASSED',
+      'Clearer findings: a 404 or 405 points at the route, a refusal shows the start of the server answer, a failed request names its real cause (timeout, dropped body, redirect loop), and a value rule names the rule and the bad value',
+      'A scenario schema assertion shows a check ID with why and fix; a skipped step says why; with a baseline the headline reads PASSED with N known violations',
+      'CLI Builder: markdown reports get a .md file name, browse buttons open where the field points, and Server address is filled from a running server',
+    ],
+  },
+  {
     version: '0.8.8',
     date: '2026-11-22',
     items: [
@@ -268,7 +278,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.8</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.9</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

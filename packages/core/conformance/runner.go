@@ -32,6 +32,9 @@ type OperationResult struct {
 	Violations        []openapi.ValidationError
 	Error             string
 	Skipped           bool
+	// BodySnippet is the start of the response body (at most 200 characters) when the server
+	// answered 4xx or 5xx: the reason for a refusal is usually written there.
+	BodySnippet string
 	// Blocked is set when the request was not sent because a value it needs is missing: a
 	// {{placeholder}} nothing provided, or a dynamic value that failed. Missing lists the
 	// placeholder names. A blocked operation is neither passed nor skipped: it counts as failed, so
@@ -94,6 +97,16 @@ type ConformResult struct {
 	// replace them wherever they would otherwise be printed (for example inside an error that
 	// quotes the request URL).
 	Secrets []string
+
+	// FilterMatched is how many operations the --tags and --paths filters selected (every
+	// operation when there is no filter); it is 0 when a filter matches nothing, which a caller
+	// must not report as a pass.
+	FilterMatched int
+	// BaselineApplied is set when the run was compared with a baseline; KnownViolations is how
+	// many of the failures it accepted. A run with only known failures passes.
+	BaselineApplied bool
+	KnownViolations int
+	BaselineClean   bool
 }
 
 // Counts returns (passed, failed, skipped) operation counts.
@@ -223,8 +236,11 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			SpecPath:    gr.Path,
 		}
 
-		if !matchesTags(gr.Tags, opts.Tags) || !matchesPathPrefix(opPath, opts.Paths) ||
-			(opts.ReadOnly && !IsReadOnlyMethod(or.Method)) {
+		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths)
+		if selected {
+			result.FilterMatched++
+		}
+		if !selected || (opts.ReadOnly && !IsReadOnlyMethod(or.Method)) {
 			or.Skipped = true
 			result.Operations = append(result.Operations, or)
 			handled()
@@ -270,6 +286,9 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 
 		or.StatusCode = resp.StatusCode
 		or.DurationMs = resp.Duration.Milliseconds()
+		if resp.StatusCode >= 400 {
+			or.BodySnippet = snippet(resp.BodyString(), 200)
+		}
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
 		if limit := opts.limitFor(opPath); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
 			// The message holds the limit, not the measured time, so a baseline stays stable
@@ -415,4 +434,13 @@ func specPathOr(or OperationResult) string {
 		return or.SpecPath
 	}
 	return or.Path
+}
+
+func snippet(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max]) + "…"
 }

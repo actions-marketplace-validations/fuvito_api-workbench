@@ -81,7 +81,7 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 | `negative` | conform | also run negative probes |
 | `explain` | conform | explain each failure in the text report |
 | `baseline`, `write-baseline` | conform | fail only on violations not in the baseline file / record the current ones |
-| `tags`, `paths` | conform | comma-separated OpenAPI tags and path prefixes to include |
+| `tags`, `paths` | conform | comma-separated OpenAPI tags and path prefixes to include; a filter that matches no operation fails the step (exit 2) instead of passing. On Windows Git Bash set `MSYS_NO_PATHCONV=1` so a leading `/` is not rewritten |
 | `request-timeout` | conform | per-request timeout in milliseconds |
 | `max-response-time` | conform | fail an operation slower than this many milliseconds (the response is still compared with the spec) |
 | `max-response-time-for` | conform | other limits for path prefixes, one `/prefix=ms` per line, for example `/reports=2000` (the longest prefix wins; `0` turns the limit off there) |

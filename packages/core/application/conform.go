@@ -4,6 +4,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
@@ -50,6 +51,9 @@ type ConformOutput struct {
 	Violations []conformance.Violation
 	Diff       *conformance.BaselineDiff // nil without a baseline
 	Failed     bool
+	// NothingSelected explains why no operation was checked when --tags or --paths matched none
+	// (empty otherwise). A run like that proves nothing, so the CLI reports it as an error.
+	NothingSelected string
 }
 
 // SplitList turns a comma-separated flag value into trimmed, non-empty items.
@@ -101,6 +105,23 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		diff := conformance.Compare(out.Violations, in.Baseline)
 		out.Diff = &diff
 		out.Failed = len(diff.New) > 0
+		out.Result.BaselineApplied = true
+		out.Result.KnownViolations = len(diff.Known)
+		out.Result.BaselineClean = len(diff.New) == 0
+	}
+	if len(out.Result.Operations) > 0 && out.Result.FilterMatched == 0 && (len(in.Tags) > 0 || len(in.Paths) > 0) {
+		out.NothingSelected = noMatchMessage(in.Tags, in.Paths, len(out.Result.Operations))
 	}
 	return out
+}
+
+func noMatchMessage(tags, paths []string, total int) string {
+	var by []string
+	if len(tags) > 0 {
+		by = append(by, "--tags "+strings.Join(tags, ","))
+	}
+	if len(paths) > 0 {
+		by = append(by, "--paths "+strings.Join(paths, ","))
+	}
+	return fmt.Sprintf("no operation matches %s (the spec has %d operations; --paths matches the start of the path as the spec writes it, for example /cases/resp-005; on Windows Git Bash set MSYS_NO_PATHCONV=1 so a leading / is not rewritten)", strings.Join(by, " and "), total)
 }

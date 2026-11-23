@@ -42,6 +42,9 @@ func textScenario(result *scenario.Result, showSeed bool) string {
 	for _, sr := range result.Steps {
 		if sr.Skipped {
 			fmt.Fprintf(&b, "  SKIP  %s\n", sr.Label)
+			if sr.SkipReason != "" {
+				fmt.Fprintf(&b, "         skipped: %s\n", sr.SkipReason)
+			}
 			continue
 		}
 
@@ -74,6 +77,9 @@ func textScenario(result *scenario.Result, showSeed bool) string {
 				fmt.Fprintf(&b, "         %s %s\n", mark, label)
 			} else {
 				fmt.Fprintf(&b, "         %s %s: %s\n", mark, label, x.text(ar.Message))
+				if f, ok := schemaFinding(ar); ok {
+					fmt.Fprintf(&b, "         → %s\n", x.text(explanationLine(f)))
+				}
 			}
 		}
 
@@ -200,6 +206,28 @@ type JSONAssertion struct {
 	Actual   string `json:"actual"`
 	Passed   bool   `json:"passed"`
 	Message  string `json:"message,omitempty"`
+	// CheckID names the catalog check a failed schema assertion maps to (for example CS-RESP-005).
+	CheckID string `json:"checkId,omitempty"`
+}
+
+// schemaFinding explains a failed `schema` assertion with the same check IDs, why and fix text as
+// conform, so a scenario result can be found in the catalog. It reports false for any other
+// assertion, for a pass, and when the message is not a recognised schema violation.
+func schemaFinding(ar domain.AssertionResult) (conformance.Finding, bool) {
+	if ar.Passed || ar.Assertion.Type != domain.AssertionSchema || ar.Message == "" {
+		return conformance.Finding{}, false
+	}
+	msg := ar.Message
+	if i := strings.Index(msg, "; Error at"); i > 0 {
+		msg = msg[:i]
+	}
+	fs := conformance.Diagnose(conformance.OperationResult{Violations: []openapi.ValidationError{{Message: msg}}})
+	if len(fs) == 0 || fs[0].CheckID == "" {
+		return conformance.Finding{}, false
+	}
+	f := fs[0]
+	f.Spec = ""
+	return f, true
 }
 
 // ---- JUnit XML ----
@@ -369,6 +397,7 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	fmt.Fprintf(&b, "Base URL: %s\n\n", x.text(result.BaseURL))
 
 	sent, unanswered, firstErr := 0, 0, ""
+	kinds := map[string]bool{}
 	for _, op := range result.Operations {
 		if op.Skipped || op.Blocked != "" {
 			continue
@@ -376,12 +405,16 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 		sent++
 		if op.Error != "" {
 			unanswered++
+			kinds[conformance.NetworkErrorKind(op.Error)] = true
 			if firstErr == "" {
 				firstErr = op.Error
 			}
 		}
 	}
 	nobodyAnswered := sent > 0 && unanswered == sent
+	// One line for a dead server is enough; when the operations fail for different reasons (a
+	// timeout here, a dropped body there) each keeps its own error.
+	serverDown := nobodyAnswered && len(kinds) == 1 && kinds[conformance.NetUnreachable]
 
 	for _, op := range result.Operations {
 		path := op.Path
@@ -400,8 +433,11 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 		if op.StatusCode > 0 {
 			suffix = fmt.Sprintf("  %d  %dms", op.StatusCode, op.DurationMs)
 		}
+		if len(op.RequestViolations) > 0 && len(op.Violations) == 0 && op.Error == "" {
+			suffix += "  (the request does not fit the spec; the answer was not judged)"
+		}
 		fmt.Fprintf(&b, "  %s  %-7s %s%s\n", status, op.Method, path, suffix)
-		if op.Error != "" && !nobodyAnswered {
+		if op.Error != "" && !serverDown {
 			fmt.Fprintf(&b, "         error: %s\n", x.text(op.Error))
 		}
 		if op.Blocked != "" {
@@ -421,18 +457,33 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	}
 
 	fmt.Fprintln(&b)
-	if nobodyAnswered {
+	switch {
+	case serverDown:
 		fmt.Fprintf(&b, "No operation got an answer from %s: is the server running?\n  First error: %s\n\n", x.text(result.BaseURL), x.text(firstErr))
+	case nobodyAnswered:
+		fmt.Fprintf(&b, "No operation got an answer from %s (the error under each operation says why).\n\n", x.text(result.BaseURL))
 	}
 	passed, failed, skipped := result.Counts()
 	total := passed + failed + skipped
 
 	verdict := "PASSED"
-	if failed > 0 {
+	switch {
+	case passed+failed == 0:
+		verdict = "NOTHING CHECKED"
+	case failed > 0 && result.BaselineApplied && result.BaselineClean:
+		verdict = fmt.Sprintf("PASSED with %d known violation%s", result.KnownViolations, plural(result.KnownViolations))
+	case failed > 0:
 		verdict = "FAILED"
 	}
 	fmt.Fprintf(&b, "%s  %d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms\n",
 		verdict, total, passed, failed, skipped, result.Duration.Milliseconds())
+	if passed+failed == 0 {
+		if total == 0 {
+			fmt.Fprintf(&b, "       The spec declares no operations, so there was nothing to check.\n")
+		} else {
+			fmt.Fprintf(&b, "       Every operation was skipped (by --tags, --paths or --read-only), so nothing was sent.\n")
+		}
+	}
 	if n, missing := result.BlockedSummary(); n > 0 {
 		fmt.Fprintf(&b, "%s\n", conformance.MissingValuesAdvice(n, missing))
 	}
@@ -729,10 +780,26 @@ func NegativeText(result *conformance.NegativeResult) string {
 	if failed > 0 || errored > 0 {
 		verdict = "FAILED"
 	}
-	fmt.Fprintf(&b, "%s  %d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms\n",
-		verdict, total, passed, failed, skipped, errored, result.Duration.Milliseconds())
+	fmt.Fprintf(&b, "%s  %d probe%s  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d error%s  %dms\n",
+		verdict, total, plural(total), passed, failed, skipped, errored, plural(errored), result.Duration.Milliseconds())
 	if failed > 0 {
-		fmt.Fprintf(&b, "       %d operation(s) accepted requests they should have rejected — fix server validation\n", failed)
+		authFailed, otherFailed := 0, 0
+		for _, p := range result.Probes {
+			if p.Skipped || p.Error != "" || p.Passed() {
+				continue
+			}
+			if p.Kind == openapi.ProbeMissingAuth {
+				authFailed++
+			} else {
+				otherFailed++
+			}
+		}
+		if otherFailed > 0 {
+			fmt.Fprintf(&b, "       %d probe%s: the server accepted a request it should have rejected — fix server validation\n", otherFailed, plural(otherFailed))
+		}
+		if authFailed > 0 {
+			fmt.Fprintf(&b, "       %d probe%s sent no credentials and the server still accepted the request — fix the authentication rule for those operations\n", authFailed, plural(authFailed))
+		}
 	}
 	if errored > 0 {
 		fmt.Fprintf(&b, "       %d probe(s) got no answer, so they could not be judged — check that the server is running and the base URL is right\n", errored)
@@ -882,10 +949,18 @@ func JSON(result *scenario.Result) ([]byte, error) {
 				Actual:   x.text(ar.Actual),
 				Passed:   ar.Passed,
 				Message:  x.text(ar.Message),
+				CheckID:  schemaCheckID(ar),
 			})
 		}
 		report.Steps = append(report.Steps, step)
 	}
 
 	return json.MarshalIndent(report, "", "  ")
+}
+
+func schemaCheckID(ar domain.AssertionResult) string {
+	if f, ok := schemaFinding(ar); ok {
+		return f.CheckID
+	}
+	return ""
 }
