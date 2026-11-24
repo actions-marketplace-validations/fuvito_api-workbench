@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
     version: '0.9.0',
-    date: 'unreleased',
+    date: '2026-11-24',
     items: [
       'Format checks (can turn a green run red): email, uuid, ipv4 and ipv6 values are now checked in responses and generated requests (date, date-time and byte already were); other formats are accepted as before. Adopt gradually with --write-baseline and --baseline',
       'Severity levels: every finding is a failure, warning or note; warnings are shown (WARN, PASSED with N warnings) but only fail the run with clrsig conform --fail-on warning (Action input conform-fail-on, MCP failOn, Fail on warnings on the Check Conformance page). No existing check is a warning yet',

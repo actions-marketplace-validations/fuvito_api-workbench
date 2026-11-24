@@ -14,5 +14,5 @@
 ## Before tagging
 
 - [ ] CI green on the exact commit (`docs/process/release-process.md`).
-- [ ] Set the date of the 0.9.0 entry in `AboutDialog.tsx` (now `unreleased`).
+- [x] Date set in AboutDialog.tsx (2026-11-24).
 - [ ] Owner has confirmed the open decisions in `docs/enhancements/2026-11-24-severity-and-check-ids.md` section 9.
