@@ -730,6 +730,27 @@ export interface ConformContext {
   environments: CliFile[]
   // the file "Active environment" means; empty when none is selected
   activeEnvironment?: string
+  // what the workspace's clrsig.yaml chooses for this page
+  projectDefaults?: ConformDefaults
+}
+
+export interface ConformDefaults {
+  found: boolean
+  file?: string
+  // what was not applied and why
+  note?: string
+  // the keys that gave a value, as written in the file
+  applied: string[]
+  specPath?: string
+  environmentPath?: string
+  baseUrl?: string
+  tags: string[]
+  paths: string[]
+  negative: boolean
+  failOnWarning: boolean
+  requestTimeoutMs: number
+  maxResponseTimeMs: number
+  maxResponseTimeFor: string[]
 }
 
 export interface ConformSpecInfo {
@@ -1350,7 +1371,7 @@ export type AttentionItem = {
   where: string
   why: string
   fix: string
-  target: { kind: 'scenario' | 'environment' | 'spec' | 'request' | 'contracts'; path: string }
+  target: { kind: 'scenario' | 'environment' | 'spec' | 'request' | 'contracts' | 'projectfile'; path: string }
 }
 
 export type DashCoverage = {
@@ -1391,6 +1412,8 @@ export type WorkspaceOverview = {
   specs: DashSpec[]
   lastRun?: { at: string; scenario: string; passed: boolean; scenarios: number; failingNow: number }
   attention: AttentionItem[]
+  // the clrsig.yaml in the workspace folder
+  projectFile?: { found: boolean; path?: string; error?: string; keys: string[] }
   snapshotAt: string
 }
 

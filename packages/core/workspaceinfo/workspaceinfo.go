@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/projectconfig"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/fuvito/api-workbench/packages/core/variables"
@@ -33,6 +34,9 @@ const (
 	ItemSpecOutside     = "spec-outside"
 	ItemScenarioInvalid = "scenario-invalid"
 	ItemRequestRef      = "request-ref-missing"
+
+	ItemProjectFileInvalid = "project-file-invalid"
+	ItemProjectFilePath    = "project-file-path"
 )
 
 // Spec file states.
@@ -92,6 +96,19 @@ type Report struct {
 	EnvVars         []EnvVar    `json:"envVars"`
 	Specs           []Spec      `json:"specs"`
 	Attention       []Attention `json:"attention"`
+	ProjectFile     ProjectFile `json:"projectFile"`
+}
+
+// ProjectFile is what the workspace folder says about its clrsig.yaml: whether it has one, whether
+// it can be used, and which settings it gives.
+type ProjectFile struct {
+	Found bool `json:"found"`
+	// Path is the file relative to the workspace, with forward slashes.
+	Path string `json:"path,omitempty"`
+	// Error is why the file cannot be used (empty when it is fine).
+	Error string `json:"error,omitempty"`
+	// Keys are the settings the file gives, as written in it.
+	Keys []string `json:"keys"`
 }
 
 var (
@@ -101,7 +118,7 @@ var (
 // Inspect reports on the workspace at root. env and envPath are the active environment (nil and
 // "" when none is selected).
 func Inspect(root string, env *domain.Environment, envPath string) Report {
-	r := Report{Root: root, EnvVars: []EnvVar{}, Specs: []Spec{}, Attention: []Attention{}}
+	r := Report{Root: root, EnvVars: []EnvVar{}, Specs: []Spec{}, Attention: []Attention{}, ProjectFile: ProjectFile{Keys: []string{}}}
 	r.Requests = countDataFiles(filepath.Join(root, "requests"))
 	r.Environments = countDataFilesFlat(filepath.Join(root, "environments"))
 
@@ -158,6 +175,8 @@ func Inspect(root string, env *domain.Environment, envPath string) Report {
 			})
 		}
 	}
+
+	inspectProjectFile(root, &r)
 
 	names := make([]string, 0, len(unresolved))
 	for n := range unresolved {
@@ -465,4 +484,65 @@ func countDataFilesFlat(dir string) int {
 		}
 	}
 	return n
+}
+
+// inspectProjectFile reads the clrsig.yaml in the workspace folder (never one above it) and reports
+// on it. A file that cannot be used, or that names a spec or environment that is not there, is
+// something to fix.
+func inspectProjectFile(root string, r *Report) {
+	path, err := projectconfig.InFolder(root)
+	if err != nil {
+		r.ProjectFile = ProjectFile{Found: true, Error: err.Error(), Keys: []string{}}
+		r.Attention = append(r.Attention, projectFileProblem("", err.Error(), "Keep one project file in the workspace folder."))
+		return
+	}
+	if path == "" {
+		return
+	}
+	r.ProjectFile.Found, r.ProjectFile.Path = true, relTo(root, path)
+	cfg, err := projectconfig.Load(path)
+	if err != nil {
+		r.ProjectFile.Error = err.Error()
+		r.Attention = append(r.Attention, projectFileProblem(path, err.Error(),
+			"Correct the key the message names, or remove the file. From a terminal, clrsig config show reads it the same way."))
+		return
+	}
+	r.ProjectFile.Keys = cfg.SetKeys()
+	check := func(key, value, kind string) {
+		if value == "" || strings.Contains(value, "://") {
+			return
+		}
+		full := value
+		if !filepath.IsAbs(full) {
+			full = filepath.Join(cfg.Dir(), filepath.FromSlash(value))
+		}
+		if _, err := os.Stat(full); err == nil {
+			return
+		}
+		r.Attention = append(r.Attention, Attention{
+			ID: ItemProjectFilePath, Severity: SeverityWarning,
+			What:   fmt.Sprintf("%s names a %s that does not exist: %q.", r.ProjectFile.Path, kind, value),
+			Where:  fmt.Sprintf("%s, key %s", r.ProjectFile.Path, key),
+			Why:    "Commands that read the project file (clrsig conform with no arguments, for example) fail until the file is there.",
+			Fix:    fmt.Sprintf("Put the %s at that path, or change %s in %s.", kind, key, r.ProjectFile.Path),
+			Target: Target{Kind: "projectfile", Path: path},
+		})
+	}
+	check("spec", cfg.Spec, "spec")
+	check("environment", cfg.Environment, "environment file")
+}
+
+func projectFileProblem(path, why, fix string) Attention {
+	where := "the workspace folder"
+	if path != "" {
+		where = filepath.Base(path)
+	}
+	return Attention{
+		ID: ItemProjectFileInvalid, Severity: SeverityWarning,
+		What:   "The project file cannot be used.",
+		Where:  where,
+		Why:    why,
+		Fix:    fix,
+		Target: Target{Kind: "projectfile", Path: path},
+	}
 }

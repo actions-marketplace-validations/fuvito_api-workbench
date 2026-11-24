@@ -204,3 +204,39 @@ describe('openSummary', () => {
     expect(openSummary(two)).toContain('2 things need attention')
   })
 })
+
+describe('WorkspaceTab project file card', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('suggests clrsig init when the workspace has no project file', () => {
+    show({ ...base, projectFile: { found: false, keys: [] } })
+    const card = screen.getByTestId('project-file-card')
+    expect(card).toHaveTextContent('No clrsig.yaml here')
+    expect(screen.getByTestId('init-command')).toHaveTextContent('clrsig init')
+  })
+
+  it('says nothing about it when the snapshot has no project file information (older data)', () => {
+    show(base)
+    expect(screen.getByTestId('project-file-card')).toHaveTextContent('No clrsig.yaml here')
+  })
+
+  it('lists what a usable project file gives', () => {
+    show({ ...base, projectFile: { found: true, path: 'clrsig.yaml', keys: ['spec', 'baseUrl', 'conform.readOnly'] } })
+    const card = screen.getByTestId('project-file-card')
+    expect(card).toHaveTextContent('clrsig.yaml')
+    expect(card).toHaveTextContent('Gives: spec, baseUrl, conform.readOnly.')
+    expect(card).toHaveTextContent('clrsig config show')
+    expect(card).not.toHaveTextContent('No clrsig.yaml here')
+  })
+
+  it('points to Needs attention when the file cannot be used, and offers to show it', () => {
+    show({
+      ...base,
+      projectFile: { found: true, path: 'clrsig.yaml', error: 'unknown key "baseURL"', keys: [] },
+      attention: [{ id: 'project-file-invalid', severity: 'warning', what: 'The project file cannot be used.', where: 'clrsig.yaml', why: 'unknown key "baseURL"', fix: 'Correct the key the message names.', target: { kind: 'projectfile', path: '/ws/shop/clrsig.yaml' } }],
+    })
+    expect(screen.getByTestId('project-file-card')).toHaveTextContent('Cannot be used: see Needs attention.')
+    fireEvent.click(screen.getByRole('button', { name: 'Show project file' }))
+    expect(bridge.openInExplorer).toHaveBeenCalledWith('/ws/shop/clrsig.yaml')
+  })
+})

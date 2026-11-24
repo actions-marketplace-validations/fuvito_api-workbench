@@ -250,3 +250,22 @@ func TestDashboard_SampleWorkspacesNeedNoAttention(t *testing.T) {
 		}
 	}
 }
+
+func TestDashboard_ProjectFile(t *testing.T) {
+	d, ws := newTestDashboard(t)
+	root := t.TempDir()
+	ws.workspacePath = root
+	if o := d.GetWorkspaceOverview(); o.ProjectFile.Found || o.ProjectFile.Keys == nil {
+		t.Fatalf("no file: %+v", o.ProjectFile)
+	}
+	writeWS(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nbaseUrl: http://localhost:8080\n")
+	o := d.GetWorkspaceOverview()
+	if !o.ProjectFile.Found || o.ProjectFile.Path != "clrsig.yaml" || strings.Join(o.ProjectFile.Keys, ",") != "baseUrl" || len(o.Attention) != 0 {
+		t.Fatalf("a good file: %+v attention=%v", o.ProjectFile, o.Attention)
+	}
+	writeWS(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nunknown: 1\n")
+	o = d.GetWorkspaceOverview()
+	if o.ProjectFile.Error == "" || len(o.Attention) != 1 || o.Attention[0].ID != "project-file-invalid" {
+		t.Fatalf("an unusable file is something to fix: %+v %v", o.ProjectFile, o.Attention)
+	}
+}

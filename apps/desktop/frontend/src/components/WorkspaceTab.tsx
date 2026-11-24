@@ -192,6 +192,28 @@ export function WorkspaceTab({ overview, error, loading, onRefresh, focusAttenti
               <span>{overview.specs.length} {overview.specs.length === 1 ? 'spec' : 'specs'}</span>
             </section>
 
+            <section aria-label="Project file" data-testid="project-file-card" className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-3 text-xs">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-1">Project file</h2>
+              {overview.projectFile?.found ? (
+                <>
+                  <p className="font-mono">{overview.projectFile.path ?? 'clrsig.yaml'}</p>
+                  {overview.projectFile.error ? (
+                    <p className="mt-1 text-amber-400">Cannot be used: see Needs attention.</p>
+                  ) : (
+                    <p className="mt-1 text-[var(--color-muted-foreground)]">
+                      {overview.projectFile.keys.length === 0 ? 'Gives no settings.' : `Gives: ${overview.projectFile.keys.join(', ')}.`}{' '}
+                      From a terminal in this folder, <code>clrsig conform</code> uses these values; <code>clrsig config show</code> lists them.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-[var(--color-muted-foreground)]">
+                  No <code>clrsig.yaml</code> here. It holds the defaults of <code>clrsig conform</code> and <code>run</code> (spec, environment, base URL), so a terminal or CI command needs no flags.
+                  In a terminal in this folder, run <code data-testid="init-command">clrsig init</code> to create it (it never overwrites anything).
+                </p>
+              )}
+            </section>
+
             <section aria-label="Environment" className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-3 text-xs">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted-foreground)] mb-1">Environment</h2>
               <p data-testid="env-source">
@@ -246,6 +268,9 @@ function AttentionCard({ item, index, onOpenScenario, onOpenContracts }: {
           )}
           {item.target.kind === 'contracts' && (
             <button type="button" onClick={() => onOpenContracts(item.target.path)} className="rounded border border-[var(--color-border)] px-2 py-1 hover:bg-[var(--color-muted)]">Open Contracts</button>
+          )}
+          {item.target.kind === 'projectfile' && item.target.path && (
+            <button type="button" onClick={() => void openInExplorer(item.target.path)} className="rounded border border-[var(--color-border)] px-2 py-1 hover:bg-[var(--color-muted)]">Show project file</button>
           )}
           {item.target.kind === 'environment' && item.target.path && (
             <button type="button" onClick={() => void openInExplorer(item.target.path)} className="rounded border border-[var(--color-border)] px-2 py-1 hover:bg-[var(--color-muted)]">Show environment file</button>

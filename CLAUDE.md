@@ -939,3 +939,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **`clrsig config show [conform|run|validate]`:** for each command, every setting, its value and `file` or `default`; no project file, `--no-config` and a bad command name each have their own message. It applies the file to a fresh copy of the command, so it reports what the command would use.
 - **CLI Command Builder:** `clibuild.Build` adds an info message when a `clrsig.yaml` applies where the command is run ("the command shown is written in full and does not depend on it; run clrsig config show <command>") for conform, run and validate; the command itself is unchanged.
 - **Not yet:** the desktop (phase 4): Check Conformance and the Workspace page reading the file, and a card that suggests `init`.
+
+### 2026-11-24 — Desktop reads the project file, phase 4 of `docs/enhancements/2026-11-24-init-and-project-config.md`
+
+- **Core:** `projectconfig.InFolder` (only that folder, no walk up) and `Config.SetKeys`; `workspaceinfo.Report.ProjectFile` (found, path, error, keys) and two attention items: `project-file-invalid` (what / where / why / fix, with the parser's message) and `project-file-path` (the spec or environment it names does not exist).
+- **Desktop:** `DashboardService` carries `projectFile`; `ConformanceService.GetConformContext` carries `projectDefaults` (spec, environment, base URL, tags, paths, negative, fail on warning, timeouts and limits). A path is used only when it is inside the open workspace and exists; `conform.readOnly: false` is not applied and says so. The Workspace page has a **Project file** card (what the file gives, or the `clrsig init` command to run in a terminal when there is none); Check Conformance preselects the file's values once and says where they came from.
+- **Tests:** core, service and component tests; Playwright (173) passes against a dev server on a free port.
+- **Done:** all four phases of the proposal. **Not done:** a button that runs `init` from the app (the card shows the command; writing files stays an explicit act in a terminal).

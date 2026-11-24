@@ -129,6 +129,59 @@ func Discover(startDir, homeDir string) (string, error) {
 
 func sameDir(a, b string) bool { return strings.EqualFold(filepath.Clean(a), filepath.Clean(b)) }
 
+// InFolder returns the project file in exactly this folder, or "" when there is none. It does not
+// look in folders above it, which is what the desktop app wants: it reads only inside the open
+// workspace.
+func InFolder(dir string) (string, error) {
+	var found []string
+	for _, name := range FileNames {
+		if st, err := os.Stat(filepath.Join(dir, name)); err == nil && !st.IsDir() {
+			found = append(found, filepath.Join(dir, name))
+		}
+	}
+	switch len(found) {
+	case 0:
+		return "", nil
+	case 1:
+		return found[0], nil
+	}
+	names := make([]string, len(found))
+	for i, f := range found {
+		names[i] = filepath.Base(f)
+	}
+	return "", fmt.Errorf("%s has more than one project file (%s): keep one", dir, strings.Join(names, ", "))
+}
+
+// SetKeys lists the settings the file actually gives, written as in the file.
+func (c *Config) SetKeys() []string {
+	var out []string
+	add := func(set bool, key string) {
+		if set {
+			out = append(out, key)
+		}
+	}
+	add(c.Spec != "", "spec")
+	add(c.Environment != "", "environment")
+	add(c.BaseURL != "", "baseUrl")
+	if x := c.Conform; x != nil {
+		add(x.ReadOnly != nil, "conform.readOnly")
+		add(x.Negative != nil, "conform.negative")
+		add(x.FailOn != "", "conform.failOn")
+		add(x.RequestTimeoutMs != nil, "conform.requestTimeoutMs")
+		add(x.MaxResponseTimeMs != nil, "conform.maxResponseTimeMs")
+		add(len(x.MaxResponseTimeFor) > 0, "conform.maxResponseTimeFor")
+		add(len(x.Tags) > 0, "conform.tags")
+		add(len(x.Paths) > 0, "conform.paths")
+		add(x.Baseline != "", "conform.baseline")
+	}
+	if x := c.Run; x != nil {
+		add(len(x.Scenarios) > 0, "run.scenarios")
+		add(x.FailFast != nil, "run.failFast")
+	}
+	add(len(c.Reports) > 0, "reports")
+	return out
+}
+
 // Load reads and validates a project file. Every error says which file and which key.
 func Load(path string) (*Config, error) {
 	abs, err := filepath.Abs(path)

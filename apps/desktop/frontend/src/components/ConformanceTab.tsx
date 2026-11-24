@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ShieldCheck, Terminal, Play, Square, AlertTriangle, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -156,6 +156,10 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [progress, setProgress] = useState<ConformProgress | null>(null)
   const [output, setOutput] = useState<ConformRunOutput | null>(null)
 
+  const [defaultsApplied, setDefaultsApplied] = useState(false)
+  const [defaultsNote, setDefaultsNote] = useState('')
+  const pendingBaseUrl = useRef('')
+
   const [appliedRequest, setAppliedRequest] = useState<ConformRequest | null>(null)
   if ((request ?? null) !== appliedRequest) {
     setAppliedRequest(request ?? null)
@@ -176,6 +180,32 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     getConformContext().then(setCtx).catch(e => setLoadError(String(e)))
   }, [])
 
+  // The workspace's clrsig.yaml chooses the starting point, once. It never turns on writes.
+  useEffect(() => {
+    if (!ctx || defaultsApplied) return
+    setDefaultsApplied(true)
+    const d = ctx.projectDefaults
+    if (!d?.found) return
+    const parts: string[] = []
+    if (d.applied?.length) parts.push(`Starting values from ${d.file ?? 'clrsig.yaml'}: ${d.applied.join(', ')}.`)
+    else if (d.note) parts.push(`${d.file ?? 'clrsig.yaml'} was found but gave nothing.`)
+    if (d.note) parts.push(d.note + '.')
+    setDefaultsNote(parts.join(' '))
+    if (!specPath && d.specPath && ctx.specs.some(f => f.path === d.specPath)) {
+      pendingBaseUrl.current = d.baseUrl ?? ''
+      setSpecPath(d.specPath)
+    }
+    if (!envPath && d.environmentPath && ctx.environments.some(f => f.path === d.environmentPath)) setEnvPath(d.environmentPath)
+    if (d.tags?.length) setTagsText(d.tags.join(', '))
+    if (d.paths?.length) setPathsText(d.paths.join(', '))
+    if (d.negative) setNegative(true)
+    if (d.failOnWarning) setFailOnWarning(true)
+    if (d.requestTimeoutMs > 0) setTimeoutText(String(d.requestTimeoutMs))
+    if (d.maxResponseTimeMs > 0) setMaxResponseText(String(d.maxResponseTimeMs))
+    if (d.maxResponseTimeFor?.length) setPathLimitsText(d.maxResponseTimeFor.join('\n'))
+    if (d.tags?.length || d.paths?.length || d.negative || d.failOnWarning || d.requestTimeoutMs > 0 || d.maxResponseTimeMs > 0 || d.maxResponseTimeFor?.length) setOptionsOpen(true)
+  }, [ctx]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!running) return
     return onConformanceProgress(setProgress)
@@ -189,7 +219,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     inspectConformSpec(specPath).then(i => {
       if (!current) return
       setInfo(i)
-      setBaseUrl(i.serverUrl)
+      setBaseUrl(pendingBaseUrl.current || i.serverUrl)
+      pendingBaseUrl.current = ''
     }).catch(e => current && setInfo({ title: '', version: '', serverUrl: '', reads: 0, writes: 0, error: String(e) }))
     return () => { current = false }
   }, [specPath])
@@ -241,6 +272,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           <p className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
             Spec Conformance Testing: call every operation in an OpenAPI spec and check that each response matches what the spec declares.
           </p>
+          {defaultsNote && <p data-testid="project-defaults-note" className="mt-1 text-[11px] text-sky-400">{defaultsNote}</p>}
         </div>
         {onOpenCliBuilder && (
           <button

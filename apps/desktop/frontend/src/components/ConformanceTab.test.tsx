@@ -581,3 +581,51 @@ describe('warnings', () => {
     expect(cliValues(base)['fail-on']).toBeUndefined()
   })
 })
+
+describe('starting values from the workspace project file', () => {
+  const defaults = {
+    found: true, file: 'clrsig.yaml', note: '', applied: ['spec', 'environment', 'baseUrl', 'conform.negative', 'conform.failOn', 'conform.tags'],
+    specPath: '/ws/api.yaml', environmentPath: '/ws/environments/local.yaml', baseUrl: 'http://localhost:9000',
+    tags: ['users'], paths: [], negative: true, failOnWarning: true, requestTimeoutMs: 3000, maxResponseTimeMs: 0, maxResponseTimeFor: [],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(output)
+  })
+
+  it('preselects the spec, environment, base URL and options, and says where they came from', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: defaults })
+    render(<ConformanceTab />)
+    expect(await screen.findByTestId('project-defaults-note')).toHaveTextContent('Starting values from clrsig.yaml: spec, environment, baseUrl')
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:9000'))
+    expect(screen.getByLabelText(/Spec/)).toHaveValue('/ws/api.yaml')
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({
+      specPath: '/ws/api.yaml', envPath: '/ws/environments/local.yaml', baseUrl: 'http://localhost:9000', tags: ['users'], negative: true, failOnWarning: true, timeoutMs: 3000,
+    })))
+  })
+
+  it('never turns on writes, whatever the file says', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: { ...defaults, note: 'conform.readOnly: false is not applied; this page sends only reads until you tick Allow writes.' } })
+    render(<ConformanceTab />)
+    expect(await screen.findByTestId('project-defaults-note')).toHaveTextContent('readOnly: false is not applied')
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:9000'))
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ allowWrites: false })))
+  })
+
+  it('ignores a spec that is not among the workspace files, and does nothing without a file', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: { ...defaults, specPath: '/elsewhere/api.yaml' } })
+    const { unmount } = render(<ConformanceTab />)
+    await screen.findByTestId('project-defaults-note')
+    expect(screen.getByLabelText(/Spec/)).toHaveValue('')
+    unmount()
+
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: { found: false, applied: [], tags: [], paths: [], negative: false, failOnWarning: false, requestTimeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [] } })
+    render(<ConformanceTab />)
+    await screen.findByLabelText(/Spec/)
+    expect(screen.queryByTestId('project-defaults-note')).not.toBeInTheDocument()
+  })
+})

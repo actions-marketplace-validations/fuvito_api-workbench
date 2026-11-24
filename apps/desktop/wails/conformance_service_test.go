@@ -515,3 +515,44 @@ func TestBaselineWrittenBy089StillWorks(t *testing.T) {
 		t.Fatalf("the current format accepts them too: %+v", again.Diff)
 	}
 }
+
+func TestConformanceService_PreselectsFromTheProjectFile(t *testing.T) {
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	if d := svc.GetConformContext().ProjectDefaults; d.Found {
+		t.Fatalf("no project file: %+v", d)
+	}
+
+	conformanceSpecFile(t) // <ws>/conformance-openapi.yaml
+	conformanceEnvFile(t)  // <ws>/conformance-environment.yaml
+	writeProject := func(text string) {
+		if err := os.WriteFile(filepath.Join(ws, "clrsig.yaml"), []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeProject("schemaVersion: \"1\"\nspec: conformance-openapi.yaml\nenvironment: conformance-environment.yaml\nbaseUrl: http://localhost:9999\n" +
+		"conform:\n  readOnly: false\n  negative: true\n  failOn: warning\n  requestTimeoutMs: 3000\n  maxResponseTimeMs: 800\n  maxResponseTimeFor: [\"/slow=5000\"]\n  tags: [products]\n  paths: [/products]\n")
+	d := svc.GetConformContext().ProjectDefaults
+	if !d.Found || d.File != "clrsig.yaml" || d.SpecPath != filepath.Join(ws, "conformance-openapi.yaml") || d.EnvironmentPath != filepath.Join(ws, "conformance-environment.yaml") || d.BaseURL != "http://localhost:9999" {
+		t.Fatalf("paths and base URL: %+v", d)
+	}
+	if !d.Negative || !d.FailOnWarning || d.RequestTimeoutMs != 3000 || d.MaxResponseTimeMs != 800 || len(d.MaxResponseTimeFor) != 1 || d.Tags[0] != "products" || d.Paths[0] != "/products" {
+		t.Fatalf("options: %+v", d)
+	}
+	if !strings.Contains(d.Note, "readOnly: false is not applied") {
+		t.Errorf("the page stays read-only whatever the file says, and says so: %q", d.Note)
+	}
+
+	// a path outside the workspace is not preselected
+	writeProject("schemaVersion: \"1\"\nspec: ../elsewhere.yaml\n")
+	d = svc.GetConformContext().ProjectDefaults
+	if d.SpecPath != "" || !strings.Contains(d.Note, "outside the workspace") {
+		t.Errorf("a path outside the workspace is not used: %+v", d)
+	}
+	// a file that cannot be used is reported, not guessed at
+	writeProject("schemaVersion: \"1\"\nbaseURL: x\n")
+	d = svc.GetConformContext().ProjectDefaults
+	if !d.Found || !strings.Contains(d.Note, "baseURL") || len(d.Applied) != 0 {
+		t.Errorf("an unusable file: %+v", d)
+	}
+}

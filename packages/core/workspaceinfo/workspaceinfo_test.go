@@ -330,3 +330,59 @@ func TestInspect_ASpecReachedThroughALinkOutOfTheWorkspaceIsOutside(t *testing.T
 		t.Fatalf("a link that leaves the workspace must be reported as outside: %+v", r.Specs)
 	}
 }
+
+func TestInspect_ProjectFile(t *testing.T) {
+	root := t.TempDir()
+	if r := Inspect(root, nil, ""); r.ProjectFile.Found || len(r.ProjectFile.Keys) != 0 || len(r.Attention) != 0 {
+		t.Fatalf("no file is not a problem: %+v", r)
+	}
+
+	write(t, root, "specs/api.yaml", "x")
+	write(t, root, "environments/local.yaml", "x")
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nspec: specs/api.yaml\nenvironment: environments/local.yaml\nbaseUrl: http://localhost:8080\nconform:\n  readOnly: true\n")
+	r := Inspect(root, nil, "")
+	pf := r.ProjectFile
+	if !pf.Found || pf.Path != "clrsig.yaml" || pf.Error != "" || strings.Join(pf.Keys, ",") != "spec,environment,baseUrl,conform.readOnly" {
+		t.Fatalf("a good file: %+v", pf)
+	}
+	if has(r, ItemProjectFileInvalid) != nil || has(r, ItemProjectFilePath) != nil {
+		t.Errorf("a good file raises nothing: %v", ids(r))
+	}
+}
+
+func TestInspect_ProjectFileProblems(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nbaseURL: x\n")
+	r := Inspect(root, nil, "")
+	a := has(r, ItemProjectFileInvalid)
+	if a == nil || r.ProjectFile.Error == "" || !strings.Contains(a.Why, "baseURL") || a.Fix == "" || a.Target.Kind != "projectfile" {
+		t.Fatalf("an unusable file says what, where, why and how to fix: %+v / %+v", r.ProjectFile, a)
+	}
+
+	root = t.TempDir()
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nspec: specs/gone.yaml\nenvironment: https://example.com/x\n")
+	r = Inspect(root, nil, "")
+	a = has(r, ItemProjectFilePath)
+	if a == nil || !strings.Contains(a.What, "specs/gone.yaml") || !strings.Contains(a.Where, "key spec") {
+		t.Fatalf("a spec that is not there is named: %v %+v", ids(r), a)
+	}
+
+	root = t.TempDir()
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\n")
+	write(t, root, "clrsig.json", `{"schemaVersion":"1"}`)
+	if r := Inspect(root, nil, ""); has(r, ItemProjectFileInvalid) == nil {
+		t.Errorf("two project files in the folder is a problem: %v", ids(r))
+	}
+}
+
+func TestInspect_ProjectFileIsOnlyReadInsideTheWorkspace(t *testing.T) {
+	outer := t.TempDir()
+	write(t, outer, "clrsig.yaml", "schemaVersion: \"1\"\n")
+	root := filepath.Join(outer, "ws")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if r := Inspect(root, nil, ""); r.ProjectFile.Found {
+		t.Errorf("a file above the workspace is not read: %+v", r.ProjectFile)
+	}
+}
