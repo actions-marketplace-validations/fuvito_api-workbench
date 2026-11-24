@@ -982,3 +982,9 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Bug fix for every limited run:** a baseline entry was reported as fixed when its operation had simply not been sent (`--tags`, `--paths`, `--read-only`). `conformance.CompareChecked` / `CheckedOperations` now call an entry fixed only when its operation was sent.
 - **Behaviour change:** `--write-baseline` is refused together with `--tags`, `--paths` or `--changed-against` (it would drop the entries of the operations left out); record a baseline with a full run.
 - **Limits, documented:** it follows the spec only (a server fault with no spec change is invisible) and unattributed spec-level changes do not widen the check; keep a full run on the main branch.
+
+### 2026-11-24 — `conform --format github`: pull-request annotations (B-087)
+
+- **Core:** `reporting.ConformGitHub(result, neg, locator)` renders GitHub workflow commands: an error per failing finding (a warning-level check is a warning), titled `<check ID> <METHOD> <path>`, with what / where / why / fix in the message, text redacted like every report, `%`, line breaks (and `:` `,` in properties) escaped; accepted negative probes are errors; one closing notice with the counts and the scope line. `openapi.OperationLines` finds the line of each operation in a YAML or JSON spec (yaml.v3 nodes), so an annotation points at the operation; a URL spec, or a file outside the current folder, leaves the annotation on the run.
+- **CLI:** `--format github` is a screen format of `conform` only (`planReportsWith`): not a `--report` file, not offered by `run`, `diff` or `bundle run`. The Action's `format: github` works for `conform`.
+- **Not done:** annotations for scenario runs (`run`: step lines in the scenario file) and `diff`.

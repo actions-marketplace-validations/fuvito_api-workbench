@@ -2,9 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/reporting"
 )
 
 // changedOperationScope compares the spec with its version at a git ref and returns the operations
@@ -41,4 +45,29 @@ func changedOperationScope(src, ref string, spec *openapi.Spec) (map[string]bool
 		only = map[string]bool{}
 	}
 	return only, scope, nil
+}
+
+// githubLocator points an annotation at an operation in the spec file, when the spec is a local file
+// inside the current folder; for a URL or a file elsewhere the annotations stay on the run.
+func githubLocator(src string, data []byte) reporting.Locator {
+	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
+		return nil
+	}
+	abs, err := filepath.Abs(src)
+	if err != nil {
+		return nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+	rel, err := filepath.Rel(cwd, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil
+	}
+	file := filepath.ToSlash(rel)
+	lines := openapi.OperationLines(data)
+	return func(method, specPath string) (string, int) {
+		return file, lines[openapi.OperationKey(method, specPath)]
+	}
 }

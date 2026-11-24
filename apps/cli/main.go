@@ -503,7 +503,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			}
 			src := args[0]
 
-			plan, err := planReports(format, reports, outputFile)
+			plan, err := planReportsWith([]string{"github"}, format, reports, outputFile)
 			if err != nil {
 				return err
 			}
@@ -607,6 +607,8 @@ only new ones fail the run; --write-baseline records the current violations.`,
 
 			render := func(f string) ([]byte, error) {
 				switch f {
+				case "github":
+					return []byte(reporting.ConformGitHub(result, negResult, githubLocator(src, data))), nil
 				case "json":
 					b, err := reporting.ConformJSON(result, cov, negResult)
 					if err != nil {
@@ -684,7 +686,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringArrayVar(&reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/conform.xml (repeatable)")
 	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include; each matches the start of the path as the spec writes it (/latency/ also selects /latency/{ms})")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
+	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage+", or github (workflow commands that annotate a pull request, with the check ID in the title and the line of the operation in the spec)")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail an operation whose response takes longer than this many milliseconds (the response is still compared with the spec; 0 = no limit)")

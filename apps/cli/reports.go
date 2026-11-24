@@ -37,9 +37,19 @@ type extraReport struct {
 // planReports checks --format and every --report value (format=file) so a typo is reported
 // before a single request is sent.
 func planReports(format string, reports []string, outputFile string) (reportPlan, error) {
+	return planReportsWith(nil, format, reports, outputFile)
+}
+
+// planReportsWith is planReports for a command that also offers formats meant for the screen only
+// (primary): they are accepted as --format but not as a --report file.
+func planReportsWith(primary []string, format string, reports []string, outputFile string) (reportPlan, error) {
 	plan := reportPlan{format: strings.ToLower(format)}
-	if !validFormat(plan.format) {
-		return plan, fmt.Errorf("unknown --format %q (use one of: %s)", format, strings.Join(reportFormats, ", "))
+	isPrimary := false
+	for _, p := range primary {
+		isPrimary = isPrimary || p == plan.format
+	}
+	if !validFormat(plan.format) && !isPrimary {
+		return plan, fmt.Errorf("unknown --format %q (use one of: %s)", format, strings.Join(append(append([]string(nil), reportFormats...), primary...), ", "))
 	}
 	seen := map[string]bool{}
 	if outputFile != "" {

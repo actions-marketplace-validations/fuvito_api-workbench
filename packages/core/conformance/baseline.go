@@ -83,6 +83,9 @@ var probeChecks = map[string]string{
 	"missing_auth":           "CS-PROBE-004",
 }
 
+// ProbeCheckID is the check ID of a negative probe kind, or "" for a kind that has none.
+func ProbeCheckID(kind string) string { return probeChecks[kind] }
+
 // Violations lists what a run found wrong, sorted and without duplicates. neg may be nil.
 // Skipped operations and passing probes are not violations.
 func Violations(r *ConformResult, neg *NegativeResult) []Violation {

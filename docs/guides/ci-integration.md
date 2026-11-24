@@ -158,6 +158,22 @@ jobs:
           path: reports/conform.html
 ```
 
+### Findings on the pull request
+
+`format: github` (`clrsig conform --format github`) prints each finding as a GitHub workflow command, so it shows up in the pull request's **Checks** view and as an annotation, with the check ID in the title (`CS-RESP-005 GET /users/{id}`), what is wrong, why it fails and how to fix it, and, when the spec is a file in the repository, on the line of the operation. It prints only those commands plus one summary notice, so keep the usual reports with `report:` (for example `junit=reports/conform.xml`). Failures are errors, warnings are warnings, and the exit code is the same as for any other format. GitHub shows only the first ten annotations of each kind per step in the pull request view; the log has all of them.
+
+```yaml
+- uses: fuvito/api-workbench@v1
+  with:
+    command: conform
+    spec: openapi.yaml
+    base-url: ${{ vars.API_BASE_URL }}
+    format: github
+    report: |
+      junit=reports/conform.xml
+      html=reports/conform.html
+```
+
 ### Only what a pull request changed
 
 ```yaml
