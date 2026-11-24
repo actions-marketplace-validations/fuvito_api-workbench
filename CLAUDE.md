@@ -963,3 +963,8 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 ### 2026-11-24 — 0.9.1 prepared, not tagged
 
 - Version 0.9.1 in `AboutDialog.tsx` (entry dated `unreleased`), its tests and the user guide; draft GitHub notes in `docs/process/release-notes-0.9.1-draft.md`. It carries the project file, `init`, `config show`, `conform --setup`, `validate --strict` and the desktop reading the file; no existing result or exit code changes without a `clrsig.yaml` or a new flag. **Waiting for:** a green CI on the final commit, then set the date and tag.
+
+### 2026-11-24 — v0.9.1 released
+
+- **Tag `v0.9.1` on `bbd4350`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published (no result or exit code changes without a `clrsig.yaml` or a new flag); Scoop updated by the tap-bump commit and installed on Windows (`clrsig version v0.9.1`); the released CLI shows `validate --strict` and `init`. The draft notes file was deleted after publishing.
+- **Not verified:** the Docker image run (no daemon on the machine), the Homebrew install (no Mac) and the Action at `@v0.9.1` (its new `setup` and `strict` inputs and the empty-argument fix are the part worth trying in a real workflow).
