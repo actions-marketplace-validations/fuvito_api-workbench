@@ -50,6 +50,7 @@ paths:
                   when: {type: string, format: date-time}
                   mail: {type: string, format: email}
                   uid: {type: string, format: uuid}
+                  link: {type: string, format: uri}
                   tags: {type: array, items: {type: string}, uniqueItems: true, minItems: 1}
                   maybe: {type: string, nullable: true}
                   secret: {type: string, writeOnly: true}
@@ -179,8 +180,12 @@ func TestCheck_ResponseBody(t *testing.T) {
 		{"CS-RESP-010 extra property when additionalProperties is false", "/strict", "strict", `{"id":1,"extra":true}`, true},
 		// Known gaps, pinned so the catalog stays honest.
 		{"CS-RESP-010 KnownGap extra property on an open schema is allowed (the OpenAPI default)", "/open", "open", `{"id":1,"extra":true}`, false},
-		{"CS-GAP-001 KnownGap format email is not validated", "/constraints", "constraints", `{"mail":"nope"}`, false},
-		{"CS-GAP-001 KnownGap format uuid is not validated", "/constraints", "constraints", `{"uid":"x"}`, false},
+		{"CS-RESP-007 email format", "/constraints", "constraints", `{"mail":"nope"}`, true},
+		{"CS-RESP-007 uuid format", "/constraints", "constraints", `{"uid":"x"}`, true},
+		{"a valid email passes", "/constraints", "constraints", `{"mail":"ana@example.com"}`, false},
+		{"a valid uuid passes", "/constraints", "constraints", `{"uid":"0b6f6b2e-8d2a-4c53-9a53-5c1f0a3d9e11"}`, false},
+		// Known gap, pinned so the catalog stays honest: formats outside the supported list.
+		{"CS-GAP-001 KnownGap format uri is not validated", "/constraints", "constraints", `{"link":"not a uri"}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
