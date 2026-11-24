@@ -959,3 +959,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Core:** `scenario.Lint(sc, LintOptions{Env})`: warnings for a step with no assertions that extracts nothing, an extraction no later step uses, and (with an environment) a `{{name}}` nothing defines (scenario variables, earlier extractions, the environment; `$functions` are not names). Disabled steps are ignored. A missing `requestRef` was already an error in `Validate`.
 - **CLI:** `validate --strict [--env file]`: warnings print as `warning: ...` under the file; with `--strict` a warning makes the file not valid (exit 1, the summary and JSON `valid` agree, JSON gains `warnings`); without it nothing changes. `environment:` in `clrsig.yaml` now also supplies `--env` for `validate`. Action inputs `strict` (and `env` with it).
 - **Not done:** the same findings as Workspace page attention items (B-071), which would reuse `scenario.Lint`.
+
+### 2026-11-24 — 0.9.1 prepared, not tagged
+
+- Version 0.9.1 in `AboutDialog.tsx` (entry dated `unreleased`), its tests and the user guide; draft GitHub notes in `docs/process/release-notes-0.9.1-draft.md`. It carries the project file, `init`, `config show`, `conform --setup`, `validate --strict` and the desktop reading the file; no existing result or exit code changes without a `clrsig.yaml` or a new flag. **Waiting for:** a green CI on the final commit, then set the date and tag.

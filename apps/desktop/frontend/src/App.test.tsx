@@ -220,7 +220,7 @@ describe('App — menus and dialogs', () => {
     await screen.findByRole('button', { name: /New Workspace/ })
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'Help' }))
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'About Clear Signal' }))
-    expect(await screen.findByText('Version 0.9.0')).toBeInTheDocument()
+    expect(await screen.findByText('Version 0.9.1')).toBeInTheDocument()
   })
 
   it.each([
