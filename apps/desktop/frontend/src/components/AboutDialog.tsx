@@ -3,6 +3,17 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.10.0',
+    date: '2026-11-24',
+    items: [
+      'Pull requests: clrsig conform --changed-against origin/main checks only the operations that are new or changed compared with the spec at that git ref (a change to a shared schema counts for each operation that uses it); nothing changed passes with NOTHING CHECKED. It follows the spec only, so keep a full run on your main branch',
+      'clrsig conform --format github prints GitHub workflow commands: every finding appears on the pull request with the check ID in the title and, when the spec is a file in the repository, on the line of the operation',
+      'Behaviour changes: a baseline entry for an operation that was not sent (a --tags, --paths, --read-only or --changed-against run) is no longer reported as fixed; --write-baseline is refused together with --tags, --paths or --changed-against, because it would drop the other entries: record a baseline with a full run',
+      'clrsig validate --strict also warns when a scenario specFile does not exist and, with --env, about a ${NAME} the environment needs that no process variable sets; it reads request files a step references, which fixes a false "extraction nobody uses"',
+      'Desktop: the Workspace page lists weak scenarios as information items; every finding has Copy as issue (check, operation, expected, got, why, fix, version); findings shown in the app now hide secrets that came back in a response, like the reports',
+    ],
+  },
+  {
     version: '0.9.1',
     date: '2026-11-24',
     items: [

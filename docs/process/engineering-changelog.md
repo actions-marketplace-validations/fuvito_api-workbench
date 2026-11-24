@@ -801,3 +801,7 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **B-095:** the engineering changelog moved from section 10 of `CLAUDE.md` to this file (`docs/process/engineering-changelog.md`); `CLAUDE.md` keeps the rules and a pointer (about 200 lines instead of 990 loaded in every session). New entries go here.
 - **B-088 (data-driven scenarios):** not built. The earlier analysis (future enhancements 17, "think twice": a large change to the scenario format and the runner that moves toward load and data testing, which is out of scope, with no evidence of demand) still holds. The backlog row says so.
 - **B-091 (actions on findings):** proposal written (`docs/enhancements/2026-11-24-fix-actions.md`), recommending to defer: only one finding has a button today, and attention items already carry a target.
+
+### 2026-11-24 — 0.10.0 prepared, not tagged
+
+- Version 0.10.0 in `AboutDialog.tsx` (dated 2026-11-24), the user guide (`TestVersionsAgree` checks they agree); draft GitHub notes in `docs/process/release-notes-0.10.0-draft.md`. The notes lead with three behaviour changes: `--write-baseline` refused with `--tags`/`--paths`/`--changed-against`, a baseline entry is fixed only when its operation was sent, and the stricter `validate --strict`. CI now runs the CLI and desktop Go tests, `go vet`, Vitest and the browser tests; the first run on Linux found two test-only problems (the parity test built the CLI with an isolated module cache, a temp workspace test set only the Windows temp variables), fixed in `ed9f16b`.
