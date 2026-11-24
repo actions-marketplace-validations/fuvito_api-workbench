@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -24,6 +25,18 @@ func TestConformanceParity_ServiceMatchesTheCLI(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs the CLI")
 	}
+	// The service test isolates HOME, which on Linux moves the Go module and build caches into a
+	// temporary folder (and its read-only files cannot be removed). Build the CLI with the caches
+	// the machine already has.
+	goEnv := func(name string) string {
+		out, err := exec.Command("go", "env", name).Output()
+		if err != nil {
+			t.Fatalf("go env %s: %v", name, err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	modCache, buildCache := goEnv("GOMODCACHE"), goEnv("GOCACHE")
+
 	// The server keeps state (the DELETE operation removes product 1), so each run gets a fresh one.
 	serviceSrv, cliSrv := httptest.NewServer(newConformanceMux()), httptest.NewServer(newConformanceMux())
 	defer serviceSrv.Close()
@@ -34,6 +47,7 @@ func TestConformanceParity_ServiceMatchesTheCLI(t *testing.T) {
 	exe := filepath.Join(t.TempDir(), "clrsig.exe")
 	build := exec.Command("go", "build", "-o", exe, ".")
 	build.Dir = filepath.Join("..", "..", "cli")
+	build.Env = append(os.Environ(), "GOMODCACHE="+modCache, "GOCACHE="+buildCache)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("building the CLI: %v\n%s", err, out)
 	}
