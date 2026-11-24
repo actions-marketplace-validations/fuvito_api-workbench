@@ -209,6 +209,15 @@ var catalog = []Command{
 				Group: GroupEssential,
 			},
 			{
+				Name: "changed-against", Kind: KindString,
+				Label: "Only what changed since",
+				Help: "Check only the operations that are new or changed compared with the spec at this git ref, for pull requests: " +
+					"for example origin/main. It needs git and a local spec file (and in CI a checkout with full history). " +
+					"It follows the spec only, so a server fault with no spec change is not seen: keep a full run on your main branch.",
+				Example: "origin/main",
+				Group:   GroupAdvanced,
+			},
+			{
 				Name: "setup", Kind: KindFile, Accepts: specExts,
 				Label: "Run a scenario first",
 				Help: "A scenario that runs before the check, usually a login. Whatever its steps extract (a token, an id) is available to the " +

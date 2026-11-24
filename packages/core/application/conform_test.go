@@ -199,3 +199,20 @@ func TestRunConformance_BaselineFollowsFailOn(t *testing.T) {
 		t.Fatal("with --fail-on warning the warning is a new violation")
 	}
 }
+
+func TestRunConformance_OnlyOperations(t *testing.T) {
+	all := run(t, application.ConformInput{})
+	if p, f, s := all.Result.Counts(); p != 1 || f != 1 || s != 0 {
+		t.Fatalf("baseline of the test: %d %d %d", p, f, s)
+	}
+
+	only := run(t, application.ConformInput{OnlyOperations: map[string]bool{"GET /ok": true}})
+	if p, f, s := only.Result.Counts(); p != 1 || f != 0 || s != 1 || only.Failed {
+		t.Errorf("only /ok is sent: passed=%d failed=%d skipped=%d failed=%v", p, f, s, only.Failed)
+	}
+
+	none := run(t, application.ConformInput{OnlyOperations: map[string]bool{}, Tags: []string{"a"}})
+	if _, f, _ := none.Result.Counts(); f != 0 || none.Failed || none.NothingSelected != "" {
+		t.Errorf("an empty set selects nothing and passes, even with a tag filter that would otherwise be an error: %+v", none)
+	}
+}

@@ -268,6 +268,9 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 
 	x := newRedactor(result.Secrets, false)
 	doc.Subtitle = x.text(doc.Subtitle)
+	if line := result.Scope.Line(); line != "" {
+		doc.Subtitle += " " + x.text(line)
+	}
 	ops := htmlSection{Heading: "Operations"}
 	if n, missing := result.BlockedSummary(); n > 0 {
 		ops.Footer = x.text(conformance.MissingValuesAdvice(n, missing))

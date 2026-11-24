@@ -243,3 +243,52 @@ func TestVersion1BaselineIsComparedByWording(t *testing.T) {
 func quoteYAML(s string) string {
 	return strconv.Quote(s)
 }
+
+func TestCompareCheckedOnlyCallsCheckedOperationsFixed(t *testing.T) {
+	base := NewBaseline(Violations(sampleResult(), nil))
+	now := sampleResult()
+	now.Operations[1].Violations = nil // GET /users/{id} is fixed
+	cur := Violations(now, nil)
+
+	all := CompareChecked(cur, base, nil)
+	if len(all.Fixed) != 1 || all.Fixed[0].Operation != "GET /users/{id}" {
+		t.Fatalf("with every operation checked it is fixed: %+v", all.Fixed)
+	}
+	notChecked := CompareChecked(cur, base, map[string]bool{"GET /leaky": true})
+	if len(notChecked.Fixed) != 0 {
+		t.Errorf("an operation that was not checked is not fixed: %+v", notChecked.Fixed)
+	}
+	checked := CompareChecked(cur, base, map[string]bool{"GET /users/{id}": true})
+	if len(checked.Fixed) != 1 {
+		t.Errorf("the checked operation that no longer fails is fixed: %+v", checked.Fixed)
+	}
+}
+
+func TestCheckedOperationsSkipsSkippedAndBlocked(t *testing.T) {
+	r := &ConformResult{Operations: []OperationResult{
+		{Method: "GET", Path: "/a", StatusCode: 200},
+		{Method: "GET", Path: "/b", Skipped: true},
+		{Method: "GET", Path: "/c", Blocked: "not sent"},
+	}}
+	got := CheckedOperations(r, &NegativeResult{Probes: []NegativeProbeResult{{Method: "POST", Path: "/p"}, {Method: "POST", Path: "/q", Skipped: true}}})
+	if !got["GET /a"] || got["GET /b"] || got["GET /c"] || !got["POST /p"] || got["POST /q"] {
+		t.Errorf("%v", got)
+	}
+}
+
+func TestScopeLine(t *testing.T) {
+	var none *Scope
+	if none.Line() != "" {
+		t.Error("no scope, no line")
+	}
+	s := &Scope{ChangedAgainst: "origin/main", Checked: []string{"GET /a"}, Added: 1, Unchanged: 4, Removed: []string{"GET /old"}, Unattributed: 2}
+	line := s.Line()
+	for _, want := range []string{"Changed against origin/main: 1 operation (1 added, 0 modified) checked", "4 unchanged and not checked", "1 removed", "2 spec-level changes"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("missing %q in %q", want, line)
+		}
+	}
+	if got := (&Scope{ChangedAgainst: "main", Unchanged: 3}).Line(); !strings.Contains(got, "no operation changed, so nothing was checked") {
+		t.Errorf("%q", got)
+	}
+}

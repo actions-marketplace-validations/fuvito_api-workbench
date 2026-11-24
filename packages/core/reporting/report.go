@@ -405,7 +405,11 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	x := newRedactor(result.Secrets, false)
 
 	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
-	fmt.Fprintf(&b, "Base URL: %s\n\n", x.text(result.BaseURL))
+	fmt.Fprintf(&b, "Base URL: %s\n", x.text(result.BaseURL))
+	if line := result.Scope.Line(); line != "" {
+		fmt.Fprintln(&b, line)
+	}
+	fmt.Fprintln(&b)
 
 	sent, unanswered, firstErr := 0, 0, ""
 	kinds := map[string]bool{}
@@ -495,6 +499,8 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	if passed+failed == 0 {
 		if total == 0 {
 			fmt.Fprintf(&b, "       The spec declares no operations, so there was nothing to check.\n")
+		} else if result.Scope != nil {
+			fmt.Fprintf(&b, "       Nothing was sent: no operation changed against %s.\n", result.Scope.ChangedAgainst)
 		} else {
 			fmt.Fprintf(&b, "       Every operation was skipped (by --tags, --paths or --read-only), so nothing was sent.\n")
 		}
@@ -534,6 +540,8 @@ type JSONConformReport struct {
 	// Warnings is how many operations passed with warnings only.
 	Warnings   int   `json:"warnings,omitempty"`
 	DurationMs int64 `json:"durationMs"`
+	// Scope is set when the run checked only the operations a change touched.
+	Scope *conformance.Scope `json:"scope,omitempty"`
 	// MissingValues lists the placeholders that kept operations from being sent (each once).
 	MissingValues []string        `json:"missingValues,omitempty"`
 	Operations    []JSONConformOp `json:"operations"`
@@ -629,6 +637,7 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		SpecTitle:   result.SpecTitle,
 		SpecVersion: result.SpecVersion,
 		BaseURL:     x.text(result.BaseURL),
+		Scope:       result.Scope,
 		Passed:      failed == 0,
 		DurationMs:  result.Duration.Milliseconds(),
 	}

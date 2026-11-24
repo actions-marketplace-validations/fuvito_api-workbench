@@ -84,7 +84,7 @@ func runDiff(cmd *cobra.Command, args []string, o diffOptions) error {
 		if err != nil {
 			return err
 		}
-		baseData, baseFmt, err = gitSpecAt(args[0], o.against)
+		baseData, baseFmt, err = gitSpecAt("--against", args[0], o.against)
 	} else {
 		if baseData, baseFmt, err = fetchSpec(args[0]); err == nil {
 			revData, revFmt, err = fetchSpec(args[1])
@@ -216,17 +216,17 @@ func diffText(result *openapi.DiffResult, changes []openapi.DiffChange, breaking
 
 // gitSpecAt returns the contents of specPath as committed at ref, found through the git
 // repository that contains the file.
-func gitSpecAt(specPath, ref string) ([]byte, string, error) {
+func gitSpecAt(flag, specPath, ref string) ([]byte, string, error) {
 	// The ref becomes part of one git argument (<ref>:<path>); a ref that starts with "-" would be
 	// read by git as an option (for example --output=<file>), so it is refused.
 	if strings.HasPrefix(ref, "-") || strings.ContainsAny(ref, "\x00\n\r") {
-		return nil, "", fmt.Errorf("--against %q is not a valid git ref (it must not start with '-')", ref)
+		return nil, "", fmt.Errorf("%s %q is not a valid git ref (it must not start with '-')", flag, ref)
 	}
 	if strings.HasPrefix(specPath, "http://") || strings.HasPrefix(specPath, "https://") {
-		return nil, "", fmt.Errorf("--against needs a local spec file, not a URL")
+		return nil, "", fmt.Errorf("%s needs a local spec file, not a URL", flag)
 	}
 	if _, err := osexec.LookPath("git"); err != nil {
-		return nil, "", fmt.Errorf("--against needs git, which is not installed or not on PATH")
+		return nil, "", fmt.Errorf("%s needs git, which is not installed or not on PATH", flag)
 	}
 	abs, err := filepath.Abs(specPath)
 	if err != nil {
@@ -236,7 +236,7 @@ func gitSpecAt(specPath, ref string) ([]byte, string, error) {
 
 	top, err := runGit(dir, "rev-parse", "--show-toplevel")
 	if err != nil {
-		return nil, "", fmt.Errorf("--against needs the spec to be in a git repository: %s is not in one", dir)
+		return nil, "", fmt.Errorf("%s needs the spec to be in a git repository: %s is not in one", flag, dir)
 	}
 	rel, err := filepath.Rel(filepath.FromSlash(strings.TrimSpace(string(top))), abs)
 	if err != nil {

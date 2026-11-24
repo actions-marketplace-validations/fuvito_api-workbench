@@ -328,8 +328,37 @@ type BaselineDiff struct {
 }
 
 // Compare splits the current violations against a baseline. A version 2 baseline is compared by
-// check, a version 1 baseline by the wording it recorded.
+// check, a version 1 baseline by the wording it recorded. Every operation counts as checked.
 func Compare(current []Violation, b *Baseline) BaselineDiff {
+	return CompareChecked(current, b, nil)
+}
+
+// CheckedOperations lists the operations a run really sent, written as a baseline names them. A
+// baseline entry for any other operation says nothing about this run: it is neither known nor
+// fixed.
+func CheckedOperations(r *ConformResult, neg *NegativeResult) map[string]bool {
+	checked := map[string]bool{}
+	if r != nil {
+		for _, op := range r.Operations {
+			if !op.Skipped && op.Blocked == "" {
+				checked[op.Method+" "+op.Path] = true
+			}
+		}
+	}
+	if neg != nil {
+		for _, p := range neg.Probes {
+			if !p.Skipped {
+				checked[p.Method+" "+p.Path] = true
+			}
+		}
+	}
+	return checked
+}
+
+// CompareChecked is Compare for a run that did not check every operation (a filter, read-only
+// mode, a change set): a baseline entry counts as fixed only when its operation was checked. A nil
+// checked means every operation was.
+func CompareChecked(current []Violation, b *Baseline, checked map[string]bool) BaselineDiff {
 	key := Violation.Key
 	if b.Legacy {
 		key = Violation.LegacyKey
@@ -352,7 +381,7 @@ func Compare(current []Violation, b *Baseline) BaselineDiff {
 		}
 	}
 	for _, v := range b.Violations {
-		if !now[key(v)] {
+		if !now[key(v)] && (checked == nil || checked[v.Operation]) {
 			d.Fixed = append(d.Fixed, v)
 		}
 	}

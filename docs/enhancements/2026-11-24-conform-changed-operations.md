@@ -1,6 +1,6 @@
 # `conform --changed-against`: check only the operations a change touched
 
-- **Status:** Accepted
+- **Status:** Done (phases 1 and 2 built 2026-11-24)
 - **Date:** 2026-11-24
 - **Backlog:** B-085 (also B-087 benefits: fewer, more relevant findings per pull request)
 
@@ -120,3 +120,4 @@ User guide (`conform` flags and a "Pull requests" paragraph), `docs/guides/ci-in
 |---|---|---|
 | 2026-11-24 | Proposal written; open decisions 1 to 5 above | Claude, awaiting owner |
 | 2026-11-24 | Open decisions 1 to 5 accepted as recommended: any level counts; nothing changed exits 0 with NOTHING CHECKED; unattributed spec-level changes are reported, not widened; `--changed-against`; `--write-baseline` is refused on a filtered run | owner |
+| 2026-11-24 | Built. Settled while building: `--write-baseline` is refused for `--tags` and `--paths` as well as `--changed-against` (decision 5 says "a filtered run"); a baseline entry counts as fixed only when its operation was sent (blocked and skipped operations are not checked); an empty change set with `--tags` is NOTHING CHECKED and exit 0, never the exit 2 of a mistyped filter | Claude |

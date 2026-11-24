@@ -150,6 +150,8 @@ type ConformResult struct {
 	// operation when there is no filter); it is 0 when a filter matches nothing, which a caller
 	// must not report as a pass.
 	FilterMatched int
+	// Scope is set when the run was limited to the operations a change touched.
+	Scope *Scope
 	// BaselineApplied is set when the run was compared with a baseline; KnownViolations is how
 	// many of the failures it accepted. A run with only known failures passes.
 	BaselineApplied bool
@@ -213,6 +215,10 @@ type Options struct {
 	// Paths filters operations to those whose path starts with one of the given prefixes.
 	// Empty means all paths are included.
 	Paths []string
+	// OnlyOperations restricts the run to these operations, each written METHOD path with the path as
+	// the spec writes it (see openapi.OperationKey). Nil means no restriction; an empty map selects
+	// nothing. It applies to requests and to negative probes, and combines with Tags and Paths.
+	OnlyOperations map[string]bool
 	// FailFast stops after the first failing operation.
 	FailFast bool
 	// RequestTimeoutMs overrides the per-request timeout. 0 = use executor default.
@@ -287,7 +293,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			SpecPath:    gr.Path,
 		}
 
-		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths)
+		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths) && matchesOnly(opts.OnlyOperations, or.Method, gr.Path)
 		if selected {
 			result.FilterMatched++
 		}
@@ -383,6 +389,10 @@ func pathOf(fullURL, baseURL string) string {
 		return fullURL
 	}
 	return u.Path
+}
+
+func matchesOnly(only map[string]bool, method, path string) bool {
+	return only == nil || only[openapi.OperationKey(method, path)]
 }
 
 func matchesTags(opTags, filterTags []string) bool {
@@ -494,4 +504,39 @@ func snippet(s string, max int) string {
 		return s
 	}
 	return string(r[:max]) + "…"
+}
+
+// Scope describes a run that was limited to the operations that changed since a git ref.
+type Scope struct {
+	ChangedAgainst string   `json:"changedAgainst"`
+	Checked        []string `json:"checked"`
+	Added          int      `json:"added"`
+	Modified       int      `json:"modified"`
+	Unchanged      int      `json:"unchanged"`
+	Removed        []string `json:"removed,omitempty"`
+	// Unattributed counts spec-level changes no operation owns; they do not widen the check.
+	Unattributed int `json:"unattributed,omitempty"`
+}
+
+// Line is the one-line description shown in reports and on the terminal.
+func (s *Scope) Line() string {
+	if s == nil {
+		return ""
+	}
+	if len(s.Checked) == 0 {
+		return fmt.Sprintf("Changed against %s: no operation changed, so nothing was checked (%d unchanged%s).", s.ChangedAgainst, s.Unchanged, s.removedText())
+	}
+	line := fmt.Sprintf("Changed against %s: %d operation%s (%d added, %d modified) checked, %d unchanged and not checked%s.",
+		s.ChangedAgainst, len(s.Checked), map[bool]string{true: "", false: "s"}[len(s.Checked) == 1], s.Added, s.Modified, s.Unchanged, s.removedText())
+	if s.Unattributed > 0 {
+		line += fmt.Sprintf(" %d spec-level change%s (for example servers or security) belong to no operation and do not widen the check.", s.Unattributed, map[bool]string{true: "", false: "s"}[s.Unattributed == 1])
+	}
+	return line
+}
+
+func (s *Scope) removedText() string {
+	if len(s.Removed) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d removed", len(s.Removed))
 }

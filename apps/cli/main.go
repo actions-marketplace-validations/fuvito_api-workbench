@@ -469,6 +469,7 @@ func conformCmd() *cobra.Command {
 	var readOnly bool
 	var failOnFlag string
 	var setupFile string
+	var changedAgainst string
 	var explain bool
 	var vars []string
 	var reports []string
@@ -518,6 +519,12 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			if baselineFile != "" && writeBaseline != "" {
 				return fmt.Errorf("use --baseline or --write-baseline, not both")
 			}
+			if changedAgainst != "" && (strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://")) {
+				return fmt.Errorf("--changed-against needs a local spec file, not a URL")
+			}
+			if writeBaseline != "" && (changedAgainst != "" || tagsCSV != "" || pathsCSV != "") {
+				return fmt.Errorf("--write-baseline records the whole API, and a run limited by --changed-against, --tags or --paths would drop the other entries: record the baseline with a full run")
+			}
 			var base *conformance.Baseline
 			if baselineFile != "" {
 				baseData, err := os.ReadFile(baselineFile)
@@ -555,6 +562,15 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				return err
 			}
 
+			var only map[string]bool
+			var scope *conformance.Scope
+			if changedAgainst != "" {
+				if only, scope, err = changedOperationScope(src, changedAgainst, spec); err != nil {
+					return err
+				}
+				fmt.Fprintln(cmd.ErrOrStderr(), scope.Line())
+			}
+
 			exec := newExecutor()
 			if setupFile != "" {
 				if env, err = runConformSetup(cmd, exec, setupFile, env, baseURL, vars); err != nil {
@@ -577,6 +593,8 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				Negative:          runNegative,
 				Baseline:          base,
 				FailOn:            failOn,
+				OnlyOperations:    only,
+				Scope:             scope,
 			})
 			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
@@ -673,6 +691,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringArrayVar(&timeLimits, "max-response-time-for", nil, "A different response-time limit for the operations under a path prefix: /prefix=ms, for example /reports=2000 (repeatable; the longest prefix wins; 0 turns the limit off there)")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
+	cmd.Flags().StringVar(&changedAgainst, "changed-against", "", "Check only the operations that are new or changed compared with the spec at this git ref (for pull requests; needs git and a local spec file; a full run on main stays the safety net)")
 	cmd.Flags().StringVar(&setupFile, "setup", "", "A scenario to run before the check, usually a login: what its steps extract is available to the generated requests as {{name}} (never printed; credential-like names are masked); if it fails the check does not start")
 	cmd.Flags().StringVar(&failOnFlag, "fail-on", "failure", "Fail the run on findings of this level or worse: failure (the default) or warning; warnings are reported but do not fail the run unless this is warning")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
