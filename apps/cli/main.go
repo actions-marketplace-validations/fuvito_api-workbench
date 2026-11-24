@@ -63,6 +63,7 @@ func main() {
 	root.AddCommand(bundleCmd())
 	root.AddCommand(importCmd())
 	root.AddCommand(initCmd())
+	root.AddCommand(configCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError

@@ -194,6 +194,24 @@ func Parse(data []byte, filename string) (*Config, error) {
 	return &cfg, nil
 }
 
+// Keys lists every setting a project file can hold, written as in the file (conform.readOnly,
+// run.scenarios, ...). Commands map each one to a flag or argument; a test keeps the two lists equal.
+func Keys() []string {
+	var out []string
+	for _, k := range sectionKeys[""] {
+		if k == "schemaVersion" || k == "conform" || k == "run" {
+			continue
+		}
+		out = append(out, k)
+	}
+	for _, section := range []string{"conform", "run"} {
+		for _, k := range sectionKeys[section] {
+			out = append(out, section+"."+k)
+		}
+	}
+	return out
+}
+
 var sectionKeys = map[string][]string{
 	"":        {"schemaVersion", "spec", "environment", "baseUrl", "conform", "run", "reports"},
 	"conform": {"readOnly", "negative", "failOn", "requestTimeoutMs", "maxResponseTimeMs", "maxResponseTimeFor", "tags", "paths", "baseline"},

@@ -1,6 +1,6 @@
 # `clrsig init` and the project config file (0.9.1)
 
-- **Status:** Accepted; in progress (phases 1 and 2 built 2026-11-24: config, `init`; phases 3 and 4 not started)
+- **Status:** Accepted; in progress (phases 1 to 3 built 2026-11-24: config, `init`, visibility; phase 4, the desktop, not started)
 - **Date:** 2026-11-24
 - **Backlog:** B-021 (`clrsig init`), B-089 (project config file); related: B-015 (CLI Command Builder snippets), B-084 (`conform --setup`) and B-020 (`validate --strict`), which are separate and need no proposal
 - **Depends on:** the schema migration policy (`docs/process/schema-migration-policy.md`), accepted for new persisted files
@@ -209,3 +209,4 @@ Each phase ships green on its own. Phases 1 and 2 are the 0.9.1 scope; 3 and 4 f
 | 2026-11-24 | Open decisions 1 to 8 accepted as recommended: `clrsig.yaml` (with `.yml` and `.json`); walk up to the first file, stopping at `.git`; no `vars`; `init` writes a workflow only with `init github-actions --write`; no starter scenario; `config show` in phase 3; desktop reads the file read-only in phase 4 (may slip); `environment` is a path | owner |
 | 2026-11-24 | Phase 1 built. Clarified while building: `spec` applies to `conform` only (not `run --spec`, which would override every scenario's own `specFile`); `impact` does not read the file yet; a key must be spelled exactly (the JSON decoder alone would accept another letter case) | Claude |
 | 2026-11-24 | Phase 2 built. Details settled while building: `init` keeps an existing `clrsig.yml`/`.json` as the project file; an existing folder gets no `.gitkeep`; `--spec` that is a local file must parse (checked through the same parser conform uses); the workflow pins the running release tag (or `main` with a note for a dev build) and is read-only unless `clrsig.yaml` says `readOnly: false` | Claude |
+| 2026-11-24 | Phase 3 built: `clrsig config show [conform\|run\|validate]` and the builder note. `config show` applies the file to a fresh copy of the command through the same code the command uses, so it cannot disagree with it; a test keeps the key table equal to the file format's key list and checks every named flag exists | Claude |

@@ -932,3 +932,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Evidence:** parsers read back what `init` writes (project file, environment files); a test checks every `with:` key of the generated workflow against `action.yml`; end to end: empty folder, `init --spec ... --base-url ...`, then `clrsig conform` with no flags passes read-only; idempotence, no overwrite, dry run, path and symlink escapes, no network.
 - **Not yet:** `clrsig config show` (phase 3), desktop reading the file (phase 4), the CLI Command Builder note. Docs: user guide, CI guide.
 - **Action:** `action.yml` no longer passes an empty `spec` or `scenario` input as an empty argument (for `run`, `conform`, `validate`), so a `clrsig.yaml` in the checkout can supply it; an input still wins.
+
+### 2026-11-24 — `clrsig config show` and the builder note, phase 3 of `docs/enhancements/2026-11-24-init-and-project-config.md`
+
+- **One table:** `configSettings` (`apps/cli/projectconfig.go`) says which key supplies which flag or argument on which command; applying the file and `config show` both read it. `projectconfig.Keys()` lists the format's keys and `TestConfigSettingsCoverEveryKeyAndRealFlag` fails if the two differ or a named flag does not exist. The refactor changed no behaviour (the phase 1 tests pass unchanged).
+- **`clrsig config show [conform|run|validate]`:** for each command, every setting, its value and `file` or `default`; no project file, `--no-config` and a bad command name each have their own message. It applies the file to a fresh copy of the command, so it reports what the command would use.
+- **CLI Command Builder:** `clibuild.Build` adds an info message when a `clrsig.yaml` applies where the command is run ("the command shown is written in full and does not depend on it; run clrsig config show <command>") for conform, run and validate; the command itself is unchanged.
+- **Not yet:** the desktop (phase 4): Check Conformance and the Workspace page reading the file, and a card that suggests `init`.
