@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
     version: '0.9.1',
-    date: 'unreleased',
+    date: '2026-11-24',
     items: [
       'Project file: a clrsig.yaml at the project root holds the defaults that repeat (spec, environment, base URL, conform options, scenarios, reports), so clrsig conform, run and validate work with no flags; a flag always wins, paths are relative to the file, it never holds secrets, and a command says on stderr when it used it. --config and --no-config choose or ignore it; clrsig config show lists what a command takes from it',
       'clrsig init creates the project file, a local and a CI environment and the starter folders, never overwriting anything; clrsig init github-actions prints a ready workflow (--write saves it)',

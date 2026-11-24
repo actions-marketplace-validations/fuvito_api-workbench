@@ -21,5 +21,5 @@ New inputs `setup` and `strict`. An empty `spec` or `scenario` input is no longe
 ## Before tagging
 
 - [ ] CI green on the exact commit (`docs/process/release-process.md`).
-- [ ] Set the date of the 0.9.1 entry in `AboutDialog.tsx` (now `unreleased`).
+- [x] Date set in AboutDialog.tsx (2026-11-24).
 - [ ] Not verified yet: the Docker image run, the Homebrew install and the Action at the new tag.
