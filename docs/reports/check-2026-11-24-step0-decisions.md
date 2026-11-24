@@ -23,3 +23,7 @@ Source: section 11 of [`check-2026-11-24-improvement-ideas.md`](check-2026-11-24
 1. Review the draft migration policy and adjust.
 2. Write the step 1 proposal (severity levels, check IDs, baseline key).
 3. Then start step 1 (0.9.0) in the order given in section 11.
+
+## Update: proposal decisions (2026-11-24)
+
+The open decisions of `docs/enhancements/2026-11-24-severity-and-check-ids.md` section 9 were all accepted as recommended (see its decision log). The migration policy clause for machine-written files (section 5 of `docs/process/schema-migration-policy.md`) is therefore accepted too; the rest of the policy draft is still awaiting review.

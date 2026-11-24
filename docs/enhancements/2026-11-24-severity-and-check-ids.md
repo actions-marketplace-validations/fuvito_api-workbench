@@ -1,6 +1,6 @@
 # Severity levels, stable check IDs and the baseline key (0.9.0)
 
-- **Status:** In progress (phases A to D built; phase E prepared 2026-11-24: version, in-app notes and draft release notes; not tagged)
+- **Status:** Accepted; in progress (phases A to D built; phase E prepared 2026-11-24: version, in-app notes and draft release notes; not tagged)
 - **Date:** 2026-11-24
 - **Backlog:** B-049 (check IDs), B-050 (severity), B-053 (format validators), B-006 and B-007 (baselines)
 - **Decisions already taken (step 0, `docs/reports/check-2026-11-24-step0-decisions.md`):** D1 baseline key = check ID + operation + short detail; D2 three levels (failure, warning, note) with `--fail-on warning`; D3 migration policy first (`docs/process/schema-migration-policy.md`, draft).
@@ -173,3 +173,4 @@ Phases A to C can ship as separate commits on `main` with CI green after each; D
 | 2026-11-24 | Three severity levels, `--fail-on warning` (D2) | owner |
 | 2026-11-24 | Migration policy written before new persisted files (D3) | owner |
 | 2026-11-24 | Proposal written; open decisions 1 to 6 above | Claude, awaiting owner |
+| 2026-11-24 | Open decisions 1 to 6 accepted as recommended: existing checks stay failures; machine-written files migrate by regenerating; `--fail-on failure\|warning` and Action `conform-fail-on`; no new warning checks in 0.9.0; formats email, uuid, ipv4, ipv6 first; Contracts key stays separate | owner |
