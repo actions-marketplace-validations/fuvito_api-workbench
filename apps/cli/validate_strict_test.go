@@ -137,3 +137,39 @@ steps:
 		t.Fatalf("the token is used by the referenced request: %v\n%s", err, out)
 	}
 }
+
+const specScenario = `schemaVersion: "1"
+title: Spec
+specFile: ../specs/missing.yaml
+steps:
+  - label: Ping
+    request: {method: GET, url: "http://x/ping"}
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+`
+
+func TestValidateStrict_MissingSpecAndUnsetEnvironmentVariables(t *testing.T) {
+	project(t, map[string]string{
+		"scenarios/spec.yaml":  specScenario,
+		"scenarios/good.yaml":  goodScenario,
+		"environments/ci.yaml": "schemaVersion: \"1\"\nname: ci\nvariables:\n  - {name: baseUrl, value: \"${CLRSIG_TEST_SURELY_UNSET_BASE}\"}\n",
+	})
+	t.Setenv("CLRSIG_TEST_OTHER", "x")
+
+	out, err := exec(t, "validate", "--strict", "scenarios/spec.yaml")
+	if exitCodeOf(err) != 1 || !strings.Contains(out, `specFile "../specs/missing.yaml" does not exist`) {
+		t.Fatalf("a spec file that is not there is a warning: %v\n%s", err, out)
+	}
+	if out, err := exec(t, "validate", "scenarios/spec.yaml"); err != nil || !strings.Contains(out, "OK") {
+		t.Errorf("without --strict nothing changes: %v\n%s", err, out)
+	}
+
+	out, err = exec(t, "validate", "--strict", "--env", "environments/ci.yaml", "scenarios/good.yaml")
+	if exitCodeOf(err) != 1 || !strings.Contains(out, "CLRSIG_TEST_SURELY_UNSET_BASE") {
+		t.Fatalf("a process variable the environment needs and nothing sets fails --strict: %v\n%s", err, out)
+	}
+	t.Setenv("CLRSIG_TEST_SURELY_UNSET_BASE", "http://x")
+	if out, err := exec(t, "validate", "--strict", "--env", "environments/ci.yaml", "scenarios/good.yaml"); err != nil || strings.Contains(out, "warning") {
+		t.Errorf("once it is set the file is fine: %v\n%s", err, out)
+	}
+}

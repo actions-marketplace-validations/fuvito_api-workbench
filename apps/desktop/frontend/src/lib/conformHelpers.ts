@@ -78,3 +78,22 @@ export function cliValues(p: {
   if (!p.allowWrites) v['read-only'] = 'true'
   return v
 }
+
+// The text of a finding written for a bug tracker: the check, what is wrong, where, why and how to fix it. Fields
+// are already redacted by the core; nothing here adds data from the environment.
+export function issueText(f: ConformFinding, context: string, version: string): string {
+  const lines: string[] = []
+  lines.push(`${f.checkId ? `[${f.checkId}] ` : ''}${f.summary}`)
+  lines.push('')
+  if (context) lines.push(`- Operation: ${context}`)
+  if (f.expected) lines.push(`- Expected: ${f.expected}`)
+  if (f.got) lines.push(`- Got: ${f.got}`)
+  const where = findingWhere(f)
+  if (where) lines.push(`- Where: ${where}`)
+  if (f.spec) lines.push(`- In the spec: ${f.spec}`)
+  lines.push(`- Why: ${f.why}`)
+  lines.push(`- Fix: ${f.fix}`)
+  lines.push('')
+  lines.push(`Found by Clear Signal ${version}${f.checkId ? `, check ${f.checkId} (Help, What We Check)` : ''}.`)
+  return lines.join('\n')
+}

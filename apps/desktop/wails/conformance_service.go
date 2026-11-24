@@ -623,7 +623,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			Violations: []string{},
 			Findings:   []ConformFindingIO{},
 		}
-		item.Findings = append(item.Findings, findingsIO(conformance.Diagnose(op))...)
+		item.Findings = append(item.Findings, findingsIO(reporting.Explain(op, r.Secrets))...)
 		item.Warnings = len(op.Warnings())
 		for _, v := range op.RequestViolations {
 			item.Violations = append(item.Violations, "request: "+v.Error())

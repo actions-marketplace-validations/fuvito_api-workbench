@@ -655,3 +655,24 @@ func TestConformanceService_RunsASetupScenarioFirst(t *testing.T) {
 		t.Errorf("a setup scenario outside the workspace is refused: %q", outside.Error)
 	}
 }
+
+func TestConformanceService_FindingsShownInThePageHideSecrets(t *testing.T) {
+	const secret = "sk-live-ABCDEFGH12345"
+	msg := "Error at \"/token\": value must be a number\nSchema:\n  {\n    \"type\": \"number\"\n  }\n\nValue:\n  \"" + secret + "\"\n"
+	out := application.ConformOutput{Result: &conformance.ConformResult{
+		Secrets: []string{secret},
+		Operations: []conformance.OperationResult{
+			{Method: "GET", Path: "/t", StatusCode: 200, Violations: []openapi.ValidationError{{Message: msg}}},
+		},
+	}}
+	res := conformOutputIO(out, "http://x", false)
+	if len(res.Operations) != 1 || len(res.Operations[0].Findings) != 1 {
+		t.Fatalf("%+v", res)
+	}
+	f := res.Operations[0].Findings[0]
+	for _, text := range []string{f.Summary, f.Expected, f.Got, f.Why, f.Fix, f.Detail} {
+		if strings.Contains(text, secret) {
+			t.Fatalf("the finding leaks a secret: %+v", f)
+		}
+	}
+}

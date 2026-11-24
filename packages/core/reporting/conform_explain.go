@@ -21,6 +21,13 @@ func explain(op conformance.OperationResult, x redactor) []conformance.Finding {
 	return findings
 }
 
+// Explain returns the plain-language findings for an operation with every text field redacted, for
+// interfaces that show findings themselves (the desktop) and must not show a secret that came back
+// in a response.
+func Explain(op conformance.OperationResult, secrets []string) []conformance.Finding {
+	return explain(op, newRedactor(secrets, false))
+}
+
 // explanationLine is the one-line form used by the text, HTML, Markdown and JUnit reports.
 func explanationLine(f conformance.Finding) string {
 	var b strings.Builder

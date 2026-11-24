@@ -667,3 +667,37 @@ describe('run a scenario first', () => {
     expect(cliValues(base).setup).toBeUndefined()
   })
 })
+
+describe('copy a finding as an issue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+  })
+
+  it('puts the check, the operation, what was wrong and how to fix it on the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    bridge.runConformance.mockResolvedValue({
+      ...output,
+      operations: [{
+        operationId: 'b', method: 'GET', path: '/bad', status: 'failed', statusCode: 200, durationMs: 4, violations: [],
+        findings: [{
+          kind: 'wrong-type', checkId: 'CS-RESP-006', where: 'price', part: 'response body', spec: 'GET /bad → response 200',
+          summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+          why: 'The server sent text.', fix: 'Send a number.', detail: 'raw',
+        }],
+      }],
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy as issue' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    const text = writeText.mock.calls[0][0] as string
+    for (const want of ['[CS-RESP-006] "price" is text, the spec says number', '- Operation: GET /bad', '- Expected: number', '- Got: "9.99"', '- In the spec: GET /bad → response 200', '- Why: The server sent text.', '- Fix: Send a number.', 'Found by Clear Signal ']) {
+      expect(text).toContain(want)
+    }
+    expect(text).not.toContain('raw')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+})

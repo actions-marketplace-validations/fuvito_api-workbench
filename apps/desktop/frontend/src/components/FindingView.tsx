@@ -1,9 +1,19 @@
+import { useState } from 'react'
 import type { ConformFinding } from '@/lib/bridge'
-import { findingWhere } from '@/lib/conformHelpers'
+import { findingWhere, issueText } from '@/lib/conformHelpers'
+import { APP_VERSION } from '@/components/AboutDialog'
 
 // One explained violation: what the spec expected, what came back, where, why it fails and how to fix it.
 // Shared by the Check Conformance page and the scenario result.
-export function FindingView({ f }: { f: ConformFinding }) {
+export function FindingView({ f, context = '' }: { f: ConformFinding; context?: string }) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(issueText(f, context, APP_VERSION))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* the clipboard is not available */ }
+  }
   return (
     <div className="rounded border border-[var(--color-border)] bg-[var(--color-background)] p-2.5">
       <p className="text-xs font-semibold text-[var(--color-foreground)]">
@@ -19,6 +29,9 @@ export function FindingView({ f }: { f: ConformFinding }) {
         <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd>{f.why}</dd>
         <dt className="text-[var(--color-muted-foreground)]">Fix</dt><dd>{f.fix}</dd>
       </dl>
+      <button type="button" onClick={() => void copy()} className="mt-1.5 rounded border border-[var(--color-border)] px-1.5 py-0.5 text-[11px] text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]">
+        {copied ? 'Copied' : 'Copy as issue'}
+      </button>
       {f.detail && (
         <details className="mt-1.5">
           <summary className="cursor-pointer text-[11px] text-[var(--color-muted-foreground)]">Technical detail</summary>

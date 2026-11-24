@@ -181,6 +181,7 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 				err      error
 			}
 			var lintEnv *domain.Environment
+			envProblems := false
 			if strict && envFile != "" {
 				envData, err := os.ReadFile(envFile)
 				if err != nil {
@@ -188,6 +189,10 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 				}
 				if lintEnv, err = serialization.ParseEnvironmentFile(envData, envFile); err != nil {
 					return fmt.Errorf("parsing environment: %w", err)
+				}
+				for _, ref := range variables.MissingEnv(lintEnv) {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", ref.Message())
+					envProblems = true
 				}
 			}
 
@@ -213,11 +218,20 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 					dir := filepath.Dir(path)
 					scenario.ResolveRequestRefs(sc, dir, filepath.Join(dir, "..", "requests"))
 					r.warnings = scenario.Lint(sc, scenario.LintOptions{Env: lintEnv})
+					if sc.SpecFile != "" && !strings.Contains(sc.SpecFile, "://") {
+						spec := sc.SpecFile
+						if !filepath.IsAbs(spec) {
+							spec = filepath.Join(dir, spec)
+						}
+						if _, err := os.Stat(spec); err != nil {
+							r.warnings = append(r.warnings, scenario.Issue{Message: fmt.Sprintf("specFile %q does not exist (looked for %s): its responses cannot be checked against a spec", sc.SpecFile, filepath.ToSlash(spec))})
+						}
+					}
 				}
 				results = append(results, r)
 			}
 
-			allValid := true
+			allValid := !envProblems
 			for _, r := range results {
 				if r.err != nil || len(r.issues) > 0 || len(r.warnings) > 0 {
 					allValid = false

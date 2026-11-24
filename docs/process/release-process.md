@@ -73,7 +73,7 @@ cd apps/desktop/e2e && npx playwright test --grep "@screenshot"
 
 - [ ] Screenshots in `docs/images/` look correct in the README (re-run E2E above if stale)
 - [ ] Demo GIF (`docs/demo.gif`) plays without errors — if it looks broken, run the demo tape manually: `vhs docs/demo.tape`
-- [ ] `CLAUDE.md` changelog has an entry for any significant changes in this release
+- [ ] engineering changelog (`docs/process/engineering-changelog.md`) has an entry for any significant changes in this release
 
 ### 2d. Commit everything
 

@@ -22,12 +22,16 @@ jobs:
       - name: Check formatting
         run: test -z "$(gofmt -l $(git ls-files '*.go'))" || { gofmt -l $(git ls-files '*.go'); exit 1; }
 
+      - name: Vet core
+        run: go vet ./...
+        working-directory: packages/core
+
       - name: Test core
         run: go test -v ./...
         working-directory: packages/core
 
   cli-build:
-    name: CLI — build
+    name: CLI — build and test
     runs-on: ubuntu-latest
     needs: core
     steps:
@@ -41,6 +45,14 @@ jobs:
 
       - name: Build CLI
         run: go build ./...
+        working-directory: apps/cli
+
+      - name: Vet CLI
+        run: go vet ./...
+        working-directory: apps/cli
+
+      - name: Test CLI
+        run: go test ./...
         working-directory: apps/cli
 
   integration:
@@ -92,6 +104,47 @@ jobs:
       - name: Build desktop Go
         run: go build ./...
         working-directory: apps/desktop/wails
+
+      - name: Vet desktop Go
+        run: go vet ./...
+        working-directory: apps/desktop/wails
+
+      - name: Test desktop Go
+        run: go test ./...
+        working-directory: apps/desktop/wails
+
+      - name: Test frontend
+        run: pnpm test
+        working-directory: apps/desktop/frontend
+
+  browser-tests:
+    name: Desktop — browser tests
+    runs-on: ubuntu-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: apps/desktop/e2e
+
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/desktop/e2e
+
+      - name: Browser tests against the mock bridge
+        run: pnpm exec playwright test --project=frontend --grep-invert "smoke|@screenshot"
+        working-directory: apps/desktop/e2e
+        env:
+          CI: 'true'
 
   quickstart:
     name: "60s quickstart (CI)"

@@ -270,7 +270,7 @@ func TestConformanceWorkspaceSampleScenario(t *testing.T) {
 
 	// The scenario result explains each violation like the Check Conformance page: what, where, why, fix.
 	for i, st := range res.Steps {
-		got := specFindings(st)
+		got := specFindings(st, nil)
 		if st.Spec.State != scenario.SpecViolations {
 			if len(got) != 0 {
 				t.Errorf("step %d matched the spec and must have no findings: %+v", i, got)

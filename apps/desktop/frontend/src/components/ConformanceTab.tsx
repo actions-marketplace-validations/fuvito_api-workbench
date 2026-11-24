@@ -58,7 +58,7 @@ function ProblemCard({ op }: { op: ConformOperation }) {
         <span className="font-mono">{op.path}</span>
         {op.statusCode > 0 && <span className="text-[var(--color-muted-foreground)]">answered {op.statusCode} in {op.durationMs} ms</span>}
       </header>
-      {findings.map((f, i) => <FindingView key={i} f={f} />)}
+      {findings.map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${op.path}`} />)}
       {findings.length === 0 && (
         <ul className="list-disc pl-5 font-mono text-[11px] text-red-400">
           {op.error && <li className="break-all">{op.error}</li>}
@@ -577,7 +577,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                             <span className="font-mono text-[var(--color-muted-foreground)]">{op.statusCode} · {op.durationMs} ms</span>
                             {(op.warnings ?? 0) > 0 && (
                               <div className="basis-full mb-1 flex flex-col gap-1.5">
-                                {(op.findings ?? []).filter(f => f.severity === 'warning').map((f, i) => <FindingView key={i} f={f} />)}
+                                {(op.findings ?? []).filter(f => f.severity === 'warning').map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${op.path}`} />)}
                               </div>
                             )}
                           </li>

@@ -255,6 +255,10 @@ const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> =
   },
 ]
 
+// The version this build reports: the newest release notes entry. The user guide header must say the
+// same (a test in packages/core/doccheck compares them).
+export const APP_VERSION = RELEASE_NOTES[0].version
+
 const THIRD_PARTY: Array<{ name: string; license: string; url: string }> = [
   { name: 'Wails v2',                license: 'MIT',           url: 'github.com/wailsapp/wails' },
   { name: 'React',                   license: 'MIT',           url: 'github.com/facebook/react' },
@@ -300,7 +304,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.9.1</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version {APP_VERSION}</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,

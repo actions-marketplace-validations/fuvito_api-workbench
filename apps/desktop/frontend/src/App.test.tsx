@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import App from './App'
+import { APP_VERSION } from '@/components/AboutDialog'
 import * as bridge from '@/lib/bridge'
 
 vi.mock('@/lib/bridge')
@@ -220,7 +221,7 @@ describe('App — menus and dialogs', () => {
     await screen.findByRole('button', { name: /New Workspace/ })
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'Help' }))
     fireEvent.mouseDown(screen.getByRole('menuitem', { name: 'About Clear Signal' }))
-    expect(await screen.findByText('Version 0.9.1')).toBeInTheDocument()
+    expect(await screen.findByText(`Version ${APP_VERSION}`)).toBeInTheDocument()
   })
 
   it.each([

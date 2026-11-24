@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { AboutDialog } from './AboutDialog'
+import { AboutDialog, APP_VERSION } from './AboutDialog'
 
 describe('AboutDialog', () => {
   it('opens on the About tab with version and stack', () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(screen.getByText('Version 0.9.1')).toBeInTheDocument()
+    expect(screen.getByText(`Version ${APP_VERSION}`)).toBeInTheDocument()
     expect(screen.getByText('Go 1.26 + Wails v2')).toBeInTheDocument()
     expect(screen.getByText('MIT')).toBeInTheDocument()
   })
