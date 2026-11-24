@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.8.9
+**Version:** 0.9.0
 
 ---
 

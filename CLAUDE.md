@@ -908,3 +908,7 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **A spec still loads when its own example breaks one of these formats** (`Spec.IgnoredExampleProblem` keeps the message; examples are then not validated at all). Without that rule a spec with `example: "123"` on a uuid would have turned from valid into a parse error (exit 2). A wrong-typed example is still refused. Surfacing the ignored example to users is part of the spec lint (B-086).
 - **Evidence:** `TestFormats_*` (every supported format, valid and invalid values, the message, the example rule), the catalog rows flipped from KnownGap to caught for email and uuid; the repository's CI steps against the example server still pass (checked locally).
 - **Not done:** `uri`, `uri-reference`, `hostname`, `time`, `duration`; the release notes for 0.9.0 (phase E).
+
+### 2026-11-24 — 0.9.0 prepared (phase E), not tagged
+
+- Version 0.9.0 in `AboutDialog.tsx` (entry dated `unreleased`), its tests and the user guide; draft GitHub notes in `docs/process/release-notes-0.9.0-draft.md` with the two changes that can turn CI red first (formats, baseline format 2). **Waiting for:** the owner's answers to section 9 of the proposal and a green CI on the final commit; then set the date and tag.

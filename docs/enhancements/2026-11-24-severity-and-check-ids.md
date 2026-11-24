@@ -1,6 +1,6 @@
 # Severity levels, stable check IDs and the baseline key (0.9.0)
 
-- **Status:** In progress (phases A to D built 2026-11-24; E, the release, not started)
+- **Status:** In progress (phases A to D built; phase E prepared 2026-11-24: version, in-app notes and draft release notes; not tagged)
 - **Date:** 2026-11-24
 - **Backlog:** B-049 (check IDs), B-050 (severity), B-053 (format validators), B-006 and B-007 (baselines)
 - **Decisions already taken (step 0, `docs/reports/check-2026-11-24-step0-decisions.md`):** D1 baseline key = check ID + operation + short detail; D2 three levels (failure, warning, note) with `--fail-on warning`; D3 migration policy first (`docs/process/schema-migration-policy.md`, draft).

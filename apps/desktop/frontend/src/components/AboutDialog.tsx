@@ -3,6 +3,16 @@ import { cn } from '@/lib/utils'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.9.0',
+    date: 'unreleased',
+    items: [
+      'Format checks (can turn a green run red): email, uuid, ipv4 and ipv6 values are now checked in responses and generated requests (date, date-time and byte already were); other formats are accepted as before. Adopt gradually with --write-baseline and --baseline',
+      'Severity levels: every finding is a failure, warning or note; warnings are shown (WARN, PASSED with N warnings) but only fail the run with clrsig conform --fail-on warning (Action input conform-fail-on, MCP failOn, Fail on warnings on the Check Conformance page). No existing check is a warning yet',
+      'Baselines now record the check (CS-RESP-005 ...) instead of the validator wording, so a clrsig upgrade no longer turns known violations into new ones. A baseline from 0.8.9 or earlier still works and says it is old; run --write-baseline once to upgrade it',
+      'Every finding carries its check ID and severity in the JSON report and the desktop',
+    ],
+  },
+  {
     version: '0.8.9',
     date: '2026-11-22',
     items: [
@@ -278,7 +288,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.9</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.9.0</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
