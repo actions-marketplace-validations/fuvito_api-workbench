@@ -877,3 +877,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 - **Tag `v0.8.9` on `34885b2`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) is the latest and carries the notes; Scoop updated to 0.8.9 by the `chore: bump tap to v0.8.9` commit and installed on Windows; the installed binary shows `--paths /zzz` giving `NOTHING CHECKED` and exit 2 (and, in Git Bash, the path rewrite the message warns about). It also carries the three CLI Builder fixes listed above as unreleased.
 - **Other repositories:** failure catalog `79c2901` (thirty READMEs used renamed folder names; `fm-020-01` and `fm-025-04` scenarios now run both steps), sandbox `5ee0206` (the failed-extraction description).
 - **Not verified:** the Docker image run, the Homebrew install, the Action at `@v0.8.9`, and the sandbox's pinned expectations (`expectations/*.yaml`), several of which record 0.8.8 wording and will flip.
+
+### 2026-11-24 — Check catalog as data, phase A of `docs/enhancements/2026-11-24-severity-and-check-ids.md`
+
+- **`packages/core/checks`:** the checks that produce findings or "not checked" notes as data (`ID`, `Title`, default `Severity` failure/warning/note, `Area`); `All`, `ByID`, `SeverityOf` (an unknown ID is a failure). No dependency on other packages.
+- **`conformance.Finding.Severity`** is set in `Diagnose` from that list; JSON conform findings and the desktop `ConformFindingIO` gain an additive `severity` (every existing check is a failure, so no outcome or exit code changes).
+- **Guard tests:** every finding kind in `diagnose.go` must map to an ID in the list; every ID in the list must have a row in `what-we-check.md`; every row in that file must be in the list or in the test's documentation-only list (COV, DIFF, IMP, GAP and the run-level rows). Checked by adding a kind and an ID: both fail.
+- **Not yet:** severity levels in reports and exit codes (phase B), baseline v2 (C), format validators (D).
