@@ -210,6 +210,8 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 				}
 				r := result{path: path, issues: scenario.Validate(sc, filepath.Dir(path))}
 				if strict {
+					dir := filepath.Dir(path)
+					scenario.ResolveRequestRefs(sc, dir, filepath.Join(dir, "..", "requests"))
 					r.warnings = scenario.Lint(sc, scenario.LintOptions{Env: lintEnv})
 				}
 				results = append(results, r)

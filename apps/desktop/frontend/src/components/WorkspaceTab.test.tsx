@@ -240,3 +240,24 @@ describe('WorkspaceTab project file card', () => {
     expect(bridge.openInExplorer).toHaveBeenCalledWith('/ws/shop/clrsig.yaml')
   })
 })
+
+describe('WorkspaceTab weak scenarios', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('shows each weak spot of a scenario on its own line, as information, with a button to open it', () => {
+    show({
+      ...base,
+      attention: [{
+        id: 'scenario-weak', severity: 'info', what: 'The scenario passes its checks but is weak: 2 things to improve.', where: 'scenarios/weak.yaml',
+        why: '[step 1] Ping: has no assertions and extracts nothing\n[step 2] Login: extracts "spare", but no later step uses {{spare}}',
+        fix: 'Add an assertion, then run clrsig validate --strict to check it again.', target: { kind: 'scenario', path: '/ws/shop/scenarios/weak.yaml' },
+      }],
+    })
+    const card = screen.getByRole('article', { name: /is weak/ })
+    expect(card).toHaveTextContent('[step 1] Ping: has no assertions')
+    expect(card).toHaveTextContent('extracts "spare"')
+    expect(within(card).getByText(/\[step 1\] Ping/).className).toContain('whitespace-pre-line')
+    fireEvent.click(within(card).getByRole('button', { name: 'Open scenario' }))
+    expect(handlers.onOpenScenario).toHaveBeenCalledWith('/ws/shop/scenarios/weak.yaml', 'weak')
+  })
+})

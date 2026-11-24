@@ -968,3 +968,9 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 
 - **Tag `v0.9.1` on `bbd4350`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published (no result or exit code changes without a `clrsig.yaml` or a new flag); Scoop updated by the tap-bump commit and installed on Windows (`clrsig version v0.9.1`); the released CLI shows `validate --strict` and `init`. The draft notes file was deleted after publishing.
 - **Not verified:** the Docker image run (no daemon on the machine), the Homebrew install (no Mac) and the Action at `@v0.9.1` (its new `setup` and `strict` inputs and the empty-argument fix are the part worth trying in a real workflow).
+
+### 2026-11-24 — Weak scenarios on the Workspace page (B-071, page half)
+
+- **Core:** `workspaceinfo.Inspect` runs `scenario.Lint` (the findings of `validate --strict`, without the environment rule, which the page already reports with the environment in view) after resolving `requestRef` files, and adds one **information** item per weak scenario (`scenario-weak`: what, where, why = one line per finding, fix). The page renders a multi-line Why. It adds to "Needs attention", so a workspace of scenarios without assertions shows one item each.
+- **Fix (also in the CLI, `validate --strict`):** a value used only inside a request file a step references was reported as an extraction nobody uses; both now resolve `requestRef` files (next to the scenario and in the sibling `requests/` folder) before linting. Released 0.9.1 has the false positive.
+- **Not done:** the other half of B-071: `clrsig validate` printing the workspace's other attention items.

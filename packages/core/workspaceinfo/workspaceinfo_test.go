@@ -29,6 +29,8 @@ steps:
     request:
       method: GET
       url: "{{baseUrl}}/users"
+    assertions:
+      - {type: status, operator: eq, expected: 200}
 `
 
 func ids(r Report) []string {
@@ -384,5 +386,68 @@ func TestInspect_ProjectFileIsOnlyReadInsideTheWorkspace(t *testing.T) {
 	}
 	if r := Inspect(root, nil, ""); r.ProjectFile.Found {
 		t.Errorf("a file above the workspace is not read: %+v", r.ProjectFile)
+	}
+}
+
+func TestInspect_WeakScenariosAreInfoItems(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "scenarios/weak.yaml", `schemaVersion: "1"
+title: Weak
+steps:
+  - label: Ping
+    request: {method: GET, url: "http://x/ping"}
+  - label: Login
+    request: {method: POST, url: "http://x/login"}
+    extractions:
+      - {name: spare, source: jsonpath, path: $.spare}
+`)
+	write(t, root, "scenarios/good.yaml", `schemaVersion: "1"
+title: Good
+steps:
+  - label: Ping
+    request: {method: GET, url: "http://x/ping"}
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+`)
+	r := Inspect(root, nil, "")
+	a := has(r, ItemScenarioWeak)
+	if a == nil {
+		t.Fatalf("a weak scenario is listed: %v", ids(r))
+	}
+	if a.Severity != SeverityInfo || a.Where != "scenarios/weak.yaml" || a.Target.Kind != "scenario" {
+		t.Errorf("%+v", a)
+	}
+	if !strings.Contains(a.What, "2 things to improve") || !strings.Contains(a.Why, "[step 1] Ping: has no assertions") || !strings.Contains(a.Why, `extracts "spare"`) || !strings.Contains(a.Fix, "clrsig validate --strict") {
+		t.Errorf("what, why and fix: %+v", a)
+	}
+	count := 0
+	for _, it := range r.Attention {
+		if it.ID == ItemScenarioWeak {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("one item per weak scenario, none for the good one: %d", count)
+	}
+}
+
+// A value a step extracts and a later step uses only inside its request file (requestRef) is used.
+func TestInspect_AnExtractionUsedInAReferencedRequestIsNotWeak(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "requests/me.yaml", "schemaVersion: \"1\"\nname: Me\nmethod: GET\nurl: \"http://x/me\"\nheaders:\n  - name: Authorization\n    value: \"Bearer {{token}}\"\n")
+	write(t, root, "scenarios/s.yaml", `schemaVersion: "1"
+title: Refs
+steps:
+  - label: Login
+    request: {method: POST, url: "http://x/login"}
+    extractions:
+      - {name: token, source: jsonpath, path: $.token}
+  - label: Me
+    requestRef: me.yaml
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+`)
+	if a := has(Inspect(root, nil, ""), ItemScenarioWeak); a != nil {
+		t.Errorf("the token is used by the referenced request: %+v", a)
 	}
 }

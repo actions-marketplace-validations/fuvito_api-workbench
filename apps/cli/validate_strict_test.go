@@ -115,3 +115,25 @@ func TestValidateStrict_UsesTheProjectFile(t *testing.T) {
 		t.Fatalf("the scenarios and the environment come from the file: %v\n%s", err, out)
 	}
 }
+
+// A value used only inside a referenced request file is used.
+func TestValidateStrict_ReadsReferencedRequestFiles(t *testing.T) {
+	project(t, map[string]string{
+		"requests/me.yaml": "schemaVersion: \"1\"\nname: Me\nmethod: GET\nurl: \"http://x/me\"\nheaders:\n  - name: Authorization\n    value: \"Bearer {{token}}\"\n",
+		"scenarios/s.yaml": `schemaVersion: "1"
+title: Refs
+steps:
+  - label: Login
+    request: {method: POST, url: "http://x/login"}
+    extractions:
+      - {name: token, source: jsonpath, path: $.token}
+  - label: Me
+    requestRef: ../requests/me.yaml
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+`,
+	})
+	if out, err := exec(t, "validate", "--strict", "scenarios/s.yaml"); err != nil || !strings.Contains(out, "OK") {
+		t.Fatalf("the token is used by the referenced request: %v\n%s", err, out)
+	}
+}

@@ -34,6 +34,7 @@ const (
 	ItemSpecOutside     = "spec-outside"
 	ItemScenarioInvalid = "scenario-invalid"
 	ItemRequestRef      = "request-ref-missing"
+	ItemScenarioWeak    = "scenario-weak"
 
 	ItemProjectFileInvalid = "project-file-invalid"
 	ItemProjectFilePath    = "project-file-path"
@@ -292,6 +293,13 @@ func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order
 		addSpec(root, path, sc.SpecFile, specs, order)
 	}
 
+	// valid but weak: what clrsig validate --strict reports. Names nothing defines are left out
+	// here, because the environment check below reports those with the environment in view.
+	scenario.ResolveRequestRefs(sc, scDir, filepath.Join(root, "requests"), filepath.Join(scDir, "..", "requests"))
+	if weak := scenario.Lint(sc, scenario.LintOptions{}); len(weak) > 0 {
+		r.Attention = append(r.Attention, weakScenario(path, rel, weak))
+	}
+
 	defined := map[string]bool{}
 	for _, v := range sc.Variables {
 		defined[v.Name] = true
@@ -306,6 +314,22 @@ func inspectScenario(root, path string, r *Report, specs map[string]*Spec, order
 		if !defined[name] {
 			unresolved[name] = append(unresolved[name], rel)
 		}
+	}
+}
+
+func weakScenario(path, rel string, weak []scenario.Issue) Attention {
+	lines := make([]string, len(weak))
+	for i, w := range weak {
+		lines[i] = w.String()
+	}
+	what := fmt.Sprintf("The scenario passes its checks but is weak: %d thing%s to improve.", len(weak), map[bool]string{true: "", false: "s"}[len(weak) == 1])
+	return Attention{
+		ID: ItemScenarioWeak, Severity: SeverityInfo,
+		What:   what,
+		Where:  rel,
+		Why:    strings.Join(lines, "\n"),
+		Fix:    "Add an assertion (a status check is enough), use or remove the extracted value, then run clrsig validate --strict to check it again.",
+		Target: Target{Kind: "scenario", Path: path},
 	}
 }
 

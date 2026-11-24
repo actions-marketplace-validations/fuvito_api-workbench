@@ -259,7 +259,7 @@ function AttentionCard({ item, index, onOpenScenario, onOpenContracts }: {
         </div>
         <dl className="ml-6 grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-0.5">
           <dt className="text-[var(--color-muted-foreground)]">Where</dt><dd>{item.where}</dd>
-          <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd>{item.why}</dd>
+          <dt className="text-[var(--color-muted-foreground)]">Why</dt><dd className="whitespace-pre-line">{item.why}</dd>
           <dt className="text-[var(--color-muted-foreground)]">Fix</dt><dd>{item.fix}</dd>
         </dl>
         <div className="ml-6 mt-1">
