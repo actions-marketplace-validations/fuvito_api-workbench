@@ -58,7 +58,7 @@ export function parsePathLimits(text: string): { lines: string[]; bad: string[] 
 // conform`. Read-only is on unless writes were ticked, so the command does what the page does.
 export function cliValues(p: {
   specPath: string; baseUrl: string; envPath: string; activeEnvironment: string
-  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; timeoutText: string; maxResponseText?: string; allowWrites: boolean
+  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; failOnWarning?: boolean; timeoutText: string; maxResponseText?: string; allowWrites: boolean
 }): Record<string, string> {
   const v: Record<string, string> = {}
   if (p.specPath) v['spec'] = p.specPath
@@ -69,6 +69,7 @@ export function cliValues(p: {
   if (p.paths.length) v['paths'] = p.paths.join(',')
   if (p.negative) v['negative'] = 'true'
   if (p.failFast) v['fail-fast'] = 'true'
+  if (p.failOnWarning) v['fail-on'] = 'warning'
   const timeout = Number.parseInt(p.timeoutText, 10)
   if (timeout > 0) v['request-timeout'] = String(timeout)
   const slowest = Number.parseInt(p.maxResponseText ?? '', 10)

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 )
 
@@ -416,5 +417,43 @@ func TestPathInside_FollowsSymbolicLinks(t *testing.T) {
 	}
 	if pathInside(ws, filepath.Join(ws, "link", "spec.yaml")) {
 		t.Fatal("a link that points out of the workspace must count as outside")
+	}
+}
+
+// Lowering one check to a warning moves the operations that only break it from Failing to Passing
+// (with a warning), and "fail on warnings" puts them back, as clrsig conform --fail-on warning does.
+// The Conformance Server has two operations whose only problem is a wrong type (CS-RESP-006).
+func TestConformanceService_WarningsFollowFailOnWarning(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	in := ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)}
+
+	base := svc.RunConformance(in)
+	if base.Error != "" || base.Failing != 6 || base.WithWarnings != 0 {
+		t.Fatalf("default severities: %+v", base)
+	}
+
+	t.Cleanup(checks.WithSeverity("CS-RESP-006", checks.Warning))
+	out := svc.RunConformance(in)
+	if out.Failing != 4 || out.Passing != 4 || out.WithWarnings != 2 || !out.Failed {
+		t.Fatalf("warnings: failing=%d passing=%d withWarnings=%d failed=%v", out.Failing, out.Passing, out.WithWarnings, out.Failed)
+	}
+	seen := 0
+	for _, op := range out.Operations {
+		if op.Warnings > 0 {
+			seen++
+			if op.Status != "passed" || len(op.Findings) != 1 || op.Findings[0].Severity != "warning" || op.Findings[0].CheckID != "CS-RESP-006" {
+				t.Fatalf("operation with a warning: %+v", op)
+			}
+		}
+	}
+	if seen != 2 {
+		t.Fatalf("%d operations with warnings, want 2", seen)
+	}
+
+	in.FailOnWarning = true
+	out = svc.RunConformance(in)
+	if out.Failing != 6 || out.WithWarnings != 0 || !out.Failed {
+		t.Fatalf("fail on warning: failing=%d withWarnings=%d failed=%v", out.Failing, out.WithWarnings, out.Failed)
 	}
 }

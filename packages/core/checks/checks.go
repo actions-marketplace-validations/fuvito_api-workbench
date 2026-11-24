@@ -4,7 +4,11 @@
 // in agreement.
 package checks
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+	"sync"
+)
 
 // Severity says what a finding does to the run.
 type Severity string
@@ -76,13 +80,18 @@ var all = []Check{
 	{"CS-NC-009", "Declared media type without a decoder", Note, AreaNotChecked},
 }
 
-var byID = func() map[string]Check {
+var (
+	mu   sync.RWMutex
+	byID = index()
+)
+
+func index() map[string]Check {
 	m := make(map[string]Check, len(all))
 	for _, c := range all {
 		m[c.ID] = c
 	}
 	return m
-}()
+}
 
 // All returns every check, sorted by ID. The result is a copy.
 func All() []Check {
@@ -93,6 +102,8 @@ func All() []Check {
 
 // ByID finds a check by its ID.
 func ByID(id string) (Check, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
 	c, ok := byID[id]
 	return c, ok
 }
@@ -100,8 +111,42 @@ func ByID(id string) (Check, bool) {
 // SeverityOf is the default severity of a check. An ID that is not in the list (a violation that
 // is not recognised has none) is a failure, so nothing that failed before can pass by accident.
 func SeverityOf(id string) Severity {
+	mu.RLock()
+	defer mu.RUnlock()
 	if c, ok := byID[id]; ok {
 		return c.Severity
 	}
 	return Failure
+}
+
+// WithSeverity changes the severity of one check until the returned function is called. It is for
+// tests and for a later per-project setting; the severities in the list are the defaults. An
+// unknown ID is ignored.
+func WithSeverity(id string, s Severity) (restore func()) {
+	mu.Lock()
+	defer mu.Unlock()
+	old, ok := byID[id]
+	if !ok {
+		return func() {}
+	}
+	c := old
+	c.Severity = s
+	byID[id] = c
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		byID[id] = old
+	}
+}
+
+// ParseFailOn reads the value of a --fail-on option for conformance runs: failure (the default
+// when empty) or warning. A note never fails a run, so it is not accepted.
+func ParseFailOn(s string) (Severity, error) {
+	switch s {
+	case "", string(Failure):
+		return Failure, nil
+	case string(Warning):
+		return Warning, nil
+	}
+	return "", fmt.Errorf("--fail-on %q is not valid for conform: use failure (the default) or warning", s)
 }

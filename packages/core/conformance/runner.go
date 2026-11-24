@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -43,9 +44,56 @@ type OperationResult struct {
 	Missing []string
 }
 
-// Passed reports whether the operation executed and conformed to the spec.
+// Passed reports whether the operation executed and conformed to the spec. Findings whose check
+// is only a warning or a note do not stop an operation from passing (see Warnings).
 func (r OperationResult) Passed() bool {
-	return !r.Skipped && r.Blocked == "" && r.Error == "" && len(r.RequestViolations) == 0 && len(r.Violations) == 0
+	if r.Skipped || r.Blocked != "" || r.Error != "" {
+		return false
+	}
+	if len(r.RequestViolations) == 0 && len(r.Violations) == 0 {
+		return true
+	}
+	for _, f := range Diagnose(r) {
+		if f.Severity == checks.Failure {
+			return false
+		}
+	}
+	return true
+}
+
+// Warnings returns the findings of a passing operation that are only warnings.
+func (r OperationResult) Warnings() []Finding {
+	if r.Skipped || len(r.RequestViolations) == 0 && len(r.Violations) == 0 {
+		return nil
+	}
+	var out []Finding
+	for _, f := range Diagnose(r) {
+		if f.Severity == checks.Warning {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// OpPassed is Passed for this run: with FailOn set to warning, an operation with warnings has
+// not passed. Reports and counts use it so they agree with the exit code.
+func (r *ConformResult) OpPassed(op OperationResult) bool {
+	if !op.Passed() {
+		return false
+	}
+	return !(r.FailOn == checks.Warning && len(op.Warnings()) > 0)
+}
+
+// WarningCount is the number of operations that passed but have warnings (zero when warnings
+// fail the run, since those operations are then counted as failed).
+func (r *ConformResult) WarningCount() int {
+	n := 0
+	for _, op := range r.Operations {
+		if r.OpPassed(op) && len(op.Warnings()) > 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // BlockedSummary reports how many operations were not sent because a value was missing, and the
@@ -107,6 +155,9 @@ type ConformResult struct {
 	BaselineApplied bool
 	KnownViolations int
 	BaselineClean   bool
+
+	// FailOn is the lowest severity that fails the run: failure (the default) or warning.
+	FailOn checks.Severity
 }
 
 // Counts returns (passed, failed, skipped) operation counts.
@@ -115,7 +166,7 @@ func (r *ConformResult) Counts() (passed, failed, skipped int) {
 		switch {
 		case op.Skipped:
 			skipped++
-		case op.Passed():
+		case r.OpPassed(op):
 			passed++
 		default:
 			failed++

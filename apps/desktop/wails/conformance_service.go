@@ -13,6 +13,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
@@ -150,6 +151,8 @@ type ConformRunInput struct {
 	// Negative adds negative probes (malformed or unauthorized requests that should be rejected).
 	Negative bool `json:"negative"`
 	FailFast bool `json:"failFast"`
+	// FailOnWarning makes a warning fail the run (clrsig conform --fail-on warning).
+	FailOnWarning bool `json:"failOnWarning"`
 	// TimeoutMs is the per-request timeout; 0 uses the shared default.
 	TimeoutMs int `json:"timeoutMs"`
 	// MaxResponseTimeMs fails an operation that answers more slowly than this; 0 = no limit.
@@ -219,6 +222,8 @@ type ConformOperationIO struct {
 	Error       string   `json:"error,omitempty"`
 	// Findings explain the failure in plain language; empty for a passing or skipped operation.
 	Findings []ConformFindingIO `json:"findings"`
+	// Warnings counts the findings that are only warnings; a passing operation can have some.
+	Warnings int `json:"warnings"`
 }
 
 type ConformRunOutputIO struct {
@@ -234,6 +239,8 @@ type ConformRunOutputIO struct {
 	NotCovered int `json:"notCovered"`
 	Passing    int `json:"passing"`
 	Failing    int `json:"failing"`
+	// WithWarnings is how many passing operations have warnings.
+	WithWarnings int `json:"withWarnings"`
 	// Probes is empty unless negative probes were requested. An accepted probe means the server
 	// took a request it should have rejected.
 	Probes []ConformProbeIO `json:"probes"`
@@ -342,6 +349,7 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		Coverage:          true,
 		Negative:          in.Negative,
 		ReadOnly:          !in.AllowWrites,
+		FailOn:            failOnFor(in.FailOnWarning),
 		Progress: func(done, total int, op conformance.OperationResult) {
 			if s.emit != nil {
 				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.Path})
@@ -389,7 +397,7 @@ func (s *ConformanceService) recordCoverage(in ConformRunInput, spec *openapi.Sp
 			continue
 		}
 		executed = append(executed, openapi.ExecutedRequest{
-			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: op.Passed(), DurationMs: op.DurationMs,
+			Method: op.Method, URL: baseURL + op.Path, StatusCode: op.StatusCode, Passed: out.Result.OpPassed(op), DurationMs: op.DurationMs,
 		})
 	}
 	cr := spec.ScenarioCoverage(executed)
@@ -444,6 +452,13 @@ func (s *ConformanceService) CancelConformance() {
 	}
 }
 
+func failOnFor(warning bool) checks.Severity {
+	if warning {
+		return checks.Warning
+	}
+	return checks.Failure
+}
+
 func conformOutputIO(out application.ConformOutput, baseURL string, writes bool) ConformRunOutputIO {
 	r := out.Result
 	res := ConformRunOutputIO{
@@ -466,6 +481,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			Findings:   []ConformFindingIO{},
 		}
 		item.Findings = append(item.Findings, findingsIO(conformance.Diagnose(op))...)
+		item.Warnings = len(op.Warnings())
 		for _, v := range op.RequestViolations {
 			item.Violations = append(item.Violations, "request: "+v.Error())
 		}
@@ -479,7 +495,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			item.Status = "blocked"
 		case op.Error != "":
 			item.Status = "error"
-		case op.Passed():
+		case r.OpPassed(op):
 			item.Status = "passed"
 		default:
 			item.Status = "failed"
@@ -490,6 +506,9 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 			res.Covered++
 			if item.Status == "passed" {
 				res.Passing++
+				if item.Warnings > 0 {
+					res.WithWarnings++
+				}
 			} else {
 				res.Failing++
 			}

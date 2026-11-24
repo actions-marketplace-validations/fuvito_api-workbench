@@ -262,6 +262,9 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 			passed+failed+skipped, passed, failed, skipped, result.Duration.Milliseconds()),
 	}
 	doc.Passed = failed == 0
+	if w := result.WarningCount(); w > 0 {
+		doc.Summary += fmt.Sprintf("  ·  %d with warnings", w)
+	}
 
 	x := newRedactor(result.Secrets, false)
 	doc.Subtitle = x.text(doc.Subtitle)
@@ -274,8 +277,10 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 		switch {
 		case op.Skipped:
 			row.Status = "SKIP"
-		case op.Error != "" || !op.Passed():
+		case op.Error != "" || !result.OpPassed(op):
 			row.Status = "FAIL"
+		case len(op.Warnings()) > 0:
+			row.Status = "WARN"
 		default:
 			row.Status = "PASS"
 		}
@@ -289,10 +294,10 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: x.text(op.Blocked)})
 		}
 		for _, v := range op.RequestViolations {
-			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: "request: " + x.text(v.Error())})
+			row.Lines = append(row.Lines, htmlLine{Mark: severityMark(op, v, true), Text: "request: " + x.text(v.Error())})
 		}
 		for _, v := range op.Violations {
-			row.Lines = append(row.Lines, htmlLine{Mark: "✗", Text: x.text(v.Error())})
+			row.Lines = append(row.Lines, htmlLine{Mark: severityMark(op, v, false), Text: x.text(v.Error())})
 		}
 		for _, f := range explain(op, x) {
 			row.Lines = append(row.Lines, htmlLine{Mark: "→", Text: explanationLine(f)})

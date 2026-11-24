@@ -122,6 +122,13 @@ func Diagnose(op OperationResult) []Finding {
 	return out
 }
 
+// withSeverity fills CheckID and Severity of a finding built by diagnoseRequest or diagnoseViolation.
+func (f Finding) withSeverity() Finding {
+	f.CheckID = checkIDFor(f)
+	f.Severity = checks.SeverityOf(f.CheckID)
+	return f
+}
+
 // checkIDFor maps a finding to its ID in the catalog of checks.
 func checkIDFor(f Finding) string {
 	switch f.Kind {
@@ -784,4 +791,13 @@ func describeConstraint(msg string) (rule, fix string) {
 		return "is a multiple of " + reMultiple.FindStringSubmatch(msg)[1], generic
 	}
 	return "keeps to a rule the schema sets (" + msg + ")", generic
+}
+
+// ViolationSeverity is the severity of one violation of an operation: request is true for a
+// violation of the generated request, false for one of the response.
+func ViolationSeverity(op OperationResult, v openapi.ValidationError, request bool) checks.Severity {
+	if request {
+		return diagnoseRequest(op, v).withSeverity().Severity
+	}
+	return diagnoseViolation(op, v).withSeverity().Severity
 }

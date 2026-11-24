@@ -6,7 +6,10 @@ import { findingWhere } from '@/lib/conformHelpers'
 export function FindingView({ f }: { f: ConformFinding }) {
   return (
     <div className="rounded border border-[var(--color-border)] bg-[var(--color-background)] p-2.5">
-      <p className="text-xs font-semibold text-[var(--color-foreground)]">{f.summary}</p>
+      <p className="text-xs font-semibold text-[var(--color-foreground)]">
+        {f.severity === 'warning' && <span data-testid="finding-warning" className="mr-1.5 rounded border border-amber-500/50 bg-amber-500/10 px-1 py-px text-[10px] font-medium uppercase text-amber-400">Warning</span>}
+        {f.summary}
+      </p>
       <dl className="mt-1.5 grid grid-cols-[5.5rem_1fr] gap-x-2 gap-y-1 text-xs">
         {f.expected && <><dt className="text-[var(--color-muted-foreground)]">Expected</dt><dd className="font-mono">{f.expected}</dd></>}
         {f.got && <><dt className="text-[var(--color-muted-foreground)]">Got</dt><dd className="font-mono break-all">{f.got}</dd></>}

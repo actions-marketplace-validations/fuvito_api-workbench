@@ -209,6 +209,13 @@ var catalog = []Command{
 				Group: GroupEssential,
 			},
 			{
+				Name: "fail-on", Kind: KindEnum, Enum: []string{"failure", "warning"}, Default: "failure",
+				Label: "Fail the run on",
+				Help: "failure (the default) fails the run only on findings that are failures. warning also fails it on warnings. " +
+					"Warnings are always shown in the report. Notes never fail a run.",
+				Group: GroupAdvanced,
+			},
+			{
 				Name: "baseline", Kind: KindString,
 				Label:   "Accept recorded violations",
 				Help:    "Violations already listed in this baseline file are accepted; only new ones fail the run, and fixed ones are reported.",

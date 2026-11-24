@@ -78,6 +78,7 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 | `fail-on` | diff | `breaking`, `warning` or `info`: how serious a change must be to fail |
 | `against` | diff | compare `base-spec` with the spec at this git ref (checkout with `fetch-depth: 0`) |
 | `read-only` | conform | send only GET and HEAD; other operations are skipped and never sent |
+| `conform-fail-on` | conform | `failure` (default) or `warning`: with `warning`, findings that are only warnings also fail the run |
 | `negative` | conform | also run negative probes |
 | `explain` | conform | explain each failure in the text report |
 | `baseline`, `write-baseline` | conform | fail only on violations not in the baseline file / record the current ones |

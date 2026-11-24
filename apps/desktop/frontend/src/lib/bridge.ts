@@ -751,6 +751,8 @@ export interface ConformRunInput {
   paths: string[]
   negative: boolean
   failFast: boolean
+  // a warning fails the run (clrsig conform --fail-on warning)
+  failOnWarning?: boolean
   maxResponseTimeMs?: number
   maxResponseTimeFor?: string[]
   timeoutMs: number
@@ -800,6 +802,8 @@ export interface ConformOperation {
   error?: string
   // plain-language explanation of each violation (absent in older data)
   findings?: ConformFinding[]
+  // findings that are only warnings; a passing operation can have some
+  warnings?: number
 }
 
 export interface ConformRunOutput {
@@ -814,6 +818,8 @@ export interface ConformRunOutput {
   notCovered: number
   passing: number
   failing: number
+  // passing operations that have warnings
+  withWarnings?: number
   probes: ConformProbe[]
   warnings: string[]
   // placeholders that kept operations from being sent (each once) and how many operations that hit

@@ -820,6 +820,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--negative` | Also send negative probes: dropped required fields, wrong types, missing auth, missing parameters. |
 | `--explain` | Under each failing operation, say in plain language what the spec expected, what the server sent, why that fails and what to change. Off by default, so existing logs do not change; the JSON (`findings`), HTML, Markdown and JUnit reports always include it. |
 | `--read-only` | Send only GET and HEAD requests. POST, PUT, PATCH and DELETE operations (and their negative probes) are skipped and never sent, so the check cannot create, change or delete data. Off by default: without it `conform` sends every operation. |
+| `--fail-on <level>` | `failure` (the default) or `warning`. Every finding has a severity: a **failure** fails the run (exit code 1), a **warning** is shown (`WARN`, `PASSED with 2 warnings`, a `severity` field in JSON) but does not fail it, a **note** is information. With `--fail-on warning` warnings fail the run too. Today every check is a failure; warning-level checks arrive in later releases. In the desktop, the Check Conformance page has **Fail on warnings** in Options. |
 | `--coverage` | Append a coverage summary. |
 | `--fail-fast` | Stop after the first violation or execution error. |
 | `--request-timeout` | Per-request timeout in milliseconds (default `10000`). |

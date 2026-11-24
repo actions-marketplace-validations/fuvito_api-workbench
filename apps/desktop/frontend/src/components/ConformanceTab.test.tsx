@@ -65,7 +65,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
+      tags: [], paths: [], negative: false, failFast: false, failOnWarning: false, timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -536,5 +536,48 @@ describe('parsePathLimits', () => {
   it('reads /prefix=ms lines and names the ones that do not fit', () => {
     expect(parsePathLimits(['/reports=2000', '', ' /a/b=0 '].join('\n'))).toEqual({ lines: ['/reports=2000', '/a/b=0'], bad: [] })
     expect(parsePathLimits(['reports=1', '/x=abc'].join('\n')).bad).toEqual(['reports=1', '/x=abc'])
+  })
+})
+
+describe('warnings', () => {
+  const warned = {
+    ...output, failing: 0, passing: 1, covered: 1, notCovered: 0, total: 1, failed: false, withWarnings: 1,
+    operations: [{
+      operationId: 'w', method: 'GET', path: '/warned', status: 'passed', statusCode: 200, durationMs: 5, violations: ['price: expected number'], warnings: 1,
+      findings: [{
+        kind: 'wrong-type', checkId: 'CS-RESP-006', severity: 'warning', where: 'price', summary: '"price" is text, the spec says number',
+        why: 'The server sent text.', fix: 'Send a number.',
+      }],
+    }],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(warned)
+  })
+
+  it('lists a passing operation with its warning and explains it', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('All 1 checked operations match the spec, 1 with warnings')
+    expect(screen.getByTestId('op-warnings')).toHaveTextContent('1 warning')
+    expect(screen.getByTestId('finding-warning')).toBeInTheDocument()
+    expect(screen.getByText('Send a number.')).toBeInTheDocument()
+  })
+
+  it('sends "fail on warnings" with the run and hands it to the CLI builder', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Fail on warnings/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ failOnWarning: true })))
+  })
+
+  it('cliValues carries fail-on only when warnings fail the run', () => {
+    const base = { specPath: '/ws/api.yaml', baseUrl: 'http://x', envPath: '', activeEnvironment: '', tags: [], paths: [], negative: false, failFast: false, timeoutText: '', allowWrites: false }
+    expect(cliValues({ ...base, failOnWarning: true })['fail-on']).toBe('warning')
+    expect(cliValues(base)['fail-on']).toBeUndefined()
   })
 })

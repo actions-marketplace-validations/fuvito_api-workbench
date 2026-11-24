@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -420,6 +421,7 @@ func conformCmd() *cobra.Command {
 	var timeLimits []string
 	var failFast bool
 	var readOnly bool
+	var failOnFlag string
 	var explain bool
 	var vars []string
 	var reports []string
@@ -451,6 +453,10 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				return err
 			}
 			pathLimits, err := conformance.ParsePathLimits(timeLimits)
+			if err != nil {
+				return err
+			}
+			failOn, err := checks.ParseFailOn(failOnFlag)
 			if err != nil {
 				return err
 			}
@@ -511,6 +517,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				Coverage:          showCoverage,
 				Negative:          runNegative,
 				Baseline:          base,
+				FailOn:            failOn,
 			})
 			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
@@ -607,6 +614,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringArrayVar(&timeLimits, "max-response-time-for", nil, "A different response-time limit for the operations under a path prefix: /prefix=ms, for example /reports=2000 (repeatable; the longest prefix wins; 0 turns the limit off there)")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
+	cmd.Flags().StringVar(&failOnFlag, "fail-on", "failure", "Fail the run on findings of this level or worse: failure (the default) or warning; warnings are reported but do not fail the run unless this is warning")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")

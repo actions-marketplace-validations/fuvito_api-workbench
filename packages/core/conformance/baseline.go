@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"gopkg.in/yaml.v3"
 )
 
@@ -42,6 +43,12 @@ func (v Violation) String() string {
 // Violations lists what a run found wrong, sorted and without duplicates. neg may be nil.
 // Skipped operations and passing probes are not violations.
 func Violations(r *ConformResult, neg *NegativeResult) []Violation {
+	return ViolationsFor(r, neg, checks.Failure)
+}
+
+// ViolationsFor is Violations with the severity that counts: failure lists only findings that
+// fail a run, warning also lists the warnings (what a run with --fail-on warning must accept).
+func ViolationsFor(r *ConformResult, neg *NegativeResult, failOn checks.Severity) []Violation {
 	seen := map[string]bool{}
 	var out []Violation
 	var secrets []string
@@ -69,11 +76,18 @@ func Violations(r *ConformResult, neg *NegativeResult) []Violation {
 			if op.Error != "" {
 				add(Violation{Operation: name, Kind: "error"})
 			}
+			counts := func(f Finding) bool {
+				return f.Severity == checks.Failure || f.Severity == checks.Warning && failOn == checks.Warning
+			}
 			for _, v := range op.RequestViolations {
-				add(Violation{Operation: name, Kind: "request", Detail: v.Error()})
+				if counts(diagnoseRequest(op, v).withSeverity()) {
+					add(Violation{Operation: name, Kind: "request", Detail: v.Error()})
+				}
 			}
 			for _, v := range op.Violations {
-				add(Violation{Operation: name, Kind: "response", Detail: v.Error()})
+				if counts(diagnoseViolation(op, v).withSeverity()) {
+					add(Violation{Operation: name, Kind: "response", Detail: v.Error()})
+				}
 			}
 		}
 	}

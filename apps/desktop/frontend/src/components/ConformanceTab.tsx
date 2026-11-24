@@ -150,6 +150,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [negative, setNegative] = useState(false)
   const [failFast, setFailFast] = useState(false)
+  const [failOnWarning, setFailOnWarning] = useState(false)
   const [recordCoverage, setRecordCoverage] = useState(false)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<ConformProgress | null>(null)
@@ -215,7 +216,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     try {
       setOutput(await runConformance({
         specPath, baseUrl, envPath, allowWrites, confirmedRemote,
-        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
+        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
         maxResponseTimeMs: maxResponseBad || !maxResponseText ? 0 : maxResponseMs,
         maxResponseTimeFor: pathLimits.lines,
@@ -246,7 +247,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
             type="button"
             onClick={() => onOpenCliBuilder(cliValues({
               specPath, baseUrl, envPath, activeEnvironment: ctx.activeEnvironment ?? '',
-              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, maxResponseText, allowWrites,
+              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning, timeoutText, maxResponseText, allowWrites,
             }))}
             title="Open the CLI Command Builder with the choices on this page"
             className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
@@ -381,6 +382,10 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               <input type="checkbox" checked={failFast} onChange={e => setFailFast(e.target.checked)} />
               <span className="font-medium">Stop after the first failure</span>
             </label>
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={failOnWarning} onChange={e => setFailOnWarning(e.target.checked)} className="mt-0.5" />
+              <span><span className="font-medium">Fail on warnings</span> — a warning is always shown; with this on it also fails the run, like <code>--fail-on warning</code>.</span>
+            </label>
             <label className={cn('flex items-start gap-2 text-xs', filtered ? 'opacity-50' : 'cursor-pointer')}>
               <input type="checkbox" checked={recordCoverage && !filtered} disabled={filtered} onChange={e => setRecordCoverage(e.target.checked)} className="mt-0.5" />
               <span>
@@ -449,7 +454,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               const broken = problems.length - blocked - noAnswer
               let headline: string
               if (problems.length === 0) {
-                headline = `All ${passed.length} checked operations match the spec`
+                const withWarnings = passed.filter(o => (o.warnings ?? 0) > 0).length
+                headline = `All ${passed.length} checked operations match the spec` + (withWarnings > 0 ? `, ${withWarnings} with warnings` : '')
               } else if (output.covered === 0 && noAnswer > 0) {
                 headline = `No operation was reached: is the server running at ${output.baseUrl}?`
               } else if (broken === 0 && noAnswer === 0) {
@@ -514,10 +520,18 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                       <summary className="cursor-pointer text-xs font-semibold text-emerald-400">Passing ({passed.length})</summary>
                       <ul className="mt-2 text-xs">
                         {passed.map(op => (
-                          <li key={`${op.method} ${op.path}`} className="flex gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
+                          <li key={`${op.method} ${op.path}`} className="flex flex-wrap gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
                             <span className="font-mono font-semibold w-14 shrink-0">{op.method}</span>
                             <span className="font-mono flex-1 min-w-0 break-all">{op.path}</span>
+                            {(op.warnings ?? 0) > 0 && (
+                              <span data-testid="op-warnings" className="shrink-0 text-amber-400">⚠ {op.warnings} {op.warnings === 1 ? 'warning' : 'warnings'}</span>
+                            )}
                             <span className="font-mono text-[var(--color-muted-foreground)]">{op.statusCode} · {op.durationMs} ms</span>
+                            {(op.warnings ?? 0) > 0 && (
+                              <div className="basis-full mb-1 flex flex-col gap-1.5">
+                                {(op.findings ?? []).filter(f => f.severity === 'warning').map((f, i) => <FindingView key={i} f={f} />)}
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
