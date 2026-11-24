@@ -50,6 +50,8 @@ Secret values are replaced by `***` in every report. For `conform`, JSON, HTML, 
 
 ## GitHub Actions
 
+New project? `clrsig init github-actions` prints a ready workflow for this action (and `--write` saves it to `.github/workflows/clrsig.yml`). If the repository has a `clrsig.yaml`, the action finds it from the checkout and uses it for any option the step does not set; an input always wins.
+
 The action installs the right `clrsig` for the runner, runs one command and passes its exit code on.
 
 ```yaml

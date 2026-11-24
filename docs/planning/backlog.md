@@ -61,7 +61,7 @@ The one living list of work that is not done yet. It is edited in place: tick an
 | Done | ID | Item | Size | Needs | Source / notes |
 |---|---|---|---|---|---|
 | ☐ | B-020 | `validate --strict` (scenario quality lint). | S–M | None | [Future enhancements](../enhancements/2026-11-17-future-enhancements.md) item 12 |
-| ☐ | B-021 | `clrsig init` (workspace and CI scaffolding). | M | Proposal | Same file, item 13 |
+| ☑ | B-021 | `clrsig init` (workspace and CI scaffolding). | M | Proposal | Same file, item 13 *Done 2026-11-24: `clrsig init` and `init github-actions` (phase 2 of the init and config proposal).*  |
 | ☐ | B-022 | Select scenarios by tag or name. | M | Proposal | Same file, item 14 |
 | ☐ | B-023 | Parallel scenario execution. | M | Proposal | Same file, item 15 |
 | ☐ | B-024 | Project config file (`.clrsig.yaml`). | L | Decision | Same file, item 16 ("think twice") |
@@ -70,7 +70,7 @@ The one living list of work that is not done yet. It is edited in place: tick an
 | ☑ | B-051 | **Bug:** `clrsig impact` never matches a scenario step whose URL path contains a placeholder: it reads the path after the *last* `}}`, so `{{baseUrl}}/users/{{userId}}` has no path and `{{baseUrl}}/users/{{userId}}/orders` is read as `/orders` (a breaking change can be missed, or matched to the wrong operation). These are exactly the steps that depend on extracted values. | S | None | Found 2026-11-20 while writing the catalog: Fixed 2026-11-21 for 0.6.0: a placeholder in the step path now stands for one path segment (`TestImpact_PlaceholderInThePathIsMatched`); its gap row was removed from the catalog |
 | ☐ | B-087 | **Pull-request annotations.** `--format github` prints workflow commands so findings appear inline, with the check ID in the title. Locating the spec line may need a small lookup. | S–M | None | [Improvement ideas 2026-11-24](../reports/check-2026-11-24-improvement-ideas.md), idea 41 |
 | ☐ | B-088 | **Data-driven scenarios** (`--data rows.csv` or `rows.json`, one result per row). Check first that the Postman gap review did not decline it. | M | Proposal (format-adjacent) | [Improvement ideas 2026-11-24](../reports/check-2026-11-24-improvement-ideas.md), idea 42 |
-| ☐ | B-089 | **Project config file** (`clrsig.yaml` at the workspace root with defaults for spec, environment, base URL, limits and reports; flags override). New persisted file: `schemaVersion`, `format-spec.md`, validation. `clrsig init` (B-021) writes it. | M | Proposal, and a migration policy first (B-037) | [Improvement ideas 2026-11-24](../reports/check-2026-11-24-improvement-ideas.md), idea 43 |
+| ☐ | B-089 | **Project config file** (`clrsig.yaml` at the workspace root with defaults for spec, environment, base URL, limits and reports; flags override). New persisted file: `schemaVersion`, `format-spec.md`, validation. `clrsig init` (B-021) writes it. | M | Proposal, and a migration policy first (B-037) | [Improvement ideas 2026-11-24](../reports/check-2026-11-24-improvement-ideas.md), idea 43 *Phase 1 (CLI) built 2026-11-24; `config show` and the desktop remain.* |
 | ☐ | B-090 | **CI gaps.** Confirm what `ci.yml` lacks, then add `go vet`, `tsc --noEmit`, Vitest, the Playwright `frontend` project, a docs link check and a vulnerability scan. A scanner is outside the locked tool list. | S | Decision (scanner) | [Improvement ideas 2026-11-24](../reports/check-2026-11-24-improvement-ideas.md), idea 47 |
 
 ## Docs and project

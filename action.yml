@@ -219,7 +219,7 @@ runs:
 
         case "$CMD" in
           run)
-            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_SCENARIO" ] && ARGS+=( "$IN_SCENARIO" )
             [ -n "$IN_ENV"    ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
             [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
@@ -228,7 +228,7 @@ runs:
             repeat --report "$IN_REPORT"
             ;;
           conform)
-            ARGS+=( "$IN_SPEC" )
+            [ -n "$IN_SPEC" ] && ARGS+=( "$IN_SPEC" )
             [ -n "$IN_BASE_URL" ] && ARGS+=( -b "$IN_BASE_URL" )
             [ -n "$IN_ENV"      ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT"   ] && ARGS+=( -f "$IN_FORMAT" )
@@ -261,7 +261,7 @@ runs:
             repeat --report "$IN_REPORT"
             ;;
           validate)
-            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_SCENARIO" ] && ARGS+=( "$IN_SCENARIO" )
             [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
             [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
             ;;

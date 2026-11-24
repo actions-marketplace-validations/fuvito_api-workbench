@@ -62,6 +62,7 @@ func main() {
 	root.AddCommand(telemetryCmd())
 	root.AddCommand(bundleCmd())
 	root.AddCommand(importCmd())
+	root.AddCommand(initCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError

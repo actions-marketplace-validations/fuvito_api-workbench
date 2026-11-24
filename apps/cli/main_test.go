@@ -26,6 +26,7 @@ func newTestRoot() *cobra.Command {
 	root.AddCommand(generateCmd())
 	root.AddCommand(conformCmd())
 	root.AddCommand(diffCmd())
+	root.AddCommand(initCmd())
 	return root
 }
 

@@ -27,6 +27,7 @@ func newFullTestRoot() *cobra.Command {
 	root.AddCommand(coverageCmd())
 	root.AddCommand(impactCmd())
 	root.AddCommand(telemetryCmd())
+	root.AddCommand(initCmd())
 	return root
 }
 
