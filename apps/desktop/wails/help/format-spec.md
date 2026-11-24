@@ -467,14 +467,18 @@ scenarios:                         # optional — one or more
 Written by `clrsig conform --write-baseline <file>` and read by `--baseline <file>`. It lists the violations a team has accepted for now. YAML or JSON by file extension (`.json` is JSON). Unknown fields are errors.
 
 ```yaml
-schemaVersion: "1"           # required — always "1" (quoted string); a newer version is refused
+schemaVersion: "2"           # required — "2" is written; "1" (older files) is still read; a newer version is refused
 violations:                  # sorted, no duplicates, no timestamps (so the file only changes when violations do)
   - operation: "GET /users/{id}"   # required — method and path template from the spec
-    kind: response                 # required — request | response | error | probe
-    detail: "/id: property is missing"   # optional — field and rule; empty for an error; "<probe kind>: <description>" for a probe
+    check: CS-RESP-005             # required — the ID of the check (see What We Check); "other" for a violation that has none
+    where: email                   # optional — the field path, header name or status the violation is about
+    rule: ""                       # optional — narrows a check with several rules (which constraint broke; a probe's description); for "other", the validator's own text
+    summary: '"email" is missing from the response'   # optional — for people to read; NOT part of the identity
 ```
 
-A violation is identified by `operation` + `kind` + `detail`. Secret values are replaced with `***`.
+A violation is identified by `operation` + `check` + `where` + `rule`. Rewording a message, or a new version of the validator, never turns a recorded violation into a new one. Secret values are replaced with `***`.
+
+**Version 1** (written by clrsig 0.8.9 and earlier) identified a violation by `operation` + `kind` (`request`, `response`, `error`, `probe`) + `detail` (the validator's message text), and had no `check`, `where`, `rule` or `summary`. It is still read and compared by that wording, with a note that the file is in the old format. It is never written back and never edited in place: record a new baseline with `--write-baseline` to upgrade it. Version 2 files cannot be read by older clrsig.
 
 ---
 

@@ -847,6 +847,8 @@ clrsig conform openapi.yaml -b http://localhost:8080 --write-baseline conform-ba
 clrsig conform openapi.yaml -b http://localhost:8080 --baseline conform-baseline.yaml         # in CI
 ```
 
+A violation is recorded by the **check** that found it (for example `CS-RESP-005`), the operation and the field, not by the wording of the message, so upgrading clrsig does not turn recorded violations into new ones. A baseline written by clrsig 0.8.9 or earlier (`schemaVersion: "1"`) still works and is flagged as old; run `--write-baseline` once to upgrade it. A baseline in the new format cannot be read by an older clrsig.
+
 The baseline summary (`Baseline: 12 known, 1 new, 3 fixed`, with each new and fixed violation) is printed to stderr, so `--format json` on stdout stays machine-readable. When violations are fixed, run `--write-baseline` again to remove them, so quality can only improve; a regression of a fixed one then fails. A violation is identified by its operation (`GET /users/{id}`), its kind (`request`, `response`, `error`, `probe`) and the field and rule that broke, not by ids or timestamps, so the file does not change between runs. The JUnit/HTML/JSON reports still list every violation; only the exit code follows the baseline. Secrets never appear in the file.
 
 ### `clrsig diff` and `clrsig impact`

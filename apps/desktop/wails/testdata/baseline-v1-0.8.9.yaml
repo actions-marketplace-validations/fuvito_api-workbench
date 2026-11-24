@@ -1,0 +1,58 @@
+schemaVersion: "1"
+violations:
+    - operation: GET /categories
+      kind: response
+      detail: |
+        Error at "/0/name": property "name" is missing
+        Schema:
+          {
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "type": "object"
+          }
+
+        Value:
+          {
+            "id": 1
+          }
+    - operation: GET /inventory
+      kind: response
+      detail: 'GET /inventory 200: the response header "X-Total-Count" is required by the spec but was not sent'
+    - operation: GET /orders
+      kind: response
+      detail: |
+        Error at "/0/id": value must be an integer
+        Schema:
+          {
+            "type": "integer"
+          }
+
+        Value:
+          "1"
+    - operation: GET /products/{{id}}
+      kind: response
+      detail: |
+        Error at "/price": value must be a number
+        Schema:
+          {
+            "type": "number"
+          }
+
+        Value:
+          "49.90"
+    - operation: GET /status
+      kind: response
+      detail: GET /status answered 503, but the spec declares only 200
+    - operation: GET /widgets
+      kind: response
+      detail: GET /widgets 200 answered with Content-Type "text/plain", but the spec declares application/json for this response; the body was not checked

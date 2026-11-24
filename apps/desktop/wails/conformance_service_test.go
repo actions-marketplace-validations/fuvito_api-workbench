@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,8 +12,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/checks"
+	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
+	"github.com/fuvito/api-workbench/packages/core/executor"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/serialization"
 )
 
 // testWorkspaces gives each test one workspace folder, shared by the helpers below: the service reads
@@ -455,5 +461,57 @@ func TestConformanceService_WarningsFollowFailOnWarning(t *testing.T) {
 	out = svc.RunConformance(in)
 	if out.Failing != 6 || out.WithWarnings != 0 || !out.Failed {
 		t.Fatalf("fail on warning: failing=%d withWarnings=%d failed=%v", out.Failing, out.WithWarnings, out.Failed)
+	}
+}
+
+// A baseline written by 0.8.9 against the Conformance Server (schemaVersion 1, identified by the
+// validator's wording) still accepts exactly the six known violations with this version, and a
+// baseline recorded now is in the current format and accepts them too.
+func TestBaselineWrittenBy089StillWorks(t *testing.T) {
+	srv := localConformanceServer(t)
+	spec, err := openapi.ParseBytes(conformanceOpenAPIYAML, "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	envData, err := os.ReadFile("help/conformance-environment.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := serialization.ParseEnvironment(envData, "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	golden, err := os.ReadFile(filepath.Join("testdata", "baseline-v1-0.8.9.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := conformance.ParseBaseline(golden, "baseline-v1-0.8.9.yaml")
+	if err != nil || !old.Legacy || len(old.Violations) != 6 {
+		t.Fatalf("golden file: %v %+v", err, old)
+	}
+
+	run := func(b *conformance.Baseline) application.ConformOutput {
+		return application.RunConformance(context.Background(), application.ConformInput{
+			Exec: executor.New(executor.Options{}), Spec: spec, BaseURL: srv.URL, Env: env, ReadOnly: true, Baseline: b,
+		})
+	}
+	out := run(old)
+	if out.Failed || out.Diff == nil || len(out.Diff.Known) != 6 || len(out.Diff.New) != 0 || len(out.Diff.Fixed) != 0 || !out.Diff.Legacy {
+		t.Fatalf("a 0.8.9 baseline must accept the six known violations: failed=%v %+v", out.Failed, out.Diff)
+	}
+
+	current := conformance.NewBaseline(out.Violations)
+	if current.Legacy || current.SchemaVersion != "2" || len(current.Violations) != 6 {
+		t.Fatalf("recorded baseline: %+v", current)
+	}
+	checksSeen := map[string]bool{}
+	for _, v := range current.Violations {
+		checksSeen[v.Check] = true
+		if v.Check == "" || v.Check == "other" {
+			t.Errorf("every violation of the Conformance Server has a check: %+v", v)
+		}
+	}
+	if again := run(current); again.Failed || len(again.Diff.Known) != 6 || again.Diff.Legacy {
+		t.Fatalf("the current format accepts them too: %+v", again.Diff)
 	}
 }

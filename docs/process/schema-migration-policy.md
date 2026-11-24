@@ -1,6 +1,6 @@
 # Schema versioning and migration policy
 
-Status: **Draft for owner review** (decision D3 of `docs/reports/check-2026-11-24-improvement-ideas.md`, 2026-11-24). Required by `CLAUDE.md` section 8 ("documented migration rules for future schema versions"). It applies to every persisted file: request, scenario, environment, bundle, conformance baseline, and any new one (project config, scenario tags, data files).
+Status: **Draft for owner review** (the machine-written files clause in section 5 was added while building baseline v2) (decision D3 of `docs/reports/check-2026-11-24-improvement-ideas.md`, 2026-11-24). Required by `CLAUDE.md` section 8 ("documented migration rules for future schema versions"). It applies to every persisted file: request, scenario, environment, bundle, conformance baseline, and any new one (project config, scenario tags, data files).
 
 ## 1. What is versioned
 
@@ -33,6 +33,8 @@ A breaking change ships with all of:
 5. a guard test that the old golden files still load.
 
 ## 5. Derived and recorded data
+
+- **Machine-written files that can be regenerated** (a conformance baseline): the migration is "write it again with the same command". No `clrsig migrate` is needed. The program still reads the previous version in memory, says that it is old, never rewrites it on its own and never writes the old version. Hand-written files (scenarios, requests, environments, the project config) still need `clrsig migrate`.
 
 - **Baselines** (`conform --write-baseline`): the violation key is part of the format. Changing it (D1, check ID plus operation) is a breaking change of the baseline schema; the first read of an old baseline upgrades it in memory and says so, and `--write-baseline` writes the new version.
 - **Contracts store, history database, run logs, config in `~/.clrsig/`**: not user-authored. They may change with a short migration in code (rename or rewrite on first read) and a line in the release notes; they must never fail to start the app. If data cannot be upgraded, keep the old file, start empty and say so.
