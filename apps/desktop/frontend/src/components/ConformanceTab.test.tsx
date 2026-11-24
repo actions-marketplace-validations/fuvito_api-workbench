@@ -65,7 +65,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, failOnWarning: false, timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
+      tags: [], paths: [], negative: false, failFast: false, failOnWarning: false, setupScenario: '', timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -627,5 +627,43 @@ describe('starting values from the workspace project file', () => {
     render(<ConformanceTab />)
     await screen.findByLabelText(/Spec/)
     expect(screen.queryByTestId('project-defaults-note')).not.toBeInTheDocument()
+  })
+})
+
+describe('run a scenario first', () => {
+  const withScenarios = { ...ctx, scenarios: [{ path: '/ws/scenarios/login.yaml', label: 'scenarios/login.yaml' }] }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(withScenarios)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue({ ...output, setupNote: 'Setup scenario login.yaml passed; values available to the check: token' })
+  })
+
+  it('sends the chosen scenario with the run and shows what it made available', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Run a scenario first'), { target: { value: '/ws/scenarios/login.yaml' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ setupScenario: '/ws/scenarios/login.yaml' })))
+    expect(await screen.findByTestId('conform-setup-note')).toHaveTextContent('values available to the check: token')
+  })
+
+  it('offers no scenario by default and hands the choice to the CLI builder', async () => {
+    const open = vi.fn()
+    render(<ConformanceTab onOpenCliBuilder={open} />)
+    fireEvent.change(await screen.findByLabelText(/Spec/), { target: { value: '/ws/api.yaml' } })
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:8120'))
+    fireEvent.click(screen.getByText('Options'))
+    expect(screen.getByLabelText('Run a scenario first')).toHaveValue('')
+    fireEvent.change(screen.getByLabelText('Run a scenario first'), { target: { value: '/ws/scenarios/login.yaml' } })
+    fireEvent.click(screen.getByRole('button', { name: /Get CLI command/ }))
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ setup: '/ws/scenarios/login.yaml' }))
+  })
+
+  it('cliValues carries the scenario to run first', () => {
+    const base = { specPath: '/ws/api.yaml', baseUrl: 'http://x', envPath: '', activeEnvironment: '', tags: [], paths: [], negative: false, failFast: false, timeoutText: '', allowWrites: false }
+    expect(cliValues({ ...base, setupPath: '/ws/scenarios/login.yaml' }).setup).toBe('/ws/scenarios/login.yaml')
+    expect(cliValues(base).setup).toBeUndefined()
   })
 })

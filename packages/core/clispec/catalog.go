@@ -209,6 +209,15 @@ var catalog = []Command{
 				Group: GroupEssential,
 			},
 			{
+				Name: "setup", Kind: KindFile, Accepts: specExts,
+				Label: "Run a scenario first",
+				Help: "A scenario that runs before the check, usually a login. Whatever its steps extract (a token, an id) is available to the " +
+					"generated requests as {{name}}, so secured operations are sent instead of being reported as not sent. The scenario runs against " +
+					"the same environment; if it fails, the check does not start (exit code 2). Extracted values are never printed, and ones named like a credential are masked in reports.",
+				Example: "scenarios/login.yaml",
+				Group:   GroupAdvanced,
+			},
+			{
 				Name: "fail-on", Kind: KindEnum, Enum: []string{"failure", "warning"}, Default: "failure",
 				Label: "Fail the run on",
 				Help: "failure (the default) fails the run only on findings that are failures. warning also fails it on warnings. " +

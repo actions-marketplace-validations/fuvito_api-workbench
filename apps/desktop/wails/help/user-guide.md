@@ -820,6 +820,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 | `--negative` | Also send negative probes: dropped required fields, wrong types, missing auth, missing parameters. |
 | `--explain` | Under each failing operation, say in plain language what the spec expected, what the server sent, why that fails and what to change. Off by default, so existing logs do not change; the JSON (`findings`), HTML, Markdown and JUnit reports always include it. |
 | `--read-only` | Send only GET and HEAD requests. POST, PUT, PATCH and DELETE operations (and their negative probes) are skipped and never sent, so the check cannot create, change or delete data. Off by default: without it `conform` sends every operation. |
+| `--setup <scenario>` | Run a scenario before the check, usually a login. What its steps extract (a token, an id) is available to the generated requests as `{{name}}`, so secured operations are sent instead of being reported as not sent. It runs against the same environment (a `--base-url` fills `{{baseUrl}}` for it when the environment has none), a `--var` of the same name wins over an extracted value, and if the scenario fails the check does not start (exit code `2`, with the setup's own report). Extracted values are never printed; one named like a credential (`token`, `password`, `apiKey`...) is masked in every report. In the desktop, **Run a scenario first** in Check Conformance → Options. |
 | `--fail-on <level>` | `failure` (the default) or `warning`. Every finding has a severity: a **failure** fails the run (exit code 1), a **warning** is shown (`WARN`, `PASSED with 2 warnings`, a `severity` field in JSON) but does not fail it, a **note** is information. With `--fail-on warning` warnings fail the run too. Today every check is a failure; warning-level checks arrive in later releases. In the desktop, the Check Conformance page has **Fail on warnings** in Options. |
 | `--coverage` | Append a coverage summary. |
 | `--fail-fast` | Stop after the first violation or execution error. |
@@ -882,6 +883,8 @@ clrsig validate scenarios
 ```
 
 `generate` writes one request file per spec operation (the same files the desktop **Import OpenAPI** button creates). `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything; like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
+
+`validate --strict` also reports scenarios that are valid but weak, as warnings that fail the check (exit `1`): a step with no assertions that extracts nothing (it passes whenever the request is answered), and a value a step extracts that no later step uses. With `--env <file>` (or `environment:` in `clrsig.yaml`) it also names a `{{name}}` that nothing defines: not a scenario variable, not extracted by an earlier step and not in the environment. Without `--strict` the command is unchanged. `--format json` gives each file a `warnings` list, and `valid` is false when there are any.
 
 ### `clrsig import`
 

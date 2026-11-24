@@ -556,3 +556,102 @@ func TestConformanceService_PreselectsFromTheProjectFile(t *testing.T) {
 		t.Errorf("an unusable file: %+v", d)
 	}
 }
+
+const setupTestSpec = `openapi: "3.0.3"
+info: {title: secured, version: "1"}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+paths:
+  /secure:
+    get:
+      operationId: secure
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {type: object, required: [ok], properties: {ok: {type: boolean}}}
+        "401": {description: no}
+`
+
+const setupTestLogin = `schemaVersion: "1"
+title: Login
+steps:
+  - label: Log in
+    request:
+      method: POST
+      url: "{{baseUrl}}/login"
+    extractions:
+      - name: token
+        source: jsonpath
+        path: $.token
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+`
+
+func setupServer(t *testing.T, loginStatus int) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/login":
+			w.WriteHeader(loginStatus)
+			_, _ = w.Write([]byte(`{"token":"tkn-s3cr3t-12345"}`))
+		case "/secure":
+			if r.Header.Get("Authorization") != "Bearer tkn-s3cr3t-12345" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestConformanceService_RunsASetupScenarioFirst(t *testing.T) {
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	spec := filepath.Join(ws, "api.yaml")
+	login := filepath.Join(ws, "scenarios", "login.yaml")
+	for p, text := range map[string]string{spec: setupTestSpec, login: setupTestLogin} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ctx := svc.GetConformContext(); len(ctx.Scenarios) != 1 || ctx.Scenarios[0].Label != "scenarios/login.yaml" && ctx.Scenarios[0].Label != `scenarios\login.yaml` {
+		t.Fatalf("the page offers the workspace scenarios: %+v", ctx.Scenarios)
+	}
+
+	srv := setupServer(t, 200)
+	without := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL})
+	if without.Error != "" || without.BlockedOperations != 1 || !without.Failed {
+		t.Fatalf("without a setup the secured operation is not sent: %+v", without)
+	}
+
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, SetupScenario: login})
+	if out.Error != "" || out.Failed || out.Passing != 1 || !strings.Contains(out.SetupNote, "values available to the check: token") {
+		t.Fatalf("with the setup: %+v", out)
+	}
+	if strings.Contains(out.SetupNote, "tkn-s3cr3t") {
+		t.Error("the note names values, never shows them")
+	}
+
+	bad := setupServer(t, 401)
+	fail := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: bad.URL, SetupScenario: login})
+	if !strings.Contains(fail.Error, "did not pass, so the check was not started") || strings.Contains(fail.Error, "tkn-s3cr3t") {
+		t.Fatalf("a failed setup stops the run and does not print the token: %q", fail.Error)
+	}
+
+	if outside := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, SetupScenario: filepath.Join(t.TempDir(), "x.yaml")}); !strings.Contains(outside.Error, "outside the open workspace") {
+		t.Errorf("a setup scenario outside the workspace is refused: %q", outside.Error)
+	}
+}

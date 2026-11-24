@@ -151,6 +151,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [negative, setNegative] = useState(false)
   const [failFast, setFailFast] = useState(false)
   const [failOnWarning, setFailOnWarning] = useState(false)
+  const [setupPath, setSetupPath] = useState('')
   const [recordCoverage, setRecordCoverage] = useState(false)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<ConformProgress | null>(null)
@@ -200,10 +201,11 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     if (d.paths?.length) setPathsText(d.paths.join(', '))
     if (d.negative) setNegative(true)
     if (d.failOnWarning) setFailOnWarning(true)
+    if (d.setupPath && (ctx.scenarios ?? []).some(f => f.path === d.setupPath)) setSetupPath(d.setupPath)
     if (d.requestTimeoutMs > 0) setTimeoutText(String(d.requestTimeoutMs))
     if (d.maxResponseTimeMs > 0) setMaxResponseText(String(d.maxResponseTimeMs))
     if (d.maxResponseTimeFor?.length) setPathLimitsText(d.maxResponseTimeFor.join('\n'))
-    if (d.tags?.length || d.paths?.length || d.negative || d.failOnWarning || d.requestTimeoutMs > 0 || d.maxResponseTimeMs > 0 || d.maxResponseTimeFor?.length) setOptionsOpen(true)
+    if (d.tags?.length || d.paths?.length || d.negative || d.failOnWarning || d.requestTimeoutMs > 0 || d.maxResponseTimeMs > 0 || d.maxResponseTimeFor?.length || d.setupPath) setOptionsOpen(true)
   }, [ctx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -247,7 +249,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     try {
       setOutput(await runConformance({
         specPath, baseUrl, envPath, allowWrites, confirmedRemote,
-        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning,
+        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning, setupScenario: setupPath,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
         maxResponseTimeMs: maxResponseBad || !maxResponseText ? 0 : maxResponseMs,
         maxResponseTimeFor: pathLimits.lines,
@@ -279,7 +281,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
             type="button"
             onClick={() => onOpenCliBuilder(cliValues({
               specPath, baseUrl, envPath, activeEnvironment: ctx.activeEnvironment ?? '',
-              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning, timeoutText, maxResponseText, allowWrites,
+              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning, setupPath, timeoutText, maxResponseText, allowWrites,
             }))}
             title="Open the CLI Command Builder with the choices on this page"
             className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
@@ -353,6 +355,16 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
         >
           <summary className="cursor-pointer text-xs font-medium">Options</summary>
+          <div className="mt-3 flex flex-col gap-1">
+            <label htmlFor="conf-setup" className="text-xs font-medium">Run a scenario first</label>
+            <select id="conf-setup" value={setupPath} onChange={e => setSetupPath(e.target.value)} className={inputClass}>
+              <option value="">None</option>
+              {(ctx.scenarios ?? []).map(f => <option key={f.path} value={f.path}>{f.label}</option>)}
+            </select>
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              Usually a login. What its steps extract (a token, an id) is available to the generated requests as {'{{name}}'}, so secured operations are sent. If it fails, the check does not start.
+            </p>
+          </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label htmlFor="conf-tags" className="text-xs font-medium">Tags</label>
@@ -463,6 +475,10 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
         </div>
 
         {output?.error && <p role="alert" className="text-xs text-red-400">{output.error}</p>}
+
+        {output?.setupNote && !output.error && (
+          <p data-testid="conform-setup-note" className="text-[11px] text-[var(--color-muted-foreground)]">{output.setupNote}</p>
+        )}
 
         {output && output.warnings?.length > 0 && (
           <ul aria-label="Environment warnings" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">

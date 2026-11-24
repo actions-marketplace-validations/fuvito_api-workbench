@@ -732,6 +732,8 @@ export interface ConformContext {
   activeEnvironment?: string
   // what the workspace's clrsig.yaml chooses for this page
   projectDefaults?: ConformDefaults
+  // workspace scenarios that can run first (a login, for example)
+  scenarios?: CliFile[]
 }
 
 export interface ConformDefaults {
@@ -744,6 +746,7 @@ export interface ConformDefaults {
   specPath?: string
   environmentPath?: string
   baseUrl?: string
+  setupPath?: string
   tags: string[]
   paths: string[]
   negative: boolean
@@ -774,6 +777,8 @@ export interface ConformRunInput {
   failFast: boolean
   // a warning fails the run (clrsig conform --fail-on warning)
   failOnWarning?: boolean
+  // a workspace scenario that runs first; what it extracts is available to the requests as {{name}}
+  setupScenario?: string
   maxResponseTimeMs?: number
   maxResponseTimeFor?: string[]
   timeoutMs: number
@@ -849,6 +854,8 @@ export interface ConformRunOutput {
   coverageNote?: string
   // the run's verdict, as the CLI's exit code 1
   failed?: boolean
+  // what the setup scenario made available (names, never values)
+  setupNote?: string
 }
 
 export type ConformReportFormat = 'html' | 'junit' | 'json' | 'markdown'

@@ -69,7 +69,7 @@ func runValues(c *projectconfig.Config, f func(*projectconfig.Run) []string) []s
 
 var configSettings = []configSetting{
 	{"spec", "", []string{"conform"}, func(c *projectconfig.Config, p func(string) string) []string { return one(p(c.Spec)) }},
-	{"environment", "env", []string{"conform", "run"}, func(c *projectconfig.Config, p func(string) string) []string { return one(p(c.Environment)) }},
+	{"environment", "env", []string{"conform", "run", "validate"}, func(c *projectconfig.Config, p func(string) string) []string { return one(p(c.Environment)) }},
 	{"baseUrl", "base-url", []string{"conform"}, func(c *projectconfig.Config, _ func(string) string) []string { return one(c.BaseURL) }},
 	{"conform.readOnly", "read-only", []string{"conform"}, func(c *projectconfig.Config, _ func(string) string) []string {
 		return conformValues(c, func(x *projectconfig.Conform) []string { return boolValue(x.ReadOnly) })
@@ -97,6 +97,9 @@ var configSettings = []configSetting{
 	}},
 	{"conform.baseline", "baseline", []string{"conform"}, func(c *projectconfig.Config, p func(string) string) []string {
 		return conformValues(c, func(x *projectconfig.Conform) []string { return one(p(x.Baseline)) })
+	}},
+	{"conform.setup", "setup", []string{"conform"}, func(c *projectconfig.Config, p func(string) string) []string {
+		return conformValues(c, func(x *projectconfig.Conform) []string { return one(p(x.Setup)) })
 	}},
 	{"run.scenarios", "", []string{"run", "validate"}, func(c *projectconfig.Config, p func(string) string) []string {
 		return runValues(c, func(x *projectconfig.Run) []string {

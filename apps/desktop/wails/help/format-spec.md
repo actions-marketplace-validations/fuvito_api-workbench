@@ -503,6 +503,7 @@ conform:
   tags: [users]                       # --tags
   paths: [/users]                     # --paths
   baseline: conform-baseline.yaml     # --baseline
+  setup: scenarios/login.yaml         # --setup: a scenario that runs first (a login)
 
 run:
   scenarios: [scenarios]              # run, validate: the files and folders to use when none are given

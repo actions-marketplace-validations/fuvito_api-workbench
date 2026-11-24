@@ -52,6 +52,7 @@ type Conform struct {
 	Tags               []string `json:"tags,omitempty"`
 	Paths              []string `json:"paths,omitempty"`
 	Baseline           string   `json:"baseline,omitempty"`
+	Setup              string   `json:"setup,omitempty"`
 }
 
 // Run holds the defaults of clrsig run, validate and impact.
@@ -173,6 +174,7 @@ func (c *Config) SetKeys() []string {
 		add(len(x.Tags) > 0, "conform.tags")
 		add(len(x.Paths) > 0, "conform.paths")
 		add(x.Baseline != "", "conform.baseline")
+		add(x.Setup != "", "conform.setup")
 	}
 	if x := c.Run; x != nil {
 		add(len(x.Scenarios) > 0, "run.scenarios")
@@ -267,7 +269,7 @@ func Keys() []string {
 
 var sectionKeys = map[string][]string{
 	"":        {"schemaVersion", "spec", "environment", "baseUrl", "conform", "run", "reports"},
-	"conform": {"readOnly", "negative", "failOn", "requestTimeoutMs", "maxResponseTimeMs", "maxResponseTimeFor", "tags", "paths", "baseline"},
+	"conform": {"readOnly", "negative", "failOn", "requestTimeoutMs", "maxResponseTimeMs", "maxResponseTimeFor", "tags", "paths", "baseline", "setup"},
 	"run":     {"scenarios", "failFast"},
 }
 
@@ -353,7 +355,7 @@ func stripExtensions(m map[string]any) {
 var knownKeys = []string{
 	"schemaVersion", "spec", "environment", "baseUrl", "conform", "run", "reports",
 	"readOnly", "negative", "failOn", "requestTimeoutMs", "maxResponseTimeMs", "maxResponseTimeFor", "tags", "paths", "baseline",
-	"scenarios", "failFast",
+	"scenarios", "failFast", "setup",
 }
 
 func describeDecodeError(err error) error {
@@ -439,6 +441,7 @@ func (c *Config) validate() error {
 	}
 	if c.Conform != nil {
 		check("conform.baseline", c.Conform.Baseline)
+		check("conform.setup", c.Conform.Setup)
 		for _, v := range c.Conform.Tags {
 			check("conform.tags", v)
 		}

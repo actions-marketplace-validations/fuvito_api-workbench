@@ -15,9 +15,11 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/application"
 	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
+	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/projectconfig"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
+	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/fuvito/api-workbench/packages/core/variables"
 )
@@ -59,6 +61,8 @@ type ConformContextIO struct {
 	ActiveEnvironment string `json:"activeEnvironment"`
 	// ProjectDefaults are the choices the workspace's clrsig.yaml makes for this page.
 	ProjectDefaults ConformDefaultsIO `json:"projectDefaults"`
+	// Scenarios are the workspace scenarios the page offers to run first (a login, for example).
+	Scenarios []CliFileIO `json:"scenarios"`
 }
 
 // ConformDefaultsIO is what the page preselects from the workspace's clrsig.yaml. The file is read
@@ -75,6 +79,7 @@ type ConformDefaultsIO struct {
 	SpecPath           string   `json:"specPath,omitempty"`
 	EnvironmentPath    string   `json:"environmentPath,omitempty"`
 	BaseURL            string   `json:"baseUrl,omitempty"`
+	SetupPath          string   `json:"setupPath,omitempty"`
 	Tags               []string `json:"tags"`
 	Paths              []string `json:"paths"`
 	Negative           bool     `json:"negative"`
@@ -167,6 +172,9 @@ func projectDefaults(ws string) ConformDefaultsIO {
 			out.MaxResponseTimeFor = c.MaxResponseTimeFor
 			apply("conform.maxResponseTimeFor", true)
 		}
+		if out.SetupPath = inside("conform.setup", c.Setup); out.SetupPath != "" {
+			apply("conform.setup", true)
+		}
 		if c.ReadOnly != nil && !*c.ReadOnly {
 			notes = append(notes, "conform.readOnly: false is not applied; this page sends only reads until you tick Allow writes")
 		}
@@ -178,10 +186,11 @@ func projectDefaults(ws string) ConformDefaultsIO {
 // GetConformContext lists the workspace files the page offers.
 func (s *ConformanceService) GetConformContext() ConformContextIO {
 	ws := s.ws.GetWorkspacePath()
-	out := ConformContextIO{Workspace: ws, Specs: []CliFileIO{}, Environments: []CliFileIO{}, ActiveEnvironment: s.ws.activeEnvPath, ProjectDefaults: projectDefaults(ws)}
+	out := ConformContextIO{Workspace: ws, Specs: []CliFileIO{}, Environments: []CliFileIO{}, Scenarios: []CliFileIO{}, ActiveEnvironment: s.ws.activeEnvPath, ProjectDefaults: projectDefaults(ws)}
 	if ws != "" {
 		out.Specs = findSpecs(ws)
 		out.Environments = listFiles(ws, "environments")
+		out.Scenarios = listFiles(ws, "scenarios")
 	}
 	return out
 }
@@ -282,6 +291,9 @@ type ConformRunInput struct {
 	// Vars override or add environment variables for this run only, as name=value (the same as
 	// `clrsig conform --var`). They are not saved and not part of the Get CLI command.
 	Vars []string `json:"vars"`
+	// SetupScenario is a workspace scenario that runs first (a login): what its steps extract is
+	// available to the generated requests as {{name}}, like clrsig conform --setup.
+	SetupScenario string `json:"setupScenario"`
 }
 
 type ConformProbeIO struct {
@@ -373,6 +385,8 @@ type ConformRunOutputIO struct {
 	// Failed is the run's verdict, the one the CLI turns into exit code 1: a violation, a failed
 	// probe, an operation that was not sent or got no answer, or (with a baseline) a new violation.
 	Failed bool `json:"failed"`
+	// SetupNote says what the setup scenario did: which values it made available (never the values).
+	SetupNote string `json:"setupNote,omitempty"`
 }
 
 // IsLocalBaseURL reports whether the URL points at this computer.
@@ -436,6 +450,17 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		return ConformRunOutputIO{Error: "response-time limits: " + err.Error()}
 	}
 
+	setupNote := ""
+	if in.SetupScenario != "" {
+		if err := s.insideWorkspace("setup scenario", in.SetupScenario); err != nil {
+			return ConformRunOutputIO{Error: err.Error()}
+		}
+		var errText string
+		if env, setupNote, errText = s.runSetup(in, env, baseURL); errText != "" {
+			return ConformRunOutputIO{Error: errText}
+		}
+	}
+
 	ctx, cancel := context.WithCancel(s.ctx)
 	s.mu.Lock()
 	if s.cancelRun != nil {
@@ -478,6 +503,7 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	s.mu.Unlock()
 
 	res := conformOutputIO(out, baseURL, in.AllowWrites)
+	res.SetupNote = setupNote
 	for _, ref := range variables.MissingEnv(env) {
 		res.Warnings = append(res.Warnings, ref.Message())
 	}
@@ -744,4 +770,73 @@ func scenarioDirsUsing(ws, specRef string) []string {
 		return nil
 	})
 	return dirs
+}
+
+// runSetup runs the scenario chosen to run first and returns the environment the check should use.
+// A setup that fails stops the run with its own report, as clrsig conform --setup does.
+func (s *ConformanceService) runSetup(in ConformRunInput, env *domain.Environment, baseURL string) (*domain.Environment, string, string) {
+	data, err := os.ReadFile(in.SetupScenario)
+	if err != nil {
+		return env, "", "reading the setup scenario: " + err.Error()
+	}
+	sc, err := serialization.ParseScenarioFile(data, filepath.Base(in.SetupScenario))
+	if err != nil {
+		return env, "", "parsing the setup scenario: " + err.Error()
+	}
+	if issues := scenario.Validate(sc, filepath.Dir(in.SetupScenario)); len(issues) > 0 {
+		msgs := make([]string, len(issues))
+		for i, iss := range issues {
+			msgs[i] = iss.String()
+		}
+		return env, "", "the setup scenario is not valid: " + strings.Join(msgs, "; ")
+	}
+	setupEnv := env
+	if baseURL != "" && !envHasVariable(env, "baseUrl") {
+		withBase, _ := variables.WithOverrides(env, []string{"baseUrl=" + baseURL})
+		setupEnv = withBase
+	}
+	keep := make([]string, 0, len(in.Vars))
+	for _, v := range in.Vars {
+		name, _, _ := strings.Cut(v, "=")
+		keep = append(keep, name)
+	}
+	dir := filepath.Dir(in.SetupScenario)
+	out := application.RunSetup(s.ctx, application.SetupInput{
+		Exec: buildExecutor(s.settings), Scenario: sc, Env: setupEnv, Keep: keep,
+		RefDirs: []string{dir, filepath.Join(dir, "..", "requests")},
+	})
+	label := filepath.Base(in.SetupScenario)
+	if !out.Passed {
+		return env, "", "The setup scenario " + label + " did not pass, so the check was not started:\n" + reporting.Text(out.Result)
+	}
+	if len(out.Names) == 0 {
+		return env, "Setup scenario " + label + " passed; it extracted nothing.", ""
+	}
+	result := out.Env
+	if setupEnv != env {
+		// the {{baseUrl}} added for the setup alone stays out of the check's environment
+		kept := make([]domain.EnvironmentVariable, 0, len(result.Variables))
+		for _, v := range result.Variables {
+			if v.Name == "baseUrl" && !envHasVariable(env, "baseUrl") {
+				continue
+			}
+			kept = append(kept, v)
+		}
+		c := *result
+		c.Variables = kept
+		result = &c
+	}
+	return result, "Setup scenario " + label + " passed; values available to the check: " + strings.Join(out.Names, ", "), ""
+}
+
+func envHasVariable(env *domain.Environment, name string) bool {
+	if env == nil {
+		return false
+	}
+	for _, v := range env.Variables {
+		if v.Name == name {
+			return true
+		}
+	}
+	return false
 }
