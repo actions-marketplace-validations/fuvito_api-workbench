@@ -49,6 +49,7 @@ func main() {
 	}
 
 	addTLSFlags(root)
+	addConfigFlags(root)
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())
@@ -153,8 +154,15 @@ func validateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate <scenario-file-or-folder> [more...]",
 		Short: "Check scenario files for errors without executing them",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args, err := applyProjectConfig(cmd, args)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("validate needs a scenario file or folder: pass one, or set run.scenarios in a clrsig.yaml")
+			}
 			type result struct {
 				path   string
 				issues []scenario.Issue
@@ -444,8 +452,15 @@ Exit codes:
 
 With --baseline, violations already recorded in the baseline file are accepted and
 only new ones fail the run; --write-baseline records the current violations.`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args, err := applyProjectConfig(cmd, args)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("conform needs a spec: pass one, or set spec: in a clrsig.yaml (clrsig init creates one)")
+			}
 			src := args[0]
 
 			plan, err := planReports(format, reports, outputFile)

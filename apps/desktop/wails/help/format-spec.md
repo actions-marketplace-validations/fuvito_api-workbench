@@ -482,6 +482,44 @@ A violation is identified by `operation` + `check` + `where` + `rule`. Rewording
 
 ---
 
+## Project File (`clrsig.yaml`)
+
+The defaults of a project for the flags that repeat. Read by `clrsig conform`, `run` and `validate` from the current folder or the nearest folder above it (the search stops at the first file, at a folder that contains `.git`, and at the home folder). `clrsig.yml` and `clrsig.json` are equivalent; a folder may hold only one. `--config <file>` chooses a file, `--no-config` ignores it. It is meant to be committed: it has **no secrets and no variables**, and `${NAME}` is rejected in it (use an environment file).
+
+```yaml
+schemaVersion: "1"                    # required — the quoted string "1"; a newer version is refused
+
+spec: specs/openapi.yaml              # conform: the spec argument
+environment: environments/ci.yaml     # conform, run: --env
+baseUrl: http://localhost:8080        # conform: --base-url
+
+conform:
+  readOnly: true                      # --read-only
+  negative: false                     # --negative
+  failOn: failure                     # --fail-on: failure | warning
+  requestTimeoutMs: 10000             # --request-timeout
+  maxResponseTimeMs: 0                # --max-response-time
+  maxResponseTimeFor: ["/reports=2000"]   # --max-response-time-for
+  tags: [users]                       # --tags
+  paths: [/users]                     # --paths
+  baseline: conform-baseline.yaml     # --baseline
+
+run:
+  scenarios: [scenarios]              # run, validate: the files and folders to use when none are given
+  failFast: false                     # run: --fail-fast
+
+reports:                              # conform, run: --report (repeatable), format=file
+  - junit=reports/conform.xml
+```
+
+- Every key is optional; a file with only `schemaVersion` is valid. Unknown keys are errors (`x-` keys are kept and ignored), and a key must be spelled exactly (`baseUrl`, not `baseURL`).
+- A path is relative to the **folder of the file**, so a command gives the same result from a subfolder and in CI. A URL or an absolute path is used as written.
+- **Precedence:** a flag or argument given on the command line, then a `CLRSIG_*` environment variable where one exists, then the file, then the built-in default. `--read-only=false` overrides `readOnly: true`.
+- A command that used the file says so on stderr: `Using clrsig.yaml (spec, baseUrl, conform.readOnly from the file)`.
+- `run` does not take `spec` from the file: a scenario's own `specFile` decides whether its responses are checked.
+
+---
+
 ## File Naming Conventions
 
 | File type | Convention | Example |

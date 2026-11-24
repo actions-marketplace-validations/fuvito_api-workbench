@@ -34,7 +34,7 @@ A breaking change ships with all of:
 
 ## 5. Derived and recorded data
 
-- **Machine-written files that can be regenerated** (a conformance baseline): the migration is "write it again with the same command". No `clrsig migrate` is needed. The program still reads the previous version in memory, says that it is old, never rewrites it on its own and never writes the old version. Hand-written files (scenarios, requests, environments, the project config) still need `clrsig migrate`.
+- **Machine-written files that can be regenerated** (a conformance baseline): the migration is "write it again with the same command". No `clrsig migrate` is needed. The program still reads the previous version in memory, says that it is old, never rewrites it on its own and never writes the old version. Hand-written files (scenarios, requests, environments, the project file `clrsig.yaml`, schemaVersion "1" since 0.9.1) still need `clrsig migrate`.
 
 - **Baselines** (`conform --write-baseline`): the violation key is part of the format. Changing it (D1, check ID plus operation) is a breaking change of the baseline schema; the first read of an old baseline upgrades it in memory and says so, and `--write-baseline` writes the new version.
 - **Contracts store, history database, run logs, config in `~/.clrsig/`**: not user-authored. They may change with a short migration in code (rename or rewrite on first read) and a line in the release notes; they must never fail to start the app. If data cannot be upgraded, keep the old file, start empty and say so.

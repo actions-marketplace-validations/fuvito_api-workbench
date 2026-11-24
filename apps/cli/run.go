@@ -66,8 +66,15 @@ Exit codes:
   0  every scenario passed
   1  at least one scenario failed
   2  a file could not be read or parsed, nothing was found, or a configuration error`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args, err := applyProjectConfig(cmd, args)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("run needs a scenario file or folder: pass one, or set run.scenarios in a clrsig.yaml")
+			}
 			return runScenarios(cmd, args, o)
 		},
 	}

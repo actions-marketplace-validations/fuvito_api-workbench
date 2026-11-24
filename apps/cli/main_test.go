@@ -19,6 +19,7 @@ import (
 func newTestRoot() *cobra.Command {
 	root := &cobra.Command{Use: "clrsig", SilenceErrors: true, SilenceUsage: true}
 	addTLSFlags(root)
+	addConfigFlags(root)
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())

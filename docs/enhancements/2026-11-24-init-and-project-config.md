@@ -1,6 +1,6 @@
 # `clrsig init` and the project config file (0.9.1)
 
-- **Status:** Accepted
+- **Status:** Accepted; in progress (phase 1, the config, built 2026-11-24)
 - **Date:** 2026-11-24
 - **Backlog:** B-021 (`clrsig init`), B-089 (project config file); related: B-015 (CLI Command Builder snippets), B-084 (`conform --setup`) and B-020 (`validate --strict`), which are separate and need no proposal
 - **Depends on:** the schema migration policy (`docs/process/schema-migration-policy.md`), accepted for new persisted files
@@ -50,7 +50,7 @@ Name: `clrsig.yaml`. `clrsig.yml` and `clrsig.json` are equivalent (one serializ
 ```yaml
 schemaVersion: "1"
 
-spec: specs/openapi.yaml            # --spec / the conform and impact spec argument
+spec: specs/openapi.yaml            # the conform spec argument (not applied to run: a scenario's specFile decides)
 environment: environments/ci.yaml   # --env
 baseUrl: http://localhost:8080      # --base-url
 
@@ -207,3 +207,4 @@ Each phase ships green on its own. Phases 1 and 2 are the 0.9.1 scope; 3 and 4 f
 |---|---|---|
 | 2026-11-24 | Proposal written; open decisions 1 to 8 above | Claude, awaiting owner |
 | 2026-11-24 | Open decisions 1 to 8 accepted as recommended: `clrsig.yaml` (with `.yml` and `.json`); walk up to the first file, stopping at `.git`; no `vars`; `init` writes a workflow only with `init github-actions --write`; no starter scenario; `config show` in phase 3; desktop reads the file read-only in phase 4 (may slip); `environment` is a path | owner |
+| 2026-11-24 | Phase 1 built. Clarified while building: `spec` applies to `conform` only (not `run --spec`, which would override every scenario's own `specFile`); `impact` does not read the file yet; a key must be spelled exactly (the JSON decoder alone would accept another letter case) | Claude |

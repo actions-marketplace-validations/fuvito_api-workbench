@@ -917,3 +917,10 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 
 - **Tag `v0.9.0` on `19956dd`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published (formats and baseline format 2 first); Scoop updated by the tap-bump commit and installed on Windows (`clrsig version v0.9.0`); the released CLI shows `--fail-on`. The draft notes file was deleted after publishing.
 - **Not verified:** the Docker image run (no daemon on the machine), the Homebrew install (no Mac) and the Action at `@v0.9.0`.
+
+### 2026-11-24 — Project file `clrsig.yaml`, phase 1 of `docs/enhancements/2026-11-24-init-and-project-config.md`
+
+- **Core:** `packages/core/projectconfig` (`Discover`, `Load`, `Parse`, `ForCommandLine`): `schemaVersion: "1"`, YAML or JSON through one model, keys checked exactly (unknown keys are errors with a "did you mean", `x-` kept), values checked with the flags' own functions (`checks.ParseFailOn`, `conformance.ParsePathLimits`), `${...}` rejected, two files in one folder is an error, search stops at the first file / `.git` / the home folder.
+- **CLI:** persistent `--config` and `--no-config`; `applyProjectConfig` (`apps/cli/projectconfig.go`) fills only flags and arguments the user did not give: `conform` (spec, environment, baseUrl, the `conform` keys, reports), `run` (environment, `run.scenarios`, `run.failFast`, reports), `validate` (`run.scenarios`). Paths are relative to the file and shown relative to the current folder; stderr says `Using clrsig.yaml (...)`. A missing argument now fails with "conform needs a spec: pass one, or set spec: in a clrsig.yaml" instead of cobra's argument-count message.
+- **Clarified:** `spec` does not apply to `run`; `impact` does not read the file yet.
+- **Not yet:** `clrsig init` and `init github-actions` (phase 2), `config show` (phase 3), desktop (phase 4). Docs: `format-spec.md` "Project File", user guide.
