@@ -912,3 +912,8 @@ Commercial or enterprise-edition ideas, and anything else that is out of scope f
 ### 2026-11-24 — 0.9.0 prepared (phase E), not tagged
 
 - Version 0.9.0 in `AboutDialog.tsx` (entry dated `unreleased`), its tests and the user guide; draft GitHub notes in `docs/process/release-notes-0.9.0-draft.md` with the two changes that can turn CI red first (formats, baseline format 2). **Waiting for:** the owner's answers to section 9 of the proposal and a green CI on the final commit; then set the date and tag.
+
+### 2026-11-24 — v0.9.0 released
+
+- **Tag `v0.9.0` on `19956dd`** (CI green on that exact commit). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published (formats and baseline format 2 first); Scoop updated by the tap-bump commit and installed on Windows (`clrsig version v0.9.0`); the released CLI shows `--fail-on`. The draft notes file was deleted after publishing.
+- **Not verified:** the Docker image run (no daemon on the machine), the Homebrew install (no Mac) and the Action at `@v0.9.0`.
