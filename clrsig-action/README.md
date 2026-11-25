@@ -3,7 +3,7 @@
 Run API scenarios, validate spec conformance, or detect breaking API changes in CI.
 
 ```yaml
-- uses: fuvito/api-workbench@v0.12.0   # an exact release tag
+- uses: fuvito/api-workbench@v0.13.0   # an exact release tag
   with:
     command: run
     scenario: tests/my-scenario.yaml
@@ -72,7 +72,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 ### Run a scenario and produce a JUnit report
 
 ```yaml
-- uses: fuvito/api-workbench@v0.12.0
+- uses: fuvito/api-workbench@v0.13.0
   with:
     command: run
     scenario: tests/api-tests.yaml
@@ -90,7 +90,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 ### Validate spec conformance
 
 ```yaml
-- uses: fuvito/api-workbench@v0.12.0
+- uses: fuvito/api-workbench@v0.13.0
   with:
     command: conform
     spec: openapi.yaml
@@ -104,7 +104,7 @@ Run API scenarios, validate spec conformance, or detect breaking API changes in 
 
 ```yaml
 - name: Check for breaking changes
-  uses: fuvito/api-workbench@v0.12.0
+  uses: fuvito/api-workbench@v0.13.0
   with:
     command: diff
     base-spec: https://raw.githubusercontent.com/${{ github.repository }}/main/openapi.yaml

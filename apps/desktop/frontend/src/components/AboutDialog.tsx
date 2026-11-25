@@ -4,6 +4,15 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.0',
+    date: '2026-11-25',
+    items: [
+      'Behaviour change, a run that passed before can now fail: conform and Check Conformance treat an empty value as missing in the URL path, a bearer token, an API key and a basic user name. Before, GET /users/{id} with an empty id was sent as GET /users/, and a declared 400, 401 or 404 showed as passing. Such an operation is now "not sent" and its negative probes are skipped; an empty basic password, other empty values and clrsig run are unchanged',
+      'clrsig conform --list shows every operation with the values its request needs and which are missing, without sending anything to the API (text or JSON)',
+      'clrsig init --spec lists the values the spec needs in the new environment files, as comments with the operations that use each; credentials are marked secret. Existing files are not changed',
+    ],
+  },
+  {
     version: '0.12.0',
     date: '2026-11-25',
     items: [
