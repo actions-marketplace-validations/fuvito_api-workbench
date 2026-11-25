@@ -979,3 +979,9 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Run 45706460240, by hand against v0.13.1:** the Docker image (anonymous pull, version, `validate --spec` on a mounted folder) and the Action from the tag on Linux, macOS and Windows **passed**. Homebrew **failed**: the corrected tap cloned, then `brew install clrsig` was refused, "Refusing to load formula ... from untrusted tap". The earlier tap-address fix was therefore not enough.
 - **Fix:** the documents and the smoke job install `fuvito/api-workbench/clrsig`; by Homebrew's documentation the full name trusts that one formula, which is narrower than trusting the tap. `TestBrewTapGivesTheRepositoryAddress` now also rejects the short name. Whether it installs is confirmed only by the next smoke run.
 - **Also:** the detailed user guide proposal (B-123) was accepted.
+
+### 2026-11-25 — All post-release smoke checks pass for v0.13.1
+
+- **Run 45708219243** (by hand, after `68ce24b`): Docker image, the Action from the tag on Linux, macOS and Windows, and Homebrew on macOS **all passed**. Homebrew reported "Trusted formula fuvito/api-workbench/clrsig" and installed v0.13.1.
+- **This closes** the "Docker image run" and "Homebrew install" items that the release entries listed as not verified, for v0.13.1.
+- **Still not verified:** the call of the smoke workflow from `release.yml` (at the next release), the remote reference `@v0.13.1` (the sandbox pins v0.13.0), the Scoop upgrade on the maintainer's machine, and the desktop app by eye.

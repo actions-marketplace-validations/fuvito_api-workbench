@@ -336,7 +336,7 @@ It did not change code, tests or documentation; the only files created are this 
 - ☑ **E1** (60) Smoke job in `release.yml`: Docker version, tagged Action, Homebrew install.
 - ☑ **E2** (62) Bindings sync check in CI.
 
-> **Claude, after batch E (2026-11-25):** built; neither workflow has run yet.
+> **Claude, after batch E (2026-11-25):** built, pushed and run. All five smoke jobs pass against v0.13.1 (the second run: Homebrew also needed the full formula name), and the bindings checks pass in CI (the first run failed on file modes only). The call from `release.yml` has not happened yet.
 > - **E1** is `smoke.yml`, a reusable workflow: `release.yml` calls it after publishing, and it can be run by hand, so it can be tried on the newest release without making a new one. It covers Docker, the Action from the tag on three systems, and Homebrew.
 > - **Found while building it (B-127):** the documented `brew tap fuvito/api-workbench` could not work, because the repository it would clone does not exist. Fixed in the documents; the macOS job is the first real test of the corrected commands.
 > - **E2** is two checks, not one. Comparing the committed bindings alone would not have met idea 32: the Go data types are generated into an ignored file, and the app casts results to hand-written types. A second check compares their field names (71 of 80 types; no mismatch today). Planted drift was caught by both.
