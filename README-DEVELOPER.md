@@ -17,7 +17,7 @@ The `clrsig` CLI works independently of the desktop app.
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap fuvito/api-workbench
+brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
 brew install clrsig
 ```
 

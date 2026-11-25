@@ -64,7 +64,7 @@ The Docker job in `release.yml` pushes to `ghcr.io` using `GITHUB_TOKEN`. This w
 After the `update-tap` CI job runs (automatically after a tag push), confirm:
 
 ```bash
-brew tap fuvito/api-workbench
+brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
 brew install clrsig
 clrsig --version
 ```

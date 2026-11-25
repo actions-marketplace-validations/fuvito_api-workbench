@@ -282,3 +282,14 @@ jobs:
           commit_message: "chore: bump tap to ${{ github.ref_name }} [skip ci]"
           file_pattern: Formula/clrsig.rb bucket/clrsig.json
           branch: main
+
+  # Checks what was just published as a user would use it. The release is already out, so a failure
+  # here is a warning to fix forward: it turns this run red and cannot undo anything.
+  smoke:
+    name: Post-release smoke
+    needs: [publish, update-tap]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/smoke.yml
+    with:
+      tag: ${{ github.ref_name }}

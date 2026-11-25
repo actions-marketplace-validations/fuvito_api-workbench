@@ -117,6 +117,28 @@ jobs:
         run: pnpm test
         working-directory: apps/desktop/frontend
 
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.1
+
+      - name: Regenerate the bindings
+        run: wails generate module
+        working-directory: apps/desktop/wails
+
+      # The generated method bindings are committed, so the frontend builds without Wails.
+      - name: The committed bindings are current
+        run: |
+          if ! git diff --exit-code -- apps/desktop/frontend/wailsjs || [ -n "$(git ls-files --others --exclude-standard apps/desktop/frontend/wailsjs)" ]; then
+            git status --short apps/desktop/frontend/wailsjs
+            echo "::error::The bindings in apps/desktop/frontend/wailsjs are out of date. Run 'wails generate module' in apps/desktop/wails and commit the result."
+            exit 1
+          fi
+
+      # models.ts is not committed and the app uses hand-written types, so those are compared here.
+      - name: The hand-written types match the Go structs
+        run: |
+          python3 -m unittest discover -s scripts
+          python3 scripts/check_bindings.py
+
   browser-tests:
     name: Desktop — browser tests
     runs-on: ubuntu-latest

@@ -213,7 +213,7 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 ```bash
 # Homebrew (macOS / Linux)
-brew tap fuvito/api-workbench
+brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
 brew install clrsig
 
 # Scoop (Windows)

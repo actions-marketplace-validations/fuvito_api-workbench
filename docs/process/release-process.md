@@ -107,6 +107,7 @@ This triggers `release.yml`, which runs these jobs in order:
 5. `docker` — builds and pushes to GHCR
 6. `publish` — downloads all artifacts, generates SHA256 sidecars, creates GitHub Release
 7. `update-tap` — runs `scripts/update-tap.py`, auto-commits updated `Formula/clrsig.rb` and `bucket/clrsig.json`
+8. `smoke` (`.github/workflows/smoke.yml`) — after publishing, checks as a user would: the Docker image reports the version and validates a mounted spec (no registry login); the Action from the tag installs and runs that release on Linux, macOS and Windows; `brew tap` + `brew install clrsig` gives that version on macOS. **It cannot stop a release** (it is already out): a red `smoke` job means fix forward. To run it again for the newest release: Actions → *Post-release smoke* → Run workflow, with the tag. Not covered by it: the remote reference `uses: fuvito/api-workbench@<tag>` (`uses:` takes no variable), the Scoop install, and the desktop apps.
 
 Watch the run at `github.com/fuvito/api-workbench/actions` (or `gh run watch <id>`). The release job installs the pinned Wails CLI (`wails@v2.17.1`, matching `go.mod`); raise the pin together with the app, never to `@latest`.
 
@@ -151,7 +152,7 @@ docker run --rm ghcr.io/fuvito/api-workbench:latest --version
 The `update-tap` job auto-commits updated SHA256s to `Formula/clrsig.rb`. Verify the formula commit landed on `main`, then test:
 
 ```bash
-brew tap fuvito/api-workbench
+brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
 brew upgrade clrsig   # or install if first time
 clrsig --version
 ```

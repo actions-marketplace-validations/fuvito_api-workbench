@@ -1,0 +1,96 @@
+name: Post-release smoke
+
+# Does what we published work the way the documents tell a user to use it? release.yml calls this
+# after the release is out, so a failure cannot stop a release: it turns the release run red, and
+# the fix goes into the next one. It can also be run by hand for the newest release.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'The release tag, for example v1.2.3'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The newest release tag, for example v1.2.3 (Homebrew only has the newest)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: Smoke — Docker image
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      # No registry login: a user pulls the public image without one.
+      - name: The image reports the release version
+        run: |
+          got="$(docker run --rm "ghcr.io/${GITHUB_REPOSITORY}:${TAG}" --version)"
+          echo "$got"
+          [ "$got" = "clrsig version ${TAG}" ] || { echo "::error::The image ghcr.io/${GITHUB_REPOSITORY}:${TAG} says '${got}', not 'clrsig version ${TAG}'. 'dev' means the VERSION build argument was lost."; exit 1; }
+
+      - name: The image checks a spec from a mounted folder
+        run: docker run --rm -v "$PWD:/workspace" "ghcr.io/${GITHUB_REPOSITORY}:${TAG}" validate --spec /workspace/examples/server/openapi.yaml
+
+  action:
+    name: Smoke — Action (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # `uses:` cannot take a variable, so the tag is checked out and its action.yml run from there,
+      # with the binary of the same release. This does not exercise the remote reference
+      # fuvito/api-workbench@<tag> itself.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Run the released Action with the released binary
+        id: validate
+        uses: ./
+        with:
+          command: validate
+          spec: examples/server/openapi.yaml
+          version: ${{ inputs.tag }}
+
+      - name: Check the result and the installed version
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          RESULT: ${{ steps.validate.outputs.result }}
+        run: |
+          [ "$RESULT" = "0" ] || { echo "::error::The Action's result was '${RESULT}', expected 0."; exit 1; }
+          got="$(clrsig --version)"
+          echo "$got"
+          [ "$got" = "clrsig version ${TAG}" ] || { echo "::error::The Action installed '${got}', not ${TAG}."; exit 1; }
+
+  homebrew:
+    name: Smoke — Homebrew (macOS)
+    runs-on: macos-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      # The commands of the README, as written there. The tap reads the formula on main, which the
+      # release updates before this runs.
+      - name: Install from the tap
+        run: |
+          brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
+          brew install clrsig
+
+      - name: The installed version is the release
+        run: |
+          got="$("$(brew --prefix)/bin/clrsig" --version)"
+          echo "$got"
+          [ "$got" = "clrsig version ${TAG}" ] || { echo "::error::Homebrew installed '${got}', not ${TAG}. Check Formula/clrsig.rb on main (the formula only ever has the newest release)."; exit 1; }

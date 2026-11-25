@@ -85,3 +85,6 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+# Python caches (scripts/)
+__pycache__/
