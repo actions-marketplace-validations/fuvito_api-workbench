@@ -364,7 +364,7 @@ Light-theme versions of the Contracts, conformance, Workspace and sidebar images
 
 ## Contributing and developer docs
 
-See [README-DEVELOPER.md](README-DEVELOPER.md) for build instructions, project structure, test commands, architecture rules, and release procedures.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report a problem (include the check ID from the report), propose a change and what a change must satisfy, and [README-DEVELOPER.md](README-DEVELOPER.md) for build instructions, project structure, test commands, architecture rules, and release procedures. Found a wrong or missing finding? [Open an issue](https://github.com/fuvito/api-workbench/issues/new/choose); in the app, **Copy as issue** on a finding writes most of it for you.
 
 ---
 

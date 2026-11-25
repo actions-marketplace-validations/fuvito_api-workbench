@@ -1,0 +1,56 @@
+name: A wrong or missing finding
+description: Clear Signal passed something it should not have, failed something that is fine, or a message is unclear
+title: "[finding] "
+labels: ["finding"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        In the desktop app, **Copy as issue** on a finding writes most of this for you. Please remove tokens, passwords and private data.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong
+      options:
+        - False pass (it said the API conforms, but it does not)
+        - False failure (it reported a problem that is not one)
+        - The message is unclear or does not say how to fix it
+        - A check is missing
+    validations:
+      required: true
+  - type: input
+    id: check
+    attributes:
+      label: Check ID
+      description: From the report, for example CS-RESP-005 (Help, What We Check lists them). Leave empty for a missing check.
+      placeholder: CS-RESP-005
+  - type: input
+    id: operation
+    attributes:
+      label: Operation
+      placeholder: GET /users/{id}
+  - type: textarea
+    id: spec
+    attributes:
+      label: The smallest spec that shows it
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: response
+    attributes:
+      label: What the server answered (status, headers that matter, body)
+      render: text
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected Clear Signal to say
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: clrsig version
+      description: "clrsig --version, or Help, About in the app"
+    validations:
+      required: true

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
@@ -358,6 +359,12 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
                   <span className="text-[var(--color-foreground)] font-mono">{value}</span>
                 </div>
               ))}
+              <div className="flex gap-3 text-xs">
+                <span className="w-20 shrink-0 text-[var(--color-muted-foreground)]">Feedback</span>
+                <button type="button" onClick={() => openExternal(FEEDBACK_URL)} className="text-left text-[var(--color-accent)] hover:underline">
+                  Report a problem or suggest an idea
+                </button>
+              </div>
             </div>
           )}
 
