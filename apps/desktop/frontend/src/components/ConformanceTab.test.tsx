@@ -514,6 +514,7 @@ describe('where the problem is', () => {
     expect(within(card).queryByTestId('finding-spec')).not.toBeInTheDocument()
   })
   it('applies a choice made in the sidebar and reports the selection and the last result', async () => {
+    bridge.runConformance.mockResolvedValue(output)
     const onSelectionChange = vi.fn()
     const onResult = vi.fn()
     const { rerender } = render(<ConformanceTab onSelectionChange={onSelectionChange} onResult={onResult} />)
@@ -529,7 +530,8 @@ describe('where the problem is', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
     await screen.findByTestId('conform-headline')
-    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ specPath: '/ws/api.yaml', specTitle: 'Shop', total: 7, covered: 5, passing: 4, failing: 1 }))
+    // onResult runs in an effect, which can run after the headline is already on screen.
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ specPath: '/ws/api.yaml', specTitle: 'Shop', total: 7, covered: 5, passing: 4, failing: 1 })))
   })
 })
 
