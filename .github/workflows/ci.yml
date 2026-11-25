@@ -125,10 +125,11 @@ jobs:
         working-directory: apps/desktop/wails
 
       # The generated method bindings are committed, so the frontend builds without Wails.
+      # core.fileMode=false: on Linux Wails writes the files as executable, which is not drift.
       - name: The committed bindings are current
         run: |
-          if ! git diff --exit-code -- apps/desktop/frontend/wailsjs || [ -n "$(git ls-files --others --exclude-standard apps/desktop/frontend/wailsjs)" ]; then
-            git status --short apps/desktop/frontend/wailsjs
+          if ! git -c core.fileMode=false diff --exit-code -- apps/desktop/frontend/wailsjs || [ -n "$(git ls-files --others --exclude-standard apps/desktop/frontend/wailsjs)" ]; then
+            git -c core.fileMode=false status --short apps/desktop/frontend/wailsjs
             echo "::error::The bindings in apps/desktop/frontend/wailsjs are out of date. Run 'wails generate module' in apps/desktop/wails and commit the result."
             exit 1
           fi

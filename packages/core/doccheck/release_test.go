@@ -150,7 +150,7 @@ func TestCIChecksTheBindings(t *testing.T) {
 	ci := repoFile(t, ".github", "workflows", "ci.yml")
 	for _, want := range []string{
 		"wails generate module",
-		"git diff --exit-code -- apps/desktop/frontend/wailsjs",
+		"git -c core.fileMode=false diff --exit-code -- apps/desktop/frontend/wailsjs",
 		"git ls-files --others --exclude-standard apps/desktop/frontend/wailsjs",
 		"python3 -m unittest discover -s scripts",
 		"python3 scripts/check_bindings.py",
