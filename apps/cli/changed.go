@@ -9,6 +9,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
+	"github.com/fuvito/api-workbench/packages/core/scenario"
 )
 
 // changedOperationScope compares the spec with its version at a git ref and returns the operations
@@ -70,4 +71,24 @@ func githubLocator(src string, data []byte) reporting.Locator {
 	return func(method, specPath string) (string, int) {
 		return file, lines[openapi.OperationKey(method, specPath)]
 	}
+}
+
+// githubRuns prepares scenario runs for annotation: the file relative to the current folder (when it
+// is inside it) and the line of each step.
+func githubRuns(runs []*scenarioRun) []reporting.GitHubRun {
+	cwd, _ := os.Getwd()
+	out := make([]reporting.GitHubRun, 0, len(runs))
+	for _, r := range runs {
+		gr := reporting.GitHubRun{Result: r.result}
+		if abs, err := filepath.Abs(r.path); err == nil && cwd != "" {
+			if rel, err := filepath.Rel(cwd, abs); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				gr.File = filepath.ToSlash(rel)
+				if data, err := os.ReadFile(abs); err == nil {
+					gr.StepLines = scenario.StepLines(data)
+				}
+			}
+		}
+		out = append(out, gr)
+	}
+	return out
 }

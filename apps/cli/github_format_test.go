@@ -33,15 +33,18 @@ func TestConformFormatGitHub_AnnotatesTheOperationLineInTheSpec(t *testing.T) {
 	}
 }
 
-func TestConformFormatGitHub_IsAScreenFormatOfConformOnly(t *testing.T) {
+func TestFormatGitHub_IsAScreenFormatOfConformAndRunOnly(t *testing.T) {
 	srv, _ := hitServer(t)
 	project(t, map[string]string{"openapi.yaml": changedSpec("", ""), "s.yaml": scenarioYAML(srv.URL)})
 
 	if _, err := exec(t, "conform", "openapi.yaml", "--base-url", srv.URL, "--report", "github=out.txt"); err == nil || !strings.Contains(err.Error(), "unknown format") {
 		t.Errorf("annotations are for the screen, not a --report file: %v", err)
 	}
-	if _, err := exec(t, "run", "s.yaml", "--format", "github"); err == nil || !strings.Contains(err.Error(), "unknown --format") {
-		t.Errorf("run does not offer it: %v", err)
+	if _, err := exec(t, "diff", "openapi.yaml", "openapi.yaml", "--format", "github"); err == nil || !strings.Contains(err.Error(), "unknown --format") {
+		t.Errorf("diff does not offer it: %v", err)
+	}
+	if _, err := exec(t, "run", "s.yaml", "--report", "github=out.txt"); err == nil || !strings.Contains(err.Error(), "unknown format") {
+		t.Errorf("run takes it as a screen format, not a report file: %v", err)
 	}
 	if _, err := exec(t, "conform", "openapi.yaml", "--base-url", srv.URL, "--format", "nope"); err == nil || !strings.Contains(err.Error(), "github") {
 		t.Errorf("the list of formats names github for conform: %v", err)

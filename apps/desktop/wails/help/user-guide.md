@@ -680,7 +680,7 @@ Report commands choose their format with `--format` (`-f`) and print to the scre
 | `junit` | CI test dashboards and pull-request annotations (Jenkins, GitHub, GitLab, CircleCI) | `run`, `conform`, `diff`, `bundle run` |
 | `html` | A report a person can open in a browser, attach to a ticket or keep as a CI artifact | `run`, `conform`, `diff`, `bundle run` |
 | `markdown` | Pull-request comments and the GitHub job summary | `run`, `conform`, `diff`, `bundle run` |
-| `github` | GitHub Actions workflow commands: every finding appears on the pull request and in the log, with the check ID in the title and, when the spec is a file in the repository, on the line of the operation (it prints nothing else, ends with one summary notice, and is meant for the screen: it is not accepted as a `--report` file) | `conform` |
+| `github` | GitHub Actions workflow commands: every finding appears on the pull request and in the log, with the check ID in the title and, when the spec is a file in the repository, on the line of the operation (it prints nothing else, ends with one summary notice, and is meant for the screen: it is not accepted as a `--report` file). For `run`, a failed assertion, an unsent request or a response that breaks the spec is annotated on the line of its step in the scenario file | `conform`, `run` |
 | `csv` | Spreadsheets (the Contracts coverage data) | `coverage list`, `coverage quality` (which also take `markdown` and `html`) |
 
 ```bash
