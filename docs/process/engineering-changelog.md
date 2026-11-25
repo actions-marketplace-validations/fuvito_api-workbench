@@ -909,3 +909,9 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Not verified:** the Scoop upgrade on the maintainer's machine (the command was not permitted in this session; the manifest and its hash were checked), the Docker image run, the Homebrew install (no Mac), a workflow using the Action by its remote reference `@v0.12.0`, and the desktop app by eye.
 - **Backlog:** B-123 added (a detailed, CLI-first user guide; owner request).
 - **Open:** batches D and E; the sandbox still pins v0.11.0 and accepts both wordings of the changed line.
+
+### 2026-11-25 — Sandbox repository adopts v0.12.0
+
+- `api-workbench-sandbox` pins v0.12.0 (`780bc2e`); its one changed expectation now accepts only the "not sent" wording, and CS-GAP-012 is in its gaps map. Its CI passed on Linux with the released v0.12.0 in the container (all expectation files and the random specs).
+- **The remote Action reference is verified (closes that item of the v0.12.0 entry):** the sandbox's manual Action smoke test ran `uses: fuvito/api-workbench@v0.12.0` (resolved to `3c3ba8f`) on `ubuntu-latest`: the download's checksum was verified, a correct API gave exit 0 and a broken case exit 1. Not covered: the same by remote reference on macOS or Windows, and the `clrsig-action` subdirectory form.
+- **Still not verified for v0.12.0:** the Docker image run, the Homebrew install, the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
