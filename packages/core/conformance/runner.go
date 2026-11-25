@@ -339,7 +339,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			or.BodySnippet = snippet(resp.BodyString(), 200)
 		}
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), or.Path, resp.StatusCode, resp)
-		if limit := opts.limitFor(or.Path); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
+		if limit := opts.limitFor(or.SpecPath, or.Path); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
 			// The message holds the limit, not the measured time, so a baseline stays stable
 			// between runs; the time is in DurationMs and in the finding's Got.
 			or.Violations = append(or.Violations, openapi.ValidationError{
@@ -403,14 +403,33 @@ func matchesTags(opTags, filterTags []string) bool {
 
 // limitFor returns the response-time limit for an operation path: the longest matching
 // PathLimits prefix, otherwise MaxResponseTimeMs.
-func (o Options) limitFor(opPath string) int {
-	best, limit := -1, o.MaxResponseTimeMs
+func (o Options) limitFor(specPath, sentPath string) int {
+	best, limit := "", o.MaxResponseTimeMs
 	for prefix, ms := range o.PathLimits {
-		if strings.HasPrefix(opPath, prefix) && len(prefix) > best {
-			best, limit = len(prefix), ms
+		if hasPathPrefix(prefix, specPath, sentPath) && (best == "" || longerPrefix(prefix, best)) {
+			best, limit = prefix, ms
 		}
 	}
 	return limit
+}
+
+// longerPrefix orders the prefixes that match one operation: the one naming more of the path wins,
+// however its parameters are written. Between two spellings of the same path the {{name}} one
+// wins, which is the only one that used to match; the last rule just keeps the answer stable.
+func longerPrefix(a, b string) bool {
+	if x, y := len(SpecStyle(a)), len(SpecStyle(b)); x != y {
+		return x > y
+	}
+	if len(a) != len(b) {
+		return len(a) > len(b)
+	}
+	return a > b
+}
+
+// hasPathPrefix says whether a prefix the user typed starts an operation's path. Both spellings of
+// a parameter count: the spec's ({id}) and the generated request's ({{id}}).
+func hasPathPrefix(prefix, specPath, sentPath string) bool {
+	return strings.HasPrefix(specPath, prefix) || strings.HasPrefix(sentPath, prefix) || strings.HasPrefix(specPath, SpecStyle(prefix))
 }
 
 // ParsePathLimits reads repeated /prefix=ms values (for --max-response-time-for).
@@ -433,12 +452,12 @@ func ParsePathLimits(values []string) (map[string]int, error) {
 	return out, nil
 }
 
-func matchesPathPrefix(opPath string, prefixes []string) bool {
+func matchesPathPrefix(specPath, sentPath string, prefixes []string) bool {
 	if len(prefixes) == 0 {
 		return true
 	}
 	for _, p := range prefixes {
-		if strings.HasPrefix(opPath, p) {
+		if hasPathPrefix(p, specPath, sentPath) {
 			return true
 		}
 	}

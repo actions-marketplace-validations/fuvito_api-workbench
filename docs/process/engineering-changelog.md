@@ -946,3 +946,11 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Found there, not fixed:** `--paths` filters operations on the generated path and probes on the spec path, so a prefix with a parameter silently selects one side; with the `{{id}}` spelling the probe summary says `PASSED  0 probes`. v0.12.0 behaves the same. Catalog CS-GAP-014, pinned by `TestPathsFilter_WithAParameterSelectsOnlyOneSide_KnownGap`; backlog B-125; sandbox F-036.
 - **Observed, as designed:** with an empty basic password the sandbox's refused login (a declared 401) shows PASS (CS-GAP-013, now pinned there).
 - **Still not verified for v0.13.0:** the Docker image run, the Homebrew install, the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
+
+### 2026-11-25 — `--paths` and per-path limits take either spelling of a parameter (B-125)
+
+- **Bug:** operations were filtered on the generated path (`/items/{{id}}`) and negative probes on the spec path (`/items/{id}`), although the flag is described as taking the spec's spelling. One side silently selected nothing; with the generated spelling the probe summary said `PASSED  0 probes`. `--max-response-time-for` matched only the generated spelling, so a limit written as the spec writes it did nothing, without a word. In v0.12.0 too.
+- **Fix:** one rule, `hasPathPrefix`, for operations, probes, `--list` and the limits: a prefix matches if it starts the spec path or the generated path, or its `{name}` form starts the spec path. Among limits that match, the one naming more of the path wins (braces do not count); of two spellings of the same path, the `{{name}}` one, which was the only one that used to apply.
+- **Behaviour change (release note):** a selection can only grow. With a parameter in the prefix, a command may now run operations or probes it skipped before, and a time limit written in the spec's spelling starts to apply, so a run can turn red.
+- **Guards:** `conformance/paths_filter_test.go`, which failed before the change. The pinned-bug test and its catalog gap row were removed; CS-PROBE-005 and CS-RESP-014 describe the behaviour.
+- **Not done:** not released; the sandbox's F-036 stays open until a release can be verified there.

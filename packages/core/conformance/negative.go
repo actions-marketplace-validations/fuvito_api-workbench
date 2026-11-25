@@ -96,7 +96,7 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 
 	for _, probe := range probes {
 		// A tag or path filter leaves an operation out, and its probes with it.
-		if !matchesTags(probe.Tags, opts.Tags) || !matchesPathPrefix(probe.Path, opts.Paths) || !matchesOnly(opts.OnlyOperations, probe.Method, probe.Path) {
+		if !matchesTags(probe.Tags, opts.Tags) || !matchesPathPrefix(probe.Path, pathOf(probe.Request.URL, baseURL), opts.Paths) || !matchesOnly(opts.OnlyOperations, probe.Method, probe.Path) {
 			continue
 		}
 		pr := NegativeProbeResult{

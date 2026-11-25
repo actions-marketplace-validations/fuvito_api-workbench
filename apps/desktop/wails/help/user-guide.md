@@ -819,7 +819,7 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 |---|---|
 | `--base-url`, `-b` | Server to send requests to (overrides the spec's `servers[0]`). |
 | `--env`, `-e` | Environment file for variable resolution (for example an auth token). |
-| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path (as the spec writes it) starts with one of these prefixes, so `/latency/` also selects `/latency/{ms}`. A filter that matches no operation is an error (exit code 2), not a pass. On Windows Git Bash set `MSYS_NO_PATHCONV=1`, or the shell rewrites an argument that starts with `/`. |
+| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path (as the spec writes it) starts with one of these prefixes, so `/latency/` also selects `/latency/{ms}`. A parameter can be written as in the spec (`/latency/{ms}`) or as in a generated request (`/latency/{{ms}}`); the same applies to `--max-response-time-for`. A filter that matches no operation is an error (exit code 2), not a pass. On Windows Git Bash set `MSYS_NO_PATHCONV=1`, or the shell rewrites an argument that starts with `/`. |
 | `--negative` | Also send negative probes: dropped required fields, wrong types, missing auth, missing parameters. |
 | `--explain` | Under each failing operation, say in plain language what the spec expected, what the server sent, why that fails and what to change. Off by default, so existing logs do not change; the JSON (`findings`), HTML, Markdown and JUnit reports always include it. |
 | `--list` | **Send nothing to the API.** List every operation with the values its request needs and the ones nothing provides. See "What will a run need?" below. |

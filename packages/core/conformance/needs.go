@@ -108,7 +108,7 @@ func operationFor(gr openapi.GeneratedRequest, baseURL string) OperationResult {
 // selects says whether the tag, path and changed-operation filters pick an operation, and whether
 // a run would then send it.
 func (o Options) selects(or OperationResult, gr openapi.GeneratedRequest) (selected, send bool) {
-	selected = matchesTags(gr.Tags, o.Tags) && matchesPathPrefix(or.Path, o.Paths) && matchesOnly(o.OnlyOperations, or.Method, gr.Path)
+	selected = matchesTags(gr.Tags, o.Tags) && matchesPathPrefix(or.SpecPath, or.Path, o.Paths) && matchesOnly(o.OnlyOperations, or.Method, gr.Path)
 	return selected, selected && (!o.ReadOnly || IsReadOnlyMethod(or.Method))
 }
 
