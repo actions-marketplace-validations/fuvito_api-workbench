@@ -1,0 +1,40 @@
+# A spec the example server does NOT follow, so the guide can show what a failure looks like:
+# it asks for two fields the server never sends.
+openapi: "3.0.3"
+info:
+  title: Stricter than the server
+  version: "1"
+servers:
+  - url: http://localhost:8080
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version]
+                properties:
+                  status: {type: string}
+                  version: {type: string}
+  /users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, nickname]
+                properties:
+                  id: {type: integer}
+                  name: {type: string}
+                  nickname: {type: string}

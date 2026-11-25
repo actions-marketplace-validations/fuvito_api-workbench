@@ -70,6 +70,10 @@ func (e ValidationError) Error() string {
 // for the given operationID and HTTP status code.
 // Returns nil if valid, a list of violations otherwise.
 func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []ValidationError {
+	return safeViolations(validateResponse(s, operationID, resp), resp.Body, resp.Headers)
+}
+
+func validateResponse(s *Spec, operationID string, resp *domain.Response) []ValidationError {
 	op := findOperation(s.doc, operationID)
 	if op == nil {
 		return []ValidationError{{Message: fmt.Sprintf("operation %q not found in spec", operationID)}}
@@ -120,6 +124,10 @@ func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []Vali
 // ValidateResponseByPath validates a response against the spec using the HTTP method and path
 // directly, without needing an operationID.
 func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *domain.Response) []ValidationError {
+	return safeViolations(validateResponseByPath(s, method, path, statusCode, resp), resp.Body, resp.Headers)
+}
+
+func validateResponseByPath(s *Spec, method, path string, statusCode int, resp *domain.Response) []ValidationError {
 	router, err := s.pathRouter()
 	if err != nil {
 		return []ValidationError{{Message: "building router: " + err.Error()}}
@@ -360,6 +368,14 @@ func (s *Spec) HasOperation(method, path string) bool {
 // ValidateRequest checks that req conforms to the spec's declared request schema
 // for the matching operation. Returns nil if valid or if the path is not in the spec.
 func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
+	var body []byte
+	if req.Body != nil {
+		body = []byte(req.Body.Content)
+	}
+	return safeViolations(validateRequest(s, req), body, req.Headers)
+}
+
+func validateRequest(s *Spec, req *domain.Request) []ValidationError {
 	router, err := s.pathRouter()
 	if err != nil {
 		return []ValidationError{{Message: "building router: " + err.Error()}}

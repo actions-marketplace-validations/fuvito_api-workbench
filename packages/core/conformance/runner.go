@@ -14,6 +14,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
@@ -336,7 +337,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		or.StatusCode = resp.StatusCode
 		or.DurationMs = resp.Duration.Milliseconds()
 		if resp.StatusCode >= 400 {
-			or.BodySnippet = snippet(resp.BodyString(), 200)
+			or.BodySnippet = redact.Excerpt(resp.BodyString(), 200)
 		}
 		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), or.Path, resp.StatusCode, resp)
 		if limit := opts.limitFor(or.SpecPath, or.Path); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
@@ -494,11 +495,20 @@ func invalidBodyValues(template, resolved *domain.Request, resolver *variables.R
 			}
 		}
 		out = append(out, openapi.ValidationError{
-			Kind: openapi.KindRequestBody, Subject: field, In: "body", Expected: declared, Got: val, Variable: name,
-			Message: fmt.Sprintf("%s %s: the request body field %q takes its value from {{%s}}, which is %q; that is not a valid JSON value (the spec declares %s)", template.Method, specPath, field, name, val, declared),
+			Kind: openapi.KindRequestBody, Subject: field, In: "body", Expected: declared, Got: quotable(field, name, val), Variable: name,
+			Message: fmt.Sprintf("%s %s: the request body field %q takes its value from {{%s}}, which is %q; that is not a valid JSON value (the spec declares %s)", template.Method, specPath, field, name, quotable(field, name, val), declared),
 		})
 	}
 	return out
+}
+
+// quotable is an environment value as a message may quote it: masked when the field or the
+// variable that holds it is named like a credential, or it looks like a token.
+func quotable(field, variable, value string) string {
+	if redact.IsSensitiveName(field) || redact.IsSensitiveName(variable) {
+		return redact.Mask
+	}
+	return redact.Tokens(value)
 }
 
 // ReportPath is the path to show to a person: the one the spec writes (/users/{id}), so that every
@@ -518,15 +528,6 @@ var rePlaceholderSegment = regexp.MustCompile(`\{\{([^{}]+)\}\}`)
 // display only.
 func SpecStyle(operation string) string {
 	return rePlaceholderSegment.ReplaceAllString(operation, "{$1}")
-}
-
-func snippet(s string, max int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	r := []rune(s)
-	if len(r) <= max {
-		return s
-	}
-	return string(r[:max]) + "…"
 }
 
 // Scope describes a run that was limited to the operations that changed since a git ref.

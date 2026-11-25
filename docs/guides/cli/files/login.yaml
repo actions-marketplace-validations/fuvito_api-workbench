@@ -1,0 +1,19 @@
+schemaVersion: "1"
+title: Log in to the example server
+steps:
+  - label: Log in
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"{{username}}","password":"{{password}}"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+    extractions:
+      - name: token
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop

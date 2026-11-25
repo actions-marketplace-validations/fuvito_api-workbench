@@ -9,6 +9,7 @@ import (
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 )
 
 // Evaluator checks domain.Assertions against domain.Responses.
@@ -65,7 +66,55 @@ func evalHeader(a domain.Assertion, resp *domain.Response) (actual string, passe
 	actual, _ = resp.HeaderValue(a.Path)
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
+	actual, msg = reportable(a.Operator, actual, expected, msg, safeHeader(a.Path, actual))
 	return
+}
+
+// The comparison uses the real value. What is kept of it (the result's actual value and the
+// message, which reach reports, history and the desktop) follows the rules of package redact.
+func reportable(op domain.Operator, actual, expected, msg, safe string) (string, string) {
+	if safe == actual {
+		return actual, msg
+	}
+	if msg != "" {
+		if _, again := compare(op, safe, expected); again != "" {
+			msg = again
+		} else {
+			msg = fmt.Sprintf("expected %q %s %q; the value is not shown", expected, opLabel(op), expected)
+		}
+		msg = strings.ReplaceAll(msg, actual, redact.Mask)
+	}
+	return safe, msg
+}
+
+func safeHeader(name, value string) string {
+	if value == "" {
+		return value
+	}
+	if redact.IsSensitiveName(name) {
+		return redact.Mask
+	}
+	return redact.Tokens(value)
+}
+
+// safeJSONValue is a value found by a JSONPath expression as a result may keep it.
+func safeJSONValue(path string, val any, formatted string) string {
+	parts := strings.FieldsFunc(path, func(r rune) bool { return strings.ContainsRune("$.[]'\"*?()@ ", r) })
+	if redact.IsSensitivePath(parts) {
+		if formatted == "" {
+			return formatted
+		}
+		return redact.Mask
+	}
+	switch val.(type) {
+	case map[string]any:
+		return "{…}" // a whole object or list is never quoted
+	case []any:
+		return "[…]"
+	case string:
+		return redact.Tokens(formatted)
+	}
+	return formatted
 }
 
 // evalDuration compares the response time of the request (milliseconds, from sending it to the end
@@ -101,6 +150,7 @@ func evalJSONPath(a domain.Assertion, resp *domain.Response) (actual string, pas
 	actual = FormatValue(val)
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
+	actual, msg = reportable(a.Operator, actual, expected, msg, safeJSONValue(a.Path, val, actual))
 	return
 }
 
@@ -121,13 +171,13 @@ func (ev *Evaluator) evalSchema(a domain.Assertion, resp *domain.Response) (actu
 		}
 		errs := openapi.ValidateResponse(ev.spec, a.Schema, resp)
 		if len(errs) == 0 {
-			return body, true, ""
+			return "", true, ""
 		}
 		msgs := make([]string, len(errs))
 		for i, e := range errs {
 			msgs[i] = e.Error()
 		}
-		return body, false, strings.Join(msgs, "; ")
+		return "", false, strings.Join(msgs, "; ")
 	}
 
 	// Inline schema (JSON object or YAML fragment) — wrap it in a minimal spec
@@ -161,13 +211,13 @@ paths:
 
 	errs := openapi.ValidateResponse(inlineSpec, "validate", fakeResp)
 	if len(errs) == 0 {
-		return body, true, ""
+		return "", true, ""
 	}
 	msgs := make([]string, len(errs))
 	for i, e := range errs {
 		msgs[i] = e.Error()
 	}
-	return body, false, strings.Join(msgs, "; ")
+	return "", false, strings.Join(msgs, "; ")
 }
 
 // looksLikeOperationID returns true when s could be an OpenAPI operationId rather

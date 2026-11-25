@@ -27,6 +27,7 @@ var docOnly = map[string]bool{
 	"CS-RUN-008":   true,
 	"CS-RUN-009":   true,
 	"CS-RUN-010":   true,
+	"CS-RUN-011":   true, // what reports quote from a response
 	"CS-PROBE-005": true, // probes follow the filters
 }
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/checks"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"gopkg.in/yaml.v3"
 )
 
@@ -52,11 +53,25 @@ type Violation struct {
 
 // Key identifies the violation: two runs that find the same thing produce the same key.
 func (v Violation) Key() string {
-	return v.Operation + "\x00" + v.Check + "\x00" + v.Where + "\x00" + v.Rule
+	return v.Operation + "\x00" + v.Check + "\x00" + v.Where + "\x00" + stableText(v.Rule)
+}
+
+// stableText is the part of a validator message that identifies a violation. Baselines written by
+// earlier versions stored the message with the schema and the failing value after it; messages no
+// longer carry those, so both are compared without them.
+func stableText(s string) string {
+	for _, dump := range []string{openapi.DetailStart, "\nValue:\n"} {
+		if i := strings.Index(s, dump); i >= 0 {
+			s = s[:i]
+		}
+	}
+	return strings.TrimSpace(s)
 }
 
 // LegacyKey is the identity a version 1 baseline uses.
-func (v Violation) LegacyKey() string { return v.Operation + "\x00" + v.Kind + "\x00" + v.Detail }
+func (v Violation) LegacyKey() string {
+	return v.Operation + "\x00" + v.Kind + "\x00" + stableText(v.Detail)
+}
 
 func (v Violation) String() string {
 	if v.Check == "" {
@@ -124,7 +139,7 @@ func ViolationsFor(r *ConformResult, neg *NegativeResult, failOn checks.Severity
 	fromFinding := func(op, kind, detail string, f Finding) Violation {
 		v := Violation{Operation: op, Kind: kind, Detail: detail, Check: f.CheckID, Where: f.Where, Summary: f.Summary}
 		if v.Check == "" {
-			v.Check, v.Rule = "other", detail
+			v.Check, v.Rule = "other", stableText(detail)
 		} else if f.CheckID == "CS-RESP-007" {
 			v.Rule = strings.ToLower(reConstraint.FindString(detail))
 		}

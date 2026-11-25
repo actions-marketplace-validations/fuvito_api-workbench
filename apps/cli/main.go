@@ -39,7 +39,9 @@ type exitError struct{ code int }
 
 func (e *exitError) Error() string { return "" }
 
-func main() {
+// newRootCmd is the whole command tree, as main runs it. The test of the detailed CLI guide walks
+// it, so no command can be added without a page.
+func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "clrsig",
 		Short:         "Clear Signal — API Contract Validation and Spec Conformance Testing",
@@ -64,6 +66,11 @@ func main() {
 	root.AddCommand(importCmd())
 	root.AddCommand(initCmd())
 	root.AddCommand(configCmd())
+	return root
+}
+
+func main() {
+	root := newRootCmd()
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError

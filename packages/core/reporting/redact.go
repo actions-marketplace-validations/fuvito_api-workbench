@@ -3,8 +3,8 @@ package reporting
 import (
 	"sort"
 	"strings"
-	"unicode"
 
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 )
 
@@ -15,48 +15,9 @@ const Redacted = "***"
 // as "1" cannot corrupt ordinary words and numbers.
 const minSecretLen = 4
 
-var secretWords = map[string]bool{
-	"token": true, "secret": true, "password": true, "passwd": true, "credential": true,
-	"credentials": true, "bearer": true, "jwt": true, "cookie": true, "session": true,
-	"authorization": true, "auth": true, "key": true, "apikey": true, "private": true, "pwd": true, "passphrase": true,
-}
-
 // IsSecretName reports whether a variable name looks like it holds a credential (token,
-// password, api key, session, …). Names are split on punctuation and camelCase, so apiKey is
-// secret but authorId and monkey are not.
-func IsSecretName(name string) bool {
-	for _, w := range nameWords(name) {
-		if secretWords[w] || strings.HasPrefix(w, "passw") {
-			return true
-		}
-	}
-	return false
-}
-
-func nameWords(name string) []string {
-	var words []string
-	var cur []rune
-	flush := func() {
-		if len(cur) > 0 {
-			words = append(words, strings.ToLower(string(cur)))
-			cur = cur[:0]
-		}
-	}
-	runes := []rune(name)
-	for i, r := range runes {
-		switch {
-		case !unicode.IsLetter(r) && !unicode.IsDigit(r):
-			flush()
-		case unicode.IsUpper(r) && len(cur) > 0 && (unicode.IsLower(runes[i-1]) || (i+1 < len(runes) && unicode.IsLower(runes[i+1]))):
-			flush()
-			cur = append(cur, r)
-		default:
-			cur = append(cur, r)
-		}
-	}
-	flush()
-	return words
-}
+// password, api key, session, …).
+func IsSecretName(name string) bool { return redact.IsSecretName(name) }
 
 // redactor removes secrets from the text a report prints. Secret environment values are always
 // removed; extracted values are removed when their variable name looks secret, unless the user
