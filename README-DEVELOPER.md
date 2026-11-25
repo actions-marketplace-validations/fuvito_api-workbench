@@ -124,6 +124,8 @@ The application opens automatically. Type a URL in the request bar and press **S
 cd examples/server
 go run .
 # Listening on :8080 — includes /health, /users CRUD, /auth/login, /protected
+# GET and POST /users and /protected need the token that /auth/login returns
+# POST /admin/reset restores the sample users
 ```
 
 ### Run a scenario with the CLI
@@ -246,6 +248,7 @@ clrsig conform <spec-file-or-url> [flags]
 # Run against the local example server
 clrsig conform examples/server/openapi.yaml \
   --base-url http://localhost:8080 \
+  --env examples/environments/demo-conform.yaml \
   --coverage
 
 # Fetch the spec from a URL

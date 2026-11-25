@@ -98,7 +98,7 @@ The placeholder name always matches the spec's parameter name or the security sc
 
 ## Example: the included example server
 
-The example server at `examples/server/` requires a Bearer token for the `GET /protected` endpoint. The pre-built environment `examples/environments/demo-conform.yaml` includes the demo token:
+The example server at `examples/server/` requires a Bearer token for `GET /users`, `POST /users` and `GET /protected`, as its spec declares. The pre-built environment `examples/environments/demo-conform.yaml` includes the demo token:
 
 ```bash
 clrsig conform examples/server/openapi.yaml \
@@ -108,3 +108,11 @@ clrsig conform examples/server/openapi.yaml \
 ```
 
 The demo token is `demo-token-12345`, returned by `POST /auth/login` with `admin` / `secret`.
+
+The server follows its spec, so you can add `--negative` to this command and every probe should pass. A full run also writes to the server (it deletes user 1, for example). To put the sample users back without restarting it:
+
+```bash
+curl -X POST http://localhost:8080/admin/reset
+```
+
+`/admin/reset` belongs to the example server only; it is not part of Clear Signal or of the example spec.

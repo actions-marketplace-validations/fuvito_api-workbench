@@ -249,6 +249,16 @@ jobs:
           --base-url http://localhost:8080
           --env examples/environments/demo-conform.yaml
 
+      # The example server follows its own spec, so the probes must pass too. The reset undoes the
+      # writes of the step above.
+      - name: "clrsig conform --negative (must pass)"
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/reset
+          /tmp/clrsig conform examples/server/openapi.yaml \
+            --base-url http://localhost:8080 \
+            --env examples/environments/demo-conform.yaml \
+            --negative
+
       - name: "clrsig run user-lifecycle (must pass)"
         run: >
           /tmp/clrsig run examples/scenarios/user-lifecycle.yaml

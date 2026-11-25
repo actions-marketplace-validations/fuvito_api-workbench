@@ -6,8 +6,8 @@ description: >
   Use failPolicy: continue so all violations are reported, not just the first.
 
 steps:
-  - title: "FAIL — missing required field (version)"
-    description: >
+  - label: "FAIL — missing required field (version)"
+    notes: >
       The spec declares no 'version' field on /health, so asserting it is
       required will always catch a drift if the field is ever removed.
     request:
@@ -31,8 +31,8 @@ steps:
           }
     failPolicy: continue
 
-  - title: "FAIL — wrong type for id (string instead of integer)"
-    description: >
+  - label: "FAIL — wrong type for id (string instead of integer)"
+    notes: >
       The API returns id as an integer. Asserting string catches any API change
       that serialises id differently (e.g. switching to UUID strings).
     request:
@@ -56,8 +56,8 @@ steps:
           }
     failPolicy: continue
 
-  - title: "FAIL — extra required field not in response"
-    description: >
+  - label: "FAIL — extra required field not in response"
+    notes: >
       Asserts a 'role' field that the API has never returned. Useful as a
       canary: if this ever passes, the API added an undeclared field.
     request:

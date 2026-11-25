@@ -330,7 +330,7 @@ Violations that were fixed are reported, so the file can be regenerated and comm
 
 **3. Know what fails the run.** Exit code `1` means at least one of: a response that does not match the spec (wrong status, Content-Type, header or body), a request that could not be built or sent, an operation that was not sent for lack of a value, a negative probe that the server accepted (`--negative`), or, with `--baseline`, a violation that is not in the file. Skipped operations and coverage signals do not fail the run. Every message says what is wrong, where, why, and how to fix it; the full list with IDs, including what is **not** checked, is in [What We Check](../../apps/desktop/wails/help/what-we-check.md).
 
-**4. Prove the CI step itself.** The repository's own pipeline runs `clrsig conform` against the example server (`examples/server`) with `examples/environments/demo-conform.yaml` and expects it to pass, and runs `clrsig diff` on two example specs and expects it to find breaking changes: a useful template for your own smoke step.
+**4. Prove the CI step itself.** The repository's own pipeline runs `clrsig conform` against the example server (`examples/server`) with `examples/environments/demo-conform.yaml` and expects it to pass, with and without `--negative`, and runs `clrsig diff` on two example specs and expects it to find breaking changes: a useful template for your own smoke step.
 
 ---
 

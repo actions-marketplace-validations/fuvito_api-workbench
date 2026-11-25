@@ -879,3 +879,14 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **macOS (CI, on `ff47d6c`):** the new install script ran with `/bin/bash`, downloaded v0.11.0, verified it and installed it. The old script was not run there.
 - **Not verified:** the Docker image run (the daemon was not running), the Homebrew install (no Mac), and a workflow that uses the Action by its remote reference `@v0.11.1` (the self-test uses `uses: ./`).
 - **Open:** batches B to E of `docs/reports/check-2026-11-25-improvement-ideas.md`.
+
+### 2026-11-25 — The example server follows its own spec (batch B, B-111)
+
+- **Why:** the README sends new users to it, and `conform --negative` failed against it. The spec declared bearer auth on `GET` and `POST /users` that the server did not check, its `ErrorResponse` schema (`error`) matched none of the server's RFC 7807 bodies (hidden because the media type differed, so no error body was ever compared), and `/health` did not declare its plain-text answer.
+- **Server:** enforces the declared auth (other methods still get 405 without a token); a login with a missing field is 422 and does not count against the rate limit; `POST /admin/reset` also restores the sample users.
+- **Spec:** `ProblemDetails` as `application/problem+json`; 400, 401, 422 and 429 declared where the server sends them; `text/plain` for `/health`. Still eight operations.
+- **Scenarios:** `pagination` and `problem-details` log in first (one more step each).
+- **Guards:** `examples/server/server_test.go` (conformance, every probe rejected for the tested reason, a broken problem body is reported, auth, reset, every example scenario) runs in the CI integration job; the quickstart job also runs `conform --negative` after a reset.
+- **Checked locally:** the CI sequence and all eleven scenarios with the built CLI; ten pass and `contract-violation` fails as it is written to.
+- **Example scenario keys (B-120, older than this change):** steps used `title:` (29) and `description:` (3), which a step does not have, so they ran unnamed and `clrsig validate` rejected 10 of 11 files. Renamed to `label:` and `notes:`; `TestExampleScenarioFilesAreValid` decodes each example strictly and validates it.
+- **Not done:** B-121 (whether the product should report unknown keys). No product code changed.

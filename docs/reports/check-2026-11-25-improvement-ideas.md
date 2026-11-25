@@ -290,10 +290,21 @@ It did not change code, tests or documentation; the only files created are this 
 
 ### Batch B: an example that follows its own spec (no product change)
 
-- ☐ **B1** (58) Problem-details schema and media type in the spec.
-- ☐ **B2** (58) Enforce the declared auth; declare 401; update scenarios, README and the demo recording as needed.
-- ☐ **B3** (58) Extend `/admin/reset` to restore the users.
-- ☐ **B4** (58) CI runs `conform --negative` against the example and it must pass.
+- ☑ **B1** (58) Problem-details schema and media type in the spec.
+- ☑ **B2** (58) Enforce the declared auth; declare 401; update scenarios, README and the demo recording as needed.
+- ☑ **B3** (58) Extend `/admin/reset` to restore the users.
+- ☑ **B4** (58) CI runs `conform --negative` against the example and it must pass.
+
+> **Claude, after batch B (2026-11-25):** built.
+> - Beyond the plan: the spec also lacked `text/plain` for `/health` (found by running the scenarios with spec checking) and the 400, 422 and 429 answers the server can give. `/auth/login` now answers a missing field with 422 instead of counting it as a wrong password, so each probe is rejected for what it tests; `server_test.go` asserts the status of each, which a passing probe alone does not show (CS-GAP-012).
+> - The desktop scenario templates target the app's Demo Server, not the example server, and were not changed.
+> - `docs/demo.tape` needed no change; pushing changes under `examples/` makes the demo workflow record the GIF again.
+>
+> ### V14. Ten of the eleven example scenarios do not pass `clrsig validate` (new, Medium)
+>
+> Their steps use `title:`, but a step's name is `label:`. The unknown key is ignored, so the steps run unnamed, and `validate` reports "step label is required". The committed files before batch B fail the same way. The two login steps added in batch B use `label:`.
+>
+> **Fixed 2026-11-25** (B-120, on the owner's word): 29 `title:` keys became `label:`, and three step `description:` keys in `contract-violation.yaml`, also ignored, became `notes:`. A test now rejects unknown keys and validation problems in every example. Whether the product should report unknown keys is a separate decision (B-121).
 
 ### Batch C: report consistency (0.12.0, one release note)
 
