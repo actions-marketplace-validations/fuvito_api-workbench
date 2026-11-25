@@ -853,3 +853,9 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **What:** `api-workbench-sandbox` moved its pin from v0.8.9 to v0.11.0 (commits `3358e22`, `9111946`; CI green). Expectations that flipped: `gap-format-email-uuid` now fails with CS-RESP-007 (renamed `resp-007g-format-email-uuid`; a `uri` case is the CS-GAP-001 fixture; contract-fail is 27 of 37 failing); `conform-fail-fast` and the baseline ratchet (a baseline is now recorded from a full run, since `--write-baseline` with `--paths` is refused). Five cases added for `--format github`, `--fail-on`, `validate --spec`, `validate --strict` and `run --format github`.
 - **Why it matters:** the sandbox is the first consumer to meet the 0.9.0 format checks and 0.10.0 baseline rules; both were deliberate behaviour changes, and its nightly job (clrsig from `main`) would have gone red.
 - **Not done:** `--changed-against`, `init`, `config show` and `--setup` have no sandbox case yet.
+
+### 2026-11-24 — Conformance screenshots show check IDs, severity and the baseline
+
+- **What:** the screenshot suite `screenshots-conformance.spec.ts` now feeds the page what the product reports since 0.9.0: a `checkId` and `severity` on each finding, a baseline (2 known, 1 new, 1 fixed) and a spec-health warning. `docs/images/15-conformance-results[-light].png` and `16-scenario-spec-conformance[-light].png` regenerated. The mocked data mirrors the shapes in `bridge.ts`; it is not a captured run.
+- **Why:** the images were from before 0.9.0 and showed none of the new fields; the website uses the same files.
+- **Not done:** the Workspace page (17) and the CLI builder shots were not regenerated; they were not changed by 0.9-0.11 except for lint cards on the Workspace page.
