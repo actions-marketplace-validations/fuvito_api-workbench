@@ -4,6 +4,15 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.2',
+    date: '2026-11-25',
+    items: [
+      'Security, please upgrade: a response that did not match its schema was quoted in full in conform and run reports, CI logs, Check Conformance findings and some baseline files, so a token, a password or personal data sent by the API could be written there (scenario schema assertions kept the whole body even when they passed). Upgrading does not remove what is already written: check saved reports, CI logs, artifacts and committed baselines, and replace secrets that may be in them',
+      'Reports now quote no whole body, object or schema; the one value at fault may be shown, and is masked when its field is named like a credential or it looks like a token. This is a set of rules, not a guarantee',
+      'JSON scenario reports: "actual" is empty for schema assertions and masked for credential-named values, objects and lists; existing baselines keep working',
+    ],
+  },
+  {
     version: '0.13.1',
     date: '2026-11-25',
     items: [
