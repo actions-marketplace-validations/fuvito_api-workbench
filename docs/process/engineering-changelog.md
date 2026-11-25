@@ -871,3 +871,11 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Backlog:** six finished or duplicate rows ticked, leftovers of ticked rows and the new ideas given IDs (B-096 to B-119).
 - **Behaviour change:** workflows using the subdirectory Action now have their ignored inputs honoured (on `@main` as soon as this is pushed); the Action fails without a matching checksum. No `clrsig` check, result or exit code changes.
 - **Not verified:** the Action on a GitHub runner (both legs run on the next push), the browser tests (not run locally).
+
+### 2026-11-25 — v0.11.1 released
+
+- **Flaky test fixed first (`496dd58`):** the sidebar-choice test of Check Conformance failed in CI on `5806ac0` with `onResult` called 0 times. The callback runs in an effect, which can run after the headline is on screen; delaying the callback locally gave the same error, and the test now waits. It also set no run result of its own and passed only on one left by an earlier test (alone it timed out). The component did not change.
+- **Tag `v0.11.1` on `496dd58`** (CI green on that exact commit, all eight jobs, the Action self-test on Linux and macOS). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their published `.sha256` files and the Homebrew and Scoop manifests carry the same hashes; Scoop updated and installed on Windows (`clrsig version v0.11.1`); the released CLI's `init github-actions` pins `@v0.11.1` and asks for `contents: read`. The draft notes file was deleted after publishing.
+- **macOS (CI, on `ff47d6c`):** the new install script ran with `/bin/bash`, downloaded v0.11.0, verified it and installed it. The old script was not run there.
+- **Not verified:** the Docker image run (the daemon was not running), the Homebrew install (no Mac), and a workflow that uses the Action by its remote reference `@v0.11.1` (the self-test uses `uses: ./`).
+- **Open:** batches B to E of `docs/reports/check-2026-11-25-improvement-ideas.md`.

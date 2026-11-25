@@ -279,13 +279,13 @@ It did not change code, tests or documentation; the only files created are this 
 - ☑ **A6** (66) Catalog gap row and corrected CS-PROBE wording, with a test.
 - ☑ **A7** (57) Terminology fixes and the test (`CLAUDE.md` line 10 only if you agree).
 - ☑ **A8** (59) Backlog tidy; add IDs for the leftovers and for ideas 31, 32 and 51 to 68 that are not done in this batch.
-- ☐ **A9** Release 0.11.1: versions, notes, tag on your word. *Versions and notes are ready; commit, push and tag are waiting.*
+- ☑ **A9** Release 0.11.1: versions, notes, tag on your word. *Released 2026-11-25 as `v0.11.1` on `496dd58`.*
 
 (62, the bindings check, is not needed for the release. It moves to batch E so it cannot delay the Action fixes.)
 
 > **Claude, after batch A (2026-11-25):**
 > - A correction to V7: the existing link test skips `#` anchors, so it would **not** have caught a broken guide anchor. The three uses of the renamed anchor were changed by hand and searched for afterwards.
-> - V13 stays unverified until the macOS leg runs on a push.
+> - V13: after the push, the macOS leg ran the **new** script with `/bin/bash` and passed (download, checksum, install). The old script was never run on macOS, so that it failed there remains an inference.
 > - Passed locally: `go vet` and `go test` in all four Go modules, `tsc --noEmit`, Vitest (1,680 tests), `gofmt`. The browser tests were not run.
 
 ### Batch B: an example that follows its own spec (no product change)
