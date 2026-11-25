@@ -994,3 +994,10 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Behaviour change:** messages are shorter (no schema or body under a violation). In JSON reports a scenario `schema` assertion has an empty `actual`; `actual` is `***`, `{…}` or `[…]` in the cases above. Anything that parsed those must change.
 - **Limits (CS-GAP-017):** rules of thumb. A secret in a field with an ordinary name, too plain to look like a token, is quoted when it is the value at fault. Not changed: the desktop response viewer, `clrsig request`, `run --show-extracted`.
 - **Not done:** not released. Reports and CI logs already produced by earlier releases still hold what they quoted.
+
+### 2026-11-25 — Released 0.13.2 (the B-129 security fix)
+
+- Tagged `b88e588` after CI passed on it; the sandbox expectations had passed in Docker with `clrsig` built from `main` with the fix. All release jobs and all five post-release smoke jobs passed (their first run as part of `release.yml`).
+- Release notes published with the security issue first: what could leak and where, the affected versions (0.11.1, 0.12.0 and 0.13.1 tested; earlier ones share the code), what to do with reports, logs, artifacts and baselines already written, and the changes in JSON reports.
+- Checked afterwards: the four checksum files match their binaries; the Homebrew formula and Scoop manifest carry the published hashes; the downloaded Windows binary shows the issued token in none of the six `conform` formats and not in a new baseline file (0.13.1 showed it in five formats).
+- **Not done:** older releases are not marked as affected on GitHub. The sandbox still pins 0.13.0.
