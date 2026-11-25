@@ -310,9 +310,9 @@ It did not change code, tests or documentation; the only files created are this 
 
 - ☑ **C1** (54) Spec path in all human reports, coverage lists and probe rows; add JSON `specPath`; a test that baselines are unchanged.
 - ☑ **C2** (56) "not sent" in the text, Markdown, HTML and GitHub summaries.
-- ☐ **C3** *(edited and checked locally; waiting to be committed in the sandbox)* Update the sandbox repository's expectations (a separate repository; I will ask before pushing there).
+- ☑ **C3** *(sandbox `a0918ad`; its CI passed with the released clrsig and, on a manual run, with clrsig built from main)* Update the sandbox repository's expectations (a separate repository; I will ask before pushing there).
 
-> **Claude, after batch C (2026-11-25):** C1 and C2 built, not yet released.
+> **Claude, after batch C (2026-11-25):** C1 and C2 built.
 > - "not sent" is printed only when above zero, so every other summary line is unchanged.
 > - Also covered, beyond the list: the `NEW`/`FIXED` lines of the baseline comparison and the cumulative "Never covered" line, which printed stored paths. Only the display changed.
 > - A baseline recorded by the released v0.11.1 was read by the new build (2 known, 0 new), and the new build wrote the same entries.

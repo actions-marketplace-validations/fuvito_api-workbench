@@ -176,7 +176,7 @@ After the initial listing (see `docs/process/manual-steps.md`), subsequent relea
 
 ```yaml
 # In any test workflow
-- uses: fuvito/api-workbench@v0.11.1
+- uses: fuvito/api-workbench@v0.12.0
   with:
     command: conform
     spec: openapi.yaml

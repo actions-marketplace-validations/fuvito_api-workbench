@@ -4,6 +4,17 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.12.0',
+    date: '2026-11-25',
+    items: [
+      'One name per operation: conform reports (Markdown, HTML, JUnit, coverage lists), the baseline comparison, cumulative coverage and the Check Conformance page now write the path as your spec does (GET /users/{id}), as the text report already did',
+      'JUnit: the test names of operations with path parameters change once, so a CI tool that keeps test history treats them as new tests',
+      'JSON: path is unchanged and a new specPath field holds the spec\'s path, on each operation and coverage entry; baseline files keep working and are written as before',
+      'The counts line of the text, HTML, Markdown and GitHub output shows operations that were never sent for lack of a value as "not sent", apart from "failed" (only when there is at least one; they still fail the run, and JUnit totals, JSON and exit codes are unchanged)',
+      'The example server follows its own spec, so conform --negative passes against it (GET and POST /users now need its demo token), and the example scenarios show their step names and pass clrsig validate',
+    ],
+  },
+  {
     version: '0.11.1',
     date: '2026-11-25',
     items: [
