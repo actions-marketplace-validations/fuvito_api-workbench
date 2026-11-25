@@ -641,7 +641,7 @@ func blockedFinding(op OperationResult) Finding {
 		Summary: "No value for " + strings.Join(refs, ", "),
 		Got:     "not sent",
 		Why: "The request needs " + strings.Join(refs, ", ") + " (a path parameter, a credential or a body field taken from the spec), " +
-			"but neither the environment nor the variable overrides provide it. It was not sent, so nothing was compared with the spec.",
+			"but neither the environment nor the variable overrides provide it (a path value or a credential that is empty counts as not provided). It was not sent, so nothing was compared with the spec.",
 		Fix:    "Add " + strings.Join(op.Missing, ", ") + " to the environment, or give it as an override (" + strings.Join(overrides, ", ") + ").",
 		Detail: op.Blocked,
 	}

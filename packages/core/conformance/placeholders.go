@@ -15,15 +15,20 @@ func UnresolvedPlaceholders(req *domain.Request) []string {
 	return variables.UnresolvedPlaceholders(req)
 }
 
+// braced writes names as the placeholders they are: {{a}}, {{b}}.
+func braced(names []string) string {
+	refs := make([]string, len(names))
+	for i, n := range names {
+		refs[i] = "{{" + n + "}}"
+	}
+	return strings.Join(refs, ", ")
+}
+
 // blockedReason is the sentence recorded when an operation is not sent.
 func blockedReason(missing []string, dynamicErrors []error) string {
 	var parts []string
 	if len(missing) > 0 {
-		refs := make([]string, len(missing))
-		for i, n := range missing {
-			refs[i] = "{{" + n + "}}"
-		}
-		parts = append(parts, "no value for "+strings.Join(refs, ", "))
+		parts = append(parts, "no value for "+braced(missing))
 	}
 	for _, e := range dynamicErrors {
 		parts = append(parts, e.Error())

@@ -248,6 +248,14 @@ var catalog = []Command{
 				Group:   GroupAdvanced, Deferred: true,
 			},
 			{
+				Name: "list", Kind: KindBool, Default: "false",
+				Label: "List what is needed",
+				Help: "Send nothing to the API: list every operation with the values its request needs and the ones nothing provides. " +
+					"Use it before the first run to see what to put in the environment. Works with the spec, environment, overrides, base URL, filters, read-only and changed-against; " +
+					"writes text or json, and exits 0 once the spec has been read.",
+				Group: GroupAdvanced, Deferred: true,
+			},
+			{
 				Name: "tags", Kind: KindString,
 				Label:   "Only these tags",
 				Help:    "Only check operations that carry one of these OpenAPI tags. Separate several with commas.",

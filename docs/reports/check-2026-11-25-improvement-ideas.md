@@ -321,8 +321,15 @@ It did not change code, tests or documentation; the only files created are this 
 
 ### Batch D: first hour
 
-- ☐ **D1** (61, first half) `conform --list`: operations and the values each needs, sending nothing. Update the CLI command catalog (`TestCatalogMatchesCobra`).
-- ☐ **D2** (55) `init --spec` pre-fills the new environment files from the same data.
+- ☑ **D1** (61, first half) `conform --list`: operations and the values each needs, sending nothing. Update the CLI command catalog (`TestCatalogMatchesCobra`).
+- ☑ **D2** (55) `init --spec` pre-fills the new environment files from the same data.
+
+> **Claude, after batch D (2026-11-25):** built, not yet released.
+> - `--list` and a run now share the code that selects operations and finds missing values; a test compares them in seven set-ups.
+> - D2 writes the names as **comments**. Measuring first showed why: an empty value is sent as empty, and `GET /users/` showed PASS. That is a false pass in the current product, recorded as CS-GAP-013 with the decision as B-124.
+> - `init --spec` lists the values of every operation, writes included, although a new project is read-only; each line says which operations use it.
+> - The desktop app has no listing yet.
+> - **B-124, fixed before the push (owner's decision):** in `conform`, an empty path value or credential is now "not sent", and its probes are skipped. The basic **password** is an exception to "credentials": some APIs take a key as the user name and an empty password. CS-GAP-013 now covers only what is still sent empty.
 
 ### Batch E: release and engineering checks
 

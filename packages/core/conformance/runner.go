@@ -283,31 +283,23 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 	}
 
 	for _, gr := range reqs {
-		opPath := pathOf(gr.Request.URL, baseURL)
-		or := OperationResult{
-			OperationID: gr.OperationID,
-			Summary:     gr.Summary,
-			Tags:        gr.Tags,
-			Method:      string(gr.Request.Method),
-			Path:        opPath,
-			SpecPath:    gr.Path,
-		}
+		or := operationFor(gr, baseURL)
 
-		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths) && matchesOnly(opts.OnlyOperations, or.Method, gr.Path)
+		selected, send := opts.selects(or, gr)
 		if selected {
 			result.FilterMatched++
 		}
-		if !selected || (opts.ReadOnly && !IsReadOnlyMethod(or.Method)) {
+		if !send {
 			or.Skipped = true
 			result.Operations = append(result.Operations, or)
 			handled()
 			continue
 		}
 
-		resolved := resolver.InterpolateRequest(gr.Request)
-		if missing, dynamicErrors := UnresolvedPlaceholders(resolved), resolver.TakeErrors(); len(missing) > 0 || len(dynamicErrors) > 0 {
+		resolved, missing, blocked := prepare(resolver, gr)
+		if blocked != "" {
 			or.Missing = missing
-			or.Blocked = blockedReason(missing, dynamicErrors)
+			or.Blocked = blocked
 			result.Operations = append(result.Operations, or)
 			handled()
 			if opts.FailFast {
@@ -346,8 +338,8 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		if resp.StatusCode >= 400 {
 			or.BodySnippet = snippet(resp.BodyString(), 200)
 		}
-		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
-		if limit := opts.limitFor(opPath); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
+		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), or.Path, resp.StatusCode, resp)
+		if limit := opts.limitFor(or.Path); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
 			// The message holds the limit, not the measured time, so a baseline stays stable
 			// between runs; the time is in DurationMs and in the finding's Got.
 			or.Violations = append(or.Violations, openapi.ValidationError{

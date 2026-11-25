@@ -328,6 +328,8 @@ clrsig conform openapi.yaml --base-url "$API_URL" --env environments/ci.yaml --b
 
 Violations that were fixed are reported, so the file can be regenerated and committed to ratchet quality up. Do this too after upgrading `clrsig`: releases before the 2026-11-20 change did not check declared response headers, so a response whose operation declared any header could pass with a broken body, and a run that used to be green may now report real problems.
 
+To see what a run will need before wiring it into CI, `clrsig conform openapi.yaml --list --env environments/ci.yaml` lists every operation with its values and what is missing, without calling the API.
+
 **3. Know what fails the run.** Exit code `1` means at least one of: a response that does not match the spec (wrong status, Content-Type, header or body), a request that could not be built or sent, an operation that was not sent for lack of a value, a negative probe that the server accepted (`--negative`), or, with `--baseline`, a violation that is not in the file. Skipped operations and coverage signals do not fail the run. Every message says what is wrong, where, why, and how to fix it; the full list with IDs, including what is **not** checked, is in [What We Check](../../apps/desktop/wails/help/what-we-check.md).
 
 **4. Prove the CI step itself.** The repository's own pipeline runs `clrsig conform` against the example server (`examples/server`) with `examples/environments/demo-conform.yaml` and expects it to pass, with and without `--negative`, and runs `clrsig diff` on two example specs and expects it to find breaking changes: a useful template for your own smoke step.

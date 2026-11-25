@@ -130,13 +130,18 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		out.Result.KnownViolations = len(diff.Known)
 		out.Result.BaselineClean = len(diff.New) == 0
 	}
-	if in.OnlyOperations == nil && len(out.Result.Operations) > 0 && out.Result.FilterMatched == 0 && (len(in.Tags) > 0 || len(in.Paths) > 0) {
-		out.NothingSelected = noMatchMessage(in.Tags, in.Paths, len(out.Result.Operations))
+	if in.OnlyOperations == nil {
+		out.NothingSelected = NoMatchMessage(in.Tags, in.Paths, out.Result.FilterMatched, len(out.Result.Operations))
 	}
 	return out
 }
 
-func noMatchMessage(tags, paths []string, total int) string {
+// NoMatchMessage explains that --tags or --paths selected none of the spec's operations; it is
+// empty when they selected something, were not given, or the spec declares no operations.
+func NoMatchMessage(tags, paths []string, matched, total int) string {
+	if total == 0 || matched > 0 || (len(tags) == 0 && len(paths) == 0) {
+		return ""
+	}
 	var by []string
 	if len(tags) > 0 {
 		by = append(by, "--tags "+strings.Join(tags, ","))

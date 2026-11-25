@@ -118,7 +118,9 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 		// Skip probes where path parameters are still unresolved. An unresolved
 		// placeholder in the URL causes a network error that masks the actual
 		// rejection behaviour we are trying to observe.
-		if strings.Contains(resolved.URL, "{{") {
+		// The same goes for an empty path value or credential: the server would refuse the probe
+		// for that, and the refusal would count for what the probe tests.
+		if strings.Contains(resolved.URL, "{{") || len(emptyWhereNeeded(resolver, probe.Request)) > 0 {
 			pr.Skipped = true
 			result.Probes = append(result.Probes, pr)
 			continue

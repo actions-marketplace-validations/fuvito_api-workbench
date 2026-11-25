@@ -915,3 +915,19 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - `api-workbench-sandbox` pins v0.12.0 (`780bc2e`); its one changed expectation now accepts only the "not sent" wording, and CS-GAP-012 is in its gaps map. Its CI passed on Linux with the released v0.12.0 in the container (all expectation files and the random specs).
 - **The remote Action reference is verified (closes that item of the v0.12.0 entry):** the sandbox's manual Action smoke test ran `uses: fuvito/api-workbench@v0.12.0` (resolved to `3c3ba8f`) on `ubuntu-latest`: the download's checksum was verified, a correct API gave exit 0 and a broken case exit 1. Not covered: the same by remote reference on macOS or Windows, and the `clrsig-action` subdirectory form.
 - **Still not verified for v0.12.0:** the Docker image run, the Homebrew install, the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
+
+### 2026-11-25 — `conform --list`, and `init --spec` lists what the spec needs (batch D, B-114 and B-115)
+
+- **`conform --list`:** every operation with the values its generated request takes, which are missing, and READY / MISS / SKIP; text or JSON; sends nothing to the API; exit 0 once the spec is read, 2 for a usage error or a filter that matches nothing. Flags that only matter for a run are refused when typed and ignored when they come from `clrsig.yaml` (a setup scenario is not run and a note says so). Catalogued as a deferred builder input.
+- **Core:** `conformance.ListNeeds` shares operation selection and substitution with `Runner.Run` (moved into `operationFor`, `Options.selects`, `prepare`); `TestListNeeds_AgreesWithARun` compares them. `application.NoMatchMessage` is exported so both say the same about an unmatched filter. Names only are printed, never values.
+- **`init --spec` (local file):** both new environment files list the needed names as commented-out variables with the operations that use them; credentials (used for authentication, or named like one) are marked secret and in `ci.yaml` suggest `${NAME}`. Existing files are not changed; a URL spec is not fetched. Names come from the spec, so names that would not fit on one line are left out and line breaks are removed from comments (`TestNeededValuesFromAHostileSpecCannotAddLiveLines`).
+- **Found:** an empty value is sent as empty (CS-GAP-013, pinned by a test; decision B-124). This is why the names are comments. No run behaviour changed.
+- **Not done:** no listing in the desktop app. Not released.
+
+### 2026-11-25 — An empty path value or credential counts as missing in `conform` (B-124)
+
+- **Why:** `value: ""` filled `{{id}}` with nothing and sent `GET /users/`; a declared `400` then showed **PASS** (measured on the example server). A secret that is not configured often reaches CI as a set but empty variable.
+- **Rule:** in the requests built from the spec, empty is missing in the URL path, a bearer token, an API key (header, query or cookie) and a basic user name. The operation is not sent and says which value is empty; its negative probes are skipped. Still sent empty: query, header, cookie and body values, and a basic password (a key as user name with no password is a real pattern). `run` is unchanged: a scenario may send an empty value on purpose. `conform --list` and the Check Conformance page follow from the shared code.
+- **Behaviour change:** a `conform` run that passed with such an empty value now fails with "not sent"; probes that "passed" because of it are now skipped. This also applies to a name added empty by the page's "Add these to Variable overrides" button. Needs a line in the next release notes.
+- **Guards:** `conformance/empty_values_test.go` (all credential forms, the basic password, an empty process variable, probes); each failed before the change. CS-RUN-001 and CS-GAP-013 updated.
+- **Checked:** the example server's CI steps and all sandbox suites and random specs pass with this build.

@@ -523,7 +523,7 @@ func conformCmd() *cobra.Command {
 	var vars []string
 	var reports []string
 	var showCoverage bool
-	var runNegative bool
+	var runNegative, listOnly bool
 	var baselineFile, writeBaseline string
 	var start = time.Now()
 
@@ -540,12 +540,35 @@ Exit codes:
   2  spec parse or configuration error
 
 With --baseline, violations already recorded in the baseline file are accepted and
-only new ones fail the run; --write-baseline records the current violations.`,
+only new ones fail the run; --write-baseline records the current violations.
+
+--list sends nothing to the API: it lists every operation with the values its request
+needs and the ones nothing provides, and exits 0 once the spec has been read.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if listOnly {
+				if err := checkListFlags(cmd); err != nil {
+					return err
+				}
+			}
+			formatTyped, outputTyped := cmd.Flags().Changed("format"), cmd.Flags().Changed("output")
+
 			args, err := applyProjectConfig(cmd, args)
 			if err != nil {
 				return err
+			}
+			if listOnly {
+				// What the project file sets for a real run does not apply to a listing.
+				if setupFile != "" {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Note: --list sends nothing, so the setup scenario %s is not run; what it would extract is listed as missing.\n", setupFile)
+				}
+				setupFile, baselineFile, writeBaseline, reports = "", "", "", nil
+				if !formatTyped {
+					format = "text"
+				}
+				if !outputTyped {
+					outputFile = ""
+				}
 			}
 			if len(args) == 0 {
 				return fmt.Errorf("conform needs a spec: pass one, or set spec: in a clrsig.yaml (clrsig init creates one)")
@@ -618,6 +641,28 @@ only new ones fail the run; --write-baseline records the current violations.`,
 					return err
 				}
 				fmt.Fprintln(cmd.ErrOrStderr(), scope.Line())
+			}
+
+			if listOnly {
+				paths := application.SplitList(pathsCSV)
+				tags := application.SplitList(tagsCSV)
+				list, err := conformance.ListNeeds(spec, baseURL, env, conformance.Options{Tags: tags, Paths: paths, ReadOnly: readOnly, OnlyOperations: only})
+				if err != nil {
+					return fmt.Errorf("reading the operations of the spec: %w", err)
+				}
+				data, err := renderNeeds(list, strings.ToLower(format))
+				if err != nil {
+					return err
+				}
+				if err := writeReport(cmd, outputFile, data); err != nil {
+					return err
+				}
+				if only == nil {
+					if msg := application.NoMatchMessage(tags, paths, list.FilterMatched, len(list.Operations)); msg != "" {
+						return fmt.Errorf("%s", msg)
+					}
+				}
+				return nil
 			}
 
 			exec := newExecutor()
@@ -749,6 +794,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")
 	cmd.Flags().StringVar(&writeBaseline, "write-baseline", "", "Record the current violations in this file (YAML or JSON by extension) and exit 0")
+	cmd.Flags().BoolVar(&listOnly, "list", false, "List the operations and the values each needs, without sending anything to the API (text or json)")
 	cmd.Flags().BoolVar(&runNegative, "negative", false, "Also run negative probes: drop required fields, wrong types, missing auth, missing params")
 	return cmd
 }
