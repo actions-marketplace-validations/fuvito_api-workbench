@@ -66,7 +66,7 @@ The `--env` flag resolves `{{token}}` in every generated `Authorization` header 
 ## Step 3 — Run in CI (GitHub Actions)
 
 ```yaml
-- uses: fuvito/api-workbench@v0.13.0
+- uses: fuvito/api-workbench@v0.13.1
   with:
     command: conform
     spec: openapi.yaml

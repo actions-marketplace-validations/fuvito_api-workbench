@@ -4,6 +4,14 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.1',
+    date: '2026-11-25',
+    items: [
+      'Fix, a run that passed can now fail: --paths matched operations and negative probes against two different spellings of a path parameter, so /items/{id} selected no operation and /items/{{id}} selected no probe (reported as PASSED, 0 probes). Both spellings now select both, also in conform --list and Check Conformance; nothing selected before is lost',
+      'Fix: a response-time limit for a path written as the spec writes it (--max-response-time-for /items/{id}=500) did nothing; it now applies',
+    ],
+  },
+  {
     version: '0.13.0',
     date: '2026-11-25',
     items: [
