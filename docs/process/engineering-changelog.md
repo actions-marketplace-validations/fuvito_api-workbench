@@ -939,3 +939,10 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Tag `v0.13.0` on `abfeed7`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. The downloaded Windows CLI reports `v0.13.0`; against the example server it does not send an empty `id` and names it, `--list` works, `init --spec` lists six values as comments, and `init github-actions` pins `@v0.13.0`. The draft notes file was deleted after publishing.
 - **Not verified:** the Docker image run, the Homebrew install (no Mac), the Scoop upgrade on the maintainer's machine, a workflow using the Action by its remote reference `@v0.13.0`, and the desktop app by eye.
 - **Open:** the sandbox still pins v0.12.0; B-123 (detailed user guide, proposal first); batch E.
+
+### 2026-11-25 — Sandbox adopts v0.13.0; the `--paths` bug recorded (B-125, CS-GAP-014)
+
+- `api-workbench-sandbox` pins v0.13.0 (`087c064`) and adds eight runs for `conform --list`, `init --spec` and the empty-value rule. Its CI passed in the container with the released v0.13.0, and its Action smoke test ran `uses: fuvito/api-workbench@v0.13.0` (resolved to `abfeed7`) on `ubuntu-latest`: checksum verified, exit 0 for a correct API and 1 for a broken case. **This closes the "remote reference" item of the v0.13.0 entry** (Linux only).
+- **Found there, not fixed:** `--paths` filters operations on the generated path and probes on the spec path, so a prefix with a parameter silently selects one side; with the `{{id}}` spelling the probe summary says `PASSED  0 probes`. v0.12.0 behaves the same. Catalog CS-GAP-014, pinned by `TestPathsFilter_WithAParameterSelectsOnlyOneSide_KnownGap`; backlog B-125; sandbox F-036.
+- **Observed, as designed:** with an empty basic password the sandbox's refused login (a declared 401) shows PASS (CS-GAP-013, now pinned there).
+- **Still not verified for v0.13.0:** the Docker image run, the Homebrew install, the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
