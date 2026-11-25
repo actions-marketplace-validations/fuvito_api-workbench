@@ -841,3 +841,9 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 ### 2026-11-24 — 0.11.0 prepared, not tagged
 
 - Version 0.11.0 in `AboutDialog.tsx` (dated 2026-11-24) and the user guide; draft GitHub notes in `docs/process/release-notes-0.11.0-draft.md`. Additive only: baselines and Spec health in Check Conformance, `validate --spec`, `run --format github`, the community files. No existing result or exit code changes.
+
+### 2026-11-24 — v0.11.0 released
+
+- **Tag `v0.11.0` on `71669c9`** (CI green on that exact commit, including the Action self-test). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; Scoop updated by the tap-bump commit and installed on Windows (`clrsig version v0.11.0`); the released CLI shows `validate --spec` and `run --format github`. The draft notes file was deleted after publishing. The first tag push was blocked by the permission check and done after the owner confirmed.
+- **Not verified:** the Docker image run (no daemon on the machine) and the Homebrew install (no Mac). The Action is now exercised in CI by the self-test (with the previous release of clrsig); its new `spec` input for `validate` and `format: github` for `run` are checked only statically until the next self-test uses a release that has them.
+- **Open:** B-091 (proposal recommends deferring), B-088 (reviewed, not proposed), the vulnerability scan of B-090, GitHub Discussions (a repository setting), the owner decision on `docs/process/path-to-1.0.md`, annotations for `diff` and `bundle run`, a rendered `CHANGELOG.md` for B-094.
