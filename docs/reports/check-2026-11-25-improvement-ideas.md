@@ -324,7 +324,7 @@ It did not change code, tests or documentation; the only files created are this 
 - ☑ **D1** (61, first half) `conform --list`: operations and the values each needs, sending nothing. Update the CLI command catalog (`TestCatalogMatchesCobra`).
 - ☑ **D2** (55) `init --spec` pre-fills the new environment files from the same data.
 
-> **Claude, after batch D (2026-11-25):** built, not yet released.
+> **Claude, after batch D (2026-11-25):** built; released in 0.13.0.
 > - `--list` and a run now share the code that selects operations and finds missing values; a test compares them in seven set-ups.
 > - D2 writes the names as **comments**. Measuring first showed why: an empty value is sent as empty, and `GET /users/` showed PASS. That is a false pass in the current product, recorded as CS-GAP-013 with the decision as B-124.
 > - `init --spec` lists the values of every operation, writes included, although a new project is read-only; each line says which operations use it.

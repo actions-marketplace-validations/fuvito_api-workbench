@@ -931,3 +931,11 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Behaviour change:** a `conform` run that passed with such an empty value now fails with "not sent"; probes that "passed" because of it are now skipped. This also applies to a name added empty by the page's "Add these to Variable overrides" button. Needs a line in the next release notes.
 - **Guards:** `conformance/empty_values_test.go` (all credential forms, the basic password, an empty process variable, probes); each failed before the change. CS-RUN-001 and CS-GAP-013 updated.
 - **Checked:** the example server's CI steps and all sandbox suites and random specs pass with this build.
+
+### 2026-11-25 — v0.13.0 released
+
+- **Contains** batch D (`conform --list`; `init --spec` lists the needed values) and B-124 (an empty path value or credential is not sent). The release notes lead with the behaviour change.
+- **Before tagging:** the sandbox CI passed with clrsig built from `main` at `339456b` (the feature commit plus the demo GIF) in its container. gofmt, vet and tests of all four Go modules, CLI build, `tsc`, Vitest (1,681) and the browser tests (173) passed locally. The screenshot suite was not run.
+- **Tag `v0.13.0` on `abfeed7`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. The downloaded Windows CLI reports `v0.13.0`; against the example server it does not send an empty `id` and names it, `--list` works, `init --spec` lists six values as comments, and `init github-actions` pins `@v0.13.0`. The draft notes file was deleted after publishing.
+- **Not verified:** the Docker image run, the Homebrew install (no Mac), the Scoop upgrade on the maintainer's machine, a workflow using the Action by its remote reference `@v0.13.0`, and the desktop app by eye.
+- **Open:** the sandbox still pins v0.12.0; B-123 (detailed user guide, proposal first); batch E.
