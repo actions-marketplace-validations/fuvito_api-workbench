@@ -805,3 +805,9 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 ### 2026-11-24 — 0.10.0 prepared, not tagged
 
 - Version 0.10.0 in `AboutDialog.tsx` (dated 2026-11-24), the user guide (`TestVersionsAgree` checks they agree); draft GitHub notes in `docs/process/release-notes-0.10.0-draft.md`. The notes lead with three behaviour changes: `--write-baseline` refused with `--tags`/`--paths`/`--changed-against`, a baseline entry is fixed only when its operation was sent, and the stricter `validate --strict`. CI now runs the CLI and desktop Go tests, `go vet`, Vitest and the browser tests; the first run on Linux found two test-only problems (the parity test built the CLI with an isolated module cache, a temp workspace test set only the Windows temp variables), fixed in `ed9f16b`.
+
+### 2026-11-24 — v0.10.0 released
+
+- **Tag `v0.10.0` on `255aa92`** (CI green on that exact commit, including the new CLI, desktop Go, Vitest and browser steps). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published (the three behaviour changes first); Scoop updated by the tap-bump commit and installed on Windows (`clrsig version v0.10.0`); the released CLI shows `--changed-against` and `--format github`. The draft notes file was deleted after publishing.
+- **Not verified:** the Docker image run (no daemon on the machine), the Homebrew install (no Mac) and the Action at `@v0.10.0` (new inputs `changed-against`, `setup`, `strict`; `format: github`).
+- **Open:** B-091 (proposal recommends deferring), B-088 (reviewed, not proposed), the vulnerability scan of B-090, the HTML report anchor of B-092, the rendered `CHANGELOG.md` of B-094, annotations for `run` and `diff`.
