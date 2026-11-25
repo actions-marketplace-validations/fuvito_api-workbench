@@ -18,6 +18,10 @@ export function InspectConformSpec(arg1) {
   return window['go']['main']['ConformanceService']['InspectConformSpec'](arg1);
 }
 
+export function RecordConformBaseline(arg1) {
+  return window['go']['main']['ConformanceService']['RecordConformBaseline'](arg1);
+}
+
 export function RunConformance(arg1) {
   return window['go']['main']['ConformanceService']['RunConformance'](arg1);
 }

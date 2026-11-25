@@ -676,3 +676,74 @@ func TestConformanceService_FindingsShownInThePageHideSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestConformanceService_RecordAndCompareABaseline(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	in := ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)}
+
+	if r := svc.RecordConformBaseline(filepath.Join(ws, "conform-baseline.yaml")); !strings.Contains(r.Error, "run the check first") {
+		t.Fatalf("nothing to record before a run: %+v", r)
+	}
+	first := svc.RunConformance(in)
+	if first.Error != "" || !first.Failed || first.Baseline != nil {
+		t.Fatalf("without a baseline the known violations fail the run: %+v", first)
+	}
+
+	path := filepath.Join(ws, "conform-baseline.yaml")
+	rec := svc.RecordConformBaseline(path)
+	if rec.Error != "" || rec.Violations != 6 || rec.Replaced {
+		t.Fatalf("record: %+v", rec)
+	}
+	if again := svc.RecordConformBaseline(path); !again.Replaced {
+		t.Errorf("recording over an existing file says so: %+v", again)
+	}
+	if ctx := svc.GetConformContext(); len(ctx.Baselines) != 1 || ctx.Baselines[0].Path != path {
+		t.Errorf("the page offers the baseline files of the workspace: %+v", ctx.Baselines)
+	}
+
+	in.BaselinePath = path
+	second := svc.RunConformance(in)
+	if second.Error != "" || second.Failed || second.Baseline == nil || len(second.Baseline.Known) != 6 || len(second.Baseline.New) != 0 || len(second.Baseline.Fixed) != 0 || second.Baseline.Legacy {
+		t.Fatalf("with the baseline the same violations are accepted: %+v", second.Baseline)
+	}
+	if k := second.Baseline.Known[0]; k.Operation == "" || k.Check == "" || k.Summary == "" {
+		t.Errorf("a known violation names the operation, the check and says what it was: %+v", k)
+	}
+
+	// a limited run cannot become a baseline, and a baseline outside the workspace is refused
+	limited := in
+	limited.BaselinePath, limited.Paths = "", []string{"/products"}
+	svc.RunConformance(limited)
+	if r := svc.RecordConformBaseline(path); !strings.Contains(r.Error, "limited by tags or path prefixes") {
+		t.Errorf("%+v", r)
+	}
+	bad := in
+	bad.BaselinePath = filepath.Join(t.TempDir(), "b.yaml")
+	if r := svc.RunConformance(bad); !strings.Contains(r.Error, "outside the open workspace") {
+		t.Errorf("%q", r.Error)
+	}
+	svc.RunConformance(in)
+	if r := svc.RecordConformBaseline(filepath.Join(ws, "baseline.txt")); !strings.Contains(r.Error, ".yaml") {
+		t.Errorf("%+v", r)
+	}
+}
+
+func TestConformanceService_ABaselineFromAnOlderVersionStillWorks(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	golden, err := os.ReadFile(filepath.Join("testdata", "baseline-v1-0.8.9.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(ws, "old-baseline.yaml")
+	if err := os.WriteFile(path, golden, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := svc.RunConformance(ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t), BaselinePath: path})
+	if out.Error != "" || out.Failed || out.Baseline == nil || !out.Baseline.Legacy || len(out.Baseline.Known) != 6 {
+		t.Fatalf("a 0.8.9 baseline is accepted and flagged: %+v %s", out.Baseline, out.Error)
+	}
+}

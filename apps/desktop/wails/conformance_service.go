@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -32,8 +33,11 @@ type ConformanceService struct {
 	settings  *SettingsService
 	mu        sync.Mutex
 	cancelRun context.CancelFunc
-	last      *application.ConformOutput              // the latest run, for Export
-	emit      func(event string, data ...interface{}) // nil outside the running app (tests)
+	last      *application.ConformOutput // the latest run, for Export
+	// lastFiltered is set when the latest run was limited by tags or path prefixes: such a run cannot
+	// become a baseline, because it would drop the entries of the operations it left out.
+	lastFiltered bool
+	emit         func(event string, data ...interface{}) // nil outside the running app (tests)
 }
 
 func NewConformanceService(ws *WorkspaceService, ss *SettingsService) *ConformanceService {
@@ -63,6 +67,8 @@ type ConformContextIO struct {
 	ProjectDefaults ConformDefaultsIO `json:"projectDefaults"`
 	// Scenarios are the workspace scenarios the page offers to run first (a login, for example).
 	Scenarios []CliFileIO `json:"scenarios"`
+	// Baselines are the workspace files that look like conformance baselines (their name says baseline).
+	Baselines []CliFileIO `json:"baselines"`
 }
 
 // ConformDefaultsIO is what the page preselects from the workspace's clrsig.yaml. The file is read
@@ -80,6 +86,7 @@ type ConformDefaultsIO struct {
 	EnvironmentPath    string   `json:"environmentPath,omitempty"`
 	BaseURL            string   `json:"baseUrl,omitempty"`
 	SetupPath          string   `json:"setupPath,omitempty"`
+	BaselinePath       string   `json:"baselinePath,omitempty"`
 	Tags               []string `json:"tags"`
 	Paths              []string `json:"paths"`
 	Negative           bool     `json:"negative"`
@@ -172,6 +179,9 @@ func projectDefaults(ws string) ConformDefaultsIO {
 			out.MaxResponseTimeFor = c.MaxResponseTimeFor
 			apply("conform.maxResponseTimeFor", true)
 		}
+		if out.BaselinePath = inside("conform.baseline", c.Baseline); out.BaselinePath != "" {
+			apply("conform.baseline", true)
+		}
 		if out.SetupPath = inside("conform.setup", c.Setup); out.SetupPath != "" {
 			apply("conform.setup", true)
 		}
@@ -186,11 +196,12 @@ func projectDefaults(ws string) ConformDefaultsIO {
 // GetConformContext lists the workspace files the page offers.
 func (s *ConformanceService) GetConformContext() ConformContextIO {
 	ws := s.ws.GetWorkspacePath()
-	out := ConformContextIO{Workspace: ws, Specs: []CliFileIO{}, Environments: []CliFileIO{}, Scenarios: []CliFileIO{}, ActiveEnvironment: s.ws.activeEnvPath, ProjectDefaults: projectDefaults(ws)}
+	out := ConformContextIO{Workspace: ws, Specs: []CliFileIO{}, Environments: []CliFileIO{}, Scenarios: []CliFileIO{}, Baselines: []CliFileIO{}, ActiveEnvironment: s.ws.activeEnvPath, ProjectDefaults: projectDefaults(ws)}
 	if ws != "" {
 		out.Specs = findSpecs(ws)
 		out.Environments = listFiles(ws, "environments")
 		out.Scenarios = listFiles(ws, "scenarios")
+		out.Baselines = findBaselines(ws)
 	}
 	return out
 }
@@ -291,6 +302,9 @@ type ConformRunInput struct {
 	// Vars override or add environment variables for this run only, as name=value (the same as
 	// `clrsig conform --var`). They are not saved and not part of the Get CLI command.
 	Vars []string `json:"vars"`
+	// BaselinePath is a baseline file in the workspace: violations recorded in it are accepted and
+	// only new ones fail the run, as clrsig conform --baseline does.
+	BaselinePath string `json:"baselinePath"`
 	// SetupScenario is a workspace scenario that runs first (a login): what its steps extract is
 	// available to the generated requests as {{name}}, like clrsig conform --setup.
 	SetupScenario string `json:"setupScenario"`
@@ -387,6 +401,8 @@ type ConformRunOutputIO struct {
 	Failed bool `json:"failed"`
 	// SetupNote says what the setup scenario did: which values it made available (never the values).
 	SetupNote string `json:"setupNote,omitempty"`
+	// Baseline is how the run compares with the baseline file, when one was chosen.
+	Baseline *ConformBaselineIO `json:"baseline,omitempty"`
 }
 
 // IsLocalBaseURL reports whether the URL points at this computer.
@@ -450,6 +466,20 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		return ConformRunOutputIO{Error: "response-time limits: " + err.Error()}
 	}
 
+	var baseline *conformance.Baseline
+	if in.BaselinePath != "" {
+		if err := s.insideWorkspace("baseline", in.BaselinePath); err != nil {
+			return ConformRunOutputIO{Error: err.Error()}
+		}
+		data, err := os.ReadFile(in.BaselinePath)
+		if err != nil {
+			return ConformRunOutputIO{Error: "reading the baseline: " + err.Error() + " (record one with Record as baseline after a run)"}
+		}
+		if baseline, err = conformance.ParseBaseline(data, in.BaselinePath); err != nil {
+			return ConformRunOutputIO{Error: err.Error()}
+		}
+	}
+
 	setupNote := ""
 	if in.SetupScenario != "" {
 		if err := s.insideWorkspace("setup scenario", in.SetupScenario); err != nil {
@@ -492,6 +522,7 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		Negative:          in.Negative,
 		ReadOnly:          !in.AllowWrites,
 		FailOn:            failOnFor(in.FailOnWarning),
+		Baseline:          baseline,
 		Progress: func(done, total int, op conformance.OperationResult) {
 			if s.emit != nil {
 				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.Path})
@@ -500,10 +531,12 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 	})
 	s.mu.Lock()
 	s.last = &out
+	s.lastFiltered = len(in.Tags) > 0 || len(in.Paths) > 0
 	s.mu.Unlock()
 
 	res := conformOutputIO(out, baseURL, in.AllowWrites)
 	res.SetupNote = setupNote
+	res.Baseline = baselineIO(in.BaselinePath, out.Diff)
 	for _, ref := range variables.MissingEnv(env) {
 		res.Warnings = append(res.Warnings, ref.Message())
 	}
@@ -839,4 +872,109 @@ func envHasVariable(env *domain.Environment, name string) bool {
 		}
 	}
 	return false
+}
+
+// ConformViolationIO is one violation in a baseline comparison. A version 1 baseline entry has no
+// check, so Summary carries what it recorded.
+type ConformViolationIO struct {
+	Operation string `json:"operation"`
+	Check     string `json:"check,omitempty"`
+	Where     string `json:"where,omitempty"`
+	Summary   string `json:"summary"`
+}
+
+// ConformBaselineIO says how a run compares with its baseline: the three lists of clrsig conform
+// --baseline. Failed on the run output already accounts for it (only new violations fail).
+type ConformBaselineIO struct {
+	Path string `json:"path"`
+	// Legacy is set for a version 1 file: it still works, and Record as baseline upgrades it.
+	Legacy bool                 `json:"legacy"`
+	Known  []ConformViolationIO `json:"known"`
+	New    []ConformViolationIO `json:"new"`
+	Fixed  []ConformViolationIO `json:"fixed"`
+}
+
+func baselineIO(path string, d *conformance.BaselineDiff) *ConformBaselineIO {
+	if d == nil {
+		return nil
+	}
+	conv := func(vs []conformance.Violation) []ConformViolationIO {
+		out := []ConformViolationIO{}
+		for _, v := range vs {
+			item := ConformViolationIO{Operation: v.Operation, Check: v.Check, Where: v.Where, Summary: v.Summary}
+			if item.Summary == "" {
+				item.Summary = v.Detail
+				if i := strings.Index(item.Summary, "\n"); i >= 0 {
+					item.Summary = item.Summary[:i]
+				}
+			}
+			out = append(out, item)
+		}
+		return out
+	}
+	return &ConformBaselineIO{Path: path, Legacy: d.Legacy, Known: conv(d.Known), New: conv(d.New), Fixed: conv(d.Fixed)}
+}
+
+// findBaselines lists the workspace files whose name says they are a baseline (conform-baseline.yaml,
+// baseline.json, ...), so the page can offer them.
+func findBaselines(ws string) []CliFileIO {
+	const maxDepth, maxFiles = 4, 20
+	out := []CliFileIO{}
+	_ = filepath.WalkDir(ws, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if path != ws && (skipDirs[d.Name()] || strings.Count(relLabel(ws, path), "/") >= maxDepth) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if len(out) < maxFiles && dataExts[strings.ToLower(filepath.Ext(path))] && strings.Contains(strings.ToLower(d.Name()), "baseline") {
+			out = append(out, CliFileIO{Path: path, Label: relLabel(ws, path)})
+		}
+		return nil
+	})
+	sort.Slice(out, func(i, j int) bool { return out[i].Label < out[j].Label })
+	return out
+}
+
+// RecordedBaselineIO is the outcome of RecordConformBaseline.
+type RecordedBaselineIO struct {
+	Path       string `json:"path"`
+	Violations int    `json:"violations"`
+	Replaced   bool   `json:"replaced"`
+	Error      string `json:"error,omitempty"`
+}
+
+// RecordConformBaseline writes the violations of the latest run to a baseline file in the workspace
+// (version 2, atomically), as clrsig conform --write-baseline does. A run limited by tags or path
+// prefixes cannot be recorded: it would drop the entries of the operations it left out. An existing
+// file is replaced, so the caller asks first (the page lists the existing baselines).
+func (s *ConformanceService) RecordConformBaseline(path string) RecordedBaselineIO {
+	s.mu.Lock()
+	last, filtered := s.last, s.lastFiltered
+	s.mu.Unlock()
+	switch {
+	case last == nil:
+		return RecordedBaselineIO{Error: "run the check first: a baseline records the violations of a run"}
+	case filtered:
+		return RecordedBaselineIO{Error: "this run was limited by tags or path prefixes, and a baseline recorded from it would drop the other operations: run the check without them, then record the baseline"}
+	case path == "":
+		return RecordedBaselineIO{Error: "choose a file name for the baseline"}
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".yaml", ".yml", ".json":
+	default:
+		return RecordedBaselineIO{Error: "the baseline file must be .yaml, .yml or .json"}
+	}
+	if err := s.insideWorkspace("baseline", path); err != nil {
+		return RecordedBaselineIO{Error: err.Error()}
+	}
+	_, statErr := os.Stat(path)
+	b := conformance.NewBaseline(last.Violations)
+	if err := conformance.WriteBaselineFile(path, b); err != nil {
+		return RecordedBaselineIO{Error: "writing the baseline: " + err.Error()}
+	}
+	return RecordedBaselineIO{Path: path, Violations: len(b.Violations), Replaced: statErr == nil}
 }

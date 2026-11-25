@@ -10,6 +10,7 @@ const bridge = vi.hoisted(() => ({
   cancelConformance: vi.fn(),
   onConformanceProgress: vi.fn((_cb: unknown): (() => void) => () => {}),
   exportConformReport: vi.fn(),
+  recordConformBaseline: vi.fn(),
   saveContentToFile: vi.fn(),
   openInSystemViewer: vi.fn(),
 }))
@@ -65,7 +66,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, failOnWarning: false, setupScenario: '', timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
+      tags: [], paths: [], negative: false, failFast: false, failOnWarning: false, setupScenario: '', baselinePath: '', timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -699,5 +700,78 @@ describe('copy a finding as an issue', () => {
     }
     expect(text).not.toContain('raw')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+})
+
+describe('baselines', () => {
+  const withBaselines = { ...ctx, workspace: '/ws', baselines: [{ path: '/ws/conform-baseline.yaml', label: 'conform-baseline.yaml' }] }
+  const failing = {
+    ...output, failed: true, failing: 1, passing: 0, covered: 1,
+    operations: [{ ...output.operations[1], status: 'failed' }],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(withBaselines)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(failing)
+    bridge.recordConformBaseline = vi.fn().mockResolvedValue({ path: '/ws/conform-baseline.yaml', violations: 1, replaced: true })
+  })
+
+  it('sends the chosen baseline and shows known, new and fixed against it', async () => {
+    bridge.runConformance.mockResolvedValue({
+      ...failing, failed: true,
+      baseline: {
+        path: '/ws/conform-baseline.yaml', legacy: true,
+        known: [{ operation: 'GET /a', check: 'CS-RESP-006', where: 'price', summary: 'text, not number' }],
+        new: [{ operation: 'GET /b', check: 'CS-RESP-005', where: 'id', summary: 'id is missing' }],
+        fixed: [{ operation: 'GET /c', summary: 'old wording' }],
+      },
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Baseline'), { target: { value: '/ws/conform-baseline.yaml' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ baselinePath: '/ws/conform-baseline.yaml' })))
+    expect(await screen.findByTestId('baseline-summary')).toHaveTextContent('1 known, 1 new, 1 fixed')
+    const region = screen.getByRole('region', { name: 'Baseline' })
+    expect(region).toHaveTextContent('GET /b')
+    expect(region).toHaveTextContent('CS-RESP-005')
+    expect(region).toHaveTextContent('old format')
+  })
+
+  it('says when every failure is known to the baseline', async () => {
+    bridge.runConformance.mockResolvedValue({ ...failing, failed: false, baseline: { path: '/ws/conform-baseline.yaml', legacy: false, known: [{ operation: 'GET /bad', summary: 'x' }], new: [], fixed: [] } })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('all known to the baseline')
+  })
+
+  it('records the run as a baseline, asking first before replacing one', async () => {
+    await chooseSpec()
+    expect(screen.getByRole('button', { name: 'Record as baseline' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    fireEvent.click(screen.getByRole('button', { name: 'Record as baseline' }))
+    expect(screen.getByRole('alertdialog', { name: 'Replace the baseline' })).toHaveTextContent('conform-baseline.yaml')
+    expect(bridge.recordConformBaseline).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Replace' }))
+    await waitFor(() => expect(bridge.recordConformBaseline).toHaveBeenCalledWith('/ws/conform-baseline.yaml'))
+    expect(await screen.findByTestId('baseline-recorded')).toHaveTextContent('Recorded 1 violation in conform-baseline.yaml (replaced the old file)')
+  })
+
+  it('records a new file without asking, and not while tags or paths limit the run', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, workspace: '/ws', baselines: [] })
+    bridge.recordConformBaseline = vi.fn().mockResolvedValue({ path: '/ws/conform-baseline.yaml', violations: 1, replaced: false })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    fireEvent.click(screen.getByRole('button', { name: 'Record as baseline' }))
+    await waitFor(() => expect(bridge.recordConformBaseline).toHaveBeenCalledWith('/ws/conform-baseline.yaml'))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Tags'), { target: { value: 'users' } })
+    expect(screen.getByRole('button', { name: 'Record as baseline' })).toBeDisabled()
   })
 })

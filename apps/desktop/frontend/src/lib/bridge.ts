@@ -91,6 +91,7 @@ import {
   RunConformance as WailsRunConformance,
   CancelConformance as WailsCancelConformance,
   ExportConformReport as WailsExportConformReport,
+  RecordConformBaseline as WailsRecordConformBaseline,
 } from '@wailsjs/go/main/ConformanceService'
 import { GetWorkspaceOverview as WailsGetWorkspaceOverview } from '@wailsjs/go/main/DashboardService'
 import {
@@ -734,6 +735,8 @@ export interface ConformContext {
   projectDefaults?: ConformDefaults
   // workspace scenarios that can run first (a login, for example)
   scenarios?: CliFile[]
+  // workspace files that look like conformance baselines
+  baselines?: CliFile[]
 }
 
 export interface ConformDefaults {
@@ -747,6 +750,7 @@ export interface ConformDefaults {
   environmentPath?: string
   baseUrl?: string
   setupPath?: string
+  baselinePath?: string
   tags: string[]
   paths: string[]
   negative: boolean
@@ -779,6 +783,8 @@ export interface ConformRunInput {
   failOnWarning?: boolean
   // a workspace scenario that runs first; what it extracts is available to the requests as {{name}}
   setupScenario?: string
+  // a baseline file in the workspace: recorded violations are accepted and only new ones fail the run
+  baselinePath?: string
   maxResponseTimeMs?: number
   maxResponseTimeFor?: string[]
   timeoutMs: number
@@ -856,6 +862,31 @@ export interface ConformRunOutput {
   failed?: boolean
   // what the setup scenario made available (names, never values)
   setupNote?: string
+  // how the run compares with the chosen baseline
+  baseline?: ConformBaseline
+}
+
+export interface ConformViolation {
+  operation: string
+  check?: string
+  where?: string
+  summary: string
+}
+
+export interface ConformBaseline {
+  path: string
+  // a version 1 file: it still works; recording a new baseline upgrades it
+  legacy: boolean
+  known: ConformViolation[]
+  new: ConformViolation[]
+  fixed: ConformViolation[]
+}
+
+export interface RecordedBaseline {
+  path: string
+  violations: number
+  replaced: boolean
+  error?: string
 }
 
 export type ConformReportFormat = 'html' | 'junit' | 'json' | 'markdown'
@@ -874,6 +905,10 @@ export async function runConformance(input: ConformRunInput): Promise<ConformRun
 
 export async function cancelConformance(): Promise<void> {
   await WailsCancelConformance()
+}
+
+export async function recordConformBaseline(path: string): Promise<RecordedBaseline> {
+  return (await WailsRecordConformBaseline(path)) as unknown as RecordedBaseline
 }
 
 export async function exportConformReport(format: ConformReportFormat): Promise<RunReport> {
