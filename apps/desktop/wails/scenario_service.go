@@ -927,7 +927,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		for _, v := range sr.Spec.Violations {
 			step.SpecViolations = append(step.SpecViolations, v.Error())
 		}
-		step.SpecFindings = specFindings(sr)
+		step.SpecFindings = specFindings(sr, result.Secrets)
 		if sr.Request != nil {
 			step.RequestMethod, step.RequestURL, step.RequestHeaders, step.RequestBody = exchangeRequest(sr.Request, result.Secrets)
 		}
@@ -1479,7 +1479,7 @@ func requestPath(raw string) string {
 
 // specFindings explains the spec violations of one step in plain language, as the Check Conformance
 // page does for an operation. The operation is the one the step called, so its path is the request's.
-func specFindings(sr scenario.StepResult) []ConformFindingIO {
+func specFindings(sr scenario.StepResult, secrets []string) []ConformFindingIO {
 	if len(sr.Spec.Violations) == 0 || sr.Request == nil {
 		return nil
 	}
@@ -1487,5 +1487,5 @@ func specFindings(sr scenario.StepResult) []ConformFindingIO {
 	if sr.Response != nil {
 		op.StatusCode = sr.Response.StatusCode
 	}
-	return findingsIO(conformance.Diagnose(op))
+	return findingsIO(reporting.Explain(op, secrets))
 }

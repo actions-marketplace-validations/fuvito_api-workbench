@@ -50,6 +50,8 @@ Secret values are replaced by `***` in every report. For `conform`, JSON, HTML, 
 
 ## GitHub Actions
 
+New project? `clrsig init github-actions` prints a ready workflow for this action (and `--write` saves it to `.github/workflows/clrsig.yml`). If the repository has a `clrsig.yaml`, the action finds it from the checkout and uses it for any option the step does not set; an input always wins.
+
 The action installs the right `clrsig` for the runner, runs one command and passes its exit code on.
 
 ```yaml
@@ -78,6 +80,10 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 | `fail-on` | diff | `breaking`, `warning` or `info`: how serious a change must be to fail |
 | `against` | diff | compare `base-spec` with the spec at this git ref (checkout with `fetch-depth: 0`) |
 | `read-only` | conform | send only GET and HEAD; other operations are skipped and never sent |
+| `changed-against` | conform | check only the operations that are new or changed compared with the spec at this git ref (for pull requests; checkout with `fetch-depth: 0`) |
+| `strict` | validate | also report valid but weak scenarios (steps that check nothing, extractions nobody uses; names nothing defines when `env` is set) as warnings that fail the step |
+| `setup` | conform | a scenario to run first, usually a login: what it extracts (a token) is available to the generated requests as `{{name}}`; if it fails the check does not start |
+| `conform-fail-on` | conform | `failure` (default) or `warning`: with `warning`, findings that are only warnings also fail the run |
 | `negative` | conform | also run negative probes |
 | `explain` | conform | explain each failure in the text report |
 | `baseline`, `write-baseline` | conform | fail only on violations not in the baseline file / record the current ones |
@@ -151,6 +157,38 @@ jobs:
           name: conformance-report
           path: reports/conform.html
 ```
+
+### Findings on the pull request
+
+`format: github` (`clrsig conform --format github`) prints each finding as a GitHub workflow command, so it shows up in the pull request's **Checks** view and as an annotation, with the check ID in the title (`CS-RESP-005 GET /users/{id}`), what is wrong, why it fails and how to fix it, and, when the spec is a file in the repository, on the line of the operation. It also works for `clrsig run` (`command: run`, `format: github`): each failed assertion, unsent request or response that breaks the spec is annotated on the line of its step in the scenario file. It prints only those commands plus one summary notice, so keep the usual reports with `report:` (for example `junit=reports/conform.xml`). Failures are errors, warnings are warnings, and the exit code is the same as for any other format. GitHub shows only the first ten annotations of each kind per step in the pull request view; the log has all of them.
+
+```yaml
+- uses: fuvito/api-workbench@v1
+  with:
+    command: conform
+    spec: openapi.yaml
+    base-url: ${{ vars.API_BASE_URL }}
+    format: github
+    report: |
+      junit=reports/conform.xml
+      html=reports/conform.html
+```
+
+### Only what a pull request changed
+
+```yaml
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}           # the comparison needs the history of the target branch
+      - uses: fuvito/api-workbench@v1
+        with:
+          command: conform
+          spec: openapi.yaml
+          base-url: ${{ vars.API_BASE_URL }}
+          changed-against: origin/main
+          read-only: 'true'
+```
+
+`--changed-against <ref>` checks only the operations that are **new or changed** compared with the spec at that ref (changes to a schema that several operations share count for each of them), with the same checks and exit codes as a full run. A pull request that does not touch the API passes with `NOTHING CHECKED`. It follows the **spec only**: a server regression with no spec change is invisible to it, and a change that belongs to no operation (a different `servers` list, global `security`) does not widen the check; the report says how many such changes there were. Keep a full `conform` on your main branch and nightly. With `--baseline`, entries of operations that were not checked are neither known nor fixed, and `--write-baseline` refuses to run on a limited run (record it with a full run).
 
 ### Breaking changes on pull requests
 

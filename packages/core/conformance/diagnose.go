@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 )
 
@@ -41,6 +42,9 @@ type Finding struct {
 	// CheckID is the ID of the check in the catalog of what Clear Signal checks (Help, What We
 	// Check), for example CS-RESP-005. Empty for a violation this package does not recognise.
 	CheckID string
+	// Severity is what the finding does to the run, from the check's entry in package checks. A
+	// violation that is not recognised is a failure.
+	Severity checks.Severity
 	// Part is the part of the exchange the finding is about: "response body", "response status",
 	// "response header" (also used for Content-Type), "request" or "network".
 	Part string
@@ -113,8 +117,16 @@ func Diagnose(op OperationResult) []Finding {
 	}
 	for i := range out {
 		out[i].CheckID = checkIDFor(out[i])
+		out[i].Severity = checks.SeverityOf(out[i].CheckID)
 	}
 	return out
+}
+
+// withSeverity fills CheckID and Severity of a finding built by diagnoseRequest or diagnoseViolation.
+func (f Finding) withSeverity() Finding {
+	f.CheckID = checkIDFor(f)
+	f.Severity = checks.SeverityOf(f.CheckID)
+	return f
 }
 
 // checkIDFor maps a finding to its ID in the catalog of checks.
@@ -779,4 +791,13 @@ func describeConstraint(msg string) (rule, fix string) {
 		return "is a multiple of " + reMultiple.FindStringSubmatch(msg)[1], generic
 	}
 	return "keeps to a rule the schema sets (" + msg + ")", generic
+}
+
+// ViolationSeverity is the severity of one violation of an operation: request is true for a
+// violation of the generated request, false for one of the response.
+func ViolationSeverity(op OperationResult, v openapi.ValidationError, request bool) checks.Severity {
+	if request {
+		return diagnoseRequest(op, v).withSeverity().Severity
+	}
+	return diagnoseViolation(op, v).withSeverity().Severity
 }

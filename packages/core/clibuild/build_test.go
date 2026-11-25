@@ -494,3 +494,27 @@ func TestEveryReportFormatHasAnExtension(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildNotesAProjectFileWithoutDependingOnIt(t *testing.T) {
+	root := repo(t)
+	values := map[string]string{"spec": "openapi.yaml", "base-url": "http://localhost:8080"}
+
+	plain := clibuild.Build(clibuild.Request{Command: "conform", Values: values}, root)
+	if !plain.Valid || has(plain, clibuild.Info, "project file") {
+		t.Fatalf("no project file, no note: %+v", plain.Messages)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "clrsig.yaml"), []byte("schemaVersion: \"1\"\nspec: elsewhere.yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	with := clibuild.Build(clibuild.Request{Command: "conform", Values: values}, root)
+	if !with.Valid || !has(with, clibuild.Info, "clrsig.yaml") || !has(with, clibuild.Info, "clrsig config show conform") {
+		t.Fatalf("the note names the file and the command that shows what it supplies: %+v", with.Messages)
+	}
+	if strings.Join(with.Argv, " ") != strings.Join(plain.Argv, " ") {
+		t.Errorf("the command itself must not change: %v vs %v", with.Argv, plain.Argv)
+	}
+	if other := clibuild.Build(clibuild.Request{Command: "diff", Values: map[string]string{"base-spec": "openapi.yaml", "revision-spec": "openapi.yaml"}}, root); has(other, clibuild.Info, "project file") {
+		t.Error("commands that do not read the file get no note")
+	}
+}

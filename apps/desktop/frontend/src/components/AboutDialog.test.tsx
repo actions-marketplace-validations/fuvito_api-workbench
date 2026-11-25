@@ -1,11 +1,20 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { AboutDialog } from './AboutDialog'
+import { AboutDialog, APP_VERSION } from './AboutDialog'
+
+const external = vi.hoisted(() => ({ openExternal: vi.fn(), FEEDBACK_URL: 'https://github.com/fuvito/api-workbench/issues/new/choose' }))
+vi.mock('@/lib/external', () => external)
 
 describe('AboutDialog', () => {
+  it('offers a way to send feedback', () => {
+    render(<AboutDialog onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Report a problem or suggest an idea' }))
+    expect(external.openExternal).toHaveBeenCalledWith('https://github.com/fuvito/api-workbench/issues/new/choose')
+  })
+
   it('opens on the About tab with version and stack', () => {
     render(<AboutDialog onClose={vi.fn()} />)
-    expect(screen.getByText('Version 0.8.9')).toBeInTheDocument()
+    expect(screen.getByText(`Version ${APP_VERSION}`)).toBeInTheDocument()
     expect(screen.getByText('Go 1.26 + Wails v2')).toBeInTheDocument()
     expect(screen.getByText('MIT')).toBeInTheDocument()
   })

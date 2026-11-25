@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ShieldCheck, Terminal, Play, Square, AlertTriangle, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   getConformContext, inspectConformSpec, runConformance, cancelConformance,
-  exportConformReport, saveContentToFile, openInSystemViewer, onConformanceProgress,
+  exportConformReport, recordConformBaseline, saveContentToFile, openInSystemViewer, onConformanceProgress,
 } from '@/lib/bridge'
 import { isLocalUrl, parseVars, parsePathLimits, splitList, cliValues } from '@/lib/conformHelpers'
 import { FindingView } from '@/components/FindingView'
 import type { ConformSummary } from '@/components/ConformanceSidebarPanel'
-import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat } from '@/lib/bridge'
+import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat, RecordedBaseline, ConformBaseline, ConformViolation, SpecIssue } from '@/lib/bridge'
 
 const inputClass =
   'w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)]'
@@ -58,7 +58,7 @@ function ProblemCard({ op }: { op: ConformOperation }) {
         <span className="font-mono">{op.path}</span>
         {op.statusCode > 0 && <span className="text-[var(--color-muted-foreground)]">answered {op.statusCode} in {op.durationMs} ms</span>}
       </header>
-      {findings.map((f, i) => <FindingView key={i} f={f} />)}
+      {findings.map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${op.path}`} />)}
       {findings.length === 0 && (
         <ul className="list-disc pl-5 font-mono text-[11px] text-red-400">
           {op.error && <li className="break-all">{op.error}</li>}
@@ -121,6 +121,56 @@ function ExportMenu({ disabled }: { disabled: boolean }) {
   )
 }
 
+function SpecHealth({ issues }: { issues: SpecIssue[] }) {
+  if (issues.length === 0) return null
+  const errors = issues.filter(i => i.severity === 'error').length
+  return (
+    <details open={errors > 0} role="region" aria-label="Spec health" className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs">
+      <summary data-testid="spec-health" className="cursor-pointer font-medium text-amber-400">
+        The spec itself has {issues.length} problem{issues.length === 1 ? '' : 's'}{errors > 0 ? ` (${errors} to fix first)` : ''}: response violations blame the server for what the spec got wrong
+      </summary>
+      <ul className="mt-2 flex flex-col gap-2">
+        {issues.map((i, k) => (
+          <li key={k}>
+            <p><span className={i.severity === 'error' ? 'text-red-400' : 'text-amber-400'}>{i.severity}</span> <span className="font-mono text-[var(--color-muted-foreground)]">{i.check}</span> {i.what}</p>
+            <p className="text-[var(--color-muted-foreground)]">Why: {i.why} Fix: {i.fix}</p>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+function BaselineSummary({ b }: { b: ConformBaseline }) {
+  const list = (label: string, items: ConformViolation[], tone: string) => items.length > 0 && (
+    <details className="mt-1" open={label === 'New'}>
+      <summary className={cn('cursor-pointer text-[11px] font-medium', tone)}>{label} ({items.length})</summary>
+      <ul className="mt-1 text-[11px]">
+        {items.map((v, i) => (
+          <li key={i} className="py-0.5">
+            <span className="font-mono">{v.operation}</span>
+            {v.check && <span className="ml-1.5 font-mono text-[var(--color-muted-foreground)]">{v.check}</span>}
+            {v.where && <span className="ml-1.5 font-mono text-[var(--color-muted-foreground)]">{v.where}</span>}
+            <span className="ml-1.5">{v.summary}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+  return (
+    <div role="region" aria-label="Baseline" className="rounded border border-[var(--color-border)] px-3 py-2 text-xs">
+      <p data-testid="baseline-summary" className="font-medium">
+        Against the baseline: {b.known.length} known, <span className={b.new.length > 0 ? 'text-red-400' : ''}>{b.new.length} new</span>, {b.fixed.length} fixed
+      </p>
+      {list('New', b.new, 'text-red-400')}
+      {list('Fixed', b.fixed, 'text-emerald-400')}
+      {list('Known', b.known, 'text-[var(--color-muted-foreground)]')}
+      {b.fixed.length > 0 && <p className="mt-1 text-[11px] text-[var(--color-muted-foreground)]">Fixed violations stay in the baseline until you record it again.</p>}
+      {b.legacy && <p className="mt-1 text-[11px] text-amber-400">This baseline uses the old format (written by clrsig 0.8.9 or earlier). It still works; recording a new baseline upgrades it.</p>}
+    </div>
+  )
+}
+
 // A choice made in the Check Conformance sidebar; `id` changes with every click so the same choice can be made again.
 export type ConformRequest = { id: number; specPath?: string; envPath?: string }
 
@@ -150,10 +200,19 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [negative, setNegative] = useState(false)
   const [failFast, setFailFast] = useState(false)
+  const [failOnWarning, setFailOnWarning] = useState(false)
+  const [setupPath, setSetupPath] = useState('')
+  const [baselinePath, setBaselinePath] = useState('')
+  const [confirmRecord, setConfirmRecord] = useState(false)
+  const [recorded, setRecorded] = useState<RecordedBaseline | null>(null)
   const [recordCoverage, setRecordCoverage] = useState(false)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<ConformProgress | null>(null)
   const [output, setOutput] = useState<ConformRunOutput | null>(null)
+
+  const [defaultsApplied, setDefaultsApplied] = useState(false)
+  const [defaultsNote, setDefaultsNote] = useState('')
+  const pendingBaseUrl = useRef('')
 
   const [appliedRequest, setAppliedRequest] = useState<ConformRequest | null>(null)
   if ((request ?? null) !== appliedRequest) {
@@ -175,6 +234,34 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     getConformContext().then(setCtx).catch(e => setLoadError(String(e)))
   }, [])
 
+  // The workspace's clrsig.yaml chooses the starting point, once. It never turns on writes.
+  useEffect(() => {
+    if (!ctx || defaultsApplied) return
+    setDefaultsApplied(true)
+    const d = ctx.projectDefaults
+    if (!d?.found) return
+    const parts: string[] = []
+    if (d.applied?.length) parts.push(`Starting values from ${d.file ?? 'clrsig.yaml'}: ${d.applied.join(', ')}.`)
+    else if (d.note) parts.push(`${d.file ?? 'clrsig.yaml'} was found but gave nothing.`)
+    if (d.note) parts.push(d.note + '.')
+    setDefaultsNote(parts.join(' '))
+    if (!specPath && d.specPath && ctx.specs.some(f => f.path === d.specPath)) {
+      pendingBaseUrl.current = d.baseUrl ?? ''
+      setSpecPath(d.specPath)
+    }
+    if (!envPath && d.environmentPath && ctx.environments.some(f => f.path === d.environmentPath)) setEnvPath(d.environmentPath)
+    if (d.tags?.length) setTagsText(d.tags.join(', '))
+    if (d.paths?.length) setPathsText(d.paths.join(', '))
+    if (d.negative) setNegative(true)
+    if (d.failOnWarning) setFailOnWarning(true)
+    if (d.setupPath && (ctx.scenarios ?? []).some(f => f.path === d.setupPath)) setSetupPath(d.setupPath)
+    if (d.baselinePath && (ctx.baselines ?? []).some(f => f.path === d.baselinePath)) setBaselinePath(d.baselinePath)
+    if (d.requestTimeoutMs > 0) setTimeoutText(String(d.requestTimeoutMs))
+    if (d.maxResponseTimeMs > 0) setMaxResponseText(String(d.maxResponseTimeMs))
+    if (d.maxResponseTimeFor?.length) setPathLimitsText(d.maxResponseTimeFor.join('\n'))
+    if (d.tags?.length || d.paths?.length || d.negative || d.failOnWarning || d.requestTimeoutMs > 0 || d.maxResponseTimeMs > 0 || d.maxResponseTimeFor?.length || d.setupPath || d.baselinePath) setOptionsOpen(true)
+  }, [ctx]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!running) return
     return onConformanceProgress(setProgress)
@@ -188,7 +275,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
     inspectConformSpec(specPath).then(i => {
       if (!current) return
       setInfo(i)
-      setBaseUrl(i.serverUrl)
+      setBaseUrl(pendingBaseUrl.current || i.serverUrl)
+      pendingBaseUrl.current = ''
     }).catch(e => current && setInfo({ title: '', version: '', serverUrl: '', reads: 0, writes: 0, error: String(e) }))
     return () => { current = false }
   }, [specPath])
@@ -208,14 +296,35 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
   const parsedVars = parseVars(varsText)
   const canRun = !timeoutBad && !maxResponseBad && pathLimits.bad.length === 0 && parsedVars.bad.length === 0 && !!specPath && !info?.error && baseUrl.trim() !== '' && (!remote || confirmedRemote) && !running
 
+  const sep = ctx.workspace.includes('\\') ? '\\' : '/'
+  const recordPath = baselinePath || `${ctx.workspace}${sep}conform-baseline.yaml`
+  const baselineExists = (ctx.baselines ?? []).some(f => f.path === recordPath)
+  const recordLabel = (ctx.baselines ?? []).find(f => f.path === recordPath)?.label ?? recordPath.slice(ctx.workspace.length + 1)
+
+  async function record() {
+    setConfirmRecord(false)
+    try {
+      const r = await recordConformBaseline(recordPath)
+      setRecorded(r)
+      if (!r.error) {
+        setCtx(await getConformContext())
+        setBaselinePath(r.path)
+      }
+    } catch (e) {
+      setRecorded({ path: recordPath, violations: 0, replaced: false, error: String(e) })
+    }
+  }
+
   async function run() {
     setRunning(true)
     setProgress(null)
     setOutput(null)
+    setRecorded(null)
+    setConfirmRecord(false)
     try {
       setOutput(await runConformance({
         specPath, baseUrl, envPath, allowWrites, confirmedRemote,
-        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast,
+        tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning, setupScenario: setupPath, baselinePath,
         timeoutMs: timeoutBad || !timeoutText ? 0 : timeoutMs,
         maxResponseTimeMs: maxResponseBad || !maxResponseText ? 0 : maxResponseMs,
         maxResponseTimeFor: pathLimits.lines,
@@ -240,13 +349,14 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           <p className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">
             Spec Conformance Testing: call every operation in an OpenAPI spec and check that each response matches what the spec declares.
           </p>
+          {defaultsNote && <p data-testid="project-defaults-note" className="mt-1 text-[11px] text-sky-400">{defaultsNote}</p>}
         </div>
         {onOpenCliBuilder && (
           <button
             type="button"
             onClick={() => onOpenCliBuilder(cliValues({
               specPath, baseUrl, envPath, activeEnvironment: ctx.activeEnvironment ?? '',
-              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, timeoutText, maxResponseText, allowWrites,
+              tags: splitList(tagsText), paths: splitList(pathsText), negative, failFast, failOnWarning, setupPath, timeoutText, maxResponseText, allowWrites,
             }))}
             title="Open the CLI Command Builder with the choices on this page"
             className="shrink-0 flex items-center gap-1.5 rounded border border-[var(--color-border)] px-2 py-1 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-muted)]"
@@ -290,6 +400,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           </div>
         </div>
 
+        {info && !info.error && <SpecHealth issues={info.lint ?? []} />}
+
         {remote && (
           <label className="flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs cursor-pointer">
             <input type="checkbox" checked={confirmedRemote} onChange={e => setConfirmedRemote(e.target.checked)} className="mt-0.5" />
@@ -320,6 +432,26 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
           className="rounded border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2"
         >
           <summary className="cursor-pointer text-xs font-medium">Options</summary>
+          <div className="mt-3 flex flex-col gap-1">
+            <label htmlFor="conf-setup" className="text-xs font-medium">Run a scenario first</label>
+            <select id="conf-setup" value={setupPath} onChange={e => setSetupPath(e.target.value)} className={inputClass}>
+              <option value="">None</option>
+              {(ctx.scenarios ?? []).map(f => <option key={f.path} value={f.path}>{f.label}</option>)}
+            </select>
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              Usually a login. What its steps extract (a token, an id) is available to the generated requests as {'{{name}}'}, so secured operations are sent. If it fails, the check does not start.
+            </p>
+          </div>
+          <div className="mt-3 flex flex-col gap-1">
+            <label htmlFor="conf-baseline" className="text-xs font-medium">Baseline</label>
+            <select id="conf-baseline" value={baselinePath} onChange={e => setBaselinePath(e.target.value)} className={inputClass}>
+              <option value="">None</option>
+              {(ctx.baselines ?? []).map(f => <option key={f.path} value={f.path}>{f.label}</option>)}
+            </select>
+            <p className="text-[11px] text-[var(--color-muted-foreground)]">
+              Violations recorded in the baseline are accepted and only new ones fail the run, so an API with known problems can adopt the check and improve gradually. After a run, <strong>Record as baseline</strong> saves its violations.
+            </p>
+          </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
               <label htmlFor="conf-tags" className="text-xs font-medium">Tags</label>
@@ -381,6 +513,10 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               <input type="checkbox" checked={failFast} onChange={e => setFailFast(e.target.checked)} />
               <span className="font-medium">Stop after the first failure</span>
             </label>
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={failOnWarning} onChange={e => setFailOnWarning(e.target.checked)} className="mt-0.5" />
+              <span><span className="font-medium">Fail on warnings</span> — a warning is always shown; with this on it also fails the run, like <code>--fail-on warning</code>.</span>
+            </label>
             <label className={cn('flex items-start gap-2 text-xs', filtered ? 'opacity-50' : 'cursor-pointer')}>
               <input type="checkbox" checked={recordCoverage && !filtered} disabled={filtered} onChange={e => setRecordCoverage(e.target.checked)} className="mt-0.5" />
               <span>
@@ -427,6 +563,10 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
 
         {output?.error && <p role="alert" className="text-xs text-red-400">{output.error}</p>}
 
+        {output?.setupNote && !output.error && (
+          <p data-testid="conform-setup-note" className="text-[11px] text-[var(--color-muted-foreground)]">{output.setupNote}</p>
+        )}
+
         {output && output.warnings?.length > 0 && (
           <ul aria-label="Environment warnings" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-400">
             {output.warnings.map((w, i) => <li key={i}>{w}</li>)}
@@ -447,9 +587,11 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               }
               const noAnswer = problems.filter(o => o.status === 'error').length
               const broken = problems.length - blocked - noAnswer
+              const accepted = !!output.baseline && !output.failed && problems.length > 0
               let headline: string
               if (problems.length === 0) {
-                headline = `All ${passed.length} checked operations match the spec`
+                const withWarnings = passed.filter(o => (o.warnings ?? 0) > 0).length
+                headline = `All ${passed.length} checked operations match the spec` + (withWarnings > 0 ? `, ${withWarnings} with warnings` : '')
               } else if (output.covered === 0 && noAnswer > 0) {
                 headline = `No operation was reached: is the server running at ${output.baseUrl}?`
               } else if (broken === 0 && noAnswer === 0) {
@@ -464,8 +606,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
               return (
                 <>
                   <div>
-                    <h2 data-testid="conform-headline" className={cn('text-sm font-semibold', problems.length > 0 || output.failed ? 'text-red-400' : 'text-emerald-400')}>
-                      {headline}
+                    <h2 data-testid="conform-headline" className={cn('text-sm font-semibold', accepted ? 'text-amber-400' : problems.length > 0 || output.failed ? 'text-red-400' : 'text-emerald-400')}>
+                      {headline}{accepted ? ' (all known to the baseline)' : ''}
                     </h2>
                     {notRun.length > 0 && (
                       <p data-testid="conform-skipped" className="mt-1 text-[11px] text-[var(--color-muted-foreground)]">
@@ -481,6 +623,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                       </p>
                     )}
                   </div>
+
+                  {output.baseline && <BaselineSummary b={output.baseline} />}
 
                   {missing.length > 0 && (
                     <div role="region" aria-label="Missing values" className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
@@ -514,10 +658,18 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                       <summary className="cursor-pointer text-xs font-semibold text-emerald-400">Passing ({passed.length})</summary>
                       <ul className="mt-2 text-xs">
                         {passed.map(op => (
-                          <li key={`${op.method} ${op.path}`} className="flex gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
+                          <li key={`${op.method} ${op.path}`} className="flex flex-wrap gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
                             <span className="font-mono font-semibold w-14 shrink-0">{op.method}</span>
                             <span className="font-mono flex-1 min-w-0 break-all">{op.path}</span>
+                            {(op.warnings ?? 0) > 0 && (
+                              <span data-testid="op-warnings" className="shrink-0 text-amber-400">⚠ {op.warnings} {op.warnings === 1 ? 'warning' : 'warnings'}</span>
+                            )}
                             <span className="font-mono text-[var(--color-muted-foreground)]">{op.statusCode} · {op.durationMs} ms</span>
+                            {(op.warnings ?? 0) > 0 && (
+                              <div className="basis-full mb-1 flex flex-col gap-1.5">
+                                {(op.findings ?? []).filter(f => f.severity === 'warning').map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${op.path}`} />)}
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -574,7 +726,32 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
       </div>
 
       <aside role="region" aria-label="Summary" className="w-80 shrink-0 overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-card)] p-4 flex flex-col gap-3">
-        <div className="flex justify-end"><ExportMenu disabled={!output || !!output.error} /></div>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            disabled={!output || !!output.error || filtered}
+            title={filtered ? 'Not available while tags or path prefixes are set: a baseline from a limited run would drop the other operations' : 'Save the violations of this run as the baseline'}
+            onClick={() => (baselineExists ? setConfirmRecord(true) : void record())}
+            className="rounded border border-[var(--color-border)] px-2 py-1 text-xs hover:bg-[var(--color-muted)] disabled:opacity-50"
+          >
+            Record as baseline
+          </button>
+          <ExportMenu disabled={!output || !!output.error} />
+        </div>
+        {confirmRecord && (
+          <div role="alertdialog" aria-label="Replace the baseline" className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            <p>Replace <span className="font-mono">{recordLabel}</span> with the violations of this run? Entries for violations that are fixed now are dropped.</p>
+            <div className="mt-2 flex gap-2">
+              <button type="button" onClick={() => void record()} className="rounded border border-amber-500/50 px-2 py-0.5 hover:bg-amber-500/20">Replace</button>
+              <button type="button" onClick={() => setConfirmRecord(false)} className="rounded border border-[var(--color-border)] px-2 py-0.5 hover:bg-[var(--color-muted)]">Cancel</button>
+            </div>
+          </div>
+        )}
+        {recorded && (
+          <p data-testid="baseline-recorded" role="status" className={cn('text-[11px]', recorded.error ? 'text-red-400' : 'text-emerald-400')}>
+            {recorded.error ? recorded.error : `Recorded ${recorded.violations} violation${recorded.violations === 1 ? '' : 's'} in ${recordLabel}${recorded.replaced ? ' (replaced the old file)' : ''}. Later runs can compare with it.`}
+          </p>
+        )}
         {output && !output.error ? (
           <>
             <div className="grid grid-cols-2 gap-2">

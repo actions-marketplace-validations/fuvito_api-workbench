@@ -58,7 +58,7 @@ export function parsePathLimits(text: string): { lines: string[]; bad: string[] 
 // conform`. Read-only is on unless writes were ticked, so the command does what the page does.
 export function cliValues(p: {
   specPath: string; baseUrl: string; envPath: string; activeEnvironment: string
-  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; timeoutText: string; maxResponseText?: string; allowWrites: boolean
+  tags: string[]; paths: string[]; negative: boolean; failFast: boolean; failOnWarning?: boolean; setupPath?: string; timeoutText: string; maxResponseText?: string; allowWrites: boolean
 }): Record<string, string> {
   const v: Record<string, string> = {}
   if (p.specPath) v['spec'] = p.specPath
@@ -69,10 +69,31 @@ export function cliValues(p: {
   if (p.paths.length) v['paths'] = p.paths.join(',')
   if (p.negative) v['negative'] = 'true'
   if (p.failFast) v['fail-fast'] = 'true'
+  if (p.failOnWarning) v['fail-on'] = 'warning'
+  if (p.setupPath) v['setup'] = p.setupPath
   const timeout = Number.parseInt(p.timeoutText, 10)
   if (timeout > 0) v['request-timeout'] = String(timeout)
   const slowest = Number.parseInt(p.maxResponseText ?? '', 10)
   if (slowest > 0) v['max-response-time'] = String(slowest)
   if (!p.allowWrites) v['read-only'] = 'true'
   return v
+}
+
+// The text of a finding written for a bug tracker: the check, what is wrong, where, why and how to fix it. Fields
+// are already redacted by the core; nothing here adds data from the environment.
+export function issueText(f: ConformFinding, context: string, version: string): string {
+  const lines: string[] = []
+  lines.push(`${f.checkId ? `[${f.checkId}] ` : ''}${f.summary}`)
+  lines.push('')
+  if (context) lines.push(`- Operation: ${context}`)
+  if (f.expected) lines.push(`- Expected: ${f.expected}`)
+  if (f.got) lines.push(`- Got: ${f.got}`)
+  const where = findingWhere(f)
+  if (where) lines.push(`- Where: ${where}`)
+  if (f.spec) lines.push(`- In the spec: ${f.spec}`)
+  lines.push(`- Why: ${f.why}`)
+  lines.push(`- Fix: ${f.fix}`)
+  lines.push('')
+  lines.push(`Found by Clear Signal ${version}${f.checkId ? `, check ${f.checkId} (Help, What We Check)` : ''}.`)
+  return lines.join('\n')
 }

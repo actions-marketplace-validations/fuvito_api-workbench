@@ -84,6 +84,8 @@ type WorkspaceOverviewIO struct {
 	Specs     []DashSpecIO              `json:"specs"`
 	LastRun   *DashLastRunIO            `json:"lastRun,omitempty"`
 	Attention []workspaceinfo.Attention `json:"attention"`
+	// ProjectFile is the clrsig.yaml in the workspace folder, if there is one.
+	ProjectFile workspaceinfo.ProjectFile `json:"projectFile"`
 
 	SnapshotAt string `json:"snapshotAt"`
 }
@@ -92,7 +94,7 @@ type WorkspaceOverviewIO struct {
 // changes anything.
 func (d *DashboardService) GetWorkspaceOverview() WorkspaceOverviewIO {
 	out := WorkspaceOverviewIO{
-		EnvVars: []DashEnvVarIO{}, Specs: []DashSpecIO{}, Attention: []workspaceinfo.Attention{},
+		EnvVars: []DashEnvVarIO{}, Specs: []DashSpecIO{}, Attention: []workspaceinfo.Attention{}, ProjectFile: workspaceinfo.ProjectFile{Keys: []string{}},
 		SnapshotAt: time.Now().Format(time.RFC3339),
 	}
 	root := d.ws.workspacePath
@@ -116,6 +118,7 @@ func (d *DashboardService) GetWorkspaceOverview() WorkspaceOverviewIO {
 		out.EnvVars = append(out.EnvVars, DashEnvVarIO{Name: v.Name, Secret: v.Secret, Set: v.Set, UnsetRef: v.UnsetRef})
 	}
 	out.Attention = rep.Attention
+	out.ProjectFile = rep.ProjectFile
 
 	// Look coverage up by the store's own key, as the store does: spellings that differ only in
 	// punctuation (../specs/a.yaml and ../../specs/a.yaml) share one stored entry and one card.

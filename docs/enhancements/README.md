@@ -18,11 +18,11 @@ Every **major** enhancement (new UI area, new command family, format change, any
 4. **Design** — user experience, architecture (which packages, dependency direction), security, data and file formats.
 5. **Phasing and acceptance criteria** — what each phase delivers and how we know it works.
 6. **Testing.**
-7. **Documentation impact** — user guide, `format-spec.md`, READMEs, `CLAUDE.md` changelog.
+7. **Documentation impact** — user guide, `format-spec.md`, READMEs, engineering changelog (`docs/process/engineering-changelog.md`).
 8. **Risks.**
 9. **Open decisions** — questions for the project owner, each with a recommendation.
 10. **Decision log** — date, decision, who.
 
 ## When the work ships
 
-Add a `CLAUDE.md` changelog entry, update the user guide (and `format-spec.md` if a serialized format changed), set the status to `Done`, and link the release.
+Add an entry to the engineering changelog (`docs/process/engineering-changelog.md`), update the user guide (and `format-spec.md` if a serialized format changed), set the status to `Done`, and link the release.

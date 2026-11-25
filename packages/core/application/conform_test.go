@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -162,5 +163,56 @@ func TestRunConformance_ReportsProgressForEveryOperation(t *testing.T) {
 	}
 	if len(done) != 2 || done[0] != 1 || done[1] != 2 || totals[0] != 2 || totals[1] != 2 {
 		t.Fatalf("progress = done %v of %v (%v)", done, totals, seen)
+	}
+}
+
+// A check that is only a warning does not fail the run unless FailOn says so. Nothing in the
+// default severities is a warning yet, so the test lowers one.
+func TestRunConformance_WarningsDoNotFailUnlessAsked(t *testing.T) {
+	t.Cleanup(checks.WithSeverity("CS-RESP-006", checks.Warning))
+
+	out := run(t, application.ConformInput{})
+	if out.Failed || out.Warnings != 1 || len(out.Violations) != 0 {
+		t.Fatalf("default: failed=%v warnings=%d violations=%d, want a pass with one warning", out.Failed, out.Warnings, len(out.Violations))
+	}
+	if p, f, _ := out.Result.Counts(); p != 2 || f != 0 {
+		t.Fatalf("counts passed=%d failed=%d, want 2 and 0", p, f)
+	}
+
+	out = run(t, application.ConformInput{FailOn: checks.Warning})
+	if !out.Failed || out.Warnings != 0 || len(out.Violations) != 1 {
+		t.Fatalf("fail on warning: failed=%v warnings=%d violations=%d, want a failure", out.Failed, out.Warnings, len(out.Violations))
+	}
+	if _, f, _ := out.Result.Counts(); f != 1 {
+		t.Fatalf("failed count = %d, want 1", f)
+	}
+}
+
+func TestRunConformance_BaselineFollowsFailOn(t *testing.T) {
+	t.Cleanup(checks.WithSeverity("CS-RESP-006", checks.Warning))
+	empty := conformance.NewBaseline(nil)
+
+	if out := run(t, application.ConformInput{Baseline: empty}); out.Failed {
+		t.Fatal("a warning must not count as a new violation when warnings do not fail the run")
+	}
+	if out := run(t, application.ConformInput{Baseline: empty, FailOn: checks.Warning}); !out.Failed {
+		t.Fatal("with --fail-on warning the warning is a new violation")
+	}
+}
+
+func TestRunConformance_OnlyOperations(t *testing.T) {
+	all := run(t, application.ConformInput{})
+	if p, f, s := all.Result.Counts(); p != 1 || f != 1 || s != 0 {
+		t.Fatalf("baseline of the test: %d %d %d", p, f, s)
+	}
+
+	only := run(t, application.ConformInput{OnlyOperations: map[string]bool{"GET /ok": true}})
+	if p, f, s := only.Result.Counts(); p != 1 || f != 0 || s != 1 || only.Failed {
+		t.Errorf("only /ok is sent: passed=%d failed=%d skipped=%d failed=%v", p, f, s, only.Failed)
+	}
+
+	none := run(t, application.ConformInput{OnlyOperations: map[string]bool{}, Tags: []string{"a"}})
+	if _, f, _ := none.Result.Counts(); f != 0 || none.Failed || none.NothingSelected != "" {
+		t.Errorf("an empty set selects nothing and passes, even with a tag filter that would otherwise be an error: %+v", none)
 	}
 }

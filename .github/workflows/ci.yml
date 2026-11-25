@@ -22,12 +22,16 @@ jobs:
       - name: Check formatting
         run: test -z "$(gofmt -l $(git ls-files '*.go'))" || { gofmt -l $(git ls-files '*.go'); exit 1; }
 
+      - name: Vet core
+        run: go vet ./...
+        working-directory: packages/core
+
       - name: Test core
         run: go test -v ./...
         working-directory: packages/core
 
   cli-build:
-    name: CLI — build
+    name: CLI — build and test
     runs-on: ubuntu-latest
     needs: core
     steps:
@@ -41,6 +45,14 @@ jobs:
 
       - name: Build CLI
         run: go build ./...
+        working-directory: apps/cli
+
+      - name: Vet CLI
+        run: go vet ./...
+        working-directory: apps/cli
+
+      - name: Test CLI
+        run: go test ./...
         working-directory: apps/cli
 
   integration:
@@ -92,6 +104,110 @@ jobs:
       - name: Build desktop Go
         run: go build ./...
         working-directory: apps/desktop/wails
+
+      - name: Vet desktop Go
+        run: go vet ./...
+        working-directory: apps/desktop/wails
+
+      - name: Test desktop Go
+        run: go test ./...
+        working-directory: apps/desktop/wails
+
+      - name: Test frontend
+        run: pnpm test
+        working-directory: apps/desktop/frontend
+
+  browser-tests:
+    name: Desktop — browser tests
+    runs-on: ubuntu-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: apps/desktop/e2e
+
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/desktop/e2e
+
+      - name: Browser tests against the mock bridge
+        run: pnpm exec playwright test --project=frontend --grep-invert "smoke|@screenshot"
+        working-directory: apps/desktop/e2e
+        env:
+          CI: 'true'
+
+  action-selftest:
+    name: GitHub Action — self-test
+    runs-on: ubuntu-latest
+    needs: core
+    # Runs action.yml from this commit with the LATEST RELEASED clrsig, so it must only use inputs that
+    # the latest release already supports; the static check in apps/cli/action_test.go covers the rest.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Build and start example server
+        timeout-minutes: 2
+        run: |
+          go build -o /tmp/example-server ./
+          /tmp/example-server &
+          for i in $(seq 1 50); do
+            curl -sf http://localhost:8080/health && break
+            [ $i -eq 50 ] && { echo "Server did not start"; exit 1; }
+            sleep 0.2
+          done
+        working-directory: examples/server
+
+      - name: Action conform (must pass)
+        id: conform
+        uses: ./
+        with:
+          command: conform
+          spec: examples/server/openapi.yaml
+          base-url: http://localhost:8080
+          env: examples/environments/demo-conform.yaml
+          report: |
+            junit=reports/conform.xml
+
+      - name: Action validate (must pass)
+        id: validate
+        uses: ./
+        with:
+          command: validate
+          scenario: examples/scenarios/user-lifecycle.yaml
+
+      - name: Action passes a failing exit code on
+        id: failing
+        uses: ./
+        continue-on-error: true
+        with:
+          command: conform
+          spec: examples/server/openapi.yaml
+          base-url: http://localhost:8080
+          env: examples/environments/demo-conform.yaml
+          paths: /no-such-path
+
+      - name: Check the results
+        run: |
+          test "${{ steps.conform.outputs.result }}" = "0"
+          test "${{ steps.validate.outputs.result }}" = "0"
+          test "${{ steps.failing.outputs.result }}" = "2"
+          test -s reports/conform.xml
 
   quickstart:
     name: "60s quickstart (CI)"

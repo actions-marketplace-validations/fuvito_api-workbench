@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,7 +12,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/checks"
+	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
+	"github.com/fuvito/api-workbench/packages/core/executor"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/serialization"
 )
 
 // testWorkspaces gives each test one workspace folder, shared by the helpers below: the service reads
@@ -416,5 +423,347 @@ func TestPathInside_FollowsSymbolicLinks(t *testing.T) {
 	}
 	if pathInside(ws, filepath.Join(ws, "link", "spec.yaml")) {
 		t.Fatal("a link that points out of the workspace must count as outside")
+	}
+}
+
+// Lowering one check to a warning moves the operations that only break it from Failing to Passing
+// (with a warning), and "fail on warnings" puts them back, as clrsig conform --fail-on warning does.
+// The Conformance Server has two operations whose only problem is a wrong type (CS-RESP-006).
+func TestConformanceService_WarningsFollowFailOnWarning(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	in := ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)}
+
+	base := svc.RunConformance(in)
+	if base.Error != "" || base.Failing != 6 || base.WithWarnings != 0 {
+		t.Fatalf("default severities: %+v", base)
+	}
+
+	t.Cleanup(checks.WithSeverity("CS-RESP-006", checks.Warning))
+	out := svc.RunConformance(in)
+	if out.Failing != 4 || out.Passing != 4 || out.WithWarnings != 2 || !out.Failed {
+		t.Fatalf("warnings: failing=%d passing=%d withWarnings=%d failed=%v", out.Failing, out.Passing, out.WithWarnings, out.Failed)
+	}
+	seen := 0
+	for _, op := range out.Operations {
+		if op.Warnings > 0 {
+			seen++
+			if op.Status != "passed" || len(op.Findings) != 1 || op.Findings[0].Severity != "warning" || op.Findings[0].CheckID != "CS-RESP-006" {
+				t.Fatalf("operation with a warning: %+v", op)
+			}
+		}
+	}
+	if seen != 2 {
+		t.Fatalf("%d operations with warnings, want 2", seen)
+	}
+
+	in.FailOnWarning = true
+	out = svc.RunConformance(in)
+	if out.Failing != 6 || out.WithWarnings != 0 || !out.Failed {
+		t.Fatalf("fail on warning: failing=%d withWarnings=%d failed=%v", out.Failing, out.WithWarnings, out.Failed)
+	}
+}
+
+// A baseline written by 0.8.9 against the Conformance Server (schemaVersion 1, identified by the
+// validator's wording) still accepts exactly the six known violations with this version, and a
+// baseline recorded now is in the current format and accepts them too.
+func TestBaselineWrittenBy089StillWorks(t *testing.T) {
+	srv := localConformanceServer(t)
+	spec, err := openapi.ParseBytes(conformanceOpenAPIYAML, "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	envData, err := os.ReadFile("help/conformance-environment.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := serialization.ParseEnvironment(envData, "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	golden, err := os.ReadFile(filepath.Join("testdata", "baseline-v1-0.8.9.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := conformance.ParseBaseline(golden, "baseline-v1-0.8.9.yaml")
+	if err != nil || !old.Legacy || len(old.Violations) != 6 {
+		t.Fatalf("golden file: %v %+v", err, old)
+	}
+
+	run := func(b *conformance.Baseline) application.ConformOutput {
+		return application.RunConformance(context.Background(), application.ConformInput{
+			Exec: executor.New(executor.Options{}), Spec: spec, BaseURL: srv.URL, Env: env, ReadOnly: true, Baseline: b,
+		})
+	}
+	out := run(old)
+	if out.Failed || out.Diff == nil || len(out.Diff.Known) != 6 || len(out.Diff.New) != 0 || len(out.Diff.Fixed) != 0 || !out.Diff.Legacy {
+		t.Fatalf("a 0.8.9 baseline must accept the six known violations: failed=%v %+v", out.Failed, out.Diff)
+	}
+
+	current := conformance.NewBaseline(out.Violations)
+	if current.Legacy || current.SchemaVersion != "2" || len(current.Violations) != 6 {
+		t.Fatalf("recorded baseline: %+v", current)
+	}
+	checksSeen := map[string]bool{}
+	for _, v := range current.Violations {
+		checksSeen[v.Check] = true
+		if v.Check == "" || v.Check == "other" {
+			t.Errorf("every violation of the Conformance Server has a check: %+v", v)
+		}
+	}
+	if again := run(current); again.Failed || len(again.Diff.Known) != 6 || again.Diff.Legacy {
+		t.Fatalf("the current format accepts them too: %+v", again.Diff)
+	}
+}
+
+func TestConformanceService_PreselectsFromTheProjectFile(t *testing.T) {
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	if d := svc.GetConformContext().ProjectDefaults; d.Found {
+		t.Fatalf("no project file: %+v", d)
+	}
+
+	conformanceSpecFile(t) // <ws>/conformance-openapi.yaml
+	conformanceEnvFile(t)  // <ws>/conformance-environment.yaml
+	writeProject := func(text string) {
+		if err := os.WriteFile(filepath.Join(ws, "clrsig.yaml"), []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeProject("schemaVersion: \"1\"\nspec: conformance-openapi.yaml\nenvironment: conformance-environment.yaml\nbaseUrl: http://localhost:9999\n" +
+		"conform:\n  readOnly: false\n  negative: true\n  failOn: warning\n  requestTimeoutMs: 3000\n  maxResponseTimeMs: 800\n  maxResponseTimeFor: [\"/slow=5000\"]\n  tags: [products]\n  paths: [/products]\n")
+	d := svc.GetConformContext().ProjectDefaults
+	if !d.Found || d.File != "clrsig.yaml" || d.SpecPath != filepath.Join(ws, "conformance-openapi.yaml") || d.EnvironmentPath != filepath.Join(ws, "conformance-environment.yaml") || d.BaseURL != "http://localhost:9999" {
+		t.Fatalf("paths and base URL: %+v", d)
+	}
+	if !d.Negative || !d.FailOnWarning || d.RequestTimeoutMs != 3000 || d.MaxResponseTimeMs != 800 || len(d.MaxResponseTimeFor) != 1 || d.Tags[0] != "products" || d.Paths[0] != "/products" {
+		t.Fatalf("options: %+v", d)
+	}
+	if !strings.Contains(d.Note, "readOnly: false is not applied") {
+		t.Errorf("the page stays read-only whatever the file says, and says so: %q", d.Note)
+	}
+
+	// a path outside the workspace is not preselected
+	writeProject("schemaVersion: \"1\"\nspec: ../elsewhere.yaml\n")
+	d = svc.GetConformContext().ProjectDefaults
+	if d.SpecPath != "" || !strings.Contains(d.Note, "outside the workspace") {
+		t.Errorf("a path outside the workspace is not used: %+v", d)
+	}
+	// a file that cannot be used is reported, not guessed at
+	writeProject("schemaVersion: \"1\"\nbaseURL: x\n")
+	d = svc.GetConformContext().ProjectDefaults
+	if !d.Found || !strings.Contains(d.Note, "baseURL") || len(d.Applied) != 0 {
+		t.Errorf("an unusable file: %+v", d)
+	}
+}
+
+const setupTestSpec = `openapi: "3.0.3"
+info: {title: secured, version: "1"}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+paths:
+  /secure:
+    get:
+      operationId: secure
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {type: object, required: [ok], properties: {ok: {type: boolean}}}
+        "401": {description: no}
+`
+
+const setupTestLogin = `schemaVersion: "1"
+title: Login
+steps:
+  - label: Log in
+    request:
+      method: POST
+      url: "{{baseUrl}}/login"
+    extractions:
+      - name: token
+        source: jsonpath
+        path: $.token
+    assertions:
+      - type: status
+        operator: eq
+        expected: 200
+`
+
+func setupServer(t *testing.T, loginStatus int) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/login":
+			w.WriteHeader(loginStatus)
+			_, _ = w.Write([]byte(`{"token":"tkn-s3cr3t-12345"}`))
+		case "/secure":
+			if r.Header.Get("Authorization") != "Bearer tkn-s3cr3t-12345" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestConformanceService_RunsASetupScenarioFirst(t *testing.T) {
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	spec := filepath.Join(ws, "api.yaml")
+	login := filepath.Join(ws, "scenarios", "login.yaml")
+	for p, text := range map[string]string{spec: setupTestSpec, login: setupTestLogin} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ctx := svc.GetConformContext(); len(ctx.Scenarios) != 1 || ctx.Scenarios[0].Label != "scenarios/login.yaml" && ctx.Scenarios[0].Label != `scenarios\login.yaml` {
+		t.Fatalf("the page offers the workspace scenarios: %+v", ctx.Scenarios)
+	}
+
+	srv := setupServer(t, 200)
+	without := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL})
+	if without.Error != "" || without.BlockedOperations != 1 || !without.Failed {
+		t.Fatalf("without a setup the secured operation is not sent: %+v", without)
+	}
+
+	out := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, SetupScenario: login})
+	if out.Error != "" || out.Failed || out.Passing != 1 || !strings.Contains(out.SetupNote, "values available to the check: token") {
+		t.Fatalf("with the setup: %+v", out)
+	}
+	if strings.Contains(out.SetupNote, "tkn-s3cr3t") {
+		t.Error("the note names values, never shows them")
+	}
+
+	bad := setupServer(t, 401)
+	fail := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: bad.URL, SetupScenario: login})
+	if !strings.Contains(fail.Error, "did not pass, so the check was not started") || strings.Contains(fail.Error, "tkn-s3cr3t") {
+		t.Fatalf("a failed setup stops the run and does not print the token: %q", fail.Error)
+	}
+
+	if outside := svc.RunConformance(ConformRunInput{SpecPath: spec, BaseURL: srv.URL, SetupScenario: filepath.Join(t.TempDir(), "x.yaml")}); !strings.Contains(outside.Error, "outside the open workspace") {
+		t.Errorf("a setup scenario outside the workspace is refused: %q", outside.Error)
+	}
+}
+
+func TestConformanceService_FindingsShownInThePageHideSecrets(t *testing.T) {
+	const secret = "sk-live-ABCDEFGH12345"
+	msg := "Error at \"/token\": value must be a number\nSchema:\n  {\n    \"type\": \"number\"\n  }\n\nValue:\n  \"" + secret + "\"\n"
+	out := application.ConformOutput{Result: &conformance.ConformResult{
+		Secrets: []string{secret},
+		Operations: []conformance.OperationResult{
+			{Method: "GET", Path: "/t", StatusCode: 200, Violations: []openapi.ValidationError{{Message: msg}}},
+		},
+	}}
+	res := conformOutputIO(out, "http://x", false)
+	if len(res.Operations) != 1 || len(res.Operations[0].Findings) != 1 {
+		t.Fatalf("%+v", res)
+	}
+	f := res.Operations[0].Findings[0]
+	for _, text := range []string{f.Summary, f.Expected, f.Got, f.Why, f.Fix, f.Detail} {
+		if strings.Contains(text, secret) {
+			t.Fatalf("the finding leaks a secret: %+v", f)
+		}
+	}
+}
+
+func TestConformanceService_RecordAndCompareABaseline(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	in := ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t)}
+
+	if r := svc.RecordConformBaseline(filepath.Join(ws, "conform-baseline.yaml")); !strings.Contains(r.Error, "run the check first") {
+		t.Fatalf("nothing to record before a run: %+v", r)
+	}
+	first := svc.RunConformance(in)
+	if first.Error != "" || !first.Failed || first.Baseline != nil {
+		t.Fatalf("without a baseline the known violations fail the run: %+v", first)
+	}
+
+	path := filepath.Join(ws, "conform-baseline.yaml")
+	rec := svc.RecordConformBaseline(path)
+	if rec.Error != "" || rec.Violations != 6 || rec.Replaced {
+		t.Fatalf("record: %+v", rec)
+	}
+	if again := svc.RecordConformBaseline(path); !again.Replaced {
+		t.Errorf("recording over an existing file says so: %+v", again)
+	}
+	if ctx := svc.GetConformContext(); len(ctx.Baselines) != 1 || ctx.Baselines[0].Path != path {
+		t.Errorf("the page offers the baseline files of the workspace: %+v", ctx.Baselines)
+	}
+
+	in.BaselinePath = path
+	second := svc.RunConformance(in)
+	if second.Error != "" || second.Failed || second.Baseline == nil || len(second.Baseline.Known) != 6 || len(second.Baseline.New) != 0 || len(second.Baseline.Fixed) != 0 || second.Baseline.Legacy {
+		t.Fatalf("with the baseline the same violations are accepted: %+v", second.Baseline)
+	}
+	if k := second.Baseline.Known[0]; k.Operation == "" || k.Check == "" || k.Summary == "" {
+		t.Errorf("a known violation names the operation, the check and says what it was: %+v", k)
+	}
+
+	// a limited run cannot become a baseline, and a baseline outside the workspace is refused
+	limited := in
+	limited.BaselinePath, limited.Paths = "", []string{"/products"}
+	svc.RunConformance(limited)
+	if r := svc.RecordConformBaseline(path); !strings.Contains(r.Error, "limited by tags or path prefixes") {
+		t.Errorf("%+v", r)
+	}
+	bad := in
+	bad.BaselinePath = filepath.Join(t.TempDir(), "b.yaml")
+	if r := svc.RunConformance(bad); !strings.Contains(r.Error, "outside the open workspace") {
+		t.Errorf("%q", r.Error)
+	}
+	svc.RunConformance(in)
+	if r := svc.RecordConformBaseline(filepath.Join(ws, "baseline.txt")); !strings.Contains(r.Error, ".yaml") {
+		t.Errorf("%+v", r)
+	}
+}
+
+func TestConformanceService_ABaselineFromAnOlderVersionStillWorks(t *testing.T) {
+	srv := localConformanceServer(t)
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	golden, err := os.ReadFile(filepath.Join("testdata", "baseline-v1-0.8.9.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(ws, "old-baseline.yaml")
+	if err := os.WriteFile(path, golden, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := svc.RunConformance(ConformRunInput{SpecPath: conformanceSpecFile(t), BaseURL: srv.URL, EnvPath: conformanceEnvFile(t), BaselinePath: path})
+	if out.Error != "" || out.Failed || out.Baseline == nil || !out.Baseline.Legacy || len(out.Baseline.Known) != 6 {
+		t.Fatalf("a 0.8.9 baseline is accepted and flagged: %+v %s", out.Baseline, out.Error)
+	}
+}
+
+func TestConformanceService_InspectReportsProblemsInTheSpecItself(t *testing.T) {
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	broken := filepath.Join(ws, "broken.yaml")
+	spec := "openapi: \"3.0.3\"\ninfo: {title: b, version: \"1\"}\npaths:\n  /a:\n    get:\n      responses:\n        \"200\":\n          description: ok\n          content:\n            application/json:\n              schema: {type: object, required: [id, email], properties: {id: {type: integer}}}\n"
+	if err := os.WriteFile(broken, []byte(spec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info := svc.InspectConformSpec(broken)
+	if info.Error != "" || len(info.Lint) != 2 {
+		t.Fatalf("a missing operationId and an undeclared required property: %+v", info)
+	}
+	if info.Lint[0].Check != "CS-SPEC-001" || info.Lint[1].Check != "CS-SPEC-002" || info.Lint[1].Severity != "error" || info.Lint[1].Fix == "" {
+		t.Errorf("%+v", info.Lint)
+	}
+	if clean := svc.InspectConformSpec(conformanceSpecFile(t)); len(clean.Lint) != 0 || clean.Lint == nil {
+		t.Errorf("the Conformance Server's spec is clean, and the list is never null: %+v", clean.Lint)
 	}
 }

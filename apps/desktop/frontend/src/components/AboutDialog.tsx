@@ -1,7 +1,52 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
+  {
+    version: '0.11.0',
+    date: '2026-11-24',
+    items: [
+      'Check Conformance now has Baseline: choose a baseline file and the violations recorded in it are accepted, only new ones fail the run, and the result shows what is known, new and fixed; Record as baseline saves a run (it asks before replacing a file, and is not available while tags or paths limit the run)',
+      'Spec lint: clrsig validate --spec openapi.yaml checks the spec document itself (an operation without an operationId, a required property the schema does not declare, an example that breaks its format) and Check Conformance shows a Spec health region as soon as you choose a spec, because these are problems in the spec, not the server',
+      'clrsig run --format github annotates each failed step on its line in the scenario file (conform already did this for the operation in the spec); the GitHub Action accepts format: github for run and spec for validate',
+      'CONTRIBUTING.md, issue forms that ask for the check ID, a pull request template, and Report a problem in the About dialog',
+      'No existing result or exit code changes in this release',
+    ],
+  },
+  {
+    version: '0.10.0',
+    date: '2026-11-24',
+    items: [
+      'Pull requests: clrsig conform --changed-against origin/main checks only the operations that are new or changed compared with the spec at that git ref (a change to a shared schema counts for each operation that uses it); nothing changed passes with NOTHING CHECKED. It follows the spec only, so keep a full run on your main branch',
+      'clrsig conform --format github prints GitHub workflow commands: every finding appears on the pull request with the check ID in the title and, when the spec is a file in the repository, on the line of the operation',
+      'Behaviour changes: a baseline entry for an operation that was not sent (a --tags, --paths, --read-only or --changed-against run) is no longer reported as fixed; --write-baseline is refused together with --tags, --paths or --changed-against, because it would drop the other entries: record a baseline with a full run',
+      'clrsig validate --strict also warns when a scenario specFile does not exist and, with --env, about a ${NAME} the environment needs that no process variable sets; it reads request files a step references, which fixes a false "extraction nobody uses"',
+      'Desktop: the Workspace page lists weak scenarios as information items; every finding has Copy as issue (check, operation, expected, got, why, fix, version); findings shown in the app now hide secrets that came back in a response, like the reports',
+    ],
+  },
+  {
+    version: '0.9.1',
+    date: '2026-11-24',
+    items: [
+      'Project file: a clrsig.yaml at the project root holds the defaults that repeat (spec, environment, base URL, conform options, scenarios, reports), so clrsig conform, run and validate work with no flags; a flag always wins, paths are relative to the file, it never holds secrets, and a command says on stderr when it used it. --config and --no-config choose or ignore it; clrsig config show lists what a command takes from it',
+      'clrsig init creates the project file, a local and a CI environment and the starter folders, never overwriting anything; clrsig init github-actions prints a ready workflow (--write saves it)',
+      'clrsig conform --setup <scenario> runs a login (or any scenario) first and makes what it extracts, such as a token, available to the generated requests, so secured operations are sent instead of reported as not sent. Check Conformance has "Run a scenario first" in Options',
+      'clrsig validate --strict reports valid but weak scenarios (steps that check nothing, extractions nobody uses, with --env names nothing defines) as warnings that fail the check',
+      'Desktop: the Workspace page has a Project file card and flags a project file that cannot be used; Check Conformance starts from the spec, environment, base URL and options in the file (it stays read-only until you tick Allow writes)',
+      'GitHub Action: new inputs setup and strict; an empty spec or scenario input is no longer passed as an empty argument, so a clrsig.yaml in the checkout can supply it',
+    ],
+  },
+  {
+    version: '0.9.0',
+    date: '2026-11-24',
+    items: [
+      'Format checks (can turn a green run red): email, uuid, ipv4 and ipv6 values are now checked in responses and generated requests (date, date-time and byte already were); other formats are accepted as before. Adopt gradually with --write-baseline and --baseline',
+      'Severity levels: every finding is a failure, warning or note; warnings are shown (WARN, PASSED with N warnings) but only fail the run with clrsig conform --fail-on warning (Action input conform-fail-on, MCP failOn, Fail on warnings on the Check Conformance page). No existing check is a warning yet',
+      'Baselines now record the check (CS-RESP-005 ...) instead of the validator wording, so a clrsig upgrade no longer turns known violations into new ones. A baseline from 0.8.9 or earlier still works and says it is old; run --write-baseline once to upgrade it',
+      'Every finding carries its check ID and severity in the JSON report and the desktop',
+    ],
+  },
   {
     version: '0.8.9',
     date: '2026-11-22',
@@ -233,6 +278,10 @@ const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> =
   },
 ]
 
+// The version this build reports: the newest release notes entry. The user guide header must say the
+// same (a test in packages/core/doccheck compares them).
+export const APP_VERSION = RELEASE_NOTES[0].version
+
 const THIRD_PARTY: Array<{ name: string; license: string; url: string }> = [
   { name: 'Wails v2',                license: 'MIT',           url: 'github.com/wailsapp/wails' },
   { name: 'React',                   license: 'MIT',           url: 'github.com/facebook/react' },
@@ -278,7 +327,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           />
           <div className="flex flex-col items-center gap-1">
             <h2 className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">Clear Signal</h2>
-            <p className="text-xs text-[var(--color-muted-foreground)]">Version 0.8.9</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">Version {APP_VERSION}</p>
           </div>
           <p className="text-xs text-[var(--color-muted-foreground)] leading-relaxed text-center max-w-xs">
             Your local-first API workbench. Test requests, validate OpenAPI contracts,
@@ -321,6 +370,12 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
                   <span className="text-[var(--color-foreground)] font-mono">{value}</span>
                 </div>
               ))}
+              <div className="flex gap-3 text-xs">
+                <span className="w-20 shrink-0 text-[var(--color-muted-foreground)]">Feedback</span>
+                <button type="button" onClick={() => openExternal(FEEDBACK_URL)} className="text-left text-[var(--color-accent)] hover:underline">
+                  Report a problem or suggest an idea
+                </button>
+              </div>
             </div>
           )}
 

@@ -10,6 +10,7 @@ const bridge = vi.hoisted(() => ({
   cancelConformance: vi.fn(),
   onConformanceProgress: vi.fn((_cb: unknown): (() => void) => () => {}),
   exportConformReport: vi.fn(),
+  recordConformBaseline: vi.fn(),
   saveContentToFile: vi.fn(),
   openInSystemViewer: vi.fn(),
 }))
@@ -65,7 +66,7 @@ describe('ConformanceTab', () => {
     expect(await screen.findByText('Passing')).toBeInTheDocument()
     expect(bridge.runConformance).toHaveBeenCalledWith({
       specPath: '/ws/api.yaml', baseUrl: 'http://localhost:8120', envPath: '', allowWrites: false, confirmedRemote: false,
-      tags: [], paths: [], negative: false, failFast: false, timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
+      tags: [], paths: [], negative: false, failFast: false, failOnWarning: false, setupScenario: '', baselinePath: '', timeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [], recordCoverage: false, vars: [],
     })
     for (const label of ['Covered', 'Not covered', 'Passing', 'Failing']) expect(screen.getByText(label)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Not run' })).toHaveTextContent('write request, not sent')
@@ -536,5 +537,271 @@ describe('parsePathLimits', () => {
   it('reads /prefix=ms lines and names the ones that do not fit', () => {
     expect(parsePathLimits(['/reports=2000', '', ' /a/b=0 '].join('\n'))).toEqual({ lines: ['/reports=2000', '/a/b=0'], bad: [] })
     expect(parsePathLimits(['reports=1', '/x=abc'].join('\n')).bad).toEqual(['reports=1', '/x=abc'])
+  })
+})
+
+describe('warnings', () => {
+  const warned = {
+    ...output, failing: 0, passing: 1, covered: 1, notCovered: 0, total: 1, failed: false, withWarnings: 1,
+    operations: [{
+      operationId: 'w', method: 'GET', path: '/warned', status: 'passed', statusCode: 200, durationMs: 5, violations: ['price: expected number'], warnings: 1,
+      findings: [{
+        kind: 'wrong-type', checkId: 'CS-RESP-006', severity: 'warning', where: 'price', summary: '"price" is text, the spec says number',
+        why: 'The server sent text.', fix: 'Send a number.',
+      }],
+    }],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(warned)
+  })
+
+  it('lists a passing operation with its warning and explains it', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('All 1 checked operations match the spec, 1 with warnings')
+    expect(screen.getByTestId('op-warnings')).toHaveTextContent('1 warning')
+    expect(screen.getByTestId('finding-warning')).toBeInTheDocument()
+    expect(screen.getByText('Send a number.')).toBeInTheDocument()
+  })
+
+  it('sends "fail on warnings" with the run and hands it to the CLI builder', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Fail on warnings/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ failOnWarning: true })))
+  })
+
+  it('cliValues carries fail-on only when warnings fail the run', () => {
+    const base = { specPath: '/ws/api.yaml', baseUrl: 'http://x', envPath: '', activeEnvironment: '', tags: [], paths: [], negative: false, failFast: false, timeoutText: '', allowWrites: false }
+    expect(cliValues({ ...base, failOnWarning: true })['fail-on']).toBe('warning')
+    expect(cliValues(base)['fail-on']).toBeUndefined()
+  })
+})
+
+describe('starting values from the workspace project file', () => {
+  const defaults = {
+    found: true, file: 'clrsig.yaml', note: '', applied: ['spec', 'environment', 'baseUrl', 'conform.negative', 'conform.failOn', 'conform.tags'],
+    specPath: '/ws/api.yaml', environmentPath: '/ws/environments/local.yaml', baseUrl: 'http://localhost:9000',
+    tags: ['users'], paths: [], negative: true, failOnWarning: true, requestTimeoutMs: 3000, maxResponseTimeMs: 0, maxResponseTimeFor: [],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(output)
+  })
+
+  it('preselects the spec, environment, base URL and options, and says where they came from', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: defaults })
+    render(<ConformanceTab />)
+    expect(await screen.findByTestId('project-defaults-note')).toHaveTextContent('Starting values from clrsig.yaml: spec, environment, baseUrl')
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:9000'))
+    expect(screen.getByLabelText(/Spec/)).toHaveValue('/ws/api.yaml')
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({
+      specPath: '/ws/api.yaml', envPath: '/ws/environments/local.yaml', baseUrl: 'http://localhost:9000', tags: ['users'], negative: true, failOnWarning: true, timeoutMs: 3000,
+    })))
+  })
+
+  it('never turns on writes, whatever the file says', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: { ...defaults, note: 'conform.readOnly: false is not applied; this page sends only reads until you tick Allow writes.' } })
+    render(<ConformanceTab />)
+    expect(await screen.findByTestId('project-defaults-note')).toHaveTextContent('readOnly: false is not applied')
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:9000'))
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ allowWrites: false })))
+  })
+
+  it('ignores a spec that is not among the workspace files, and does nothing without a file', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: { ...defaults, specPath: '/elsewhere/api.yaml' } })
+    const { unmount } = render(<ConformanceTab />)
+    await screen.findByTestId('project-defaults-note')
+    expect(screen.getByLabelText(/Spec/)).toHaveValue('')
+    unmount()
+
+    bridge.getConformContext.mockResolvedValue({ ...ctx, projectDefaults: { found: false, applied: [], tags: [], paths: [], negative: false, failOnWarning: false, requestTimeoutMs: 0, maxResponseTimeMs: 0, maxResponseTimeFor: [] } })
+    render(<ConformanceTab />)
+    await screen.findByLabelText(/Spec/)
+    expect(screen.queryByTestId('project-defaults-note')).not.toBeInTheDocument()
+  })
+})
+
+describe('run a scenario first', () => {
+  const withScenarios = { ...ctx, scenarios: [{ path: '/ws/scenarios/login.yaml', label: 'scenarios/login.yaml' }] }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(withScenarios)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue({ ...output, setupNote: 'Setup scenario login.yaml passed; values available to the check: token' })
+  })
+
+  it('sends the chosen scenario with the run and shows what it made available', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Run a scenario first'), { target: { value: '/ws/scenarios/login.yaml' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ setupScenario: '/ws/scenarios/login.yaml' })))
+    expect(await screen.findByTestId('conform-setup-note')).toHaveTextContent('values available to the check: token')
+  })
+
+  it('offers no scenario by default and hands the choice to the CLI builder', async () => {
+    const open = vi.fn()
+    render(<ConformanceTab onOpenCliBuilder={open} />)
+    fireEvent.change(await screen.findByLabelText(/Spec/), { target: { value: '/ws/api.yaml' } })
+    await waitFor(() => expect(screen.getByLabelText(/Base URL/)).toHaveValue('http://localhost:8120'))
+    fireEvent.click(screen.getByText('Options'))
+    expect(screen.getByLabelText('Run a scenario first')).toHaveValue('')
+    fireEvent.change(screen.getByLabelText('Run a scenario first'), { target: { value: '/ws/scenarios/login.yaml' } })
+    fireEvent.click(screen.getByRole('button', { name: /Get CLI command/ }))
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ setup: '/ws/scenarios/login.yaml' }))
+  })
+
+  it('cliValues carries the scenario to run first', () => {
+    const base = { specPath: '/ws/api.yaml', baseUrl: 'http://x', envPath: '', activeEnvironment: '', tags: [], paths: [], negative: false, failFast: false, timeoutText: '', allowWrites: false }
+    expect(cliValues({ ...base, setupPath: '/ws/scenarios/login.yaml' }).setup).toBe('/ws/scenarios/login.yaml')
+    expect(cliValues(base).setup).toBeUndefined()
+  })
+})
+
+describe('copy a finding as an issue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+  })
+
+  it('puts the check, the operation, what was wrong and how to fix it on the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    bridge.runConformance.mockResolvedValue({
+      ...output,
+      operations: [{
+        operationId: 'b', method: 'GET', path: '/bad', status: 'failed', statusCode: 200, durationMs: 4, violations: [],
+        findings: [{
+          kind: 'wrong-type', checkId: 'CS-RESP-006', where: 'price', part: 'response body', spec: 'GET /bad → response 200',
+          summary: '"price" is text, the spec says number', expected: 'number', got: '"9.99"',
+          why: 'The server sent text.', fix: 'Send a number.', detail: 'raw',
+        }],
+      }],
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy as issue' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    const text = writeText.mock.calls[0][0] as string
+    for (const want of ['[CS-RESP-006] "price" is text, the spec says number', '- Operation: GET /bad', '- Expected: number', '- Got: "9.99"', '- In the spec: GET /bad → response 200', '- Why: The server sent text.', '- Fix: Send a number.', 'Found by Clear Signal ']) {
+      expect(text).toContain(want)
+    }
+    expect(text).not.toContain('raw')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+  })
+})
+
+describe('baselines', () => {
+  const withBaselines = { ...ctx, workspace: '/ws', baselines: [{ path: '/ws/conform-baseline.yaml', label: 'conform-baseline.yaml' }] }
+  const failing = {
+    ...output, failed: true, failing: 1, passing: 0, covered: 1,
+    operations: [{ ...output.operations[1], status: 'failed' }],
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(withBaselines)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue(failing)
+    bridge.recordConformBaseline = vi.fn().mockResolvedValue({ path: '/ws/conform-baseline.yaml', violations: 1, replaced: true })
+  })
+
+  it('sends the chosen baseline and shows known, new and fixed against it', async () => {
+    bridge.runConformance.mockResolvedValue({
+      ...failing, failed: true,
+      baseline: {
+        path: '/ws/conform-baseline.yaml', legacy: true,
+        known: [{ operation: 'GET /a', check: 'CS-RESP-006', where: 'price', summary: 'text, not number' }],
+        new: [{ operation: 'GET /b', check: 'CS-RESP-005', where: 'id', summary: 'id is missing' }],
+        fixed: [{ operation: 'GET /c', summary: 'old wording' }],
+      },
+    })
+    await chooseSpec()
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Baseline'), { target: { value: '/ws/conform-baseline.yaml' } })
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await waitFor(() => expect(bridge.runConformance).toHaveBeenCalledWith(expect.objectContaining({ baselinePath: '/ws/conform-baseline.yaml' })))
+    expect(await screen.findByTestId('baseline-summary')).toHaveTextContent('1 known, 1 new, 1 fixed')
+    const region = screen.getByRole('region', { name: 'Baseline' })
+    expect(region).toHaveTextContent('GET /b')
+    expect(region).toHaveTextContent('CS-RESP-005')
+    expect(region).toHaveTextContent('old format')
+  })
+
+  it('says when every failure is known to the baseline', async () => {
+    bridge.runConformance.mockResolvedValue({ ...failing, failed: false, baseline: { path: '/ws/conform-baseline.yaml', legacy: false, known: [{ operation: 'GET /bad', summary: 'x' }], new: [], fixed: [] } })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    expect(await screen.findByTestId('conform-headline')).toHaveTextContent('all known to the baseline')
+  })
+
+  it('records the run as a baseline, asking first before replacing one', async () => {
+    await chooseSpec()
+    expect(screen.getByRole('button', { name: 'Record as baseline' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    fireEvent.click(screen.getByRole('button', { name: 'Record as baseline' }))
+    expect(screen.getByRole('alertdialog', { name: 'Replace the baseline' })).toHaveTextContent('conform-baseline.yaml')
+    expect(bridge.recordConformBaseline).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Replace' }))
+    await waitFor(() => expect(bridge.recordConformBaseline).toHaveBeenCalledWith('/ws/conform-baseline.yaml'))
+    expect(await screen.findByTestId('baseline-recorded')).toHaveTextContent('Recorded 1 violation in conform-baseline.yaml (replaced the old file)')
+  })
+
+  it('records a new file without asking, and not while tags or paths limit the run', async () => {
+    bridge.getConformContext.mockResolvedValue({ ...ctx, workspace: '/ws', baselines: [] })
+    bridge.recordConformBaseline = vi.fn().mockResolvedValue({ path: '/ws/conform-baseline.yaml', violations: 1, replaced: false })
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    fireEvent.click(screen.getByRole('button', { name: 'Record as baseline' }))
+    await waitFor(() => expect(bridge.recordConformBaseline).toHaveBeenCalledWith('/ws/conform-baseline.yaml'))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Options'))
+    fireEvent.change(screen.getByLabelText('Tags'), { target: { value: 'users' } })
+    expect(screen.getByRole('button', { name: 'Record as baseline' })).toBeDisabled()
+  })
+})
+
+describe('spec health', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.runConformance.mockResolvedValue(output)
+  })
+
+  it('shows what is wrong with the spec itself, errors first, before any run', async () => {
+    bridge.inspectConformSpec.mockResolvedValue({
+      ...info,
+      lint: [
+        { check: 'CS-SPEC-002', severity: 'error', where: 'components.schemas.User', what: 'components.schemas.User lists "email" as required, but declares no property of that name.', why: 'A response can never satisfy it.', fix: 'Declare the property email, or remove it from required.' },
+        { check: 'CS-SPEC-001', severity: 'warning', where: 'GET /things', what: 'GET /things has no operationId.', why: 'Reports name operations by operationId.', fix: 'Add a unique operationId.' },
+      ],
+    })
+    await chooseSpec()
+    const region = await screen.findByRole('region', { name: 'Spec health' })
+    expect(screen.getByTestId('spec-health')).toHaveTextContent('The spec itself has 2 problems (1 to fix first)')
+    expect(region).toHaveTextContent('CS-SPEC-002')
+    expect(region).toHaveTextContent('declares no property of that name')
+    expect(region).toHaveTextContent('Fix: Declare the property email')
+  })
+
+  it('shows nothing for a healthy spec or an older answer without lint', async () => {
+    bridge.inspectConformSpec.mockResolvedValue({ ...info, lint: [] })
+    await chooseSpec()
+    expect(screen.queryByRole('region', { name: 'Spec health' })).not.toBeInTheDocument()
   })
 })

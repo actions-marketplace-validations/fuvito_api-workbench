@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
@@ -32,6 +33,11 @@ type ConformInput struct {
 	MaxResponseTimeMs int            // 0 means no response-time limit
 	PathLimits        map[string]int // per path prefix; the longest prefix wins over MaxResponseTimeMs
 	ReadOnly          bool           // send only GET and HEAD operations
+	// OnlyOperations limits the run to these operations (METHOD path as the spec writes it); nil means
+	// all. An empty, non-nil set selects nothing and the run passes with NOTHING CHECKED.
+	OnlyOperations map[string]bool
+	// Scope describes why the run was limited (a change set); it is shown in the reports.
+	Scope *conformance.Scope
 
 	// Progress, when set, is called after each operation with how many are done out of how many
 	// and the operation just handled.
@@ -40,6 +46,10 @@ type ConformInput struct {
 	Coverage bool // compute the coverage report
 	Negative bool // also run negative probes
 	Baseline *conformance.Baseline
+
+	// FailOn is the lowest severity that fails the run: checks.Failure (also the default when
+	// empty) or checks.Warning. Notes never fail a run.
+	FailOn checks.Severity
 }
 
 // ConformOutput is the outcome of a run. Failed already accounts for the baseline: with one, the
@@ -51,6 +61,9 @@ type ConformOutput struct {
 	Violations []conformance.Violation
 	Diff       *conformance.BaselineDiff // nil without a baseline
 	Failed     bool
+	// Warnings is how many operations passed with warnings (0 when FailOn is warning: they are
+	// failures then).
+	Warnings int
 	// NothingSelected explains why no operation was checked when --tags or --paths matched none
 	// (empty otherwise). A run like that proves nothing, so the CLI reports it as an error.
 	NothingSelected string
@@ -79,6 +92,7 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		Paths:             in.Paths,
 		FailFast:          in.FailFast,
 		ReadOnly:          in.ReadOnly,
+		OnlyOperations:    in.OnlyOperations,
 		RequestTimeoutMs:  timeout,
 		MaxResponseTimeMs: in.MaxResponseTimeMs,
 		PathLimits:        in.PathLimits,
@@ -87,6 +101,12 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 
 	out := ConformOutput{}
 	out.Result = conformance.New(in.Exec).Run(ctx, in.Spec, in.BaseURL, in.Env, opts)
+	failOn := in.FailOn
+	if failOn != checks.Warning {
+		failOn = checks.Failure
+	}
+	out.Result.FailOn = failOn
+	out.Result.Scope = in.Scope
 	if in.Coverage {
 		out.Coverage = conformance.ComputeCoverage(out.Result)
 	}
@@ -100,16 +120,17 @@ func RunConformance(ctx context.Context, in ConformInput) ConformOutput {
 		_, negFailed, _, _ = out.Negative.Counts()
 	}
 	out.Failed = failed > 0 || negFailed > 0
-	out.Violations = conformance.Violations(out.Result, out.Negative)
+	out.Violations = conformance.ViolationsFor(out.Result, out.Negative, failOn)
+	out.Warnings = out.Result.WarningCount()
 	if in.Baseline != nil {
-		diff := conformance.Compare(out.Violations, in.Baseline)
+		diff := conformance.CompareChecked(out.Violations, in.Baseline, conformance.CheckedOperations(out.Result, out.Negative))
 		out.Diff = &diff
 		out.Failed = len(diff.New) > 0
 		out.Result.BaselineApplied = true
 		out.Result.KnownViolations = len(diff.Known)
 		out.Result.BaselineClean = len(diff.New) == 0
 	}
-	if len(out.Result.Operations) > 0 && out.Result.FilterMatched == 0 && (len(in.Tags) > 0 || len(in.Paths) > 0) {
+	if in.OnlyOperations == nil && len(out.Result.Operations) > 0 && out.Result.FilterMatched == 0 && (len(in.Tags) > 0 || len(in.Paths) > 0) {
 		out.NothingSelected = noMatchMessage(in.Tags, in.Paths, len(out.Result.Operations))
 	}
 	return out

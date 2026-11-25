@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -48,6 +49,7 @@ func main() {
 	}
 
 	addTLSFlags(root)
+	addConfigFlags(root)
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())
@@ -60,6 +62,8 @@ func main() {
 	root.AddCommand(telemetryCmd())
 	root.AddCommand(bundleCmd())
 	root.AddCommand(importCmd())
+	root.AddCommand(initCmd())
+	root.AddCommand(configCmd())
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -148,24 +152,79 @@ func validateCmd() *cobra.Command {
 	var format string
 	var outputFile string
 	var noRecursive bool
+	var strict bool
+	var envFile string
+	var specFile string
 
 	cmd := &cobra.Command{
 		Use:   "validate <scenario-file-or-folder> [more...]",
 		Short: "Check scenario files for errors without executing them",
-		Args:  cobra.MinimumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			type result struct {
-				path   string
-				issues []scenario.Issue
-				err    error
-			}
+		Long: `Check scenario files for mistakes without sending anything. Exit code 0: every file is valid; 1: a file has
+errors; 2: a file could not be read.
 
-			files, err := expandScenarioArgs(cmd, args, noRecursive)
+With --strict, also report scenarios that are valid but weak, as warnings that fail the check:
+  - a step that has no assertions and extracts nothing (it passes whenever the request is answered)
+  - a value extracted by a step that no later step uses
+  - with --env, a {{name}} that nothing defines (not a scenario variable, not extracted earlier, not in the environment)
+
+With --spec <openapi-file>, also check the spec itself, before conformance results are read against it: an operation
+without an operationId, a schema whose required lists a property it does not declare, an example that breaks its
+format. Errors fail the check; warnings are shown as notes and fail it only with --strict. The scenarios are optional
+when --spec is given.`,
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			args, err := applyProjectConfig(cmd, args)
 			if err != nil {
 				return err
 			}
+			if len(args) == 0 && specFile == "" {
+				return fmt.Errorf("validate needs a scenario file or folder (or --spec <openapi-file>): pass one, or set run.scenarios in a clrsig.yaml")
+			}
+			type result struct {
+				path     string
+				notes    []scenario.Issue
+				issues   []scenario.Issue
+				warnings []scenario.Issue
+				err      error
+			}
+			var lintEnv *domain.Environment
+			envProblems := false
+			if strict && envFile != "" {
+				envData, err := os.ReadFile(envFile)
+				if err != nil {
+					return fmt.Errorf("reading environment: %w", err)
+				}
+				if lintEnv, err = serialization.ParseEnvironmentFile(envData, envFile); err != nil {
+					return fmt.Errorf("parsing environment: %w", err)
+				}
+				for _, ref := range variables.MissingEnv(lintEnv) {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", ref.Message())
+					envProblems = true
+				}
+			}
 
-			results := make([]result, 0, len(files))
+			var files []string
+			if len(args) > 0 {
+				var err error
+				if files, err = expandScenarioArgs(cmd, args, noRecursive); err != nil {
+					return err
+				}
+			}
+
+			results := make([]result, 0, len(files)+1)
+			if specFile != "" {
+				errs, warns, serr := lintSpecFile(specFile)
+				r := result{path: specFile, err: serr}
+				if serr == nil {
+					r.issues = errs
+					if strict {
+						r.warnings = warns
+					} else {
+						r.notes = warns
+					}
+				}
+				results = append(results, r)
+			}
 			for _, path := range files {
 				data, err := os.ReadFile(path)
 				if err != nil {
@@ -177,12 +236,27 @@ func validateCmd() *cobra.Command {
 					results = append(results, result{path: path, err: fmt.Errorf("parse error: %w", err)})
 					continue
 				}
-				results = append(results, result{path: path, issues: scenario.Validate(sc, filepath.Dir(path))})
+				r := result{path: path, issues: scenario.Validate(sc, filepath.Dir(path))}
+				if strict {
+					dir := filepath.Dir(path)
+					scenario.ResolveRequestRefs(sc, dir, filepath.Join(dir, "..", "requests"))
+					r.warnings = scenario.Lint(sc, scenario.LintOptions{Env: lintEnv})
+					if sc.SpecFile != "" && !strings.Contains(sc.SpecFile, "://") {
+						spec := sc.SpecFile
+						if !filepath.IsAbs(spec) {
+							spec = filepath.Join(dir, spec)
+						}
+						if _, err := os.Stat(spec); err != nil {
+							r.warnings = append(r.warnings, scenario.Issue{Message: fmt.Sprintf("specFile %q does not exist (looked for %s): its responses cannot be checked against a spec", sc.SpecFile, filepath.ToSlash(spec))})
+						}
+					}
+				}
+				results = append(results, r)
 			}
 
-			allValid := true
+			allValid := !envProblems
 			for _, r := range results {
-				if r.err != nil || len(r.issues) > 0 {
+				if r.err != nil || len(r.issues) > 0 || len(r.warnings) > 0 {
 					allValid = false
 					break
 				}
@@ -201,15 +275,25 @@ func validateCmd() *cobra.Command {
 					Valid  bool        `json:"valid"`
 					Error  string      `json:"error,omitempty"`
 					Issues []jsonIssue `json:"issues"`
+					// Warnings are the findings of --strict; with --strict they make the file not valid.
+					Warnings []jsonIssue `json:"warnings,omitempty"`
+					// Notes are spec findings that do not fail the check without --strict.
+					Notes []jsonIssue `json:"notes,omitempty"`
 				}
 				out := make([]jsonResult, 0, len(results))
 				for _, r := range results {
-					jr := jsonResult{Path: r.path, Valid: r.err == nil && len(r.issues) == 0, Issues: []jsonIssue{}}
+					jr := jsonResult{Path: r.path, Valid: r.err == nil && len(r.issues) == 0 && len(r.warnings) == 0, Issues: []jsonIssue{}}
 					if r.err != nil {
 						jr.Error = r.err.Error()
 					}
 					for _, iss := range r.issues {
 						jr.Issues = append(jr.Issues, jsonIssue{Step: iss.Step, Name: iss.Name, Message: iss.Message})
+					}
+					for _, w := range r.warnings {
+						jr.Warnings = append(jr.Warnings, jsonIssue{Step: w.Step, Name: w.Name, Message: w.Message})
+					}
+					for _, n := range r.notes {
+						jr.Notes = append(jr.Notes, jsonIssue{Step: n.Step, Name: n.Name, Message: n.Message})
 					}
 					out = append(out, jr)
 				}
@@ -223,12 +307,21 @@ func validateCmd() *cobra.Command {
 						fmt.Fprintf(&sb, "%s\n  PARSE ERROR: %s\n\n", r.path, r.err)
 						continue
 					}
-					if len(r.issues) == 0 {
+					if len(r.issues) == 0 && len(r.warnings) == 0 {
 						fmt.Fprintf(&sb, "%s  OK\n", r.path)
+						for _, n := range r.notes {
+							fmt.Fprintf(&sb, "  note: %s\n", n)
+						}
 					} else {
 						fmt.Fprintf(&sb, "%s\n", r.path)
 						for _, iss := range r.issues {
 							fmt.Fprintf(&sb, "  %s\n", iss)
+						}
+						for _, w := range r.warnings {
+							fmt.Fprintf(&sb, "  warning: %s\n", w)
+						}
+						for _, n := range r.notes {
+							fmt.Fprintf(&sb, "  note: %s\n", n)
 						}
 						sb.WriteByte('\n')
 					}
@@ -236,7 +329,7 @@ func validateCmd() *cobra.Command {
 				if len(results) > 1 {
 					valid := 0
 					for _, r := range results {
-						if r.err == nil && len(r.issues) == 0 {
+						if r.err == nil && len(r.issues) == 0 && len(r.warnings) == 0 {
 							valid++
 						}
 					}
@@ -265,6 +358,9 @@ func validateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
+	cmd.Flags().StringVar(&specFile, "spec", "", "Also check this OpenAPI spec itself (missing operationId, required properties that are not declared, examples that break their format); errors fail the check, warnings only with --strict")
+	cmd.Flags().BoolVar(&strict, "strict", false, "Also report valid but weak scenarios (steps that check nothing, extractions nobody uses, with --env names nothing defines) as warnings that fail the check")
+	cmd.Flags().StringVarP(&envFile, "env", "e", "", "With --strict: the environment the scenarios will run against, so names nothing defines can be found")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	return cmd
@@ -420,6 +516,9 @@ func conformCmd() *cobra.Command {
 	var timeLimits []string
 	var failFast bool
 	var readOnly bool
+	var failOnFlag string
+	var setupFile string
+	var changedAgainst string
 	var explain bool
 	var vars []string
 	var reports []string
@@ -442,11 +541,18 @@ Exit codes:
 
 With --baseline, violations already recorded in the baseline file are accepted and
 only new ones fail the run; --write-baseline records the current violations.`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args, err := applyProjectConfig(cmd, args)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("conform needs a spec: pass one, or set spec: in a clrsig.yaml (clrsig init creates one)")
+			}
 			src := args[0]
 
-			plan, err := planReports(format, reports, outputFile)
+			plan, err := planReportsWith([]string{"github"}, format, reports, outputFile)
 			if err != nil {
 				return err
 			}
@@ -454,9 +560,19 @@ only new ones fail the run; --write-baseline records the current violations.`,
 			if err != nil {
 				return err
 			}
+			failOn, err := checks.ParseFailOn(failOnFlag)
+			if err != nil {
+				return err
+			}
 
 			if baselineFile != "" && writeBaseline != "" {
 				return fmt.Errorf("use --baseline or --write-baseline, not both")
+			}
+			if changedAgainst != "" && (strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://")) {
+				return fmt.Errorf("--changed-against needs a local spec file, not a URL")
+			}
+			if writeBaseline != "" && (changedAgainst != "" || tagsCSV != "" || pathsCSV != "") {
+				return fmt.Errorf("--write-baseline records the whole API, and a run limited by --changed-against, --tags or --paths would drop the other entries: record the baseline with a full run")
 			}
 			var base *conformance.Baseline
 			if baselineFile != "" {
@@ -495,7 +611,21 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				return err
 			}
 
+			var only map[string]bool
+			var scope *conformance.Scope
+			if changedAgainst != "" {
+				if only, scope, err = changedOperationScope(src, changedAgainst, spec); err != nil {
+					return err
+				}
+				fmt.Fprintln(cmd.ErrOrStderr(), scope.Line())
+			}
+
 			exec := newExecutor()
+			if setupFile != "" {
+				if env, err = runConformSetup(cmd, exec, setupFile, env, baseURL, vars); err != nil {
+					return err
+				}
+			}
 			out := application.RunConformance(context.Background(), application.ConformInput{
 				Exec:              exec,
 				Spec:              spec,
@@ -511,6 +641,9 @@ only new ones fail the run; --write-baseline records the current violations.`,
 				Coverage:          showCoverage,
 				Negative:          runNegative,
 				Baseline:          base,
+				FailOn:            failOn,
+				OnlyOperations:    only,
+				Scope:             scope,
 			})
 			result, cov, negResult := out.Result, out.Coverage, out.Negative
 
@@ -523,6 +656,8 @@ only new ones fail the run; --write-baseline records the current violations.`,
 
 			render := func(f string) ([]byte, error) {
 				switch f {
+				case "github":
+					return []byte(reporting.ConformGitHub(result, negResult, githubLocator(src, data))), nil
 				case "json":
 					b, err := reporting.ConformJSON(result, cov, negResult)
 					if err != nil {
@@ -600,13 +735,16 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().StringArrayVar(&reports, "report", nil, "Also write a report to a file: format=file, for example junit=reports/conform.xml (repeatable)")
 	cmd.Flags().StringVar(&tagsCSV, "tags", "", "Comma-separated list of OpenAPI tags to include")
 	cmd.Flags().StringVar(&pathsCSV, "paths", "", "Comma-separated path prefixes to include; each matches the start of the path as the spec writes it (/latency/ also selects /latency/{ms})")
-	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage)
+	cmd.Flags().StringVarP(&format, "format", "f", "text", formatUsage+", or github (workflow commands that annotate a pull request, with the check ID in the title and the line of the operation in the spec)")
 	cmd.Flags().StringVarP(&outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&requestTimeout, "request-timeout", application.DefaultConformRequestTimeoutMs, "Per-request timeout in milliseconds")
 	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail an operation whose response takes longer than this many milliseconds (the response is still compared with the spec; 0 = no limit)")
 	cmd.Flags().StringArrayVar(&timeLimits, "max-response-time-for", nil, "A different response-time limit for the operations under a path prefix: /prefix=ms, for example /reports=2000 (repeatable; the longest prefix wins; 0 turns the limit off there)")
 	cmd.Flags().BoolVar(&failFast, "fail-fast", false, "Stop after the first violation or execution error")
 	cmd.Flags().BoolVar(&explain, "explain", false, "Explain each failure in plain language (what the spec expected, what the server sent, why it fails, how to fix it); JSON, HTML, Markdown and JUnit always include it")
+	cmd.Flags().StringVar(&changedAgainst, "changed-against", "", "Check only the operations that are new or changed compared with the spec at this git ref (for pull requests; needs git and a local spec file; a full run on main stays the safety net)")
+	cmd.Flags().StringVar(&setupFile, "setup", "", "A scenario to run before the check, usually a login: what its steps extract is available to the generated requests as {{name}} (never printed; credential-like names are masked); if it fails the check does not start")
+	cmd.Flags().StringVar(&failOnFlag, "fail-on", "failure", "Fail the run on findings of this level or worse: failure (the default) or warning; warnings are reported but do not fail the run unless this is warning")
 	cmd.Flags().BoolVar(&readOnly, "read-only", false, "Send only read requests (GET, HEAD); every other operation is skipped and never sent")
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")

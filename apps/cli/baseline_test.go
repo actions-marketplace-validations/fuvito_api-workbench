@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,10 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"gopkg.in/yaml.v3"
 )
 
 const baselineSpec = `openapi: "3.0.3"
@@ -76,7 +81,7 @@ func TestConformBaseline_RatchetsQualityUp(t *testing.T) {
 		t.Fatalf("write-baseline must succeed: %v\n%s", err, out)
 	}
 	data, _ := os.ReadFile(file)
-	if !strings.Contains(string(data), `schemaVersion: "1"`) || !strings.Contains(string(data), "GET /legacy") {
+	if !strings.Contains(string(data), `schemaVersion: "2"`) || !strings.Contains(string(data), "GET /legacy") || !strings.Contains(string(data), "check: CS-RESP-005") {
 		t.Fatalf("baseline file:\n%s", data)
 	}
 
@@ -137,7 +142,7 @@ func TestConformBaseline_JSONFileAndMachineReportsStayPure(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(file)
-	if !strings.HasPrefix(strings.TrimSpace(string(data)), "{") || !strings.Contains(string(data), `"schemaVersion": "1"`) {
+	if !strings.HasPrefix(strings.TrimSpace(string(data)), "{") || !strings.Contains(string(data), `"schemaVersion": "2"`) {
 		t.Errorf("a .json baseline is JSON:\n%s", data)
 	}
 	// the baseline summary goes to stderr, so --format json on stdout is still pure JSON
@@ -154,5 +159,56 @@ func TestConformBaseline_JSONFileAndMachineReportsStayPure(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "Baseline: 1 known") {
 		t.Errorf("stderr:\n%s", stderr.String())
+	}
+}
+
+// A baseline written by 0.8.9 (schemaVersion 1, identified by the validator's wording) keeps
+// working, says it is old, and --write-baseline upgrades it to the check-based format.
+func TestConformBaseline_Version1StillWorksAndUpgrades(t *testing.T) {
+	url, fixLegacy, _ := baselineAPI(t)
+	spec := writeTempFile(t, "api.yaml", baselineSpec)
+	dir := t.TempDir()
+	v1 := filepath.Join(dir, "old.yaml")
+
+	// build the 0.8.9 file from the same run: its kind and detail are the old identity
+	s, err := openapi.ParseBytes([]byte(baselineSpec), "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := application.RunConformance(context.Background(), application.ConformInput{Exec: newExecutor(), Spec: s, BaseURL: url})
+	type entry struct {
+		Operation string `yaml:"operation"`
+		Kind      string `yaml:"kind"`
+		Detail    string `yaml:"detail,omitempty"`
+	}
+	var list []entry
+	for _, v := range out.Violations {
+		list = append(list, entry{v.Operation, v.Kind, v.Detail})
+	}
+	data, err := yaml.Marshal(map[string]any{"schemaVersion": "1", "violations": list})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(v1, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	text, err := exec(t, "conform", "--base-url", url, "--baseline", v1, spec)
+	if err != nil || !strings.Contains(text, "Baseline: 1 known, 0 new, 0 fixed") || !strings.Contains(text, "old format (schemaVersion 1)") {
+		t.Fatalf("a version 1 baseline is read and flagged: %v\n%s", err, text)
+	}
+
+	upgraded := filepath.Join(dir, "new.yaml")
+	if _, err := exec(t, "conform", "--base-url", url, "--write-baseline", upgraded, spec); err != nil {
+		t.Fatal(err)
+	}
+	text, err = exec(t, "conform", "--base-url", url, "--baseline", upgraded, spec)
+	if err != nil || strings.Contains(text, "old format") {
+		t.Fatalf("the rewritten baseline is current: %v\n%s", err, text)
+	}
+	fixLegacy.Store(true)
+	text, err = exec(t, "conform", "--base-url", url, "--baseline", v1, spec)
+	if err != nil || !strings.Contains(text, "1 fixed") {
+		t.Fatalf("fixing is reported against a version 1 baseline too: %v\n%s", err, text)
 	}
 }

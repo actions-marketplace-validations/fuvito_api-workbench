@@ -29,6 +29,8 @@ steps:
     request:
       method: GET
       url: "{{baseUrl}}/users"
+    assertions:
+      - {type: status, operator: eq, expected: 200}
 `
 
 func ids(r Report) []string {
@@ -328,5 +330,124 @@ func TestInspect_ASpecReachedThroughALinkOutOfTheWorkspaceIsOutside(t *testing.T
 	r := Inspect(root, env, "e.yaml")
 	if len(r.Specs) != 1 || r.Specs[0].State != SpecOutside {
 		t.Fatalf("a link that leaves the workspace must be reported as outside: %+v", r.Specs)
+	}
+}
+
+func TestInspect_ProjectFile(t *testing.T) {
+	root := t.TempDir()
+	if r := Inspect(root, nil, ""); r.ProjectFile.Found || len(r.ProjectFile.Keys) != 0 || len(r.Attention) != 0 {
+		t.Fatalf("no file is not a problem: %+v", r)
+	}
+
+	write(t, root, "specs/api.yaml", "x")
+	write(t, root, "environments/local.yaml", "x")
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nspec: specs/api.yaml\nenvironment: environments/local.yaml\nbaseUrl: http://localhost:8080\nconform:\n  readOnly: true\n")
+	r := Inspect(root, nil, "")
+	pf := r.ProjectFile
+	if !pf.Found || pf.Path != "clrsig.yaml" || pf.Error != "" || strings.Join(pf.Keys, ",") != "spec,environment,baseUrl,conform.readOnly" {
+		t.Fatalf("a good file: %+v", pf)
+	}
+	if has(r, ItemProjectFileInvalid) != nil || has(r, ItemProjectFilePath) != nil {
+		t.Errorf("a good file raises nothing: %v", ids(r))
+	}
+}
+
+func TestInspect_ProjectFileProblems(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nbaseURL: x\n")
+	r := Inspect(root, nil, "")
+	a := has(r, ItemProjectFileInvalid)
+	if a == nil || r.ProjectFile.Error == "" || !strings.Contains(a.Why, "baseURL") || a.Fix == "" || a.Target.Kind != "projectfile" {
+		t.Fatalf("an unusable file says what, where, why and how to fix: %+v / %+v", r.ProjectFile, a)
+	}
+
+	root = t.TempDir()
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\nspec: specs/gone.yaml\nenvironment: https://example.com/x\n")
+	r = Inspect(root, nil, "")
+	a = has(r, ItemProjectFilePath)
+	if a == nil || !strings.Contains(a.What, "specs/gone.yaml") || !strings.Contains(a.Where, "key spec") {
+		t.Fatalf("a spec that is not there is named: %v %+v", ids(r), a)
+	}
+
+	root = t.TempDir()
+	write(t, root, "clrsig.yaml", "schemaVersion: \"1\"\n")
+	write(t, root, "clrsig.json", `{"schemaVersion":"1"}`)
+	if r := Inspect(root, nil, ""); has(r, ItemProjectFileInvalid) == nil {
+		t.Errorf("two project files in the folder is a problem: %v", ids(r))
+	}
+}
+
+func TestInspect_ProjectFileIsOnlyReadInsideTheWorkspace(t *testing.T) {
+	outer := t.TempDir()
+	write(t, outer, "clrsig.yaml", "schemaVersion: \"1\"\n")
+	root := filepath.Join(outer, "ws")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if r := Inspect(root, nil, ""); r.ProjectFile.Found {
+		t.Errorf("a file above the workspace is not read: %+v", r.ProjectFile)
+	}
+}
+
+func TestInspect_WeakScenariosAreInfoItems(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "scenarios/weak.yaml", `schemaVersion: "1"
+title: Weak
+steps:
+  - label: Ping
+    request: {method: GET, url: "http://x/ping"}
+  - label: Login
+    request: {method: POST, url: "http://x/login"}
+    extractions:
+      - {name: spare, source: jsonpath, path: $.spare}
+`)
+	write(t, root, "scenarios/good.yaml", `schemaVersion: "1"
+title: Good
+steps:
+  - label: Ping
+    request: {method: GET, url: "http://x/ping"}
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+`)
+	r := Inspect(root, nil, "")
+	a := has(r, ItemScenarioWeak)
+	if a == nil {
+		t.Fatalf("a weak scenario is listed: %v", ids(r))
+	}
+	if a.Severity != SeverityInfo || a.Where != "scenarios/weak.yaml" || a.Target.Kind != "scenario" {
+		t.Errorf("%+v", a)
+	}
+	if !strings.Contains(a.What, "2 things to improve") || !strings.Contains(a.Why, "[step 1] Ping: has no assertions") || !strings.Contains(a.Why, `extracts "spare"`) || !strings.Contains(a.Fix, "clrsig validate --strict") {
+		t.Errorf("what, why and fix: %+v", a)
+	}
+	count := 0
+	for _, it := range r.Attention {
+		if it.ID == ItemScenarioWeak {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("one item per weak scenario, none for the good one: %d", count)
+	}
+}
+
+// A value a step extracts and a later step uses only inside its request file (requestRef) is used.
+func TestInspect_AnExtractionUsedInAReferencedRequestIsNotWeak(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "requests/me.yaml", "schemaVersion: \"1\"\nname: Me\nmethod: GET\nurl: \"http://x/me\"\nheaders:\n  - name: Authorization\n    value: \"Bearer {{token}}\"\n")
+	write(t, root, "scenarios/s.yaml", `schemaVersion: "1"
+title: Refs
+steps:
+  - label: Login
+    request: {method: POST, url: "http://x/login"}
+    extractions:
+      - {name: token, source: jsonpath, path: $.token}
+  - label: Me
+    requestRef: me.yaml
+    assertions:
+      - {type: status, operator: eq, expected: 200}
+`)
+	if a := has(Inspect(root, nil, ""), ItemScenarioWeak); a != nil {
+		t.Errorf("the token is used by the referenced request: %+v", a)
 	}
 }

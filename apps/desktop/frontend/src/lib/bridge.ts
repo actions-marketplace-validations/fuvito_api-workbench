@@ -91,6 +91,7 @@ import {
   RunConformance as WailsRunConformance,
   CancelConformance as WailsCancelConformance,
   ExportConformReport as WailsExportConformReport,
+  RecordConformBaseline as WailsRecordConformBaseline,
 } from '@wailsjs/go/main/ConformanceService'
 import { GetWorkspaceOverview as WailsGetWorkspaceOverview } from '@wailsjs/go/main/DashboardService'
 import {
@@ -730,6 +731,33 @@ export interface ConformContext {
   environments: CliFile[]
   // the file "Active environment" means; empty when none is selected
   activeEnvironment?: string
+  // what the workspace's clrsig.yaml chooses for this page
+  projectDefaults?: ConformDefaults
+  // workspace scenarios that can run first (a login, for example)
+  scenarios?: CliFile[]
+  // workspace files that look like conformance baselines
+  baselines?: CliFile[]
+}
+
+export interface ConformDefaults {
+  found: boolean
+  file?: string
+  // what was not applied and why
+  note?: string
+  // the keys that gave a value, as written in the file
+  applied: string[]
+  specPath?: string
+  environmentPath?: string
+  baseUrl?: string
+  setupPath?: string
+  baselinePath?: string
+  tags: string[]
+  paths: string[]
+  negative: boolean
+  failOnWarning: boolean
+  requestTimeoutMs: number
+  maxResponseTimeMs: number
+  maxResponseTimeFor: string[]
 }
 
 export interface ConformSpecInfo {
@@ -739,6 +767,17 @@ export interface ConformSpecInfo {
   reads: number
   writes: number
   error?: string
+  // problems in the spec document itself
+  lint?: SpecIssue[]
+}
+
+export interface SpecIssue {
+  check: string
+  severity: 'error' | 'warning'
+  where: string
+  what: string
+  why: string
+  fix: string
 }
 
 export interface ConformRunInput {
@@ -751,6 +790,12 @@ export interface ConformRunInput {
   paths: string[]
   negative: boolean
   failFast: boolean
+  // a warning fails the run (clrsig conform --fail-on warning)
+  failOnWarning?: boolean
+  // a workspace scenario that runs first; what it extracts is available to the requests as {{name}}
+  setupScenario?: string
+  // a baseline file in the workspace: recorded violations are accepted and only new ones fail the run
+  baselinePath?: string
   maxResponseTimeMs?: number
   maxResponseTimeFor?: string[]
   timeoutMs: number
@@ -773,6 +818,7 @@ export interface ConformFinding {
   kind: 'missing-field' | 'wrong-type' | 'undeclared-status' | 'wrong-content-type' | 'missing-header' | 'bad-header' | 'missing-value' | 'dynamic-value-failed' | 'no-branch-matched' | 'invalid-body' | 'empty-body' | 'body-too-large' | 'constraint' | 'unexpected-property' | 'write-only-property' | 'number-out-of-range' | 'request' | 'no-response' | 'other'
   // the check's ID in the catalog (Help, What We Check), for example CS-RESP-005
   checkId?: string
+  severity?: string
   // where the problem is: the part (response body, response status, response header, request,
   // network) and what in it (a field path, a header name, the status code)
   part?: string
@@ -799,6 +845,8 @@ export interface ConformOperation {
   error?: string
   // plain-language explanation of each violation (absent in older data)
   findings?: ConformFinding[]
+  // findings that are only warnings; a passing operation can have some
+  warnings?: number
 }
 
 export interface ConformRunOutput {
@@ -813,6 +861,8 @@ export interface ConformRunOutput {
   notCovered: number
   passing: number
   failing: number
+  // passing operations that have warnings
+  withWarnings?: number
   probes: ConformProbe[]
   warnings: string[]
   // placeholders that kept operations from being sent (each once) and how many operations that hit
@@ -821,6 +871,33 @@ export interface ConformRunOutput {
   coverageNote?: string
   // the run's verdict, as the CLI's exit code 1
   failed?: boolean
+  // what the setup scenario made available (names, never values)
+  setupNote?: string
+  // how the run compares with the chosen baseline
+  baseline?: ConformBaseline
+}
+
+export interface ConformViolation {
+  operation: string
+  check?: string
+  where?: string
+  summary: string
+}
+
+export interface ConformBaseline {
+  path: string
+  // a version 1 file: it still works; recording a new baseline upgrades it
+  legacy: boolean
+  known: ConformViolation[]
+  new: ConformViolation[]
+  fixed: ConformViolation[]
+}
+
+export interface RecordedBaseline {
+  path: string
+  violations: number
+  replaced: boolean
+  error?: string
 }
 
 export type ConformReportFormat = 'html' | 'junit' | 'json' | 'markdown'
@@ -839,6 +916,10 @@ export async function runConformance(input: ConformRunInput): Promise<ConformRun
 
 export async function cancelConformance(): Promise<void> {
   await WailsCancelConformance()
+}
+
+export async function recordConformBaseline(path: string): Promise<RecordedBaseline> {
+  return (await WailsRecordConformBaseline(path)) as unknown as RecordedBaseline
 }
 
 export async function exportConformReport(format: ConformReportFormat): Promise<RunReport> {
@@ -1343,7 +1424,7 @@ export type AttentionItem = {
   where: string
   why: string
   fix: string
-  target: { kind: 'scenario' | 'environment' | 'spec' | 'request' | 'contracts'; path: string }
+  target: { kind: 'scenario' | 'environment' | 'spec' | 'request' | 'contracts' | 'projectfile'; path: string }
 }
 
 export type DashCoverage = {
@@ -1384,6 +1465,8 @@ export type WorkspaceOverview = {
   specs: DashSpec[]
   lastRun?: { at: string; scenario: string; passed: boolean; scenarios: number; failingNow: number }
   attention: AttentionItem[]
+  // the clrsig.yaml in the workspace folder
+  projectFile?: { found: boolean; path?: string; error?: string; keys: string[] }
   snapshotAt: string
 }
 

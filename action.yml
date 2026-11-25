@@ -19,7 +19,7 @@ inputs:
 
   # --- conform ---
   spec:
-    description: 'Path or URL to OpenAPI spec (conform)'
+    description: 'Path or URL to OpenAPI spec (conform; with validate, a spec to check itself)'
     required: false
 
   # --- diff ---
@@ -61,6 +61,19 @@ inputs:
     required: false
   against:
     description: 'Compare the spec in base-spec with the one at this git ref (diff; needs the full git history, so use fetch-depth: 0)'
+    required: false
+  changed-against:
+    description: 'Check only the operations that are new or changed compared with the spec at this git ref, for pull requests; needs a checkout with full history (fetch-depth: 0) (conform)'
+    required: false
+  strict:
+    description: 'Also report valid but weak scenarios (steps that check nothing, extractions nobody uses) as warnings that fail the check (validate)'
+    required: false
+    default: 'false'
+  setup:
+    description: 'A scenario to run before the check, usually a login; what its steps extract is available to the generated requests as {{name}} (conform)'
+    required: false
+  conform-fail-on:
+    description: 'failure (default) or warning: warnings fail the run only when this is warning (conform)'
     required: false
   read-only:
     description: 'Send only GET and HEAD requests; every other operation is skipped and never sent (conform)'
@@ -187,6 +200,10 @@ runs:
         IN_FAIL_ON: ${{ inputs.fail-on }}
         IN_AGAINST: ${{ inputs.against }}
         IN_READ_ONLY: ${{ inputs.read-only }}
+        IN_CONFORM_FAIL_ON: ${{ inputs.conform-fail-on }}
+        IN_SETUP: ${{ inputs.setup }}
+        IN_STRICT: ${{ inputs.strict }}
+        IN_CHANGED_AGAINST: ${{ inputs.changed-against }}
         IN_NEGATIVE: ${{ inputs.negative }}
         IN_EXPLAIN: ${{ inputs.explain }}
         IN_BASELINE: ${{ inputs.baseline }}
@@ -215,7 +232,7 @@ runs:
 
         case "$CMD" in
           run)
-            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_SCENARIO" ] && ARGS+=( "$IN_SCENARIO" )
             [ -n "$IN_ENV"    ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
             [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
@@ -224,7 +241,7 @@ runs:
             repeat --report "$IN_REPORT"
             ;;
           conform)
-            ARGS+=( "$IN_SPEC" )
+            [ -n "$IN_SPEC" ] && ARGS+=( "$IN_SPEC" )
             [ -n "$IN_BASE_URL" ] && ARGS+=( -b "$IN_BASE_URL" )
             [ -n "$IN_ENV"      ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT"   ] && ARGS+=( -f "$IN_FORMAT" )
@@ -232,6 +249,9 @@ runs:
             [ "$IN_FAIL_FAST" = "true" ] && ARGS+=( --fail-fast )
             [ "$IN_COVERAGE"  = "true" ] && ARGS+=( --coverage )
             [ "$IN_READ_ONLY" = "true" ] && ARGS+=( --read-only )
+            [ -n "$IN_CONFORM_FAIL_ON" ] && ARGS+=( --fail-on "$IN_CONFORM_FAIL_ON" )
+            [ -n "$IN_SETUP" ] && ARGS+=( --setup "$IN_SETUP" )
+            [ -n "$IN_CHANGED_AGAINST" ] && ARGS+=( --changed-against "$IN_CHANGED_AGAINST" )
             [ "$IN_NEGATIVE"  = "true" ] && ARGS+=( --negative )
             [ "$IN_EXPLAIN"   = "true" ] && ARGS+=( --explain )
             [ -n "$IN_BASELINE"       ] && ARGS+=( --baseline "$IN_BASELINE" )
@@ -256,7 +276,10 @@ runs:
             repeat --report "$IN_REPORT"
             ;;
           validate)
-            ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_SCENARIO" ] && ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_SPEC" ] && ARGS+=( --spec "$IN_SPEC" )
+            [ "$IN_STRICT" = "true" ] && ARGS+=( --strict )
+            [ "$IN_STRICT" = "true" ] && [ -n "$IN_ENV" ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )
             [ -n "$IN_OUTPUT" ] && ARGS+=( -o "$IN_OUTPUT" )
             ;;

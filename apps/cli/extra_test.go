@@ -17,6 +17,7 @@ import (
 // newFullTestRoot builds a root with all commands registered.
 func newFullTestRoot() *cobra.Command {
 	root := &cobra.Command{Use: "clrsig", SilenceErrors: true, SilenceUsage: true}
+	addConfigFlags(root)
 	root.AddCommand(runCmd())
 	root.AddCommand(requestCmd())
 	root.AddCommand(validateCmd())
@@ -26,6 +27,8 @@ func newFullTestRoot() *cobra.Command {
 	root.AddCommand(coverageCmd())
 	root.AddCommand(impactCmd())
 	root.AddCommand(telemetryCmd())
+	root.AddCommand(initCmd())
+	root.AddCommand(configCmd())
 	return root
 }
 

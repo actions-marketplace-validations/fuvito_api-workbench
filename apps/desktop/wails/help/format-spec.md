@@ -467,14 +467,57 @@ scenarios:                         # optional — one or more
 Written by `clrsig conform --write-baseline <file>` and read by `--baseline <file>`. It lists the violations a team has accepted for now. YAML or JSON by file extension (`.json` is JSON). Unknown fields are errors.
 
 ```yaml
-schemaVersion: "1"           # required — always "1" (quoted string); a newer version is refused
+schemaVersion: "2"           # required — "2" is written; "1" (older files) is still read; a newer version is refused
 violations:                  # sorted, no duplicates, no timestamps (so the file only changes when violations do)
   - operation: "GET /users/{id}"   # required — method and path template from the spec
-    kind: response                 # required — request | response | error | probe
-    detail: "/id: property is missing"   # optional — field and rule; empty for an error; "<probe kind>: <description>" for a probe
+    check: CS-RESP-005             # required — the ID of the check (see What We Check); "other" for a violation that has none
+    where: email                   # optional — the field path, header name or status the violation is about
+    rule: ""                       # optional — narrows a check with several rules (which constraint broke; a probe's description); for "other", the validator's own text
+    summary: '"email" is missing from the response'   # optional — for people to read; NOT part of the identity
 ```
 
-A violation is identified by `operation` + `kind` + `detail`. Secret values are replaced with `***`.
+A violation is identified by `operation` + `check` + `where` + `rule`. Rewording a message, or a new version of the validator, never turns a recorded violation into a new one. Secret values are replaced with `***`.
+
+**Version 1** (written by clrsig 0.8.9 and earlier) identified a violation by `operation` + `kind` (`request`, `response`, `error`, `probe`) + `detail` (the validator's message text), and had no `check`, `where`, `rule` or `summary`. It is still read and compared by that wording, with a note that the file is in the old format. It is never written back and never edited in place: record a new baseline with `--write-baseline` to upgrade it. Version 2 files cannot be read by older clrsig.
+
+---
+
+## Project File (`clrsig.yaml`)
+
+The defaults of a project for the flags that repeat. Read by `clrsig conform`, `run` and `validate` from the current folder or the nearest folder above it (the search stops at the first file, at a folder that contains `.git`, and at the home folder). `clrsig.yml` and `clrsig.json` are equivalent; a folder may hold only one. `--config <file>` chooses a file, `--no-config` ignores it. It is meant to be committed: it has **no secrets and no variables**, and `${NAME}` is rejected in it (use an environment file).
+
+```yaml
+schemaVersion: "1"                    # required — the quoted string "1"; a newer version is refused
+
+spec: specs/openapi.yaml              # conform: the spec argument
+environment: environments/ci.yaml     # conform, run: --env
+baseUrl: http://localhost:8080        # conform: --base-url
+
+conform:
+  readOnly: true                      # --read-only
+  negative: false                     # --negative
+  failOn: failure                     # --fail-on: failure | warning
+  requestTimeoutMs: 10000             # --request-timeout
+  maxResponseTimeMs: 0                # --max-response-time
+  maxResponseTimeFor: ["/reports=2000"]   # --max-response-time-for
+  tags: [users]                       # --tags
+  paths: [/users]                     # --paths
+  baseline: conform-baseline.yaml     # --baseline
+  setup: scenarios/login.yaml         # --setup: a scenario that runs first (a login)
+
+run:
+  scenarios: [scenarios]              # run, validate: the files and folders to use when none are given
+  failFast: false                     # run: --fail-fast
+
+reports:                              # conform, run: --report (repeatable), format=file
+  - junit=reports/conform.xml
+```
+
+- Every key is optional; a file with only `schemaVersion` is valid. Unknown keys are errors (`x-` keys are kept and ignored), and a key must be spelled exactly (`baseUrl`, not `baseURL`).
+- A path is relative to the **folder of the file**, so a command gives the same result from a subfolder and in CI. A URL or an absolute path is used as written.
+- **Precedence:** a flag or argument given on the command line, then a `CLRSIG_*` environment variable where one exists, then the file, then the built-in default. `--read-only=false` overrides `readOnly: true`.
+- A command that used the file says so on stderr: `Using clrsig.yaml (spec, baseUrl, conform.readOnly from the file)`.
+- `run` does not take `spec` from the file: a scenario's own `specFile` decides whether its responses are checked.
 
 ---
 

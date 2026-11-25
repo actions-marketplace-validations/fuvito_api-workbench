@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -268,6 +269,8 @@ type jUnitCase struct {
 	Skipped   *struct{}     `xml:"skipped"`
 	Failure   *jUnitFailure `xml:"failure"`
 	Error     *jUnitError   `xml:"error"`
+	// SystemOut carries the warnings of a passing test case (JUnit has no warning status).
+	SystemOut string `xml:"system-out,omitempty"`
 }
 
 type jUnitFailure struct {
@@ -380,6 +383,14 @@ func junitSuiteFor(result *scenario.Result) jUnitSuite {
 
 // ---- Conformance reporting ----
 
+// severityMark is the sign in front of a violation line: ✗ for a failure, ! for a warning.
+func severityMark(op conformance.OperationResult, v openapi.ValidationError, request bool) string {
+	if conformance.ViolationSeverity(op, v, request) == checks.Warning {
+		return "!"
+	}
+	return "✗"
+}
+
 // ConformText returns a human-readable conformance report suitable for terminal / CI output.
 // Pass a non-nil coverage to append a coverage summary section.
 func ConformText(result *conformance.ConformResult, coverage *conformance.CoverageReport) string {
@@ -394,7 +405,11 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	x := newRedactor(result.Secrets, false)
 
 	fmt.Fprintf(&b, "%s  %s\n", result.SpecTitle, result.SpecVersion)
-	fmt.Fprintf(&b, "Base URL: %s\n\n", x.text(result.BaseURL))
+	fmt.Fprintf(&b, "Base URL: %s\n", x.text(result.BaseURL))
+	if line := result.Scope.Line(); line != "" {
+		fmt.Fprintln(&b, line)
+	}
+	fmt.Fprintln(&b)
 
 	sent, unanswered, firstErr := 0, 0, ""
 	kinds := map[string]bool{}
@@ -426,8 +441,10 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 			continue
 		}
 		status := "PASS"
-		if op.Error != "" || !op.Passed() {
+		if op.Error != "" || !result.OpPassed(op) {
 			status = "FAIL"
+		} else if len(op.Warnings()) > 0 {
+			status = "WARN"
 		}
 		suffix := ""
 		if op.StatusCode > 0 {
@@ -444,10 +461,10 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 			fmt.Fprintf(&b, "         ✗ %s\n", x.text(op.Blocked))
 		}
 		for _, v := range op.RequestViolations {
-			fmt.Fprintf(&b, "         ✗ request: %s\n", x.text(v.Error()))
+			fmt.Fprintf(&b, "         %s request: %s\n", severityMark(op, v, true), x.text(v.Error()))
 		}
 		for _, v := range op.Violations {
-			fmt.Fprintf(&b, "         ✗ %s\n", x.text(v.Error()))
+			fmt.Fprintf(&b, "         %s %s\n", severityMark(op, v, false), x.text(v.Error()))
 		}
 		if explainFailures {
 			for _, f := range explain(op, x) {
@@ -474,12 +491,16 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 		verdict = fmt.Sprintf("PASSED with %d known violation%s", result.KnownViolations, plural(result.KnownViolations))
 	case failed > 0:
 		verdict = "FAILED"
+	case result.WarningCount() > 0:
+		verdict = fmt.Sprintf("PASSED with %d warning%s", result.WarningCount(), plural(result.WarningCount()))
 	}
 	fmt.Fprintf(&b, "%s  %d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms\n",
 		verdict, total, passed, failed, skipped, result.Duration.Milliseconds())
 	if passed+failed == 0 {
 		if total == 0 {
 			fmt.Fprintf(&b, "       The spec declares no operations, so there was nothing to check.\n")
+		} else if result.Scope != nil {
+			fmt.Fprintf(&b, "       Nothing was sent: no operation changed against %s.\n", result.Scope.ChangedAgainst)
 		} else {
 			fmt.Fprintf(&b, "       Every operation was skipped (by --tags, --paths or --read-only), so nothing was sent.\n")
 		}
@@ -516,7 +537,11 @@ type JSONConformReport struct {
 	SpecVersion string `json:"specVersion"`
 	BaseURL     string `json:"baseURL"`
 	Passed      bool   `json:"passed"`
-	DurationMs  int64  `json:"durationMs"`
+	// Warnings is how many operations passed with warnings only.
+	Warnings   int   `json:"warnings,omitempty"`
+	DurationMs int64 `json:"durationMs"`
+	// Scope is set when the run checked only the operations a change touched.
+	Scope *conformance.Scope `json:"scope,omitempty"`
 	// MissingValues lists the placeholders that kept operations from being sent (each once).
 	MissingValues []string        `json:"missingValues,omitempty"`
 	Operations    []JSONConformOp `json:"operations"`
@@ -547,8 +572,10 @@ type JSONConformOp struct {
 	StatusCode  int    `json:"statusCode,omitempty"`
 	DurationMs  int64  `json:"durationMs,omitempty"`
 	Passed      bool   `json:"passed"`
-	Skipped     bool   `json:"skipped,omitempty"`
-	Error       string `json:"error,omitempty"`
+	// Warnings counts the findings of this operation that are only warnings.
+	Warnings int    `json:"warnings,omitempty"`
+	Skipped  bool   `json:"skipped,omitempty"`
+	Error    string `json:"error,omitempty"`
 	// Blocked says why the request was not sent (a missing value); Missing names the placeholders.
 	Blocked           string   `json:"blocked,omitempty"`
 	Missing           []string `json:"missing,omitempty"`
@@ -565,6 +592,8 @@ type JSONConformFinding struct {
 	// CheckID is the check's ID in the catalog (for example CS-RESP-005); absent when the violation
 	// is not recognised.
 	CheckID string `json:"checkId,omitempty"`
+	// Severity is failure, warning or note.
+	Severity string `json:"severity,omitempty"`
 	// Part and Where say where in the response the problem is (a header name, the status, a body
 	// field); Spec says where the expectation comes from in the spec.
 	Part     string `json:"part,omitempty"`
@@ -608,10 +637,12 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		SpecTitle:   result.SpecTitle,
 		SpecVersion: result.SpecVersion,
 		BaseURL:     x.text(result.BaseURL),
+		Scope:       result.Scope,
 		Passed:      failed == 0,
 		DurationMs:  result.Duration.Milliseconds(),
 	}
 	_, report.MissingValues = result.BlockedSummary()
+	report.Warnings = result.WarningCount()
 	for _, op := range result.Operations {
 		jo := JSONConformOp{
 			OperationID: op.OperationID,
@@ -619,7 +650,8 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			Path:        op.Path,
 			StatusCode:  op.StatusCode,
 			DurationMs:  op.DurationMs,
-			Passed:      op.Passed(),
+			Passed:      result.OpPassed(op),
+			Warnings:    len(op.Warnings()),
 			Skipped:     op.Skipped,
 			Error:       x.text(op.Error),
 			Blocked:     x.text(op.Blocked),
@@ -633,7 +665,7 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 		}
 		for _, f := range explain(op, x) {
 			jo.Findings = append(jo.Findings, JSONConformFinding{
-				Kind: f.Kind, CheckID: f.CheckID, Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
+				Kind: f.Kind, CheckID: f.CheckID, Severity: string(f.Severity), Part: f.Part, Where: f.Where, Spec: f.Spec, Summary: f.Summary, Expected: f.Expected, Got: f.Got, Why: f.Why, Fix: f.Fix,
 			})
 		}
 		report.Operations = append(report.Operations, jo)
@@ -693,7 +725,7 @@ func ConformJUnit(result *conformance.ConformResult, neg *conformance.NegativeRe
 		case op.Error != "":
 			suite.Errors++
 			tc.Error = &jUnitError{Message: x.text(op.Error), Text: x.text(op.Error)}
-		case !op.Passed():
+		case !result.OpPassed(op):
 			var msgs []string
 			if op.Blocked != "" {
 				msgs = append(msgs, "  ✗ "+x.text(op.Blocked))
@@ -712,6 +744,14 @@ func ConformJUnit(result *conformance.ConformResult, neg *conformance.NegativeRe
 				Message: fmt.Sprintf("%d violation(s)", violations),
 				Text:    strings.Join(msgs, "\n"),
 			}
+		default:
+			var lines []string
+			for _, f := range explain(op, x) {
+				if f.Severity == checks.Warning {
+					lines = append(lines, "warning: "+explanationLine(f))
+				}
+			}
+			tc.SystemOut = strings.Join(lines, "\n")
 		}
 		suite.Cases = append(suite.Cases, tc)
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
@@ -43,9 +44,56 @@ type OperationResult struct {
 	Missing []string
 }
 
-// Passed reports whether the operation executed and conformed to the spec.
+// Passed reports whether the operation executed and conformed to the spec. Findings whose check
+// is only a warning or a note do not stop an operation from passing (see Warnings).
 func (r OperationResult) Passed() bool {
-	return !r.Skipped && r.Blocked == "" && r.Error == "" && len(r.RequestViolations) == 0 && len(r.Violations) == 0
+	if r.Skipped || r.Blocked != "" || r.Error != "" {
+		return false
+	}
+	if len(r.RequestViolations) == 0 && len(r.Violations) == 0 {
+		return true
+	}
+	for _, f := range Diagnose(r) {
+		if f.Severity == checks.Failure {
+			return false
+		}
+	}
+	return true
+}
+
+// Warnings returns the findings of a passing operation that are only warnings.
+func (r OperationResult) Warnings() []Finding {
+	if r.Skipped || len(r.RequestViolations) == 0 && len(r.Violations) == 0 {
+		return nil
+	}
+	var out []Finding
+	for _, f := range Diagnose(r) {
+		if f.Severity == checks.Warning {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// OpPassed is Passed for this run: with FailOn set to warning, an operation with warnings has
+// not passed. Reports and counts use it so they agree with the exit code.
+func (r *ConformResult) OpPassed(op OperationResult) bool {
+	if !op.Passed() {
+		return false
+	}
+	return !(r.FailOn == checks.Warning && len(op.Warnings()) > 0)
+}
+
+// WarningCount is the number of operations that passed but have warnings (zero when warnings
+// fail the run, since those operations are then counted as failed).
+func (r *ConformResult) WarningCount() int {
+	n := 0
+	for _, op := range r.Operations {
+		if r.OpPassed(op) && len(op.Warnings()) > 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // BlockedSummary reports how many operations were not sent because a value was missing, and the
@@ -102,11 +150,16 @@ type ConformResult struct {
 	// operation when there is no filter); it is 0 when a filter matches nothing, which a caller
 	// must not report as a pass.
 	FilterMatched int
+	// Scope is set when the run was limited to the operations a change touched.
+	Scope *Scope
 	// BaselineApplied is set when the run was compared with a baseline; KnownViolations is how
 	// many of the failures it accepted. A run with only known failures passes.
 	BaselineApplied bool
 	KnownViolations int
 	BaselineClean   bool
+
+	// FailOn is the lowest severity that fails the run: failure (the default) or warning.
+	FailOn checks.Severity
 }
 
 // Counts returns (passed, failed, skipped) operation counts.
@@ -115,7 +168,7 @@ func (r *ConformResult) Counts() (passed, failed, skipped int) {
 		switch {
 		case op.Skipped:
 			skipped++
-		case op.Passed():
+		case r.OpPassed(op):
 			passed++
 		default:
 			failed++
@@ -162,6 +215,10 @@ type Options struct {
 	// Paths filters operations to those whose path starts with one of the given prefixes.
 	// Empty means all paths are included.
 	Paths []string
+	// OnlyOperations restricts the run to these operations, each written METHOD path with the path as
+	// the spec writes it (see openapi.OperationKey). Nil means no restriction; an empty map selects
+	// nothing. It applies to requests and to negative probes, and combines with Tags and Paths.
+	OnlyOperations map[string]bool
 	// FailFast stops after the first failing operation.
 	FailFast bool
 	// RequestTimeoutMs overrides the per-request timeout. 0 = use executor default.
@@ -236,7 +293,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			SpecPath:    gr.Path,
 		}
 
-		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths)
+		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths) && matchesOnly(opts.OnlyOperations, or.Method, gr.Path)
 		if selected {
 			result.FilterMatched++
 		}
@@ -332,6 +389,10 @@ func pathOf(fullURL, baseURL string) string {
 		return fullURL
 	}
 	return u.Path
+}
+
+func matchesOnly(only map[string]bool, method, path string) bool {
+	return only == nil || only[openapi.OperationKey(method, path)]
 }
 
 func matchesTags(opTags, filterTags []string) bool {
@@ -443,4 +504,39 @@ func snippet(s string, max int) string {
 		return s
 	}
 	return string(r[:max]) + "…"
+}
+
+// Scope describes a run that was limited to the operations that changed since a git ref.
+type Scope struct {
+	ChangedAgainst string   `json:"changedAgainst"`
+	Checked        []string `json:"checked"`
+	Added          int      `json:"added"`
+	Modified       int      `json:"modified"`
+	Unchanged      int      `json:"unchanged"`
+	Removed        []string `json:"removed,omitempty"`
+	// Unattributed counts spec-level changes no operation owns; they do not widen the check.
+	Unattributed int `json:"unattributed,omitempty"`
+}
+
+// Line is the one-line description shown in reports and on the terminal.
+func (s *Scope) Line() string {
+	if s == nil {
+		return ""
+	}
+	if len(s.Checked) == 0 {
+		return fmt.Sprintf("Changed against %s: no operation changed, so nothing was checked (%d unchanged%s).", s.ChangedAgainst, s.Unchanged, s.removedText())
+	}
+	line := fmt.Sprintf("Changed against %s: %d operation%s (%d added, %d modified) checked, %d unchanged and not checked%s.",
+		s.ChangedAgainst, len(s.Checked), map[bool]string{true: "", false: "s"}[len(s.Checked) == 1], s.Added, s.Modified, s.Unchanged, s.removedText())
+	if s.Unattributed > 0 {
+		line += fmt.Sprintf(" %d spec-level change%s (for example servers or security) belong to no operation and do not widen the check.", s.Unattributed, map[bool]string{true: "", false: "s"}[s.Unattributed == 1])
+	}
+	return line
+}
+
+func (s *Scope) removedText() string {
+	if len(s.Removed) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d removed", len(s.Removed))
 }

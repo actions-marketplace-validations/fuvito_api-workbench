@@ -66,14 +66,21 @@ Exit codes:
   0  every scenario passed
   1  at least one scenario failed
   2  a file could not be read or parsed, nothing was found, or a configuration error`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args, err := applyProjectConfig(cmd, args)
+			if err != nil {
+				return err
+			}
+			if len(args) == 0 {
+				return fmt.Errorf("run needs a scenario file or folder: pass one, or set run.scenarios in a clrsig.yaml")
+			}
 			return runScenarios(cmd, args, o)
 		},
 	}
 
 	cmd.Flags().StringVarP(&o.envFile, "env", "e", "", "Path to environment file (YAML or JSON)")
-	cmd.Flags().StringVarP(&o.format, "format", "f", "text", formatUsage)
+	cmd.Flags().StringVarP(&o.format, "format", "f", "text", formatUsage+", or github (workflow commands that annotate a pull request, on the line of each failed step)")
 	cmd.Flags().StringVarP(&o.outputFile, "output", "o", "", "Write report to file (parent directories created automatically)")
 	cmd.Flags().IntVar(&o.timeoutMs, "timeout", 0, "Global step timeout in milliseconds (overrides per-step timeout, 0 = use per-step value)")
 	cmd.Flags().StringVarP(&o.specFile, "spec", "s", "", "OpenAPI spec file or URL (overrides specFile: in scenario)")
@@ -97,7 +104,7 @@ func isDir(path string) bool {
 func runScenarios(cmd *cobra.Command, args []string, o runOptions) error {
 	start := time.Now()
 
-	plan, err := planReports(o.format, o.reports, o.outputFile)
+	plan, err := planReportsWith([]string{"github"}, o.format, o.reports, o.outputFile)
 	if err != nil {
 		return err
 	}
@@ -333,6 +340,8 @@ func accumulateCoverage(cmd *cobra.Command, workspacePath, specRef string, resul
 
 func singleReport(r *scenarioRun, o runOptions, format string) ([]byte, error) {
 	switch format {
+	case "github":
+		return []byte(reporting.RunGitHub(githubRuns([]*scenarioRun{r}))), nil
 	case "markdown":
 		var mdCov *openapi.ScenarioCoverageResult
 		if o.showCoverage {
@@ -385,6 +394,8 @@ func combinedReport(title string, runs []*scenarioRun, o runOptions, total time.
 	}
 
 	switch format {
+	case "github":
+		return []byte(reporting.RunGitHub(githubRuns(runs))), nil
 	case "markdown":
 		return reporting.MarkdownMulti(title, results, total, cov...), nil
 	case "json":

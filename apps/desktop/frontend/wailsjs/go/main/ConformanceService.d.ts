@@ -10,4 +10,6 @@ export function GetConformContext():Promise<main.ConformContextIO>;
 
 export function InspectConformSpec(arg1:string):Promise<main.ConformSpecInfoIO>;
 
+export function RecordConformBaseline(arg1:string):Promise<main.RecordedBaselineIO>;
+
 export function RunConformance(arg1:main.ConformRunInput):Promise<main.ConformRunOutputIO>;

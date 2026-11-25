@@ -1,0 +1,24 @@
+name: Feature idea
+description: Something you would like Clear Signal to do
+title: "[idea] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: The situation and the goal come first; the feature second.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What do you do today, and what is hard about it?
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+  - type: markdown
+    attributes:
+      value: |
+        Cloud accounts, team sync, hosted collaboration, GraphQL, WebSockets, gRPC, load testing, mock servers and AI-generated tests are outside the scope of the open-source project (see CONTRIBUTING.md).

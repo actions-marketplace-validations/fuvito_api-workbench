@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/clispec"
+	"github.com/fuvito/api-workbench/packages/core/projectconfig"
 )
 
 // Program is the executable name used in generated commands.
@@ -210,6 +211,7 @@ func Build(req Request, runFrom string) Result {
 
 	checkRequirements(cmd, values, in, add)
 	checkVariables(in, add)
+	noteProjectFile(req.Command, root, add)
 	res.Suggestions = checkReport(cmd, values, add)
 
 	res.Needs = in.needs
@@ -467,4 +469,22 @@ func explain(cmd clispec.Command, positional, flags []arg, values map[string]str
 		ex.Parts = append(ex.Parts, Part{Token: token, Meaning: f.Label + ": " + f.Help})
 	}
 	return ex
+}
+
+// noteProjectFile tells the user when a clrsig.yaml would also apply where they run the command.
+// The command built here is always written in full, so it does not depend on the file.
+func noteProjectFile(command, root string, add func(Message)) {
+	switch command {
+	case "conform", "run", "validate":
+	default:
+		return
+	}
+	home, _ := os.UserHomeDir()
+	path, err := projectconfig.Discover(root, home)
+	if err != nil || path == "" {
+		return
+	}
+	add(Message{Severity: Info, Text: fmt.Sprintf(
+		"A project file (%s) applies where you run this command. The command shown is written in full and does not depend on it; to see what the file supplies when a value is left out, run: clrsig config show %s",
+		filepath.Base(path), command)})
 }

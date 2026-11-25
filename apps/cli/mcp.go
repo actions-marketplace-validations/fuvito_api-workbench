@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/application"
+	"github.com/fuvito/api-workbench/packages/core/checks"
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -175,6 +176,7 @@ func mcpToolList() []map[string]interface{} {
 					"spec":               prop("Path or URL to OpenAPI spec (YAML or JSON)"),
 					"baseUrl":            prop("Base URL of the API under test, e.g. http://localhost:8080"),
 					"envFile":            prop("Path to environment YAML/JSON file for variable resolution (optional)"),
+					"failOn":             map[string]interface{}{"type": "string", "enum": []string{"failure", "warning"}, "description": "failure (default) or warning: warnings are reported but only fail the run when this is warning"},
 					"maxResponseTime":    map[string]interface{}{"type": "integer", "description": "Slowest acceptable response in milliseconds; a slower response is a violation (optional, 0 = off)"},
 					"maxResponseTimeFor": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Different limits for path prefixes, each as /prefix=ms, for example /reports=2000 (optional; the longest prefix wins; 0 = no limit there)"},
 				},
@@ -229,6 +231,7 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		BaseURL string `json:"baseUrl"`
 		EnvFile string `json:"envFile"`
 
+		FailOn             string   `json:"failOn"`
 		MaxResponseTime    int      `json:"maxResponseTime"`
 		MaxResponseTimeFor []string `json:"maxResponseTimeFor"`
 	}
@@ -241,6 +244,10 @@ func mcpConform(raw json.RawMessage) (string, error) {
 	pathLimits, err := conformance.ParsePathLimits(args.MaxResponseTimeFor)
 	if err != nil {
 		return "", err
+	}
+	failOn, err := checks.ParseFailOn(args.FailOn)
+	if err != nil {
+		return "", fmt.Errorf("failOn: %w", err)
 	}
 	if args.Spec == "" {
 		return "", fmt.Errorf("spec is required")
@@ -268,6 +275,7 @@ func mcpConform(raw json.RawMessage) (string, error) {
 
 		MaxResponseTimeMs: args.MaxResponseTime,
 		PathLimits:        pathLimits,
+		FailOn:            failOn,
 	})
 	return reporting.ConformText(out.Result, nil), nil
 }

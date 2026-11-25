@@ -131,6 +131,7 @@ func TestWorkspaceConfig_TempWorkspacesLeaveNoResidue(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("TMP", tmp)
 	t.Setenv("TEMP", tmp)
+	t.Setenv("TMPDIR", tmp)
 	stale := filepath.Join(tmp, demoWorkspacePrefix+"123")
 	stale2 := filepath.Join(tmp, conformanceWorkspacePrefix+"456")
 	for _, d := range []string{stale, stale2} {

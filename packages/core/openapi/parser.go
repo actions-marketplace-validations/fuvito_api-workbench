@@ -14,7 +14,14 @@ import (
 type Spec struct {
 	doc     *openapi3.T
 	rawPath string
+	// ignoredExample is the problem found in an example that breaks a checked format; the spec is
+	// accepted without validating its examples (see ParseBytes).
+	ignoredExample string
 }
+
+// IgnoredExampleProblem is empty unless the spec has an example that does not match its format
+// (for example an email or uuid); then it says what is wrong. The spec still loads.
+func (s *Spec) IgnoredExampleProblem() string { return s.ignoredExample }
 
 // ParseBytes parses an OpenAPI 3.0 or 3.1 spec from raw bytes.
 // format must be "yaml", "yml", or "json".
@@ -39,12 +46,23 @@ func ParseBytes(data []byte, format string) (*Spec, error) {
 
 	restore := setAsideNonJSONExamples(doc)
 	err = doc.Validate(context.Background())
+	ignored := ""
+	if err != nil && onlyAFormatExample(err) {
+		// An example that breaks one of the formats checked since 0.9.0 is a mistake in the spec,
+		// not a reason to refuse it: specs that used to load must still load. The examples are
+		// not checked at all in that case; the problem is kept for the caller.
+		if err2 := doc.Validate(context.Background(), openapi3.DisableExamplesValidation()); err2 == nil {
+			ignored, err = err.Error(), nil
+		} else {
+			err = err2
+		}
+	}
 	restore()
 	if err != nil {
 		return nil, fmt.Errorf("invalid OpenAPI spec: %w", err)
 	}
 
-	return &Spec{doc: doc}, nil
+	return &Spec{doc: doc, ignoredExample: ignored}, nil
 }
 
 // Info returns the spec title and version.
