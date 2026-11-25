@@ -953,4 +953,13 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Fix:** one rule, `hasPathPrefix`, for operations, probes, `--list` and the limits: a prefix matches if it starts the spec path or the generated path, or its `{name}` form starts the spec path. Among limits that match, the one naming more of the path wins (braces do not count); of two spellings of the same path, the `{{name}}` one, which was the only one that used to apply.
 - **Behaviour change (release note):** a selection can only grow. With a parameter in the prefix, a command may now run operations or probes it skipped before, and a time limit written in the spec's spelling starts to apply, so a run can turn red.
 - **Guards:** `conformance/paths_filter_test.go`, which failed before the change. The pinned-bug test and its catalog gap row were removed; CS-PROBE-005 and CS-RESP-014 describe the behaviour.
-- **Not done:** not released; the sandbox's F-036 stays open until a release can be verified there.
+- **Not done:** released in 0.13.1 (next entry); the sandbox's F-036 stays open until the release is verified there.
+
+### 2026-11-25 — v0.13.1 released
+
+- **Contains** the B-125 fix only. The release notes lead with the case where a passing run can now fail.
+- **Before tagging:** CI passed on the fix commit `678389f` (eight jobs), and the sandbox CI passed with clrsig built from `main` at `35cf88e` in its container. gofmt, vet and tests of all four Go modules, CLI build, `tsc`, Vitest (1,681) and the browser tests (173) passed locally. The screenshot suite was not run.
+- **Tag `v0.13.1` on `3711bc6`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. With the downloaded Windows CLI: on the sandbox spec, `/products/{productId}` and `/products/{{productId}}` each select 6 operations and 6 probes; on the example server a limit `/users/{id}=1` fails the slow response (v0.13.0 passed it silently); `init github-actions` pins `@v0.13.1`. The draft notes file was deleted after publishing.
+- **Seen, not changed:** a probe run with no probes says `PASSED  0 probes` (B-126).
+- **Not verified:** the Docker image run, the Homebrew install (no Mac), the Scoop upgrade on the maintainer's machine, a workflow using the Action by its remote reference `@v0.13.1`, and the desktop app by eye.
+- **Open:** the sandbox pins v0.13.0 with F-036 open; B-123; batch E.
