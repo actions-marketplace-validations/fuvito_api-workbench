@@ -233,8 +233,14 @@ func applyProjectConfig(cmd *cobra.Command, args []string) ([]string, error) {
 			return nil, fmt.Errorf("conform needs a spec: pass one, or set spec: in %s", displayPath(lc.cfg.Path(), lc.cwd))
 		}
 	case "run", "validate":
-		if len(args) == 0 {
-			return nil, fmt.Errorf("%s needs a scenario file or folder: pass one, or set run.scenarios in %s", cmd.Name(), displayPath(lc.cfg.Path(), lc.cwd))
+		if f := cmd.Flags().Lookup("spec"); len(args) == 0 && cmd.Name() == "validate" && f != nil && f.Changed {
+			// validate --spec needs no scenario
+		} else if len(args) == 0 {
+			hint := ""
+			if cmd.Name() == "validate" {
+				hint = " (or --spec <openapi-file>)"
+			}
+			return nil, fmt.Errorf("%s needs a scenario file or folder%s: pass one, or set run.scenarios in %s", cmd.Name(), hint, displayPath(lc.cfg.Path(), lc.cwd))
 		}
 	}
 	if len(lc.used) > 0 {

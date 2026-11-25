@@ -747,3 +747,23 @@ func TestConformanceService_ABaselineFromAnOlderVersionStillWorks(t *testing.T) 
 		t.Fatalf("a 0.8.9 baseline is accepted and flagged: %+v %s", out.Baseline, out.Error)
 	}
 }
+
+func TestConformanceService_InspectReportsProblemsInTheSpecItself(t *testing.T) {
+	svc := newTestConformanceService(t)
+	ws := testWorkspaceDir(t)
+	broken := filepath.Join(ws, "broken.yaml")
+	spec := "openapi: \"3.0.3\"\ninfo: {title: b, version: \"1\"}\npaths:\n  /a:\n    get:\n      responses:\n        \"200\":\n          description: ok\n          content:\n            application/json:\n              schema: {type: object, required: [id, email], properties: {id: {type: integer}}}\n"
+	if err := os.WriteFile(broken, []byte(spec), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info := svc.InspectConformSpec(broken)
+	if info.Error != "" || len(info.Lint) != 2 {
+		t.Fatalf("a missing operationId and an undeclared required property: %+v", info)
+	}
+	if info.Lint[0].Check != "CS-SPEC-001" || info.Lint[1].Check != "CS-SPEC-002" || info.Lint[1].Severity != "error" || info.Lint[1].Fix == "" {
+		t.Errorf("%+v", info.Lint)
+	}
+	if clean := svc.InspectConformSpec(conformanceSpecFile(t)); len(clean.Lint) != 0 || clean.Lint == nil {
+		t.Errorf("the Conformance Server's spec is clean, and the list is never null: %+v", clean.Lint)
+	}
+}

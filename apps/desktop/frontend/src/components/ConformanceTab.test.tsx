@@ -775,3 +775,33 @@ describe('baselines', () => {
     expect(screen.getByRole('button', { name: 'Record as baseline' })).toBeDisabled()
   })
 })
+
+describe('spec health', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.runConformance.mockResolvedValue(output)
+  })
+
+  it('shows what is wrong with the spec itself, errors first, before any run', async () => {
+    bridge.inspectConformSpec.mockResolvedValue({
+      ...info,
+      lint: [
+        { check: 'CS-SPEC-002', severity: 'error', where: 'components.schemas.User', what: 'components.schemas.User lists "email" as required, but declares no property of that name.', why: 'A response can never satisfy it.', fix: 'Declare the property email, or remove it from required.' },
+        { check: 'CS-SPEC-001', severity: 'warning', where: 'GET /things', what: 'GET /things has no operationId.', why: 'Reports name operations by operationId.', fix: 'Add a unique operationId.' },
+      ],
+    })
+    await chooseSpec()
+    const region = await screen.findByRole('region', { name: 'Spec health' })
+    expect(screen.getByTestId('spec-health')).toHaveTextContent('The spec itself has 2 problems (1 to fix first)')
+    expect(region).toHaveTextContent('CS-SPEC-002')
+    expect(region).toHaveTextContent('declares no property of that name')
+    expect(region).toHaveTextContent('Fix: Declare the property email')
+  })
+
+  it('shows nothing for a healthy spec or an older answer without lint', async () => {
+    bridge.inspectConformSpec.mockResolvedValue({ ...info, lint: [] })
+    await chooseSpec()
+    expect(screen.queryByRole('region', { name: 'Spec health' })).not.toBeInTheDocument()
+  })
+})

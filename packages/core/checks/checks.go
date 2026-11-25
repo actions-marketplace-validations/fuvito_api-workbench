@@ -29,6 +29,7 @@ const (
 	AreaRun        = "run"
 	AreaProbe      = "probe"
 	AreaNotChecked = "not-checked"
+	AreaSpec       = "spec"
 )
 
 // Check is one thing Clear Signal can report.
@@ -68,6 +69,10 @@ var all = []Check{
 	{"CS-PROBE-003", "Missing required query parameter or header accepted", Failure, AreaProbe},
 	{"CS-PROBE-004", "Missing credentials accepted", Failure, AreaProbe},
 	{"CS-PROBE-006", "A probe got no answer", Failure, AreaProbe},
+
+	{"CS-SPEC-001", "Operation without an operationId", Warning, AreaSpec},
+	{"CS-SPEC-002", "Required property that is not declared", Failure, AreaSpec},
+	{"CS-SPEC-003", "Example that breaks its own format", Warning, AreaSpec},
 
 	{"CS-NC-001", "Path not in the spec", Note, AreaNotChecked},
 	{"CS-NC-002", "No response content declared", Note, AreaNotChecked},

@@ -213,6 +213,19 @@ type ConformSpecInfoIO struct {
 	Reads     int    `json:"reads"`
 	Writes    int    `json:"writes"`
 	Error     string `json:"error,omitempty"`
+	// Lint lists what is wrong with the spec document itself (the same findings as clrsig validate
+	// --spec): worth fixing before reading response violations, which blame the server.
+	Lint []SpecIssueIO `json:"lint"`
+}
+
+// SpecIssueIO is one finding about the spec document.
+type SpecIssueIO struct {
+	Check    string `json:"check"`
+	Severity string `json:"severity"`
+	Where    string `json:"where"`
+	What     string `json:"what"`
+	Why      string `json:"why"`
+	Fix      string `json:"fix"`
 }
 
 // InspectConformSpec reads a spec so the page can show its default base URL and how many
@@ -226,7 +239,10 @@ func (s *ConformanceService) InspectConformSpec(specPath string) ConformSpecInfo
 		return ConformSpecInfoIO{Error: err.Error()}
 	}
 	title, version := spec.Info()
-	info := ConformSpecInfoIO{Title: title, Version: version, ServerURL: spec.FirstServerURL()}
+	info := ConformSpecInfoIO{Title: title, Version: version, ServerURL: spec.FirstServerURL(), Lint: []SpecIssueIO{}}
+	for _, i := range spec.Lint() {
+		info.Lint = append(info.Lint, SpecIssueIO{Check: i.Check, Severity: i.Severity, Where: i.Where, What: i.What, Why: i.Why, Fix: i.Fix})
+	}
 	for _, op := range spec.AllOperations() {
 		if conformance.IsReadOnlyMethod(op.Method) {
 			info.Reads++

@@ -117,6 +117,16 @@ These tell you what has **not** been proven yet. They are signals, not failures:
 
 `diff` uses [oasdiff](https://github.com/oasdiff/oasdiff)'s rules and levels as they are (rule IDs such as `endpoint-added`); this file does not copy its list. `--fail-on breaking|warning|info` sets which level fails the run.
 
+### 2.5 The spec itself (`clrsig validate --spec`, Check Conformance)
+
+A response check blames the server for what the spec got wrong, so these are worth fixing first. The OpenAPI parser already refuses a spec with a duplicate `operationId` or an undeclared path parameter (the spec does not load), so only what it accepts is listed here.
+
+| ID | Title | What it means | Example | State | Severity today | Evidence |
+|---|---|---|---|---|---|---|
+| CS-SPEC-001 | Operation without an operationId | Reports, coverage and the `schema` assertion name operations by `operationId`; without one they fall back to the method and path. | `GET /things` with no `operationId`. | caught | warning | `TestLint_FindsWhatIsWrongWithTheDocument` |
+| CS-SPEC-002 | Required property that is not declared | A schema lists a name under `required` that is not among its declared `properties` (and the schema does not compose others or allow additional properties), so a response can never satisfy it, or it is never checked. Nested schemas, request bodies and responses are walked. | `required: [id, email]` with only `id` declared. | caught | failure | `TestLint_FindsWhatIsWrongWithTheDocument`, `TestLint_ASchemaThatComposesIsNotJudged` |
+| CS-SPEC-003 | Example that breaks its own format | An `example` that does not match an `email`, `uuid`, `ipv4` or `ipv6` format. The spec still loads, but none of its examples are checked. | `format: uuid` with `example: "123"`. | caught | warning | `TestLint_AnExampleThatBreaksItsFormatIsReported`, `TestFormats_ABadFormatExampleDoesNotRefuseTheSpec` |
+
 ## 3. Known gaps: what we do not catch
 
 | ID | Title | What is missed | Why | Evidence |

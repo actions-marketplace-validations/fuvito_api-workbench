@@ -154,6 +154,7 @@ func validateCmd() *cobra.Command {
 	var noRecursive bool
 	var strict bool
 	var envFile string
+	var specFile string
 
 	cmd := &cobra.Command{
 		Use:   "validate <scenario-file-or-folder> [more...]",
@@ -164,18 +165,24 @@ errors; 2: a file could not be read.
 With --strict, also report scenarios that are valid but weak, as warnings that fail the check:
   - a step that has no assertions and extracts nothing (it passes whenever the request is answered)
   - a value extracted by a step that no later step uses
-  - with --env, a {{name}} that nothing defines (not a scenario variable, not extracted earlier, not in the environment)`,
+  - with --env, a {{name}} that nothing defines (not a scenario variable, not extracted earlier, not in the environment)
+
+With --spec <openapi-file>, also check the spec itself, before conformance results are read against it: an operation
+without an operationId, a schema whose required lists a property it does not declare, an example that breaks its
+format. Errors fail the check; warnings are shown as notes and fail it only with --strict. The scenarios are optional
+when --spec is given.`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			args, err := applyProjectConfig(cmd, args)
 			if err != nil {
 				return err
 			}
-			if len(args) == 0 {
-				return fmt.Errorf("validate needs a scenario file or folder: pass one, or set run.scenarios in a clrsig.yaml")
+			if len(args) == 0 && specFile == "" {
+				return fmt.Errorf("validate needs a scenario file or folder (or --spec <openapi-file>): pass one, or set run.scenarios in a clrsig.yaml")
 			}
 			type result struct {
 				path     string
+				notes    []scenario.Issue
 				issues   []scenario.Issue
 				warnings []scenario.Issue
 				err      error
@@ -196,12 +203,28 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 				}
 			}
 
-			files, err := expandScenarioArgs(cmd, args, noRecursive)
-			if err != nil {
-				return err
+			var files []string
+			if len(args) > 0 {
+				var err error
+				if files, err = expandScenarioArgs(cmd, args, noRecursive); err != nil {
+					return err
+				}
 			}
 
-			results := make([]result, 0, len(files))
+			results := make([]result, 0, len(files)+1)
+			if specFile != "" {
+				errs, warns, serr := lintSpecFile(specFile)
+				r := result{path: specFile, err: serr}
+				if serr == nil {
+					r.issues = errs
+					if strict {
+						r.warnings = warns
+					} else {
+						r.notes = warns
+					}
+				}
+				results = append(results, r)
+			}
 			for _, path := range files {
 				data, err := os.ReadFile(path)
 				if err != nil {
@@ -254,6 +277,8 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 					Issues []jsonIssue `json:"issues"`
 					// Warnings are the findings of --strict; with --strict they make the file not valid.
 					Warnings []jsonIssue `json:"warnings,omitempty"`
+					// Notes are spec findings that do not fail the check without --strict.
+					Notes []jsonIssue `json:"notes,omitempty"`
 				}
 				out := make([]jsonResult, 0, len(results))
 				for _, r := range results {
@@ -266,6 +291,9 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 					}
 					for _, w := range r.warnings {
 						jr.Warnings = append(jr.Warnings, jsonIssue{Step: w.Step, Name: w.Name, Message: w.Message})
+					}
+					for _, n := range r.notes {
+						jr.Notes = append(jr.Notes, jsonIssue{Step: n.Step, Name: n.Name, Message: n.Message})
 					}
 					out = append(out, jr)
 				}
@@ -281,6 +309,9 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 					}
 					if len(r.issues) == 0 && len(r.warnings) == 0 {
 						fmt.Fprintf(&sb, "%s  OK\n", r.path)
+						for _, n := range r.notes {
+							fmt.Fprintf(&sb, "  note: %s\n", n)
+						}
 					} else {
 						fmt.Fprintf(&sb, "%s\n", r.path)
 						for _, iss := range r.issues {
@@ -288,6 +319,9 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 						}
 						for _, w := range r.warnings {
 							fmt.Fprintf(&sb, "  warning: %s\n", w)
+						}
+						for _, n := range r.notes {
+							fmt.Fprintf(&sb, "  note: %s\n", n)
 						}
 						sb.WriteByte('\n')
 					}
@@ -324,6 +358,7 @@ With --strict, also report scenarios that are valid but weak, as warnings that f
 	}
 
 	cmd.Flags().BoolVar(&noRecursive, "no-recursive", false, "Only look at the top level of each folder, not its sub-folders")
+	cmd.Flags().StringVar(&specFile, "spec", "", "Also check this OpenAPI spec itself (missing operationId, required properties that are not declared, examples that break their format); errors fail the check, warnings only with --strict")
 	cmd.Flags().BoolVar(&strict, "strict", false, "Also report valid but weak scenarios (steps that check nothing, extractions nobody uses, with --env names nothing defines) as warnings that fail the check")
 	cmd.Flags().StringVarP(&envFile, "env", "e", "", "With --strict: the environment the scenarios will run against, so names nothing defines can be found")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")

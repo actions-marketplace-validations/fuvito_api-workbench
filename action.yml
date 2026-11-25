@@ -19,7 +19,7 @@ inputs:
 
   # --- conform ---
   spec:
-    description: 'Path or URL to OpenAPI spec (conform)'
+    description: 'Path or URL to OpenAPI spec (conform; with validate, a spec to check itself)'
     required: false
 
   # --- diff ---
@@ -277,6 +277,7 @@ runs:
             ;;
           validate)
             [ -n "$IN_SCENARIO" ] && ARGS+=( "$IN_SCENARIO" )
+            [ -n "$IN_SPEC" ] && ARGS+=( --spec "$IN_SPEC" )
             [ "$IN_STRICT" = "true" ] && ARGS+=( --strict )
             [ "$IN_STRICT" = "true" ] && [ -n "$IN_ENV" ] && ARGS+=( -e "$IN_ENV" )
             [ -n "$IN_FORMAT" ] && ARGS+=( -f "$IN_FORMAT" )

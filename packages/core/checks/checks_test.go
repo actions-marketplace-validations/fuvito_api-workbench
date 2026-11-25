@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	reID     = regexp.MustCompile(`^CS-(RESP|REQ|RUN|PROBE|NC)-\d{3}$`)
+	reID     = regexp.MustCompile(`^CS-(RESP|REQ|RUN|PROBE|NC|SPEC)-\d{3}$`)
 	reDocRow = regexp.MustCompile(`(?m)^\| (CS-[A-Z]+-\d{3}) \|`)
 )
 

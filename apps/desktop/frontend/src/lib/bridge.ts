@@ -767,6 +767,17 @@ export interface ConformSpecInfo {
   reads: number
   writes: number
   error?: string
+  // problems in the spec document itself
+  lint?: SpecIssue[]
+}
+
+export interface SpecIssue {
+  check: string
+  severity: 'error' | 'warning'
+  where: string
+  what: string
+  why: string
+  fix: string
 }
 
 export interface ConformRunInput {

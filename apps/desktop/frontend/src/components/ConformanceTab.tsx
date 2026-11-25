@@ -8,7 +8,7 @@ import {
 import { isLocalUrl, parseVars, parsePathLimits, splitList, cliValues } from '@/lib/conformHelpers'
 import { FindingView } from '@/components/FindingView'
 import type { ConformSummary } from '@/components/ConformanceSidebarPanel'
-import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat, RecordedBaseline, ConformBaseline, ConformViolation } from '@/lib/bridge'
+import type { ConformProgress, ConformContext, ConformSpecInfo, ConformRunOutput, ConformOperation, ConformReportFormat, RecordedBaseline, ConformBaseline, ConformViolation, SpecIssue } from '@/lib/bridge'
 
 const inputClass =
   'w-full rounded border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1 text-xs text-[var(--color-foreground)] outline-none focus:border-[var(--color-accent)]'
@@ -118,6 +118,26 @@ function ExportMenu({ disabled }: { disabled: boolean }) {
         </div>
       )}
     </div>
+  )
+}
+
+function SpecHealth({ issues }: { issues: SpecIssue[] }) {
+  if (issues.length === 0) return null
+  const errors = issues.filter(i => i.severity === 'error').length
+  return (
+    <details open={errors > 0} role="region" aria-label="Spec health" className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs">
+      <summary data-testid="spec-health" className="cursor-pointer font-medium text-amber-400">
+        The spec itself has {issues.length} problem{issues.length === 1 ? '' : 's'}{errors > 0 ? ` (${errors} to fix first)` : ''}: response violations blame the server for what the spec got wrong
+      </summary>
+      <ul className="mt-2 flex flex-col gap-2">
+        {issues.map((i, k) => (
+          <li key={k}>
+            <p><span className={i.severity === 'error' ? 'text-red-400' : 'text-amber-400'}>{i.severity}</span> <span className="font-mono text-[var(--color-muted-foreground)]">{i.check}</span> {i.what}</p>
+            <p className="text-[var(--color-muted-foreground)]">Why: {i.why} Fix: {i.fix}</p>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 
@@ -379,6 +399,8 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
             </p>
           </div>
         </div>
+
+        {info && !info.error && <SpecHealth issues={info.lint ?? []} />}
 
         {remote && (
           <label className="flex items-start gap-2 rounded border border-amber-500/40 bg-amber-500/10 p-3 text-xs cursor-pointer">
