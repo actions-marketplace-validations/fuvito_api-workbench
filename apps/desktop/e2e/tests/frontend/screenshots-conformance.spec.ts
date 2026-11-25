@@ -41,6 +41,8 @@ const RESULT = {
       "findings": [
         {
           "kind": "missing-field",
+          "checkId": "CS-RESP-005",
+          "severity": "failure",
           "part": "response body",
           "where": "[0].name",
           "spec": "GET /categories → response 200 → body schema",
@@ -76,6 +78,8 @@ const RESULT = {
       "findings": [
         {
           "kind": "missing-header",
+          "checkId": "CS-RESP-003",
+          "severity": "failure",
           "part": "response header",
           "where": "X-Total-Count",
           "spec": "GET /inventory → response 200 → headers → X-Total-Count",
@@ -101,6 +105,8 @@ const RESULT = {
       "findings": [
         {
           "kind": "wrong-type",
+          "checkId": "CS-RESP-006",
+          "severity": "failure",
           "part": "response body",
           "where": "[0].id",
           "spec": "GET /orders → response 200 → body schema",
@@ -146,6 +152,8 @@ const RESULT = {
       "findings": [
         {
           "kind": "wrong-type",
+          "checkId": "CS-RESP-006",
+          "severity": "failure",
           "part": "response body",
           "where": "price",
           "spec": "GET /products/{id} → response 200 → body schema",
@@ -181,6 +189,8 @@ const RESULT = {
       "findings": [
         {
           "kind": "undeclared-status",
+          "checkId": "CS-RESP-001",
+          "severity": "failure",
           "part": "response status",
           "where": "503",
           "spec": "GET /status → responses",
@@ -206,6 +216,8 @@ const RESULT = {
       "findings": [
         {
           "kind": "wrong-content-type",
+          "checkId": "CS-RESP-002",
+          "severity": "failure",
           "part": "response header",
           "where": "Content-Type",
           "spec": "GET /widgets → response 200 → content",
@@ -227,7 +239,22 @@ const RESULT = {
   "probes": [],
   "missingValues": [],
   "blockedOperations": 0,
-  "warnings": []
+  "warnings": [],
+  "failed": true,
+  "baseline": {
+    "path": "/workspace/baselines/conformance.yaml",
+    "legacy": false,
+    "known": [
+      { "operation": "GET /categories", "check": "CS-RESP-005", "where": "[0].name", "summary": "\"name\" is missing from the response" },
+      { "operation": "GET /orders", "check": "CS-RESP-006", "where": "[0].id", "summary": "\"[0].id\" is text, the spec says integer" }
+    ],
+    "new": [
+      { "operation": "GET /inventory", "check": "CS-RESP-003", "where": "X-Total-Count", "summary": "The required header \"X-Total-Count\" was not sent" }
+    ],
+    "fixed": [
+      { "operation": "GET /widgets/{{id}}", "check": "CS-RESP-006", "where": "price", "summary": "\"price\" is text, the spec says number" }
+    ]
+  }
 }
 
 async function openConformance(page: Page, theme: 'dark' | 'light') {
@@ -242,8 +269,9 @@ async function openConformance(page: Page, theme: 'dark' | 'light') {
         workspace: '/workspace',
         specs: [{ path: '/workspace/specs/conformance-openapi.yaml', label: 'specs/conformance-openapi.yaml' }],
         environments: [{ path: '/workspace/environments/local.yaml', label: 'environments/local.yaml' }],
+        baselines: [{ path: '/workspace/baselines/conformance.yaml', label: 'baselines/conformance.yaml' }],
       })
-      svc['InspectConformSpec'] = () => Promise.resolve({ title: 'Clear Signal Conformance Server', version: '1.0.0', serverUrl: 'http://localhost:8120', reads: 8, writes: 2 })
+      svc['InspectConformSpec'] = () => Promise.resolve({ title: 'Clear Signal Conformance Server', version: '1.0.0', serverUrl: 'http://localhost:8120', reads: 8, writes: 2, lint: [{ check: 'CS-SPEC-001', severity: 'warning', where: 'GET /health', what: 'The operation has no operationId', why: 'Tools and reports name an operation by its operationId; without one they fall back to the method and path.', fix: 'Add a unique operationId to the operation.' }] })
       svc['RunConformance'] = () => Promise.resolve(result)
     },
     { theme, result: RESULT },
@@ -252,6 +280,8 @@ async function openConformance(page: Page, theme: 'dark' | 'light') {
   await page.getByRole('button', { name: 'Check Conformance' }).click()
   await page.getByLabel(/^Spec/).selectOption('/workspace/specs/conformance-openapi.yaml')
   await page.getByLabel(/^Environment/).selectOption('/workspace/environments/local.yaml')
+  await page.locator('summary', { hasText: 'Options' }).click()
+  await page.locator('#conf-baseline').selectOption('/workspace/baselines/conformance.yaml')
   await page.getByLabel(/Also send write requests/).check()
   await page.getByRole('button', { name: 'Run conformance check' }).click()
   const results = page.getByRole('region', { name: 'Conformance results' })
