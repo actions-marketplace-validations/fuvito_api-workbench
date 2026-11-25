@@ -900,3 +900,12 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Sandbox:** run against its local server, all six suites passed with v0.11.1; this build failed one pattern, updated to accept both wordings (it passes with both). Its nightly job builds clrsig from `main`, so push the sandbox first.
 - **Desktop page (B-122):** the service sends `specPath` with each operation and names the progress line and baseline list by the spec path; the page shows it in rows, problem cards and copied issues. `conformance_paths_test.go` (service) and a `ConformanceTab` test; both failed before the change.
 - **Not done:** not released; the version is still 0.11.1.
+
+### 2026-11-25 — v0.12.0 released
+
+- **Contains** batches B and C of `docs/reports/check-2026-11-25-improvement-ideas.md` and B-122. The sandbox's one changed expectation was pushed first (`a0918ad`); its CI passed with the released clrsig, and a manual run passed with clrsig built from `main` (`1362f72`).
+- **Tag `v0.12.0` on `3c3ba8f`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. The downloaded Windows CLI reports `v0.12.0`, its `init github-actions` pins `@v0.12.0`, and against the example server it counts an unsent operation as `not sent`, names JUnit cases by the spec path and writes `path` and `specPath` in JSON. The draft notes file was deleted after publishing.
+- **Before tagging:** gofmt, vet and tests of all four Go modules, CLI build, `tsc`, Vitest (1,681) and the browser tests (173). The screenshot suite was not run.
+- **Not verified:** the Scoop upgrade on the maintainer's machine (the command was not permitted in this session; the manifest and its hash were checked), the Docker image run, the Homebrew install (no Mac), a workflow using the Action by its remote reference `@v0.12.0`, and the desktop app by eye.
+- **Backlog:** B-123 added (a detailed, CLI-first user guide; owner request).
+- **Open:** batches D and E; the sandbox still pins v0.11.0 and accepts both wordings of the changed line.
