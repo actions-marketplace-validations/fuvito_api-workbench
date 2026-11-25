@@ -18,7 +18,9 @@ The `clrsig` CLI works independently of the desktop app.
 
 ```bash
 brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
-brew install clrsig
+# the full name matters: Homebrew refuses a formula from a tap you have not trusted, and
+# installing by full name trusts this one formula only
+brew install fuvito/api-workbench/clrsig
 ```
 
 ### Scoop (Windows)

@@ -65,13 +65,13 @@ After the `update-tap` CI job runs (automatically after a tag push), confirm:
 
 ```bash
 brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
-brew install clrsig
+brew install fuvito/api-workbench/clrsig
 clrsig --version
 ```
 
 If the formula SHA256s are wrong (tap job ran before binaries were fully uploaded), re-run the `update-tap` job manually from the Actions tab.
 
-- [ ] `brew install clrsig` works from the tap
+- [ ] `brew install fuvito/api-workbench/clrsig` works from the tap
 
 ---
 

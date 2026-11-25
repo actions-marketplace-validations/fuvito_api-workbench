@@ -973,3 +973,9 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Not verified:** neither new workflow has run on a GitHub runner; whether `wails generate module` works on the Linux runner, and whether the corrected Homebrew commands install, are unknown until then.
 
 - **First CI run (`1d8d763`) failed, fixed:** `wails generate module` works on the Linux runner, but writes the 31 binding files as executable (mode 100755), which `git diff` reports. The log held only mode changes, no content change and no new file. The comparison now runs with `core.fileMode=false`; content and untracked files are still checked. Windows ignores modes, which is why the local runs passed.
+
+### 2026-11-25 — First smoke run: Docker and the Action pass, Homebrew needs the full formula name
+
+- **Run 45706460240, by hand against v0.13.1:** the Docker image (anonymous pull, version, `validate --spec` on a mounted folder) and the Action from the tag on Linux, macOS and Windows **passed**. Homebrew **failed**: the corrected tap cloned, then `brew install clrsig` was refused, "Refusing to load formula ... from untrusted tap". The earlier tap-address fix was therefore not enough.
+- **Fix:** the documents and the smoke job install `fuvito/api-workbench/clrsig`; by Homebrew's documentation the full name trusts that one formula, which is narrower than trusting the tap. `TestBrewTapGivesTheRepositoryAddress` now also rejects the short name. Whether it installs is confirmed only by the next smoke run.
+- **Also:** the detailed user guide proposal (B-123) was accepted.

@@ -42,6 +42,7 @@ func TestBrewTapGivesTheRepositoryAddress(t *testing.T) {
 	}
 	currentDocs(t, check)
 	check(".github/workflows/smoke.yml", repoFile(t, ".github", "workflows", "smoke.yml"))
+	checkBrewInstallNames(t)
 	if found < 3 {
 		t.Fatalf("only %d brew tap lines were found, so little was checked", found)
 	}
@@ -158,5 +159,30 @@ func TestCIChecksTheBindings(t *testing.T) {
 		if !strings.Contains(ci, want) {
 			t.Errorf("ci.yml does not run %q", want)
 		}
+	}
+}
+
+var reBrewShortName = regexp.MustCompile(`brew (?:install|upgrade|reinstall) clrsig\b`)
+
+// Homebrew 6 refuses to load a formula from a tap that has not been trusted. Installing by the full
+// name, fuvito/api-workbench/clrsig, trusts that one formula; the short name fails (seen on the
+// macOS runner when the smoke checks first ran).
+func checkBrewInstallNames(t *testing.T) {
+	t.Helper()
+	full := 0
+	check := func(rel, text string) {
+		for i, line := range strings.Split(text, "\n") {
+			if m := reBrewShortName.FindString(line); m != "" {
+				t.Errorf("%s:%d says %q; use the full name fuvito/api-workbench/clrsig", rel, i+1, m)
+			}
+			if strings.Contains(line, "brew install fuvito/api-workbench/clrsig") {
+				full++
+			}
+		}
+	}
+	currentDocs(t, check)
+	check(".github/workflows/smoke.yml", repoFile(t, ".github", "workflows", "smoke.yml"))
+	if full < 3 {
+		t.Errorf("only %d lines install by the full name, so little was checked", full)
 	}
 }

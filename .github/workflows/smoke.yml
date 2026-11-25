@@ -87,7 +87,7 @@ jobs:
       - name: Install from the tap
         run: |
           brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
-          brew install clrsig
+          brew install fuvito/api-workbench/clrsig
 
       - name: The installed version is the release
         run: |

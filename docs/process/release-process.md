@@ -7,7 +7,7 @@ Clear Signal ships from five places simultaneously. This doc covers what to do b
 |---|---|---|
 | GitHub Releases | Desktop app (Win/macOS/Linux) + CLI binaries + `.sha256` sidecars | ✓ CI |
 | GHCR Docker | `ghcr.io/fuvito/api-workbench` CLI image | ✓ CI |
-| Homebrew tap | `brew install clrsig` | ✓ CI (post-publish) |
+| Homebrew tap | `brew install fuvito/api-workbench/clrsig` | ✓ CI (post-publish) |
 | Scoop bucket | `scoop install clrsig` | ✓ CI (post-publish) |
 | GitHub Actions Marketplace | `uses: fuvito/api-workbench@<release tag>` | ✓ auto after initial listing |
 
@@ -107,7 +107,7 @@ This triggers `release.yml`, which runs these jobs in order:
 5. `docker` — builds and pushes to GHCR
 6. `publish` — downloads all artifacts, generates SHA256 sidecars, creates GitHub Release
 7. `update-tap` — runs `scripts/update-tap.py`, auto-commits updated `Formula/clrsig.rb` and `bucket/clrsig.json`
-8. `smoke` (`.github/workflows/smoke.yml`) — after publishing, checks as a user would: the Docker image reports the version and validates a mounted spec (no registry login); the Action from the tag installs and runs that release on Linux, macOS and Windows; `brew tap` + `brew install clrsig` gives that version on macOS. **It cannot stop a release** (it is already out): a red `smoke` job means fix forward. To run it again for the newest release: Actions → *Post-release smoke* → Run workflow, with the tag. Not covered by it: the remote reference `uses: fuvito/api-workbench@<tag>` (`uses:` takes no variable), the Scoop install, and the desktop apps.
+8. `smoke` (`.github/workflows/smoke.yml`) — after publishing, checks as a user would: the Docker image reports the version and validates a mounted spec (no registry login); the Action from the tag installs and runs that release on Linux, macOS and Windows; `brew tap` + `brew install fuvito/api-workbench/clrsig` gives that version on macOS. **It cannot stop a release** (it is already out): a red `smoke` job means fix forward. To run it again for the newest release: Actions → *Post-release smoke* → Run workflow, with the tag. Not covered by it: the remote reference `uses: fuvito/api-workbench@<tag>` (`uses:` takes no variable), the Scoop install, and the desktop apps.
 
 Watch the run at `github.com/fuvito/api-workbench/actions` (or `gh run watch <id>`). The release job installs the pinned Wails CLI (`wails@v2.17.1`, matching `go.mod`); raise the pin together with the app, never to `@latest`.
 
@@ -153,7 +153,7 @@ The `update-tap` job auto-commits updated SHA256s to `Formula/clrsig.rb`. Verify
 
 ```bash
 brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
-brew upgrade clrsig   # or install if first time
+brew upgrade fuvito/api-workbench/clrsig   # first time: brew install fuvito/api-workbench/clrsig
 clrsig --version
 ```
 
