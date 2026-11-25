@@ -837,6 +837,8 @@ export interface ConformOperation {
   operationId: string
   method: string
   path: string
+  // the path as the spec writes it, which the page shows (absent in older data)
+  specPath?: string
   // blocked: not sent because a {{placeholder}} had no value
   status: 'passed' | 'failed' | 'error' | 'blocked' | 'skipped'
   statusCode: number

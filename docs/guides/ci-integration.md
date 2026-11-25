@@ -309,7 +309,7 @@ variables:
 
 ### Values a request needs
 
-`conform` builds each request from the spec and fills `{{placeholders}}` (path parameters, `{{token}}` for secured operations, body fields) from the environment. A request that still has a placeholder nothing provides is **not sent**: it is reported as failed with `not sent: no value for {{id}}`, the run exits `1`, and one line lists every missing name once. Add those names to the environment file or pass them with `--var`. A variable that is defined but never used is ignored.
+`conform` builds each request from the spec and fills `{{placeholders}}` (path parameters, `{{token}}` for secured operations, body fields) from the environment. A request that still has a placeholder nothing provides is **not sent**: it is marked `FAIL` with `not sent: no value for {{id}}` (the counts line shows it as `not sent`, apart from `failed`), the run exits `1`, and one line lists every missing name once. Add those names to the environment file or pass them with `--var`. A variable that is defined but never used is ignored.
 
 ---
 

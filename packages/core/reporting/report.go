@@ -432,10 +432,7 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	serverDown := nobodyAnswered && len(kinds) == 1 && kinds[conformance.NetUnreachable]
 
 	for _, op := range result.Operations {
-		path := op.Path
-		if op.SpecPath != "" {
-			path = op.SpecPath
-		}
+		path := op.ReportPath()
 		if op.Skipped {
 			fmt.Fprintf(&b, "  SKIP  %-7s %s\n", op.Method, path)
 			continue
@@ -494,8 +491,7 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 	case result.WarningCount() > 0:
 		verdict = fmt.Sprintf("PASSED with %d warning%s", result.WarningCount(), plural(result.WarningCount()))
 	}
-	fmt.Fprintf(&b, "%s  %d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms\n",
-		verdict, total, passed, failed, skipped, result.Duration.Milliseconds())
+	fmt.Fprintf(&b, "%s  %s  %dms\n", verdict, conformTally(result), result.Duration.Milliseconds())
 	if passed+failed == 0 {
 		if total == 0 {
 			fmt.Fprintf(&b, "       The spec declares no operations, so there was nothing to check.\n")
@@ -516,14 +512,14 @@ func ConformTextExplained(result *conformance.ConformResult, coverage *conforman
 			fmt.Fprintln(&b)
 			fmt.Fprintln(&b, "Covered:")
 			for _, op := range coverage.CoveredOps {
-				fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
+				fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.ReportPath())
 			}
 		}
 		if len(coverage.NotCoveredOps) > 0 {
 			fmt.Fprintln(&b)
 			fmt.Fprintln(&b, "Not covered:")
 			for _, op := range coverage.NotCoveredOps {
-				fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.Path)
+				fmt.Fprintf(&b, "  %-7s %s\n", op.Method, op.ReportPath())
 			}
 		}
 	}
@@ -569,9 +565,12 @@ type JSONConformOp struct {
 	OperationID string `json:"operationId,omitempty"`
 	Method      string `json:"method"`
 	Path        string `json:"path"`
-	StatusCode  int    `json:"statusCode,omitempty"`
-	DurationMs  int64  `json:"durationMs,omitempty"`
-	Passed      bool   `json:"passed"`
+	// SpecPath is the path as the spec writes it (/users/{id}); Path is the path of the generated
+	// request (/users/{{id}}) and is unchanged.
+	SpecPath   string `json:"specPath"`
+	StatusCode int    `json:"statusCode,omitempty"`
+	DurationMs int64  `json:"durationMs,omitempty"`
+	Passed     bool   `json:"passed"`
 	// Warnings counts the findings of this operation that are only warnings.
 	Warnings int    `json:"warnings,omitempty"`
 	Skipped  bool   `json:"skipped,omitempty"`
@@ -621,6 +620,8 @@ type JSONCoverageOp struct {
 	OperationID string `json:"operationId,omitempty"`
 	Method      string `json:"method"`
 	Path        string `json:"path"`
+	// SpecPath is the path as the spec writes it; set in conformance reports.
+	SpecPath string `json:"specPath,omitempty"`
 }
 
 // ConformJSON returns a machine-readable JSON conformance report.
@@ -648,6 +649,7 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			OperationID: op.OperationID,
 			Method:      op.Method,
 			Path:        op.Path,
+			SpecPath:    op.ReportPath(),
 			StatusCode:  op.StatusCode,
 			DurationMs:  op.DurationMs,
 			Passed:      result.OpPassed(op),
@@ -689,10 +691,10 @@ func ConformJSON(result *conformance.ConformResult, coverage *conformance.Covera
 			NotCoveredOps: make([]JSONCoverageOp, 0, len(coverage.NotCoveredOps)),
 		}
 		for _, op := range coverage.CoveredOps {
-			jc.CoveredOps = append(jc.CoveredOps, JSONCoverageOp{OperationID: op.OperationID, Method: op.Method, Path: op.Path})
+			jc.CoveredOps = append(jc.CoveredOps, JSONCoverageOp{OperationID: op.OperationID, Method: op.Method, Path: op.Path, SpecPath: op.ReportPath()})
 		}
 		for _, op := range coverage.NotCoveredOps {
-			jc.NotCoveredOps = append(jc.NotCoveredOps, JSONCoverageOp{OperationID: op.OperationID, Method: op.Method, Path: op.Path})
+			jc.NotCoveredOps = append(jc.NotCoveredOps, JSONCoverageOp{OperationID: op.OperationID, Method: op.Method, Path: op.Path, SpecPath: op.ReportPath()})
 		}
 		report.Coverage = jc
 	}
@@ -714,7 +716,7 @@ func ConformJUnit(result *conformance.ConformResult, neg *conformance.NegativeRe
 	x := newRedactor(result.Secrets, false)
 	for _, op := range result.Operations {
 		tc := jUnitCase{
-			Name:      op.Method + " " + op.Path,
+			Name:      op.Method + " " + op.ReportPath(),
 			ClassName: result.SpecTitle,
 			Time:      secStr(op.DurationMs),
 		}
@@ -790,6 +792,29 @@ func ConformJUnit(result *conformance.ConformResult, neg *conformance.NegativeRe
 		return nil, err
 	}
 	return append([]byte(xml.Header), out...), nil
+}
+
+// conformCounts splits what Counts calls failed into operations that were sent and failed and
+// operations that were never sent for lack of a value. Both still fail the run.
+func conformCounts(result *conformance.ConformResult) (passed, failed, notSent, skipped int) {
+	passed, failed, skipped = result.Counts()
+	notSent, _ = result.BlockedSummary()
+	return passed, failed - notSent, notSent, skipped
+}
+
+// conformTally is the counts line of the text, HTML and Markdown reports. "not sent" appears only
+// when an operation was not sent, so the line of any other run reads as it always has.
+func conformTally(result *conformance.ConformResult) string {
+	passed, failed, notSent, skipped := conformCounts(result)
+	parts := []string{
+		fmt.Sprintf("%d operations", passed+failed+notSent+skipped),
+		fmt.Sprintf("%d passed", passed),
+		fmt.Sprintf("%d failed", failed),
+	}
+	if notSent > 0 {
+		parts = append(parts, fmt.Sprintf("%d not sent", notSent))
+	}
+	return strings.Join(append(parts, fmt.Sprintf("%d skipped", skipped)), "  ·  ")
 }
 
 // NegativeText returns a human-readable negative conformance report.

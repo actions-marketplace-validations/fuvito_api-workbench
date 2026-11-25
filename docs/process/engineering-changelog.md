@@ -890,3 +890,13 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Checked locally:** the CI sequence and all eleven scenarios with the built CLI; ten pass and `contract-violation` fails as it is written to.
 - **Example scenario keys (B-120, older than this change):** steps used `title:` (29) and `description:` (3), which a step does not have, so they ran unnamed and `clrsig validate` rejected 10 of 11 files. Renamed to `label:` and `notes:`; `TestExampleScenarioFilesAreValid` decodes each example strictly and validates it.
 - **Not done:** B-121 (whether the product should report unknown keys). No product code changed.
+
+### 2026-11-25 — One path in every conformance report, and "not sent" counted apart (batch C, B-112 and B-113; for 0.12.0)
+
+- **Paths:** `OperationResult.ReportPath()` is what text, Markdown, HTML, JUnit names, GitHub output and coverage lists show (`/users/{id}`); `conformance.SpecStyle` does the same for the baseline comparison's lines and the cumulative-coverage line. `Path` is unchanged: baselines, `--paths`, history and Contracts coverage use it. JSON keeps `path` and adds `specPath` on operations and conformance coverage entries.
+- **Counts line:** operations not sent for lack of a value are shown as `not sent`, apart from `failed`, only when above zero. `Counts()`, JUnit totals, JSON, verdict and exit codes are unchanged.
+- **Guards:** `reporting/conform_paths_test.go` (every format, JSON additivity, the counts line, baseline keys). A baseline written by the released v0.11.1 was read by this build: 2 known, 0 new.
+- **Behaviour change:** JUnit test names of operations with path parameters change once, so CI tools that keep history see new tests; scripts that parse the counts line of a run with unsent operations see a new part.
+- **Sandbox:** run against its local server, all six suites passed with v0.11.1; this build failed one pattern, updated to accept both wordings (it passes with both). Its nightly job builds clrsig from `main`, so push the sandbox first.
+- **Desktop page (B-122):** the service sends `specPath` with each operation and names the progress line and baseline list by the spec path; the page shows it in rows, problem cards and copied issues. `conformance_paths_test.go` (service) and a `ConformanceTab` test; both failed before the change.
+- **Not done:** not released; the version is still 0.11.1.

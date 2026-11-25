@@ -60,13 +60,13 @@ func (v Violation) LegacyKey() string { return v.Operation + "\x00" + v.Kind + "
 
 func (v Violation) String() string {
 	if v.Check == "" {
-		s := v.Operation + "  " + v.Kind
+		s := SpecStyle(v.Operation) + "  " + v.Kind
 		if v.Detail != "" {
 			s += "  " + v.Detail
 		}
 		return s
 	}
-	s := v.Operation + "  " + v.Check
+	s := SpecStyle(v.Operation) + "  " + v.Check
 	if v.Where != "" {
 		s += "  " + v.Where
 	}

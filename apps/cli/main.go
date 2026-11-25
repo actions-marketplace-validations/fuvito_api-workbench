@@ -799,7 +799,7 @@ func printCumulativeCoverage(cmd *cobra.Command, specHash string) {
 	fmt.Fprintf(cmd.OutOrStdout(), "\nCumulative coverage (%d runs):  %d/%d (%.1f%%)\n",
 		rep.RunCount, len(rep.EverCoveredOps), rep.TotalOperations, rep.Percent)
 	if len(rep.NeverCoveredOps) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Never covered: %s\n", strings.Join(rep.NeverCoveredOps, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "  Never covered: %s\n", conformance.SpecStyle(strings.Join(rep.NeverCoveredOps, ", ")))
 	}
 }
 

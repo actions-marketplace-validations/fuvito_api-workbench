@@ -353,7 +353,7 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 			or.Violations = append(or.Violations, openapi.ValidationError{
 				Kind: openapi.KindSlowResponse, Subject: strconv.Itoa(limit),
 				Expected: fmt.Sprintf("within %d ms", limit), Got: fmt.Sprintf("%d ms", resp.Duration.Milliseconds()),
-				Message: fmt.Sprintf("%s %s %d: the response was slower than the %d ms limit", or.Method, specPathOr(or), resp.StatusCode, limit),
+				Message: fmt.Sprintf("%s %s %d: the response was slower than the %d ms limit", or.Method, or.ReportPath(), resp.StatusCode, limit),
 			})
 		}
 
@@ -490,11 +490,23 @@ func invalidBodyValues(template, resolved *domain.Request, resolver *variables.R
 	return out
 }
 
-func specPathOr(or OperationResult) string {
+// ReportPath is the path to show to a person: the one the spec writes (/users/{id}), so that every
+// report names an operation the same way. Path (/users/{{id}}, as the request was generated) stays
+// the identity that baselines, filters and stored history use.
+func (or OperationResult) ReportPath() string {
 	if or.SpecPath != "" {
 		return or.SpecPath
 	}
 	return or.Path
+}
+
+var rePlaceholderSegment = regexp.MustCompile(`\{\{([^{}]+)\}\}`)
+
+// SpecStyle writes a stored operation name such as "GET /users/{{id}}" the way the spec does,
+// "GET /users/{id}", where only the name is left (a baseline entry, a history row). It is for
+// display only.
+func SpecStyle(operation string) string {
+	return rePlaceholderSegment.ReplaceAllString(operation, "{$1}")
 }
 
 func snippet(s string, max int) string {

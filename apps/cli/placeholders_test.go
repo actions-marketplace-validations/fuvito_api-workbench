@@ -54,7 +54,7 @@ func TestConformDoesNotSendWhenAValueIsMissing(t *testing.T) {
 	}
 	for _, want := range []string{
 		"FAIL  GET     /items/{id}", "✗ not sent: no value for {{id}}",
-		"1 operation was not sent because nothing provides: id.", "1 passed  ·  1 failed",
+		"1 operation was not sent because nothing provides: id.", "FAILED  2 operations  ·  1 passed  ·  0 failed  ·  1 not sent",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in:\n%s", want, out)

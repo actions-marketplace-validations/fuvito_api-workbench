@@ -42,10 +42,7 @@ func ConformGitHub(result *conformance.ConformResult, neg *conformance.NegativeR
 		if op.Skipped {
 			continue
 		}
-		specPath := op.SpecPath
-		if specPath == "" {
-			specPath = op.Path
-		}
+		specPath := op.ReportPath()
 		file, line := "", 0
 		if loc != nil {
 			file, line = loc(op.Method, specPath)
@@ -85,8 +82,12 @@ func ConformGitHub(result *conformance.ConformResult, neg *conformance.NegativeR
 		}
 	}
 
-	passed, failed, skipped := result.Counts()
-	summary := fmt.Sprintf("%d operations: %d passed, %d failed, %d skipped.", passed+failed+skipped, passed, failed, skipped)
+	passed, failed, notSent, skipped := conformCounts(result)
+	unsent := ""
+	if notSent > 0 {
+		unsent = fmt.Sprintf(", %d not sent", notSent)
+	}
+	summary := fmt.Sprintf("%d operations: %d passed, %d failed%s, %d skipped.", passed+failed+notSent+skipped, passed, failed, unsent, skipped)
 	if line := result.Scope.Line(); line != "" {
 		summary += " " + line
 	}

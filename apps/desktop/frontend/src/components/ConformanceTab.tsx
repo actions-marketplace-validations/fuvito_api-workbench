@@ -46,19 +46,22 @@ function isWrite(method: string): boolean {
   return m !== 'GET' && m !== 'HEAD'
 }
 
+// An operation is named as the spec writes it, like in the reports the page exports.
+const shownPath = (op: ConformOperation) => op.specPath || op.path
+
 function ProblemCard({ op }: { op: ConformOperation }) {
   const findings = op.findings ?? []
   return (
-    <article aria-label={`${op.method} ${op.path} fails`} className="rounded border border-red-500/40 bg-red-500/5 p-3 flex flex-col gap-2">
+    <article aria-label={`${op.method} ${shownPath(op)} fails`} className="rounded border border-red-500/40 bg-red-500/5 p-3 flex flex-col gap-2">
       <header className="flex flex-wrap items-baseline gap-x-2 text-xs">
         <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
           {op.status === 'error' ? 'NO ANSWER' : op.status === 'blocked' ? 'NOT SENT' : 'FAILED'}
         </span>
         <span className="font-mono font-semibold">{op.method}</span>
-        <span className="font-mono">{op.path}</span>
+        <span className="font-mono">{shownPath(op)}</span>
         {op.statusCode > 0 && <span className="text-[var(--color-muted-foreground)]">answered {op.statusCode} in {op.durationMs} ms</span>}
       </header>
-      {findings.map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${op.path}`} />)}
+      {findings.map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${shownPath(op)}`} />)}
       {findings.length === 0 && (
         <ul className="list-disc pl-5 font-mono text-[11px] text-red-400">
           {op.error && <li className="break-all">{op.error}</li>}
@@ -649,7 +652,7 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
 
                   {problems.length > 0 && (
                     <div role="region" aria-label="Problems" className="flex flex-col gap-2.5">
-                      {problems.map(op => <ProblemCard key={`${op.method} ${op.path}`} op={op} />)}
+                      {problems.map(op => <ProblemCard key={`${op.method} ${shownPath(op)}`} op={op} />)}
                     </div>
                   )}
 
@@ -658,16 +661,16 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                       <summary className="cursor-pointer text-xs font-semibold text-emerald-400">Passing ({passed.length})</summary>
                       <ul className="mt-2 text-xs">
                         {passed.map(op => (
-                          <li key={`${op.method} ${op.path}`} className="flex flex-wrap gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
+                          <li key={`${op.method} ${shownPath(op)}`} className="flex flex-wrap gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
                             <span className="font-mono font-semibold w-14 shrink-0">{op.method}</span>
-                            <span className="font-mono flex-1 min-w-0 break-all">{op.path}</span>
+                            <span className="font-mono flex-1 min-w-0 break-all">{shownPath(op)}</span>
                             {(op.warnings ?? 0) > 0 && (
                               <span data-testid="op-warnings" className="shrink-0 text-amber-400">⚠ {op.warnings} {op.warnings === 1 ? 'warning' : 'warnings'}</span>
                             )}
                             <span className="font-mono text-[var(--color-muted-foreground)]">{op.statusCode} · {op.durationMs} ms</span>
                             {(op.warnings ?? 0) > 0 && (
                               <div className="basis-full mb-1 flex flex-col gap-1.5">
-                                {(op.findings ?? []).filter(f => f.severity === 'warning').map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${op.path}`} />)}
+                                {(op.findings ?? []).filter(f => f.severity === 'warning').map((f, i) => <FindingView key={i} f={f} context={`${op.method} ${shownPath(op)}`} />)}
                               </div>
                             )}
                           </li>
@@ -681,9 +684,9 @@ export function ConformanceTab({ onOpenCliBuilder, request, onSelectionChange, o
                       <summary className="cursor-pointer text-xs font-semibold text-[var(--color-muted-foreground)]">Not run ({notRun.length})</summary>
                       <ul className="mt-2 text-xs">
                         {notRun.map(op => (
-                          <li key={`${op.method} ${op.path}`} className="flex gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
+                          <li key={`${op.method} ${shownPath(op)}`} className="flex gap-2 border-b border-[var(--color-border)] py-1 last:border-0">
                             <span className="font-mono font-semibold w-14 shrink-0">{op.method}</span>
-                            <span className="font-mono flex-1 min-w-0 break-all">{op.path}</span>
+                            <span className="font-mono flex-1 min-w-0 break-all">{shownPath(op)}</span>
                             <span className="text-[var(--color-muted-foreground)]">
                               {isWrite(op.method) && !output.writes ? 'write request, not sent' : 'left out by the tag or path filter'}
                             </span>
