@@ -683,7 +683,7 @@ func handleDemoFeed(w http.ResponseWriter, r *http.Request) {
     <updated>%s</updated>
     <summary>Learn how to import OpenAPI specs, run requests, and build multi-step scenarios.</summary>
     <category term="tutorial" scheme="http://localhost/categories"/>
-    <content type="html">&lt;p&gt;Clear Signal is an &lt;strong&gt;open-source&lt;/strong&gt; API contract testing platform.&lt;/p&gt;</content>
+    <content type="html">&lt;p&gt;Clear Signal is an &lt;strong&gt;open-source&lt;/strong&gt; API Contract Validation platform.&lt;/p&gt;</content>
   </entry>
   <entry>
     <id>urn:uuid:entry-002</id>

@@ -111,7 +111,7 @@ This is a bigger lift — do it when macOS adoption friction becomes a reported 
 
 Highest-leverage untapped channel once the packaging above is done. Suggested sequence:
 
-1. **"Contract test your API in CI in 10 minutes"** — walks through `clrsig conform` from zero, ends with a GitHub Actions snippet. Targets "openapi contract testing ci" searches.
+1. **"Validate your API against its OpenAPI spec in CI in 10 minutes"** — walks through `clrsig conform` from zero, ends with a GitHub Actions snippet. Targets people searching for how to check an API against its OpenAPI spec in CI.
 2. **"Newman alternative: local-first API testing with Clear Signal"** — comparison-driven post for teams already using Postman/Newman. Targets "newman alternative" and "postman alternative open source" searches.
 
 Publish on dev.to, Hacker News (Show HN), and cross-post to any relevant subreddits.

@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.11.0
+**Version:** 0.11.1
 
 ---
 
@@ -13,7 +13,7 @@
 5. [Environments and variables](#5-environments-and-variables)
 6. [Sending requests and reading responses](#6-sending-requests-and-reading-responses)
 7. [Importing an OpenAPI specification](#7-importing-an-openapi-specification)
-8. [Scenarios and contract testing](#8-scenarios-and-contract-testing)
+8. [Scenarios and API Contract Validation](#8-scenarios-and-api-contract-validation)
 9. [Contracts — coverage tracking](#9-contracts--coverage-tracking)
 10. [CLI usage](#10-cli-usage)
 11. [CI/CD integration](#11-cicd-integration)
@@ -291,7 +291,7 @@ Unlike **Export Workspace** (a ZIP of the raw files, secrets included), a bundle
 
 ---
 
-## 8. Scenarios and contract testing
+## 8. Scenarios and API Contract Validation
 
 A **scenario** is a YAML or JSON file that runs a sequence of HTTP requests in order, extracts values from responses, passes them to later steps via `{{variable}}` interpolation, and asserts that each response matches the declared contract.
 
@@ -941,7 +941,7 @@ The CLI is the natural integration point for pipelines. Build it as part of your
 The quickest route needs no Go toolchain — use the published Action:
 
 ```yaml
-- uses: fuvito/api-workbench@v1
+- uses: fuvito/api-workbench@v0.11.1
   with:
     command: conform
     spec: openapi.yaml
@@ -953,7 +953,7 @@ The quickest route needs no Go toolchain — use the published Action:
 ### Building the CLI yourself
 
 ```yaml
-name: API Contract Tests
+name: Spec Conformance Testing
 
 on:
   push:
@@ -961,19 +961,19 @@ on:
   pull_request:
 
 jobs:
-  contract-tests:
+  api-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.26"
 
       - name: Build Clear Signal CLI
         run: go build -o clrsig ./apps/cli
 
-      - name: Run contract tests
+      - name: Run the scenarios
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
@@ -984,9 +984,9 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: contract-test-results
+          name: scenario-results
           path: results.json
 ```
 
@@ -1109,7 +1109,7 @@ auth:
 
 ### Scenario file
 
-See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
+See [Section 8](#8-scenarios-and-api-contract-validation) for the full scenario format.
 
 ---
 

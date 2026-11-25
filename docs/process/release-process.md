@@ -9,7 +9,7 @@ Clear Signal ships from five places simultaneously. This doc covers what to do b
 | GHCR Docker | `ghcr.io/fuvito/api-workbench` CLI image | ✓ CI |
 | Homebrew tap | `brew install clrsig` | ✓ CI (post-publish) |
 | Scoop bucket | `scoop install clrsig` | ✓ CI (post-publish) |
-| GitHub Actions Marketplace | `uses: fuvito/api-workbench@vN` | ✓ auto after initial listing |
+| GitHub Actions Marketplace | `uses: fuvito/api-workbench@<release tag>` | ✓ auto after initial listing |
 
 ---
 
@@ -31,6 +31,8 @@ Clear Signal ships from five places simultaneously. This doc covers what to do b
 apps/desktop/frontend/src/components/AboutDialog.tsx   ← version string + RELEASE_NOTES entry
 apps/desktop/wails/help/user-guide.md                  ← same
 ```
+
+Then update every `uses:` reference to this Action in the current documents to the new version (`TestDocumentedActionRefsNameThisVersion` fails until they agree). Until the tag is pushed those references name a tag that does not exist, so tag soon after the release commit passes CI.
 
 `RELEASE_NOTES` in `AboutDialog.tsx` is an array — prepend a new entry for this release; don't edit old ones.
 
@@ -174,7 +176,7 @@ After the initial listing (see `docs/process/manual-steps.md`), subsequent relea
 
 ```yaml
 # In any test workflow
-- uses: fuvito/api-workbench@v0.2.0
+- uses: fuvito/api-workbench@v0.11.1
   with:
     command: conform
     spec: openapi.yaml
@@ -186,7 +188,7 @@ After the initial listing (see `docs/process/manual-steps.md`), subsequent relea
 > git tag -f v1
 > git push origin v1 --force
 > ```
-> Until then, the recommended pin is the full version tag (e.g. `@v0.2.0`) or `@main`.
+> Until then, the recommended pin is the full version tag, which is what the documents show.
 
 - [ ] Action works with the new version tag
 

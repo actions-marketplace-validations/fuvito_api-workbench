@@ -4,6 +4,18 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.11.1',
+    date: '2026-11-25',
+    items: [
+      'GitHub Action, behaviour change for the subdirectory form: fuvito/api-workbench/clrsig-action was an old copy that ignored 18 inputs, read-only among them, so a workflow that asked to send only GET and HEAD still sent every request. It is now the same as the root Action; inputs it ignored take effect',
+      'GitHub Action: the downloaded clrsig is checked against the SHA-256 published with the release, and the step fails if the checksum is missing or different (it catches a damaged or replaced download; it is not a signature)',
+      'GitHub Action: the install script no longer needs bash 4, which the system bash on macOS does not have',
+      'Fix: the guides told you to use fuvito/api-workbench@v1, a tag that does not exist; they now name the exact release',
+      'clrsig init github-actions: the workflow asks only to read the repository (permissions: contents: read) and uses current versions of checkout and upload-artifact',
+      'What We Check now says that a negative probe passes on any 4xx answer, not only the codes it names (CS-GAP-012)',
+    ],
+  },
+  {
     version: '0.11.0',
     date: '2026-11-24',
     items: [

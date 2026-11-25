@@ -82,7 +82,7 @@ These never fail the run and never count as passing a check. Scenario results sh
 
 ### 2.2 Negative probes (`clrsig conform --negative`)
 
-Each probe sends a deliberately wrong request and **passes when the server answers any 4xx**. A probe fails when the server accepts the bad request.
+Each probe sends a deliberately wrong request and **passes when the server answers any 4xx**. A probe fails when the server accepts the bad request (or answers anything else outside 4xx). The codes named in the rows below are what a correct server is expected to send; they are **not enforced** (CS-GAP-012).
 
 | ID | Title | What is sent | State | Evidence |
 |---|---|---|---|---|
@@ -140,6 +140,7 @@ A response check blames the server for what the spec got wrong, so these are wor
 | CS-GAP-008 | Security beyond "no credentials" | Wrong, expired or under-privileged credentials are not probed; only their absence is (CS-PROBE-004). | Not implemented. | no check exists |
 | CS-GAP-009 | More negative probes | Wrong header or path-parameter types, boundary values, enum violations, unknown fields. | Not implemented; only four kinds are generated. | `TestGenerateNegativeProbes_ExpectedKinds` |
 | CS-GAP-010 | Callbacks, webhooks and links | Operations that are not under `paths` are not exercised. | Only `paths` are generated. | no check exists |
+| CS-GAP-012 | A probe rejected for another reason | A probe passes on **any** `4xx`. A `401`, `404` or `429` answer to a body with a missing or wrong field passes CS-PROBE-001 or CS-PROBE-002, although the server may never have validated the body (a login rejects the credentials first, a rate limit answers before anything is read). The same applies to a `404` where CS-PROBE-004 expects `401` or `403`. Read the status printed beside a passing probe. | Any `4xx` was chosen so that a correct server with its own choice of code is not failed; telling the reasons apart needs a new outcome. | `TestNegativeProbe_AnyClientErrorPasses_KnownGap` |
 | CS-GAP-011 | Only the first problem per response | A response with a header problem and a body problem reports the header problem first. | The validation library stops at the first problem. | `TestResponseChecks` |
 
 ## Adding to this list

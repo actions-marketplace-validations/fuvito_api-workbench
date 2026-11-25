@@ -266,6 +266,12 @@ func TestWorkflowIsValidAndOnlyUsesInputsTheActionHas(t *testing.T) {
 	if dev := scaffold.GitHubWorkflow(scaffold.WorkflowOptions{Version: "dev"}); !strings.Contains(dev, "@main") || !strings.Contains(dev, "pin a release tag") {
 		t.Errorf("a build that is not a release says so:\n%s", dev)
 	}
+	var parsed struct {
+		Permissions map[string]string `yaml:"permissions"`
+	}
+	if err := yaml.Unmarshal([]byte(rel), &parsed); err != nil || len(parsed.Permissions) != 1 || parsed.Permissions["contents"] != "read" {
+		t.Errorf("the workflow asks only to read the repository: %v %v\n%s", parsed.Permissions, err, rel)
+	}
 	if strings.Contains(scaffold.GitHubWorkflow(scaffold.WorkflowOptions{}), "read-only") {
 		t.Error("read-only is only written when the project asks for it")
 	}

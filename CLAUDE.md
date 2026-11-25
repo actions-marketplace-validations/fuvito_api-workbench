@@ -7,7 +7,7 @@ This file is Claude Code's operating contract for this repository. Read it fully
 ## 1. Project Identity
 
 **Name:** Clear Signal (working title: api-workbench)
-**Primary type:** Open-source, local-first **API contract testing platform**
+**Primary type:** Open-source, local-first **API Contract Validation platform**
 **Secondary:** Full API development and testing workbench (interactive client, collections, environments, scenarios)
 **Status:** Pre-implementation — engineering foundation phase (Phase 0)
 

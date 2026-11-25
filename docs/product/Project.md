@@ -12,7 +12,7 @@ Three important architectural decisions were made at the outset:
 2. **Dual-format project files:** Support YAML and JSON through one canonical internal data model.
 3. **OpenAPI in MVP:** Make OpenAPI import and schema validation part of the initial release, not a future enhancement.
 
-The CLI is retained as a first-class component even though desktop is the primary delivery method. Automated execution is one of the strongest differentiators for contract testing.
+The CLI is retained as a first-class component even though desktop is the primary delivery method. Automated execution is one of the strongest differentiators for Spec Conformance Testing.
 
 ---
 

@@ -228,7 +228,7 @@ docker run --rm -v "$PWD:/workspace" ghcr.io/fuvito/api-workbench:latest \
 ### GitHub Actions
 
 ```yaml
-- uses: fuvito/api-workbench@v1
+- uses: fuvito/api-workbench@v0.11.1
   with:
     command: conform
     spec: openapi.yaml

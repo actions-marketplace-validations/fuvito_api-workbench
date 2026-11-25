@@ -147,9 +147,14 @@ jobs:
           CI: 'true'
 
   action-selftest:
-    name: GitHub Action — self-test
-    runs-on: ubuntu-latest
+    name: GitHub Action — self-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: core
+    # macOS too: its system bash is old (3.2), and the Action's scripts are bash.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     # Runs action.yml from this commit with the LATEST RELEASED clrsig, so it must only use inputs that
     # the latest release already supports; the static check in apps/cli/action_test.go covers the rest.
     steps:

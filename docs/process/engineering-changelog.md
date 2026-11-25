@@ -859,3 +859,15 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **What:** the screenshot suite `screenshots-conformance.spec.ts` now feeds the page what the product reports since 0.9.0: a `checkId` and `severity` on each finding, a baseline (2 known, 1 new, 1 fixed) and a spec-health warning. `docs/images/15-conformance-results[-light].png` and `16-scenario-spec-conformance[-light].png` regenerated. The mocked data mirrors the shapes in `bridge.ts`; it is not a captured run.
 - **Why:** the images were from before 0.9.0 and showed none of the new fields; the website uses the same files.
 - **Not done:** the Workspace page (17) and the CLI builder shots were not regenerated; they were not changed by 0.9-0.11 except for lint cards on the Workspace page.
+
+### 2026-11-25 — 0.11.1 prepared, not tagged: the Action and the documented way to use it (batch A of the 2026-11-25 round)
+
+- **Stale second Action:** `clrsig-action/action.yml` was a copy from 2026-11-17 without 18 inputs, `read-only` among them. GitHub only warns about an undeclared input, so such a step sent every operation (read from the file; not reproduced on a runner). It is now identical to the root file; `TestSubdirectoryActionIsTheSameAsTheRootAction` keeps it so.
+- **Download verification:** the install step compares the binary with the release's `.sha256` and fails, removing the file, when it is missing or different. `TestActionVerifiesTheDownload` runs the real script with a fake `curl`. The script was also run on Windows against the published v0.11.0 assets with the Linux, macOS and Windows runner values: all three verified. It does not protect against a compromised release.
+- **macOS:** `${VAR,,}` (bash 4) replaced with `tr`; the Action self-test now runs on `ubuntu-latest` and `macos-latest`.
+- **Docs and `init github-actions`:** `@v1` (no such tag) replaced with exact release references; the generated workflow asks for `contents: read`; shown and generated workflows use our CI's checkout, upload-artifact and setup-go versions. Guards: `TestDocumentedActionRefsNameThisVersion` (against `AboutDialog.tsx`, not git tags, so it works in a shallow checkout; the references name an unpushed tag between the release commit and the tag) and `TestShownWorkflowsUseTheSameActionVersionsAsCI`.
+- **Catalog:** CS-GAP-012, a negative probe passes on any 4xx; the CS-PROBE section says so.
+- **Terminology:** bare "contract testing" removed (including `CLAUDE.md` section 1, agreed by the owner); `TestNoBareContractTestingTerm`. The user guide's section 8 heading and anchor changed.
+- **Backlog:** six finished or duplicate rows ticked, leftovers of ticked rows and the new ideas given IDs (B-096 to B-119).
+- **Behaviour change:** workflows using the subdirectory Action now have their ignored inputs honoured (on `@main` as soon as this is pushed); the Action fails without a matching checksum. No `clrsig` check, result or exit code changes.
+- **Not verified:** the Action on a GitHub runner (both legs run on the next push), the browser tests (not run locally).
