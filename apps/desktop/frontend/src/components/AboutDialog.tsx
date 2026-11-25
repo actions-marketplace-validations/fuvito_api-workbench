@@ -4,6 +4,17 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.11.0',
+    date: '2026-11-24',
+    items: [
+      'Check Conformance now has Baseline: choose a baseline file and the violations recorded in it are accepted, only new ones fail the run, and the result shows what is known, new and fixed; Record as baseline saves a run (it asks before replacing a file, and is not available while tags or paths limit the run)',
+      'Spec lint: clrsig validate --spec openapi.yaml checks the spec document itself (an operation without an operationId, a required property the schema does not declare, an example that breaks its format) and Check Conformance shows a Spec health region as soon as you choose a spec, because these are problems in the spec, not the server',
+      'clrsig run --format github annotates each failed step on its line in the scenario file (conform already did this for the operation in the spec); the GitHub Action accepts format: github for run and spec for validate',
+      'CONTRIBUTING.md, issue forms that ask for the check ID, a pull request template, and Report a problem in the About dialog',
+      'No existing result or exit code changes in this release',
+    ],
+  },
+  {
     version: '0.10.0',
     date: '2026-11-24',
     items: [

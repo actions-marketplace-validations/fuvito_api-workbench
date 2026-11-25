@@ -837,3 +837,7 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 
 - **Core:** `scenario.StepLines(data)` (the line of each step in a scenario file, yaml.v3 nodes) and `reporting.RunGitHub(runs)`: an error for each step that could not be sent, each failed assertion and each response that breaks the spec (the title carries the check ID of the spec problem), on the line of the step; a scenario that could not start is annotated on the file; text is redacted like the other reports; one closing notice with the counts.
 - **CLI:** `--format github` is now a screen format of `conform` and `run` (not a `--report` file; `diff` and `bundle run` do not offer it). **Not done:** annotations for `diff` and `bundle run`, and the HTML report anchor of B-092 (no value without scripts in a self-contained report).
+
+### 2026-11-24 — 0.11.0 prepared, not tagged
+
+- Version 0.11.0 in `AboutDialog.tsx` (dated 2026-11-24) and the user guide; draft GitHub notes in `docs/process/release-notes-0.11.0-draft.md`. Additive only: baselines and Spec health in Check Conformance, `validate --spec`, `run --format github`, the community files. No existing result or exit code changes.
