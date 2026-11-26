@@ -4,6 +4,15 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.5',
+    date: '2026-11-25',
+    items: [
+      'Security, please upgrade if you use clrsig mcp: the conform tool an AI agent calls sent every operation, DELETE included, and ignored a read-only project file. It is now read-only; writes need the new --allow-writes flag and allowWrites on the call, and a project with readOnly: true forbids them',
+      'This does not limit the run_scenario tool, which sends whatever a scenario says',
+      'The detailed command-line guide now has a page for every command',
+    ],
+  },
+  {
     version: '0.13.4',
     date: '2026-11-25',
     items: [

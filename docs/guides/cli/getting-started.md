@@ -24,7 +24,7 @@ Four things come up on every page:
 - **Without a package manager:** download the binary for your system from the [releases page](https://github.com/fuvito/api-workbench/releases/latest). The binaries are not signed: on macOS run `xattr -d com.apple.quarantine ./clrsig` once; on Windows, SmartScreen may ask you to confirm.
 - **Docker:** `docker run --rm -v "$PWD:/work" -w /work ghcr.io/fuvito/api-workbench:latest --version`.
 
-Check that it works. Use version 0.13.4 or later: earlier releases can write secrets from your API into reports, or pass a `schema` check that checked nothing.
+Check that it works. Use version 0.13.5 or later: earlier releases can write secrets from your API into reports, pass a `schema` check that checked nothing, or let an AI agent change data through `clrsig mcp`.
 
 <!-- run: exit=0 contains="clrsig version" -->
 ```bash

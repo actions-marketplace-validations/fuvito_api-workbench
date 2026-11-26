@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.13.4
+**Version:** 0.13.5
 
 ---
 
@@ -964,7 +964,7 @@ The CLI is the natural integration point for pipelines. Build it as part of your
 The quickest route needs no Go toolchain — use the published Action:
 
 ```yaml
-- uses: fuvito/api-workbench@v0.13.4
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: openapi.yaml
