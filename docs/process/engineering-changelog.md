@@ -1070,3 +1070,11 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Not covered:** `run_scenario` still sends whatever a scenario says (the tool description and the guide say so). No limit by server address.
 - **Not done:** not released.
 
+### 2026-11-25 — Released 0.13.5 (B-140; guide pages for every command)
+
+- Tagged `b862977` after all CI jobs passed on it; the sandbox had passed in Docker against `main` at `f19a3dc`. Between 0.13.4 and this release the only product code change is `apps/cli/mcp.go`.
+- On the way: CI first failed because `.gitignore`'s `coverage.*` had kept `docs/guides/cli/coverage.md` out of the commit; local tests passed because the file was on disk. Now excepted, and the release preparation also ran the Go tests on a clean copy of the staged tree. A following push was rejected (the demo GIF job had pushed first) and rebased.
+- All release jobs and all five post-release smoke jobs passed. The notes begin with the `mcp` problem, the new permissions, and that `run_scenario` is not limited.
+- Checked afterwards: the four checksum files match; Homebrew and Scoop carry the published hashes. With the downloaded Windows binary: read-only by default and with the flag alone; refused without the flag and with a read-only project; every operation sent only with both and no such project.
+- **Not done:** the sandbox still pins 0.13.4. B-141 to B-145 and B-137 to B-139 are open. The Learn examples stay labelled 0.13.4, the version they were checked with.
+
