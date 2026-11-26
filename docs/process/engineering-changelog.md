@@ -1049,3 +1049,10 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Guarded by** `assertions/schema_checked_test.go` and `apps/cli/generate_overwrite_test.go`; guide pages `run`, `generate`, the format guide and the user guide updated.
 - **Not done:** not released.
 
+### 2026-11-25 — Released 0.13.4 (B-126, B-132 to B-136; guide phase 2)
+
+- Tagged `bbeb899` after CI passed on it. Before that, the sandbox passed in Docker against `main` with both fixes (`5d39b28`); one of its expected results differs by version and is written down for both sides.
+- All release jobs and all five post-release smoke jobs passed. The notes begin with the `schema` assertion and warn that runs that passed may now fail; they correct the 0.13.3 claim about the `validation failed due to:` prefix.
+- Checked afterwards: the four checksum files match; Homebrew and Scoop carry the published hashes. With the downloaded Windows binary: a 500 without a required field and no `specFile` fails (0.13.3: `PASSED`), none of the tested unknown statuses passes a `schema` assertion, and `generate` leaves an edited file alone without `--force`.
+- **Not done:** the sandbox still pins 0.13.3. The website still offers 0.13.2.
+
