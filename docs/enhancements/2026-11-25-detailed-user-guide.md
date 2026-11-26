@@ -1,6 +1,6 @@
 # A detailed, CLI-first user guide
 
-- **Status:** Accepted (2026-11-25); phase 1 in progress
+- **Status:** Phases 0 to 3 done (2026-11-25); phase 4 (inside the app) not decided
 - **Date:** 2026-11-25
 - **Backlog:** B-123 (owner request, 2026-11-25)
 - **Release:** none needed for phases 0 to 3 (documents and tests only)

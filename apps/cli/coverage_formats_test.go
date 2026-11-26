@@ -57,7 +57,7 @@ func TestCoverageQuality_OutputFileIsWrittenWithFolders(t *testing.T) {
 	ws, spec := coverageWorkspace(t)
 	file := filepath.Join(t.TempDir(), "reports", "contracts.html")
 	out, err := execFull(t, "coverage", "quality", "-w", ws, "-f", "html", "-o", file, spec)
-	if exitCode(err) != 1 {
+	if err != nil { // gaps fail the command only with --fail-on-gaps
 		t.Fatalf("exit = %v", err)
 	}
 	if strings.Contains(out, "<!DOCTYPE") {

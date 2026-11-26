@@ -6,7 +6,7 @@
 
 `import` turns a **Postman** collection (v2.1) or an **Insomnia** export (v4) into request files, one per request. It is a start for moving your work over. It sends nothing.
 
-> **⚠ Test scripts are not converted, and nothing says so.** Postman `pm.test(...)` and other scripts are left out without a warning (backlog B-143). The imported files **check nothing** until you write assertions in [scenarios](run.md).
+> **⚠ Scripts are not converted.** Postman `pm.test(...)` and pre-request scripts are left out, and `import` warns for each request they applied to (a folder's or the collection's script applies to every request below it). The imported files **check nothing** until you write assertions in [scenarios](run.md).
 
 ## Synopsis
 
@@ -40,7 +40,11 @@ clrsig import postman docs/guides/cli/files/shop-postman.json --dry-run
 clrsig import postman docs/guides/cli/files/shop-postman.json --output imported
 ```
 
-The layout is `<output>/<collection>/<folders>/<request>.yaml`. In this collection, a bearer token setting is kept as `auth` with `{{token}}`; headers and raw bodies are kept. The **Create user** request had a test script: it is not in the file.
+The layout is `<output>/<collection>/<folders>/<request>.yaml`. In this collection, a bearer token setting is kept as `auth` with `{{token}}`; headers and raw bodies are kept. The **Create user** request had a test script: it is not in the file, and the command says so:
+
+```text
+warning: Create user: a Postman test script was not imported: add assertions, or this request checks nothing it checked in Postman
+```
 
 ## Reading the result
 
@@ -62,7 +66,7 @@ Nothing existing is overwritten: a taken name gets `-2`, `-3` and so on. **Runni
 
 ## Common mistakes and limits
 
-- Scripts (pre-request and test) are not run or converted (B-143).
+- Scripts (pre-request and test) are not run or converted. The **desktop app does not show these warnings** (backlog B-148); releases up to 0.13.5 gave none here either.
 - Secrets written **literally** in a collection are copied into the files. Replace them with `{{name}}` before you commit.
 
 ## Related commands and the desktop app

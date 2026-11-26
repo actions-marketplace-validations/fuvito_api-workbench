@@ -187,6 +187,10 @@ Exit codes:
 			if env, err = finishEnvironment(cmd, env, vars); err != nil {
 				return err
 			}
+			env, placeholders := bundle.DropPlaceholders(env)
+			for _, name := range placeholders {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: %q still holds the %s that bundle export wrote in place of a secret, so it has no value: give it with --var %s=... or --env-file\n", name, bundle.SecretPlaceholder, name)
+			}
 			engine, env, err := prepareDynamic(cmd, env, seed)
 			if err != nil {
 				return err

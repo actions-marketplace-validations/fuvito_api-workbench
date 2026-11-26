@@ -283,7 +283,7 @@ The result is ordinary request, scenario and environment files under `requests/`
 **File → Export → Bundle (environments + requests + scenarios)…** saves everything in the open workspace as one bundle file — handy for sharing a test suite, moving it to another workspace, or giving an AI assistant your existing tests as context.
 
 - Choose where to save it. A confirmation lists how many environments, requests and scenarios were written.
-- **Secret values are replaced with `CHANGE_ME`**, so the file is safe to share. The workspace is not changed, and the message tells you how many values were replaced.
+- **Values marked secret are replaced with `CHANGE_ME`.** A credential written directly in a request or scenario is not, so read the file before sharing it. The workspace is not changed, and the message tells you how many values were replaced. After importing such a bundle, put the real values in the environment files: until then, `CHANGE_ME` is what gets sent (`clrsig bundle run` alone refuses to send it).
 - Files that cannot be read (for example a request with a YAML error) are skipped and listed in the message.
 - Import the file in another workspace with **File → Import → Bundle…**; scenarios keep working with the requests they refer to.
 
@@ -575,6 +575,8 @@ The tab refreshes automatically whenever you switch to it and after any scenario
 ---
 
 ## 10. CLI usage
+
+This section is the short reference. For every command with examples, what you will see and what to do next, read the [detailed command-line guide](https://github.com/fuvito/api-workbench/blob/main/docs/guides/cli/README.md).
 
 The CLI uses the same Go execution engine as the desktop application. Build it once and use it in any terminal or CI pipeline — no behavioural differences between interactive testing and CI.
 
@@ -905,7 +907,7 @@ clrsig request requests/health-check.yaml --env environments/local.yaml [--timeo
 clrsig validate scenarios
 ```
 
-`generate` writes one request file per spec operation. It does not replace a file that exists with other content: nothing is written and it exits `2`; `--force` replaces such files (releases up to 0.13.3 replaced them without asking). The desktop **Import OpenAPI** button never replaces a file either; it gives the new one another name. `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything; like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
+`generate` writes one request file per spec operation. It does not replace a file that exists with other content: nothing is written and it exits `2`; `--force` replaces such files (releases up to 0.13.3 replaced them without asking). The desktop **Import OpenAPI** button never replaces a file either; it gives the new one another name. `request` executes one saved request file and prints the response; one with a `{{name}}` that nothing defines is not sent (exit `1`). `validate` checks scenario files for errors without sending anything (exit `1` for errors, `2` for a file that cannot be read); like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
 
 `validate --spec <openapi-file>` checks the spec document itself (scenarios are then optional): an operation without an `operationId` (CS-SPEC-001), a schema whose `required` lists a property it does not declare (CS-SPEC-002) and an example that breaks its format (CS-SPEC-003). Errors fail the check, warnings print as notes and fail it only with `--strict`. These are problems in the spec, not the server, so fix them before reading conformance violations; Check Conformance shows them as **Spec health** as soon as you choose a spec.
 
@@ -918,7 +920,7 @@ clrsig import postman collection.json --output requests/
 clrsig import insomnia export.json --output requests/ --dry-run
 ```
 
-Converts a Postman collection (v2.1) or an Insomnia export (v4) into request files, in the same layout the desktop app's **Import** menu uses: `<output>/<collection>/<folders>/<request>.yaml` (default output folder: `requests`). It never overwrites: a name that is taken gets `-2`, `-3` … `--dry-run` lists the files that would be written. `--format json` gives the list for scripts. Exit codes: `0` converted, `1` some requests could not be written, `2` the file is unreadable or not a supported export.
+Converts a Postman collection (v2.1) or an Insomnia export (v4) into request files, in the same layout the desktop app's **Import** menu uses: `<output>/<collection>/<folders>/<request>.yaml` (default output folder: `requests`). Scripts are not converted: `clrsig import` warns for each request that had a Postman test or pre-request script (the desktop import does not show warnings). It never overwrites: a name that is taken gets `-2`, `-3` … `--dry-run` lists the files that would be written. `--format json` gives the list for scripts. Exit codes: `0` converted, `1` some requests could not be written, `2` the file is unreadable or not a supported export.
 
 ### `clrsig coverage`
 
@@ -931,7 +933,7 @@ clrsig coverage quality openapi.yaml --workspace . -f html -o reports/contracts.
 clrsig coverage reset   openapi.yaml --workspace .
 ```
 
-`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking) and exits `1` when any gap is found. Both `list` and `quality` also write `--format csv|markdown|html` (with `--output`); these are the same reports the desktop Contracts **Export** menu produces, because both use the same code.
+`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking). Gaps are only reported (exit `0`); with `--fail-on-gaps` it exits `1` when there is a gap **or nothing was recorded** for the spec. A workspace folder that does not exist is an error (exit `2`) in every `coverage` command. Both `list` and `quality` also write `--format csv|markdown|html` (with `--output`); these are the same reports the desktop Contracts **Export** menu produces, because both use the same code.
 
 ### `clrsig mcp`
 
@@ -951,7 +953,7 @@ clrsig telemetry enable
 clrsig telemetry disable
 ```
 
-Anonymous usage counters are **off by default**. They never include request contents or personal data. The desktop app has the same switch in Settings.
+Usage telemetry is **off by default**. When on, `run`, `conform` and `bundle run` send the command name, result, duration and the number of steps and assertions, with a random identifier of the installation, the `clrsig` version, operating system, processor type and time. No request URLs, headers or bodies are sent; your IP address reaches the server, as with any request. The desktop app has the same switch in Settings; the app itself sends nothing.
 
 ---
 
@@ -1047,7 +1049,7 @@ Open via the gear icon at the bottom of the Activity Rail (the icon bar on the f
 | **TLS skip verify** | Disable certificate verification. Use only for local development with self-signed certificates. |
 | **Client certificate file**, **Client key file** | Mutual TLS: the PEM certificate and private key sent to servers that require a client certificate. Only the file *paths* are stored (a `${NAME}` reference is expanded when a request is sent); the key must not be password-protected. Both are needed together. |
 | **CA certificate file** | A PEM file of extra certificate authorities to trust (added to the system ones), for servers signed by a private CA. |
-| **Anonymous telemetry** | Opt-in usage counters (off by default). No request contents or personal data. Same switch as `clrsig telemetry enable`. |
+| **Usage telemetry** | Off by default. Same switch as `clrsig telemetry enable`; see [`clrsig telemetry`](#clrsig-telemetry) for what is sent. |
 
 Changes preview immediately. Click **Save** to persist; **Cancel** reverts to the last saved values.
 

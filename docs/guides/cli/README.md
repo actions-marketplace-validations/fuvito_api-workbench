@@ -4,7 +4,19 @@ For every `clrsig` command: what it is for, every option, examples with what you
 
 **New here?** Start with [your first check](getting-started.md).
 
-Every command has a page. Task-based pages, a table of exit codes and a troubleshooting page are still to come; the plan is in [the proposal](../../enhancements/2026-11-25-detailed-user-guide.md).
+**Stuck on a message?** See [troubleshooting](troubleshooting.md). **Writing a script?** See [exit codes, reports and shared options](reference.md).
+
+## By task
+
+| I want to… | Page |
+|---|---|
+| Check a running API against its spec | [Check an API](task-check-an-api.md) |
+| Start on an API that fails today | [Adopt it with a baseline](task-adopt-with-a-baseline.md) |
+| Test a sequence: log in, create, read, delete | [Test a workflow](task-test-a-workflow.md) |
+| Stop a spec change from breaking clients | [Catch breaking changes](task-catch-breaking-changes.md) |
+| Run the checks on every pull request | [Run it all in CI](task-ci.md) |
+| See what my tests have not reached | [Track coverage](task-track-coverage.md) |
+| Bring my requests from Postman or Insomnia | [Move from Postman or Insomnia](task-move-from-postman.md) |
 
 ## Command pages
 

@@ -110,8 +110,8 @@ clrsig validate --spec examples/server/openapi.yaml
 | Exit code | Meaning |
 |---|---|
 | 0 | No errors (and, with `--strict`, no warnings). |
-| 1 | A file has errors or warnings, **or could not be read** (the command's help says 2 for that; see below). |
-| 2 | The command was wrong. |
+| 1 | A file has errors or warnings, or is not valid YAML or JSON. |
+| 2 | A file could not be read (for example, it does not exist), or the command was wrong. |
 
 ## What to do next
 
@@ -125,9 +125,8 @@ clrsig validate --spec examples/server/openapi.yaml
 
 ## Common mistakes and limits
 
-- **An HTTP method that does not exist is not reported:** `method: GETT` is `OK` here and fails in `run` (CS-GAP-021).
 - A key that is misspelled or unknown is ignored without a word, here and in `run` (backlog B-121).
-- A file that cannot be read exits **1**, although `clrsig validate --help` says 2 (backlog B-139). In a script, treat any code but 0 as a failure.
+- Releases up to 0.13.5 reported `OK` for a method that does not exist, and exited 1 for a file they could not read.
 
 ## Related commands and the desktop app
 

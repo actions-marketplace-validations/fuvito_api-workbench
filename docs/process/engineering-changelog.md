@@ -1078,3 +1078,17 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - Checked afterwards: the four checksum files match; Homebrew and Scoop carry the published hashes. With the downloaded Windows binary: read-only by default and with the flag alone; refused without the flag and with a read-only project; every operation sent only with both and no such project.
 - **Not done:** the sandbox still pins 0.13.4. B-141 to B-145 and B-137 to B-139 are open. The Learn examples stay labelled 0.13.4, the version they were checked with.
 
+### 2026-11-25 — The bugs found writing the guide (B-137 to B-139, B-141 to B-147)
+
+- **Behaviour changes, each able to turn something that passed into a failure:** `coverage quality --fail-on-gaps` fails when nothing was recorded; `coverage` commands exit 2 for a workspace folder that does not exist (a job that read an empty one before its first run must create it); `request` and `bundle run` no longer send a value nothing defines or the export's `CHANGE_ME`; `validate` reports an unknown method and exits 2 for a file it cannot read.
+- **One becomes lenient, as documented:** `coverage quality` in `csv`, `markdown` or `html` no longer exits 1 on gaps without `--fail-on-gaps`. A job that relied on that must add the flag.
+- Also: `--output` works for `text` and `json`; `coverage list -f json` prints `[]` when empty; `coverage reset` says when it did nothing; `clrsig import` warns about Postman scripts; the telemetry notice names every field sent.
+- **Guards:** `apps/cli/guide_fixes_test.go` (replaces the tests that pinned the gaps), `packages/core/importer/postman_scripts_test.go`, `packages/core/telemetry/disclosure_test.go`. CS-GAP-021, 022, 024, 025 became CS-RUN-015 to 018.
+- **Not done:** the desktop app shows no import warnings (B-148, CS-GAP-026); an imported bundle's `CHANGE_ME` is still sent by `run`, `conform` and the app (B-149); the website's wording on telemetry was not checked. B-080 and B-010 are untouched.
+
+### 2026-11-25 — Detailed CLI guide, phase 3 (B-123)
+
+- Seven task pages, a reference page (exit codes, report formats, shared options) and troubleshooting by message, in `docs/guides/cli/`; one link from section 10 of the user guide, as agreed.
+- **Guards:** their marked examples run in `TestDetailedGuideExamples`; the documentation tests check links. The tables and the troubleshooting rows are prose that no test holds to the code, apart from the examples on those pages.
+- Found while writing: scenario and request files with an unsupported `schemaVersion` are accepted and sent (B-150, CS-GAP-027); recorded, not fixed.
+

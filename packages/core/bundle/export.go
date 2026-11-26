@@ -9,11 +9,34 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
 )
 
 // SecretPlaceholder replaces secret variable values in an export.
 const SecretPlaceholder = "CHANGE_ME"
+
+// DropPlaceholders returns env without the secret variables that still hold SecretPlaceholder, and
+// their names. The placeholder stands for a value the export left out, so it must not be sent as one.
+func DropPlaceholders(env *domain.Environment) (*domain.Environment, []string) {
+	if env == nil {
+		return nil, nil
+	}
+	out := *env
+	out.Variables = nil
+	var dropped []string
+	for _, v := range env.Variables {
+		if v.Secret && v.Value == SecretPlaceholder {
+			dropped = append(dropped, v.Name)
+			continue
+		}
+		out.Variables = append(out.Variables, v)
+	}
+	if len(dropped) == 0 {
+		return env, nil
+	}
+	return &out, dropped
+}
 
 // ExportOptions control what an export contains.
 type ExportOptions struct {

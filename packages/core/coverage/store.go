@@ -131,6 +131,12 @@ func Save(workspacePath string, cov StoredCoverage) error {
 	return os.Rename(tmp, dst)
 }
 
+// Has reports whether coverage data is stored for specFile in workspacePath.
+func Has(workspacePath, specFile string) bool {
+	_, err := os.Stat(filepath.Join(DirPath(workspacePath), Key(specFile)))
+	return err == nil
+}
+
 // Reset deletes the stored coverage data for specFile in workspacePath.
 func Reset(workspacePath, specFile string) error {
 	path := filepath.Join(DirPath(workspacePath), Key(specFile))

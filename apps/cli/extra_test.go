@@ -591,8 +591,8 @@ func TestCoverageResetCmd_EmptyWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v\noutput: %s", err, out)
 	}
-	if !strings.Contains(out, "Coverage reset") {
-		t.Errorf("want 'Coverage reset' in output, got:\n%s", out)
+	if !strings.Contains(out, "nothing was reset") {
+		t.Errorf("want 'nothing was reset' in output, got:\n%s", out)
 	}
 }
 

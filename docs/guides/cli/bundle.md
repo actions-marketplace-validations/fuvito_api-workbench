@@ -15,7 +15,7 @@ A **bundle** is one file that holds environments, requests and scenarios. Use it
 
 > **Treat a bundle you did not write like a script you did not write.** `bundle run` sends whatever it says, to whatever address it names, including `DELETE`. Read it first.
 
-> **⚠ After an export, fill in the secrets.** `export` replaces secret values with the text `CHANGE_ME`. `bundle run` **sends that text as it is**, for example as `Authorization: Bearer CHANGE_ME`, and the run can pass if the server does not mind (backlog B-142). Give the real value with `--env-file` or `--var`.
+> **After an export, give the secrets.** `export` replaces secret values with the text `CHANGE_ME`. `bundle run` treats a secret that still holds it as **having no value**: it names it in a warning, and a step that uses it is not sent. Give the real value with `--env-file` or `--var`. This protects `bundle run` only: after `bundle import`, the environment files still hold `CHANGE_ME`, and `run`, `conform` and the app **send it** (backlog B-149). Releases up to 0.13.5 sent it from `bundle run` too.
 
 The bundle format is in the [format spec](../../../apps/desktop/wails/help/format-spec.md).
 
@@ -134,7 +134,7 @@ Only values **marked** `secret: true` in an environment are replaced. A password
 | `Bundle is valid` | `bundle run` it, or `bundle import --dry-run`. |
 | Errors | Each names the file and field; fix and validate again. |
 | `no scenario matches` | Use a scenario's title or file name, as in the bundle. |
-| A step gets `401` after an export | A `CHANGE_ME` was sent: give the real secret. |
+| `still holds the CHANGE_ME` | Give the value: `--var name=value`, or `--env-file`. |
 
 ## Related commands and the desktop app
 

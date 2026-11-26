@@ -14,6 +14,7 @@ type postmanCollection struct {
 	Info     postmanInfo       `json:"info"`
 	Item     []postmanItem     `json:"item"`
 	Variable []postmanVariable `json:"variable"`
+	Event    []postmanEvent    `json:"event"`
 }
 
 type postmanInfo struct {
@@ -25,6 +26,17 @@ type postmanItem struct {
 	Name    string          `json:"name"`
 	Item    []postmanItem   `json:"item"`
 	Request *postmanRequest `json:"request"`
+	Event   []postmanEvent  `json:"event"`
+}
+
+// postmanEvent is a script Postman runs before a request ("prerequest") or after it ("test").
+type postmanEvent struct {
+	Listen   string `json:"listen"`
+	Disabled bool   `json:"disabled"`
+	Script   struct {
+		// Exec is a list of lines, or in some exports one string.
+		Exec json.RawMessage `json:"exec"`
+	} `json:"script"`
 }
 
 type postmanRequest struct {
@@ -113,10 +125,58 @@ func ParsePostmanCollection(data []byte) (name string, requests []ImportedReques
 	if col.Info.Name == "" {
 		col.Info.Name = "postman-import"
 	}
-	return col.Info.Name, flattenPostmanItems(col.Item, ""), nil
+	return col.Info.Name, flattenPostmanItems(col.Item, "", scriptsIn(col.Event, droppedScripts{})), nil
 }
 
-func flattenPostmanItems(items []postmanItem, folderPath string) []ImportedRequest {
+// droppedScripts is which kinds of script apply to a request: its own, and its folders' and the
+// collection's, which Postman runs for every request below them.
+type droppedScripts struct{ test, prerequest bool }
+
+func scriptsIn(events []postmanEvent, found droppedScripts) droppedScripts {
+	for _, e := range events {
+		if e.Disabled || !hasCode(e.Script.Exec) {
+			continue
+		}
+		switch e.Listen {
+		case "test":
+			found.test = true
+		case "prerequest":
+			found.prerequest = true
+		}
+	}
+	return found
+}
+
+// hasCode tells a script from the empty one Postman leaves behind in many exports.
+func hasCode(exec json.RawMessage) bool {
+	var lines []string
+	if err := json.Unmarshal(exec, &lines); err != nil {
+		var one string
+		if err := json.Unmarshal(exec, &one); err != nil {
+			return false
+		}
+		lines = strings.Split(one, "\n")
+	}
+	for _, line := range lines {
+		if text := strings.TrimSpace(line); text != "" && !strings.HasPrefix(text, "//") {
+			return true
+		}
+	}
+	return false
+}
+
+func (d droppedScripts) warnings() []string {
+	var out []string
+	if d.test {
+		out = append(out, "a Postman test script was not imported: add assertions, or this request checks nothing it checked in Postman")
+	}
+	if d.prerequest {
+		out = append(out, "a Postman pre-request script was not imported: any value it set must come from the environment or an earlier step")
+	}
+	return out
+}
+
+func flattenPostmanItems(items []postmanItem, folderPath string, inherited droppedScripts) []ImportedRequest {
 	var result []ImportedRequest
 	for _, item := range items {
 		if item.Request == nil && len(item.Item) > 0 {
@@ -125,10 +185,11 @@ func flattenPostmanItems(items []postmanItem, folderPath string) []ImportedReque
 			if folderPath != "" {
 				sub = folderPath + "/" + item.Name
 			}
-			result = append(result, flattenPostmanItems(item.Item, sub)...)
+			result = append(result, flattenPostmanItems(item.Item, sub, scriptsIn(item.Event, inherited))...)
 		} else if item.Request != nil {
 			req := convertPostmanRequest(item)
-			result = append(result, ImportedRequest{FolderPath: folderPath, Request: req, Warnings: mapDynamic(req)})
+			warnings := append(scriptsIn(item.Event, inherited).warnings(), mapDynamic(req)...)
+			result = append(result, ImportedRequest{FolderPath: folderPath, Request: req, Warnings: warnings})
 		}
 	}
 	return result

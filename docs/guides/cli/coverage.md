@@ -8,7 +8,7 @@
 
 Runs add to it when you give them a workspace: `clrsig run … --spec <spec> --workspace <folder>`. (`conform --coverage` records a separate history, shown by `conform` itself.)
 
-> **⚠ A gate with `--fail-on-gaps` can pass with nothing to check.** If the workspace has **no data** for the spec, including because its name is **misspelled**, `coverage quality --fail-on-gaps` prints `No coverage data found` and **exits 0** (backlog B-141). In CI, run it right after the runs that record coverage, and check the output for that line.
+> **A gate needs something to look at.** `coverage quality --fail-on-gaps` also fails when **nothing was recorded** for the spec, and every `coverage` command stops with an error when the workspace folder does not exist. Releases up to 0.13.5 passed in both cases.
 
 | Command | What it does |
 |---|---|
@@ -56,8 +56,8 @@ clrsig coverage quality <spec-file-or-url> --workspace <folder> [flags]
 | Option | What it does | Default and limits |
 |---|---|---|
 | `--workspace`, `-w` | The workspace folder. | Required. |
-| `--fail-on-gaps` | Exit 1 when there is a gap. | Off: gaps are only reported. See the warning above. |
-| `--format`, `-f` | `text`, `json`, `csv`, `markdown` or `html`. | `text`. With no data, a plain sentence is printed whatever the format. |
+| `--fail-on-gaps` | Exit 1 when there is a gap, or nothing was recorded. | Off: gaps are only reported. |
+| `--format`, `-f` | `text`, `json`, `csv`, `markdown` or `html`. | `text`. With no data, `text` prints a sentence; the others give a report with nothing covered. |
 | `--output`, `-o` | Writes the report to a file. | |
 
 <!-- run: exit=1 first="0" contains="NEVER EXERCISED" -->
@@ -73,7 +73,7 @@ clrsig coverage quality examples/server/openapi.yaml --workspace my-ws --fail-on
 | `SECURED NEVER AUTHED` | It needs credentials, and was never tested with them. |
 | `UNTESTED ERROR PATHS` | Declared error answers that never happened. |
 
-Exit code **0**: the report was made (with `--fail-on-gaps`: no gap, **or no data**); **1**: with `--fail-on-gaps`, a gap; **2**: the spec or the command was wrong.
+Exit code **0**: the report was made (with `--fail-on-gaps`: data and no gap); **1**: with `--fail-on-gaps`, a gap or no data; **2**: the spec or the command was wrong, or the workspace is not a folder. This is the same for every format.
 
 ## `clrsig coverage reset`
 
@@ -94,13 +94,13 @@ clrsig coverage reset examples/server/openapi.yaml --workspace my-ws
 clrsig coverage list --workspace my-ws
 ```
 
-It also says `Coverage reset for …` when there was nothing to reset, even for a file or workspace that does not exist (backlog B-144). Check with `coverage list`.
+When nothing is stored for that spec, it says `nothing was reset` and exits 0. Check the spelling of the spec: it must be written as it was in the runs.
 
 ## What to do next
 
 | Result | Next step |
 |---|---|
-| `No coverage data found` | Check the folder name, and that the runs used both `--workspace` and `--spec`. |
+| `No coverage data found` | Check the spec is written as in the runs, and that they used both `--workspace` and `--spec`. |
 | `NEVER EXERCISED` | Add scenarios, or run [`conform`](conform.md) to reach them. |
 | `HAPPY PATH ONLY`, `UNTESTED ERROR PATHS` | Add scenarios that cause the declared errors. |
 | Old results mislead after a big change | `coverage reset`, then run again. |

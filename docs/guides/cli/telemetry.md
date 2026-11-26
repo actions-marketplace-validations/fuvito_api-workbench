@@ -15,9 +15,9 @@ After `run`, `conform` and `bundle run`, a record is sent to `https://telemetry.
 - **a random identifier for this installation** (created on first use and kept in your Clear Signal settings folder, so that runs from one installation can be told apart from another's);
 - the `clrsig` version, your operating system and processor type, and the time.
 
-It does **not** contain addresses, headers, bodies, file names or values.
+It does **not** contain request addresses, headers, bodies, file names or values. As with any request, the server sees your IP address.
 
-> The text `telemetry enable` prints names only the command, result, duration and counts. The identifier, version, system and time above are sent too (backlog B-145).
+`telemetry status` (when on) and `telemetry enable` print this list.
 
 A failure to send is ignored: it never changes a result or an exit code.
 

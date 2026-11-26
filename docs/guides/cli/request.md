@@ -68,7 +68,16 @@ clrsig request examples/requests/health-check.yaml --env examples/environments/l
 
 The JSON has `method`, `url`, `statusCode`, `status`, `durationMs`, `sizeBytes`, `headers`, `body` (as text) and `error`. To fail a script on a status, test `statusCode` yourself, or write a [scenario](run.md) with a `status` assertion.
 
-### 4. No server
+### 4. A value is missing
+
+**What it does:** leaves out `--env`, so nothing fills `{{baseUrl}}`.
+
+<!-- run: exit=1 contains="not sent: no value for {{baseUrl}}" -->
+```bash
+clrsig request examples/requests/health-check.yaml
+```
+
+### 5. No server
 
 <!-- run: exit=1 contains="ERROR: executing request" -->
 ```bash
@@ -80,21 +89,21 @@ clrsig request docs/guides/cli/files/unreachable-request.yaml
 | Exit code | Meaning |
 |---|---|
 | 0 | The server answered, **with any status**. |
-| 1 | No answer: it could not connect, timed out, or the address is not usable. |
+| 1 | Not sent (a `{{name}}` has no value), or no answer: it could not connect, timed out, or the address is not usable. |
 | 2 | The file could not be read, or is not a request file. |
 
 ## What to do next
 
 | Result | Next step |
 |---|---|
-| `unsupported protocol scheme ""` with `{{baseUrl}}` in the address | A value is missing: give `--env`. |
+| `not sent: no value for {{…}}` | Give `--env`, with every name the message lists. |
 | `401` or `403` | Check the token in the environment and the request's `auth`. |
 | `context deadline exceeded` | The server is slow or stuck; try a larger `--timeout`. |
 | The answer is what you expect | Turn it into a [scenario](run.md) step with assertions. |
 
 ## Common mistakes and limits
 
-- **A `{{name}}` that nothing defines is sent as written.** In the address, a header or a token, the server receives the text `{{name}}`, and the exit code can still be 0 (CS-GAP-022). `run` and `conform` do not send such a request. Check the first line of the output.
+- **A request with a `{{name}}` that nothing defines is not sent**, so a request that must carry such braces as text cannot be sent this way. Releases up to 0.13.5 sent it as written, and could exit 0.
 - Do not use `request` as a health check that fails on errors: it exits 0 on a `500`.
 
 ## Related commands and the desktop app
