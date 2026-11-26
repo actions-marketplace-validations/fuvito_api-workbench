@@ -4,6 +4,15 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.3',
+    date: '2026-11-25',
+    items: [
+      'Fix, please upgrade from 0.13.2: with OpenAPI 3.1, a baseline could hide a new problem next to a recorded one, or report an unchanged response as new. The 0.13.2 note that baselines kept working was wrong. Each problem is now its own violation, in a stable order',
+      'A baseline recorded with 0.13.2 may show more problems as new: it saved only the start of such a message. Read them before recording again, because some may be real ones that were hidden. Baselines from 0.13.0 and 0.13.1 keep matching what they recorded',
+      'Security: a password written inside longer text (scheme://user:password@host, password=, Pwd=, token= and similar) is masked in reports, results and baselines. This does not find every secret; checks still use the real values. If a saved report or committed baseline holds a password, change it',
+    ],
+  },
+  {
     version: '0.13.2',
     date: '2026-11-25',
     items: [

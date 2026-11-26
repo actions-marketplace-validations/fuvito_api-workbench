@@ -62,7 +62,7 @@ docker run --rm \
 ### GitHub Actions
 
 ```yaml
-- uses: fuvito/api-workbench@v0.13.2
+- uses: fuvito/api-workbench@v0.13.3
   with:
     command: conform
     spec: openapi.yaml
