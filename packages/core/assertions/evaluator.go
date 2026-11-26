@@ -229,8 +229,8 @@ func looksLikeOperationID(s string) bool {
 	return !strings.ContainsAny(s, "{\n\r:")
 }
 
-func inlineSchemaYAML(s string) string {
-	s = strings.TrimSpace(s)
+func inlineSchemaYAML(raw string) string {
+	s := strings.TrimSpace(raw)
 	if len(s) == 0 {
 		return s
 	}
@@ -239,16 +239,23 @@ func inlineSchemaYAML(s string) string {
 		// YAML mapping (JSON is valid YAML; a block scalar would be a string).
 		return strings.NewReplacer("\n", "", "\r", "").Replace(s)
 	}
-	// YAML schema: indent every line to sit under the `schema:` key (14-space
-	// indent level in the wrapper spec) so the block parses as a mapping.
+	// YAML schema: move the block under the `schema:` key of the wrapper spec. Only the indentation
+	// all its lines share is replaced; the rest is the schema's structure.
 	const indent = "                " // 16 spaces
-	lines := strings.Split(s, "\n")
-	var b strings.Builder
-	for _, l := range lines {
+	var lines []string
+	shared := -1
+	for _, l := range strings.Split(strings.ReplaceAll(raw, "\r", ""), "\n") {
 		if strings.TrimSpace(l) == "" {
 			continue
 		}
-		b.WriteString("\n" + indent + strings.TrimLeft(l, " \t"))
+		lines = append(lines, l)
+		if n := len(l) - len(strings.TrimLeft(l, " ")); shared < 0 || n < shared {
+			shared = n
+		}
+	}
+	var b strings.Builder
+	for _, l := range lines {
+		b.WriteString("\n" + indent + l[shared:])
 	}
 	return b.String()
 }

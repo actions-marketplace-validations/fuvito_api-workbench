@@ -195,7 +195,7 @@ A line under a violation may quote the one value at fault. With `--explain`, eac
          → [CS-RESP-005] "version" is missing from the response. Why: The spec marks "version" as required, but the server's response did not include it. Where: response body, field version (spec: GET /health → response 200 → body schema). Fix: Return "version" from the server, or make it optional in the spec if it is not always present.
 ```
 
-`CS-RESP-005` is the check's ID. Look it up in [What We Check](../../../apps/desktop/wails/help/what-we-check.md). Only the **first** problem of a response is reported: fix it and run again.
+`CS-RESP-005` is the check's ID. Look it up in [What We Check](../../../apps/desktop/wails/help/what-we-check.md). With an OpenAPI **3.0** spec only the **first** problem of a response body is reported: fix it and run again. With 3.1, each problem has its own line.
 
 ### 6. Adopt it on an API that fails today
 
@@ -269,7 +269,7 @@ Negative conformance probes — Clear Signal Example API 1.0.0
 PASSED  11 probes  ·  11 passed  ·  0 failed  ·  0 skipped  ·  0 errors  1ms
 ```
 
-**Read the status printed after each pass.** Any `4xx` passes, so a `401` or a rate limit's `429` can pass a probe whose body was never examined (CS-GAP-012). If no operation has anything to probe, the summary says `PASSED  0 probes`: that means nothing was tested.
+**Read the status printed after each pass.** Any `4xx` passes, so a `401` or a rate limit's `429` can pass a probe whose body was never examined (CS-GAP-012). If no probe could be sent, the summary says `NOTHING CHECKED  0 probes` and why: nothing was tested. (Releases up to 0.13.3 said `PASSED  0 probes`.)
 
 ### 10. Keep reports for CI
 

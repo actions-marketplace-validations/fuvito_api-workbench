@@ -136,6 +136,23 @@ func notComparedLine(result *scenario.Result) string {
 	return fmt.Sprintf("Spec: %d of %d responses were not compared with the spec (%s)", n, total, strings.Join(names, "; "))
 }
 
+// noProbesNote says why a run of negative probes tested nothing, so that it does not read as a pass.
+func noProbesNote(skipped int) string {
+	if skipped > 0 {
+		return "no negative probe was sent: every probe of the selected operations was skipped"
+	}
+	return "no negative probe applies to the selected operations: nothing was tested (a probe needs a required body field or parameter, or an operation that asks for credentials)"
+}
+
+// expectedText is the expected value of an assertion as text; empty when it has none, such as a
+// schema assertion.
+func expectedText(v any) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", v)
+}
+
 // assertionLabel names an assertion in a report. The expected value it shows may hold a password.
 func assertionLabel(a domain.Assertion) string { return redact.Credentials(rawAssertionLabel(a)) }
 
@@ -846,8 +863,11 @@ func NegativeText(result *conformance.NegativeResult) string {
 	total := passed + failed + errored
 
 	verdict := "PASSED"
-	if failed > 0 || errored > 0 {
+	switch {
+	case failed > 0 || errored > 0:
 		verdict = "FAILED"
+	case total == 0:
+		verdict = "NOTHING CHECKED"
 	}
 	fmt.Fprintf(&b, "%s  %d probe%s  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d error%s  %dms\n",
 		verdict, total, plural(total), passed, failed, skipped, errored, plural(errored), result.Duration.Milliseconds())
@@ -869,6 +889,9 @@ func NegativeText(result *conformance.NegativeResult) string {
 		if authFailed > 0 {
 			fmt.Fprintf(&b, "       %d probe%s sent no credentials and the server still accepted the request — fix the authentication rule for those operations\n", authFailed, plural(authFailed))
 		}
+	}
+	if total == 0 {
+		fmt.Fprintf(&b, "       %s\n", noProbesNote(skipped))
 	}
 	if errored > 0 {
 		fmt.Fprintf(&b, "       %d probe(s) got no answer, so they could not be judged — check that the server is running and the base URL is right\n", errored)
@@ -1014,7 +1037,7 @@ func JSON(result *scenario.Result) ([]byte, error) {
 				Name:     ar.Assertion.Name,
 				Path:     ar.Assertion.Path,
 				Operator: string(ar.Assertion.Operator),
-				Expected: x.text(fmt.Sprintf("%v", ar.Assertion.Expected)),
+				Expected: x.text(expectedText(ar.Assertion.Expected)),
 				Actual:   x.text(ar.Actual),
 				Passed:   ar.Passed,
 				Message:  x.text(ar.Message),

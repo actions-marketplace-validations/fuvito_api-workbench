@@ -326,9 +326,13 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 
 	if neg != nil {
 		np, nf, ns, ne := neg.Counts()
+		nothing := ""
+		if np+nf+ne == 0 {
+			nothing = "NOTHING CHECKED: " + noProbesNote(ns) + "  ·  "
+		}
 		sec := htmlSection{
 			Heading: "Negative conformance probes",
-			Footer: fmt.Sprintf("%d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms",
+			Footer: nothing + fmt.Sprintf("%d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms",
 				np+nf+ne, np, nf, ns, ne, neg.Duration.Milliseconds()),
 		}
 		for _, p := range neg.Probes {

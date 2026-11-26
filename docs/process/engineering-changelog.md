@@ -1009,7 +1009,7 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Baselines:** stored text is compared with both sides masked. Files written by 0.13.2 that contain a password still match and are not printed back; files from 0.13.1 and 0.13.0 matched as before, except the case below. Old files are not rewritten: re-record any that hold a password, and Git history keeps the old one.
 - **Not masked (CS-GAP-017):** among others, addresses without a scheme, `password: x` or JSON inside a text, other names, command-line options, percent-encoded text, the part of an unquoted value after a space. Unchanged on purpose: the response viewer, `clrsig request`, desktop extracted values, and the desktop request history (it must be able to send a request again; a password in a stored URL or body stays there).
 - **Found on the way, not fixed (B-131, CS-GAP-018):** since 0.13.2 (B-129) only the first problem of a multi-problem OpenAPI 3.1 message identifies a violation. A second, new problem is usually hidden by the baseline (the released 0.13.2 passed 51 of 60 runs where 0.13.1 failed all 60), and an unchanged response sometimes shows as new. The 0.13.2 notes say no verdict changes; that is wrong. Files from 0.13.0 for such a response report one new and one fixed.
-- **Not done:** not committed, pushed or released.
+- **Not done:** not released.
 
 ### 2026-11-25 — Fixed: a baseline could hide a new violation (B-131, a regression of 0.13.2)
 
@@ -1026,4 +1026,19 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - Release notes published first thing, while the smoke jobs were still running. They begin by correcting the 0.13.2 notes, say how to review baselines recorded with 0.13.2 before recording again, and list what password masking does not find.
 - Checked afterwards: the four checksum files match their binaries; the Homebrew formula and Scoop manifest carry the published hashes. With the downloaded Windows binary, 60 runs each: a second new problem failed the build every time (also against a baseline written by the released 0.13.2) and an unchanged answer passed every time; no demo password appeared in any `conform` format or in a new baseline file, and in `run` only the fragment the scenario itself expects.
 - **Not done:** the published 0.13.2 notes still hold the wrong statement about baselines, and older releases are not marked as affected. The sandbox still pins 0.13.2.
+
+### 2026-11-25 — Four small bugs (B-126, B-132, B-133, B-134)
+
+- **B-126:** a negative-probe run that sent nothing said `PASSED  0 probes`. It now says `NOTHING CHECKED` and why (none applies, or all were skipped). Exit codes are unchanged.
+- **B-132:** OpenAPI 3.1 messages no longer begin with the library's path, which repeated segments (`/user/user/age`); a message now reads `at '/user/age': …`. A lone problem no longer starts `validation failed due to:`. **The 0.13.3 changelog and release notes said that was already so; it was not.** Baselines written by 0.13.3 and earlier still match (that text was never part of the identity).
+- **B-133:** `expected` is empty, not `<nil>`, for an assertion without an expected value.
+- **B-134:** the format guide now describes both forms of a `schema` assertion. Writing it showed that a YAML schema written in place never worked with nested keys: all indentation was removed. Only the shared indentation is now replaced. **Behaviour change:** such an assertion used to fail with "invalid schema"; it is now evaluated.
+- **Found, not fixed (B-135, CS-GAP-020):** a `schema` assertion passes any status it has no schema for, without reading the body; without a `specFile` the run passes. Fixing it can turn green runs red, so it waits for a decision. The format guide warns about it.
+- **Not done:** not released.
+
+### 2026-11-25 — Detailed CLI guide, phase 2 (B-123)
+
+- The first-check walkthrough and the pages of `init` (with `init github-actions`), `config show`, `run`, `validate`, `request` and `generate`. Their examples run in the tests; 14 commands are still pending. The `conform` page says what an empty probe run and a 3.1 body now report.
+- **Found while writing, recorded, not fixed:** `generate` overwrites edited files without asking (B-136); `validate` accepts an unknown HTTP method (B-137, CS-GAP-021); `request` sends undefined `{{names}}` as text (B-138, CS-GAP-022); `validate` exits 1 where its help says 2 (B-139). The `run` page warns about B-135.
+- **Not done:** Phase 3 (the other commands, goal pages, exit codes, troubleshooting) and the one link from the existing user guide are not started.
 

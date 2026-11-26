@@ -92,10 +92,11 @@ func answering(schema string) string {
 }
 
 const (
-	integer = `{"type":"integer"}`
-	allOf   = `{"allOf":[{"type":"object","properties":{"a":` + integer + `,"b":` + integer + `}},{"type":"object","properties":{"c":` + integer + `}}]}`
-	anyOf   = `{"type":"object","properties":{"v":{"anyOf":[` + integer + `,{"type":"object","properties":{"m":` + integer + `,"n":` + integer + `,"o":` + integer + `}}]}}}`
-	aList   = `{"type":"object","properties":{"l":{"type":"array","items":{"type":"object","properties":{"p":` + integer + `,"q":` + integer + `}}}}}`
+	integer   = `{"type":"integer"}`
+	nestedAge = `{"type":"object","properties":{"user":{"type":"object","properties":{"age":` + integer + `}}}}`
+	allOf     = `{"allOf":[{"type":"object","properties":{"a":` + integer + `,"b":` + integer + `}},{"type":"object","properties":{"c":` + integer + `}}]}`
+	anyOf     = `{"type":"object","properties":{"v":{"anyOf":[` + integer + `,{"type":"object","properties":{"m":` + integer + `,"n":` + integer + `,"o":` + integer + `}}]}}}`
+	aList     = `{"type":"object","properties":{"l":{"type":"array","items":{"type":"object","properties":{"p":` + integer + `,"q":` + integer + `}}}}}`
 )
 
 var composed = map[string]struct{ spec, body string }{
@@ -129,10 +130,10 @@ func TestEveryProblemIsAViolationOfItsOwn(t *testing.T) {
 		want := strings.Join([]string{
 			`at '': additional properties 'extra', 'more' not allowed`,
 			`at '': missing properties 'name', 'owner'`,
-			`error at "/count": at '/count': got string, want integer`,
-			`error at "/status": at '/status': value must be 'on'`,
-			`error at "/user/user/age": at '/user/age': got string, want integer`,
-			`error at "/user/user/id": at '/user/id': got string, want integer`,
+			`at '/count': got string, want integer`,
+			`at '/status': value must be 'on'`,
+			`at '/user/age': got string, want integer`,
+			`at '/user/id': got string, want integer`,
 		}, "\n")
 		if got != want {
 			t.Errorf("violations:\n%s\nwant:\n%s", got, want)
@@ -253,7 +254,7 @@ func TestABaselineWrittenBy0132MatchesOnlyWhatItRecorded(t *testing.T) {
 	b := released(t, "0.13.2")
 	runAnswer(t, manySpec(t), manyBody, manyRuns, func(r *conformance.ConformResult) {
 		d := conformance.Compare(conformance.Violations(r, nil), b)
-		want := `at '': missing properties 'name', 'owner'` + "\n" + `error at "/status": at '/status': value must be 'on'`
+		want := `at '': missing properties 'name', 'owner'` + "\n" + `at '/status': value must be 'on'`
 		if got := summaries(d.Known); got != want || len(d.New) != 4 || len(d.Fixed) != 0 {
 			t.Errorf("known:\n%s\nnew %d, fixed %d", got, len(d.New), len(d.Fixed))
 		}
@@ -290,6 +291,47 @@ func TestBaseline_AChangingValueInsideTheSentenceIsNewEachTime_KnownGap(t *testi
 	runAnswer(t, spec, `{"ref":"ab-two"}`, 1, func(r *conformance.ConformResult) {
 		if d := conformance.Compare(conformance.Violations(r, nil), b); len(d.New) != 1 || len(d.Fixed) != 1 {
 			t.Errorf("the value no longer changes the identity: update CS-GAP-019\n%s", d.Text())
+		}
+	})
+}
+
+// The library puts its own path before a nested problem, with segments repeated, and calls a lone
+// problem a "validation failed due to". Neither is shown.
+func TestA31MessageNamesTheRightPathOnce(t *testing.T) {
+	for _, c := range []struct{ schema, body, want string }{
+		{nestedAge, `{"user":{"age":"x"}}`, `at '/user/age': got string, want integer`},
+		{`{"type":"object","properties":{"count":` + integer + `}}`, `{"count":"x"}`, `at '/count': got string, want integer`},
+	} {
+		runAnswer(t, answering(c.schema), c.body, 1, func(r *conformance.ConformResult) {
+			if got, _, _ := strings.Cut(messages(r), "\n"); got != c.want {
+				t.Errorf("%s: %q, want %q", c.body, got, c.want)
+			}
+		})
+	}
+	// inside a grouped problem too
+	runAnswer(t, answering(anyOf), `{"v":{"m":"x","n":"y"}}`, 1, func(r *conformance.ConformResult) {
+		if got := messages(r); strings.Contains(got, `error at "`) || !strings.Contains(got, "at '/v/m'") {
+			t.Errorf("grouped:\n%s", got)
+		}
+	})
+}
+
+// 0.13.3 wrote the library's path into its baselines. They must match what is written now.
+func TestABaselineWrittenBy0133StillMatches(t *testing.T) {
+	old := `schemaVersion: "2"
+violations:
+    - operation: GET /thing
+      check: other
+      rule: 'validation failed due to: error at "/user/user/age": at ''/user/age'': got string, want integer'
+      summary: 'validation failed due to: error at "/user/user/age": at ''/user/age'': got string, want integer'
+`
+	b, err := conformance.ParseBaseline([]byte(old), "old.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runAnswer(t, answering(nestedAge), `{"user":{"age":"x"}}`, 5, func(r *conformance.ConformResult) {
+		if d := conformance.Compare(conformance.Violations(r, nil), b); len(d.Known) != 1 || len(d.New) != 0 || len(d.Fixed) != 0 {
+			t.Errorf("known %d, new %d, fixed %d\n%s", len(d.Known), len(d.New), len(d.Fixed), d.Text())
 		}
 	})
 }

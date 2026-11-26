@@ -15,17 +15,23 @@ import (
 // guidePages names the page of the detailed CLI guide (docs/guides/cli/) that documents each command.
 // Commands of one group share a page.
 var guidePages = map[string]string{
-	"conform": "conform.md",
+	"config show":         "config-show.md",
+	"conform":             "conform.md",
+	"generate":            "generate.md",
+	"init":                "init.md",
+	"init github-actions": "init.md",
+	"request":             "request.md",
+	"run":                 "run.md",
+	"validate":            "validate.md",
 }
 
 // guidePending lists the commands whose page is not written yet. It may only shrink: an entry whose
 // page exists fails the test, and when the guide is complete the list is empty
-// (docs/enhancements/2026-11-25-detailed-user-guide.md, phases 2 and 3).
+// (docs/enhancements/2026-11-25-detailed-user-guide.md, phase 3).
 var guidePending = []string{
-	"bundle export", "bundle import", "bundle run", "bundle validate", "config show",
-	"coverage list", "coverage quality", "coverage reset", "diff", "generate", "impact", "import",
-	"init", "init github-actions", "mcp", "request", "run", "telemetry disable", "telemetry enable",
-	"telemetry status", "validate",
+	"bundle export", "bundle import", "bundle run", "bundle validate",
+	"coverage list", "coverage quality", "coverage reset", "diff", "impact", "import",
+	"mcp", "telemetry disable", "telemetry enable", "telemetry status",
 }
 
 // runnableCommands returns every command a user can run, by its name without "clrsig".

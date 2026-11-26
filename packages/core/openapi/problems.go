@@ -17,7 +17,15 @@ import (
 // groupStart opens the library's message for an error that has causes.
 const groupStart = "validation failed due to: "
 
-var reExtraNames = regexp.MustCompile(`(additional properties )('[^\n]*')( not allowed)`)
+var (
+	reExtraNames = regexp.MustCompile(`(additional properties )('[^\n]*')( not allowed)`)
+	// the library puts a path of its own before its sentence, with segments repeated for a nested
+	// value (error at "/user/user/age": at '/user/age': …); the sentence names the right one
+	reOwnPath = regexp.MustCompile(`^error at "[^\n]*?": at '`)
+)
+
+// rootReason starts the library's error for the whole value, which only collects what is wrong.
+const rootReason = "jsonschema validation failed"
 
 // problems splits a schema error into the messages of its independent problems, sorted.
 func problems(err error) []string {
@@ -33,7 +41,7 @@ func problems(err error) []string {
 		if se, ok := err.(*openapi3.SchemaError); ok {
 			// these only collect their causes, which are separate problems. The causes of anyOf,
 			// oneOf and the like together explain one problem and stay together.
-			if causes := causesOf(se); causes != nil && (se.SchemaField == "" || se.SchemaField == "allOf" || se.SchemaField == "$ref") {
+			if causes := causesOf(se); causes != nil && (strings.HasPrefix(se.Reason, rootReason) || se.SchemaField == "" || se.SchemaField == "allOf" || se.SchemaField == "$ref") {
 				for _, e := range causes {
 					walk(e)
 				}
@@ -72,6 +80,7 @@ func ordered(err error) string {
 	msg := err.Error()
 	// the names of properties that are not allowed come in map order too
 	first, rest, cut := strings.Cut(msg, "\n")
+	first = reOwnPath.ReplaceAllString(first, "at '")
 	first = reExtraNames.ReplaceAllStringFunc(first, func(m string) string {
 		p := reExtraNames.FindStringSubmatch(m)
 		names := strings.Split(strings.Trim(p[2], "'"), "', '")

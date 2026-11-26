@@ -1,0 +1,4 @@
+schemaVersion: "1"
+title: nothing listens here
+method: GET
+url: "http://localhost:1/health"
