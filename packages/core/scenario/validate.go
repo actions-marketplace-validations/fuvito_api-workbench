@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/serialization"
 	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
@@ -75,10 +76,16 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 			add(num, name, "step must not have both request and requestRef")
 		}
 
+		if step.Request != nil && !step.Request.Method.IsValid() {
+			add(num, name, unknownMethod(step.Request.Method))
+		}
+
 		if step.RequestRef != "" && scenarioDir != "" {
 			refPath := filepath.Join(scenarioDir, step.RequestRef)
-			if _, err := os.Stat(refPath); err != nil {
+			if data, err := os.ReadFile(refPath); err != nil {
 				add(num, name, fmt.Sprintf("requestRef %q not found", step.RequestRef))
+			} else if req, err := serialization.ParseRequestFile(data, filepath.Base(refPath)); err == nil && step.Request == nil && !req.Method.IsValid() {
+				add(num, name, fmt.Sprintf("requestRef %q: %s", step.RequestRef, unknownMethod(req.Method)))
 			}
 		}
 
@@ -158,4 +165,8 @@ func Validate(sc *domain.Scenario, scenarioDir string) []Issue {
 	}
 
 	return issues
+}
+
+func unknownMethod(m domain.HTTPMethod) string {
+	return fmt.Sprintf("unknown HTTP method %q (use GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS or TRACE)", m)
 }

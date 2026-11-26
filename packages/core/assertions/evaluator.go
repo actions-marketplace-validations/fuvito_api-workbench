@@ -9,6 +9,7 @@ import (
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 )
 
 // Evaluator checks domain.Assertions against domain.Responses.
@@ -40,6 +41,8 @@ func (e *Evaluator) Evaluate(a domain.Assertion, resp *domain.Response) domain.A
 		res.Passed = false
 		res.Message = fmt.Sprintf("unknown assertion type %q", a.Type)
 	}
+	// the message also quotes the expected value, which the scenario file may write in full
+	res.Message = redact.Credentials(res.Message)
 	return res
 }
 
@@ -65,7 +68,55 @@ func evalHeader(a domain.Assertion, resp *domain.Response) (actual string, passe
 	actual, _ = resp.HeaderValue(a.Path)
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
+	actual, msg = reportable(a.Operator, actual, expected, msg, safeHeader(a.Path, actual))
 	return
+}
+
+// The comparison uses the real value. What is kept of it (the result's actual value and the
+// message, which reach reports, history and the desktop) follows the rules of package redact.
+func reportable(op domain.Operator, actual, expected, msg, safe string) (string, string) {
+	if safe == actual {
+		return actual, msg
+	}
+	if msg != "" {
+		if _, again := compare(op, safe, expected); again != "" {
+			msg = again
+		} else {
+			msg = fmt.Sprintf("expected %q %s %q; the value is not shown", expected, opLabel(op), expected)
+		}
+		msg = strings.ReplaceAll(msg, actual, redact.Mask)
+	}
+	return safe, msg
+}
+
+func safeHeader(name, value string) string {
+	if value == "" {
+		return value
+	}
+	if redact.IsSensitiveName(name) {
+		return redact.Mask
+	}
+	return redact.Tokens(value)
+}
+
+// safeJSONValue is a value found by a JSONPath expression as a result may keep it.
+func safeJSONValue(path string, val any, formatted string) string {
+	parts := strings.FieldsFunc(path, func(r rune) bool { return strings.ContainsRune("$.[]'\"*?()@ ", r) })
+	if redact.IsSensitivePath(parts) {
+		if formatted == "" {
+			return formatted
+		}
+		return redact.Mask
+	}
+	switch val.(type) {
+	case map[string]any:
+		return "{…}" // a whole object or list is never quoted
+	case []any:
+		return "[…]"
+	case string:
+		return redact.Tokens(formatted)
+	}
+	return formatted
 }
 
 // evalDuration compares the response time of the request (milliseconds, from sending it to the end
@@ -101,6 +152,7 @@ func evalJSONPath(a domain.Assertion, resp *domain.Response) (actual string, pas
 	actual = FormatValue(val)
 	expected := expectedStr(a.Expected)
 	passed, msg = compare(a.Operator, actual, expected)
+	actual, msg = reportable(a.Operator, actual, expected, msg, safeJSONValue(a.Path, val, actual))
 	return
 }
 
@@ -121,13 +173,13 @@ func (ev *Evaluator) evalSchema(a domain.Assertion, resp *domain.Response) (actu
 		}
 		errs := openapi.ValidateResponse(ev.spec, a.Schema, resp)
 		if len(errs) == 0 {
-			return body, true, ""
+			return "", true, ""
 		}
 		msgs := make([]string, len(errs))
 		for i, e := range errs {
 			msgs[i] = e.Error()
 		}
-		return body, false, strings.Join(msgs, "; ")
+		return "", false, strings.Join(msgs, "; ")
 	}
 
 	// Inline schema (JSON object or YAML fragment) — wrap it in a minimal spec
@@ -153,21 +205,23 @@ paths:
 		return "", false, fmt.Sprintf("invalid schema: %v", err)
 	}
 
+	// A schema written in place says what the body must look like, whatever the status is (a status
+	// assertion checks the status). The wrapper declares one response, so it is validated as that one.
 	fakeResp := &domain.Response{
-		StatusCode: resp.StatusCode,
+		StatusCode: 200,
 		Headers:    []domain.Header{{Name: "Content-Type", Value: "application/json"}},
 		Body:       resp.Body,
 	}
 
 	errs := openapi.ValidateResponse(inlineSpec, "validate", fakeResp)
 	if len(errs) == 0 {
-		return body, true, ""
+		return "", true, ""
 	}
 	msgs := make([]string, len(errs))
 	for i, e := range errs {
 		msgs[i] = e.Error()
 	}
-	return body, false, strings.Join(msgs, "; ")
+	return "", false, strings.Join(msgs, "; ")
 }
 
 // looksLikeOperationID returns true when s could be an OpenAPI operationId rather
@@ -177,8 +231,8 @@ func looksLikeOperationID(s string) bool {
 	return !strings.ContainsAny(s, "{\n\r:")
 }
 
-func inlineSchemaYAML(s string) string {
-	s = strings.TrimSpace(s)
+func inlineSchemaYAML(raw string) string {
+	s := strings.TrimSpace(raw)
 	if len(s) == 0 {
 		return s
 	}
@@ -187,16 +241,23 @@ func inlineSchemaYAML(s string) string {
 		// YAML mapping (JSON is valid YAML; a block scalar would be a string).
 		return strings.NewReplacer("\n", "", "\r", "").Replace(s)
 	}
-	// YAML schema: indent every line to sit under the `schema:` key (14-space
-	// indent level in the wrapper spec) so the block parses as a mapping.
+	// YAML schema: move the block under the `schema:` key of the wrapper spec. Only the indentation
+	// all its lines share is replaced; the rest is the schema's structure.
 	const indent = "                " // 16 spaces
-	lines := strings.Split(s, "\n")
-	var b strings.Builder
-	for _, l := range lines {
+	var lines []string
+	shared := -1
+	for _, l := range strings.Split(strings.ReplaceAll(raw, "\r", ""), "\n") {
 		if strings.TrimSpace(l) == "" {
 			continue
 		}
-		b.WriteString("\n" + indent + strings.TrimLeft(l, " \t"))
+		lines = append(lines, l)
+		if n := len(l) - len(strings.TrimLeft(l, " ")); shared < 0 || n < shared {
+			shared = n
+		}
+	}
+	var b strings.Builder
+	for _, l := range lines {
+		b.WriteString("\n" + indent + l[shared:])
 	}
 	return b.String()
 }

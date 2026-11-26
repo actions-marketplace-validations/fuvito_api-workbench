@@ -514,6 +514,7 @@ describe('where the problem is', () => {
     expect(within(card).queryByTestId('finding-spec')).not.toBeInTheDocument()
   })
   it('applies a choice made in the sidebar and reports the selection and the last result', async () => {
+    bridge.runConformance.mockResolvedValue(output)
     const onSelectionChange = vi.fn()
     const onResult = vi.fn()
     const { rerender } = render(<ConformanceTab onSelectionChange={onSelectionChange} onResult={onResult} />)
@@ -529,7 +530,8 @@ describe('where the problem is', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
     await screen.findByTestId('conform-headline')
-    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ specPath: '/ws/api.yaml', specTitle: 'Shop', total: 7, covered: 5, passing: 4, failing: 1 }))
+    // onResult runs in an effect, which can run after the headline is already on screen.
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ specPath: '/ws/api.yaml', specTitle: 'Shop', total: 7, covered: 5, passing: 4, failing: 1 })))
   })
 })
 
@@ -803,5 +805,40 @@ describe('spec health', () => {
     bridge.inspectConformSpec.mockResolvedValue({ ...info, lint: [] })
     await chooseSpec()
     expect(screen.queryByRole('region', { name: 'Spec health' })).not.toBeInTheDocument()
+  })
+})
+
+describe('operation names', () => {
+  const finding = { kind: 'wrong-type', summary: 's', why: 'w', fix: 'f', detail: 'd' }
+  const op = (name: string, status: string, over: object = {}) => ({
+    operationId: name, method: 'GET', path: `/${name}/{{id}}`, specPath: `/${name}/{id}`, status, statusCode: status === 'skipped' ? 0 : 200,
+    durationMs: 1, violations: [], findings: [], ...over,
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    bridge.getConformContext.mockResolvedValue(ctx)
+    bridge.inspectConformSpec.mockResolvedValue(info)
+    bridge.runConformance.mockResolvedValue({
+      ...output, operations: [
+        op('broken', 'failed', { violations: ['v'], findings: [finding] }),
+        op('fine', 'passed', { warnings: 1, findings: [{ ...finding, severity: 'warning' }] }),
+        op('left-out', 'skipped'),
+        // data from before specPath existed still shows its path
+        { ...op('older', 'passed'), specPath: undefined },
+      ],
+    })
+  })
+
+  it('shows every operation by the path the spec writes, as the exported reports do', async () => {
+    await chooseSpec()
+    fireEvent.click(screen.getByRole('button', { name: /Run conformance check/ }))
+    await screen.findByTestId('conform-headline')
+    for (const name of ['broken', 'fine', 'left-out']) {
+      expect(screen.getAllByText(`/${name}/{id}`).length).toBeGreaterThan(0)
+      expect(document.body.textContent).not.toContain(`/${name}/{{id}}`)
+    }
+    expect(screen.getByRole('article', { name: 'GET /broken/{id} fails' })).toBeInTheDocument()
+    expect(screen.getByText('/older/{{id}}')).toBeInTheDocument()
   })
 })

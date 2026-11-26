@@ -330,14 +330,34 @@ Every assertion may also carry an optional `name:` label. It is saved with the a
 
 A header the server sent more than once (`Set-Cookie`, a repeated `X-Dup`) is read as one list joined with `, `, so `contains` sees every value.
 
-### `type: schema` — OpenAPI schema validation
+### `type: schema` — schema validation
 
-Requires `specFile` set at the scenario level.
+Checks the response body against a schema. **It passes only when the body was compared with a schema and fits it.** `schema` is one of two things:
+
+**The `operationId` of an operation** in the spec named by `specFile` at the scenario level. The body is checked against the schema that operation declares for the status the server gave: that status, else its range (`4XX`), else `default`. If the server sent another type than declared, a declared JSON schema is still used. The assertion **fails and says why** when the operation declares no response for the status, that response has no schema, there is only a type that is not JSON, or the body is empty. It does not check headers.
 
 ```yaml
 - type: schema
   schema: getUserById       # operationId from the linked OpenAPI spec
 ```
+
+**A schema written in place**, as text: JSON, or YAML in a block (releases up to 0.13.3 could not read a YAML block with nested keys). It needs no `specFile`, checks the body **whatever the status is**, and is read as an OpenAPI 3.0 schema. To require a status too, add a `status` assertion.
+
+```yaml
+- type: schema
+  schema: '{"type":"object","required":["id"],"properties":{"id":{"type":"integer"}}}'
+
+- type: schema
+  schema: |
+    type: object
+    required: [id]
+    properties:
+      id: {type: integer}
+```
+
+Releases up to 0.13.3 passed, without reading the body, for a status the assertion did not know (an undeclared one; anything but `200` for a schema written in place), and for a response with no schema to compare with.
+
+A value with no `{`, `:` or line break is taken as an `operationId`; anything else as a schema written in place. Write it as text (quoted, or after `|`), not as nested YAML keys.
 
 ### `type: duration` — response time
 

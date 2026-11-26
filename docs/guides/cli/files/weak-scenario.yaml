@@ -1,0 +1,13 @@
+schemaVersion: "1"
+title: valid but weak
+steps:
+  - label: checks nothing
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+  - label: unused extraction
+    request:
+      method: GET
+      url: "{{baseUrl}}/{{nowhere}}"
+    extractions:
+      - {name: unused, source: jsonpath, path: "$.status"}

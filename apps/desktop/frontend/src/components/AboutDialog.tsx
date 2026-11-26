@@ -4,6 +4,83 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.5',
+    date: '2026-11-25',
+    items: [
+      'Security, please upgrade if you use clrsig mcp: the conform tool an AI agent calls sent every operation, DELETE included, and ignored a read-only project file. It is now read-only; writes need the new --allow-writes flag and allowWrites on the call, and a project with readOnly: true forbids them',
+      'This does not limit the run_scenario tool, which sends whatever a scenario says',
+      'The detailed command-line guide now has a page for every command',
+    ],
+  },
+  {
+    version: '0.13.4',
+    date: '2026-11-25',
+    items: [
+      'Fix, please upgrade: a scenario schema assertion could pass without reading the body (a status it did not know, a 2XX or 4XX range, a response with no schema or no JSON type). Without a spec file, a run that got a 500 could be reported as passed. It now passes only when the body was checked, so some runs that passed may now fail',
+      'clrsig generate no longer replaces files that have other content: nothing is written unless --force',
+      'Negative probes that send nothing say NOTHING CHECKED, OpenAPI 3.1 messages no longer repeat parts of a path, and a YAML schema written in a scenario can have nested keys',
+      'Detailed command-line guide: a first-check walkthrough and pages for seven more commands',
+    ],
+  },
+  {
+    version: '0.13.3',
+    date: '2026-11-25',
+    items: [
+      'Fix, please upgrade from 0.13.2: with OpenAPI 3.1, a baseline could hide a new problem next to a recorded one, or report an unchanged response as new. The 0.13.2 note that baselines kept working was wrong. Each problem is now its own violation, in a stable order',
+      'A baseline recorded with 0.13.2 may show more problems as new: it saved only the start of such a message. Read them before recording again, because some may be real ones that were hidden. Baselines from 0.13.0 and 0.13.1 keep matching what they recorded',
+      'Security: a password written inside longer text (scheme://user:password@host, password=, Pwd=, token= and similar) is masked in reports, results and baselines. This does not find every secret; checks still use the real values. If a saved report or committed baseline holds a password, change it',
+    ],
+  },
+  {
+    version: '0.13.2',
+    date: '2026-11-25',
+    items: [
+      'Security, please upgrade: a response that did not match its schema was quoted in full in conform and run reports, CI logs, Check Conformance findings and some baseline files, so a token, a password or personal data sent by the API could be written there (scenario schema assertions kept the whole body even when they passed). Upgrading does not remove what is already written: check saved reports, CI logs, artifacts and committed baselines, and replace secrets that may be in them',
+      'Reports now quote no whole body, object or schema; the one value at fault may be shown, and is masked when its field is named like a credential or it looks like a token. This is a set of rules, not a guarantee',
+      'JSON scenario reports: "actual" is empty for schema assertions and masked for credential-named values, objects and lists; existing baselines keep working',
+    ],
+  },
+  {
+    version: '0.13.1',
+    date: '2026-11-25',
+    items: [
+      'Fix, a run that passed can now fail: --paths matched operations and negative probes against two different spellings of a path parameter, so /items/{id} selected no operation and /items/{{id}} selected no probe (reported as PASSED, 0 probes). Both spellings now select both, also in conform --list and Check Conformance; nothing selected before is lost',
+      'Fix: a response-time limit for a path written as the spec writes it (--max-response-time-for /items/{id}=500) did nothing; it now applies',
+    ],
+  },
+  {
+    version: '0.13.0',
+    date: '2026-11-25',
+    items: [
+      'Behaviour change, a run that passed before can now fail: conform and Check Conformance treat an empty value as missing in the URL path, a bearer token, an API key and a basic user name. Before, GET /users/{id} with an empty id was sent as GET /users/, and a declared 400, 401 or 404 showed as passing. Such an operation is now "not sent" and its negative probes are skipped; an empty basic password, other empty values and clrsig run are unchanged',
+      'clrsig conform --list shows every operation with the values its request needs and which are missing, without sending anything to the API (text or JSON)',
+      'clrsig init --spec lists the values the spec needs in the new environment files, as comments with the operations that use each; credentials are marked secret. Existing files are not changed',
+    ],
+  },
+  {
+    version: '0.12.0',
+    date: '2026-11-25',
+    items: [
+      'One name per operation: conform reports (Markdown, HTML, JUnit, coverage lists), the baseline comparison, cumulative coverage and the Check Conformance page now write the path as your spec does (GET /users/{id}), as the text report already did',
+      'JUnit: the test names of operations with path parameters change once, so a CI tool that keeps test history treats them as new tests',
+      'JSON: path is unchanged and a new specPath field holds the spec\'s path, on each operation and coverage entry; baseline files keep working and are written as before',
+      'The counts line of the text, HTML, Markdown and GitHub output shows operations that were never sent for lack of a value as "not sent", apart from "failed" (only when there is at least one; they still fail the run, and JUnit totals, JSON and exit codes are unchanged)',
+      'The example server follows its own spec, so conform --negative passes against it (GET and POST /users now need its demo token), and the example scenarios show their step names and pass clrsig validate',
+    ],
+  },
+  {
+    version: '0.11.1',
+    date: '2026-11-25',
+    items: [
+      'GitHub Action, behaviour change for the subdirectory form: fuvito/api-workbench/clrsig-action was an old copy that ignored 18 inputs, read-only among them, so a workflow that asked to send only GET and HEAD still sent every request. It is now the same as the root Action; inputs it ignored take effect',
+      'GitHub Action: the downloaded clrsig is checked against the SHA-256 published with the release, and the step fails if the checksum is missing or different (it catches a damaged or replaced download; it is not a signature)',
+      'GitHub Action: the install script no longer needs bash 4, which the system bash on macOS does not have',
+      'Fix: the guides told you to use fuvito/api-workbench@v1, a tag that does not exist; they now name the exact release',
+      'clrsig init github-actions: the workflow asks only to read the repository (permissions: contents: read) and uses current versions of checkout and upload-artifact',
+      'What We Check now says that a negative probe passes on any 4xx answer, not only the codes it names (CS-GAP-012)',
+    ],
+  },
+  {
     version: '0.11.0',
     date: '2026-11-24',
     items: [

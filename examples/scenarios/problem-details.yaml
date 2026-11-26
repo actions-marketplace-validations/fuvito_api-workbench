@@ -6,7 +6,25 @@ description: >
   Verify that 401, 404, and 422 responses all conform.
 
 steps:
-  - title: Unauthenticated request — 401 must be Problem Details
+  - label: Log in
+    notes: "GET and POST /users need a bearer token."
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"{{username}}","password":"{{password}}"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+    extractions:
+      - name: token
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - label: Unauthenticated request — 401 must be Problem Details
     request:
       method: GET
       url: "{{baseUrl}}/protected"
@@ -36,7 +54,7 @@ steps:
         expected: ""
     failPolicy: continue
 
-  - title: Non-existent user — 404 must be Problem Details
+  - label: Non-existent user — 404 must be Problem Details
     request:
       method: GET
       url: "{{baseUrl}}/users/99999"
@@ -66,10 +84,13 @@ steps:
         expected: ""
     failPolicy: continue
 
-  - title: Create user with missing fields — 422 must be Problem Details
+  - label: Create user with missing fields — 422 must be Problem Details
     request:
       method: POST
       url: "{{baseUrl}}/users"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
       body:
         type: json
         content: '{"name":""}'

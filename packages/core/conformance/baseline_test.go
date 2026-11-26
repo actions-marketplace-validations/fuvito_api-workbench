@@ -183,8 +183,14 @@ func TestViolationIdentityIsTheCheckNotTheWording(t *testing.T) {
 	if reworded[0].Key() != v[0].Key() {
 		t.Errorf("rewording changed the identity:\n%q\n%q", v[0].Key(), reworded[0].Key())
 	}
-	if reworded[0].LegacyKey() == v[0].LegacyKey() {
-		t.Error("the version 1 identity does depend on the wording; that is what this format fixes")
+	// Version 1 compares the wording, but not the schema and value dump: messages carried one up to
+	// 0.13.1 and do not any more, and a baseline recorded then must still match.
+	if reworded[0].LegacyKey() != v[0].LegacyKey() {
+		t.Errorf("the dump is not part of the version 1 identity:\n%q\n%q", v[0].LegacyKey(), reworded[0].LegacyKey())
+	}
+	otherWords := Violations(missingFieldResult(`Error at "/email": the property "email" was not found`), nil)
+	if otherWords[0].LegacyKey() == v[0].LegacyKey() {
+		t.Error("the version 1 identity does depend on the wording; that is what version 2 fixes")
 	}
 
 	base := NewBaseline(v)
@@ -228,7 +234,7 @@ func TestVersion1BaselineIsComparedByWording(t *testing.T) {
 	if len(d.Known) != 1 || len(d.New) != 0 || !d.Legacy || !strings.Contains(d.Text(), "old format (schemaVersion 1)") {
 		t.Errorf("a version 1 baseline still accepts what it recorded: %+v\n%s", d, d.Text())
 	}
-	changed := Violations(missingFieldResult(missingEmail+"\nValue:\n  {}\n"), nil)
+	changed := Violations(missingFieldResult(`Error at "/email": the property "email" was not found`), nil)
 	if d := Compare(changed, b); len(d.New) != 1 {
 		t.Error("a version 1 baseline breaks on a wording change, as it always did")
 	}

@@ -1,6 +1,7 @@
 package openapi_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
@@ -222,16 +223,17 @@ func TestCheck_ResponseBodyFormat(t *testing.T) {
 	if byPath(spec, "/open", 200, js, ``) == 0 {
 		t.Error("CS-RESP-008: an empty body where a schema is declared is caught by ValidateResponseByPath")
 	}
-	if byOperation(spec, "open", 200, js, ``) != 0 {
-		t.Error("CS-RESP-008 KnownGap: the schema assertion does not check an empty body")
+	if byOperation(spec, "open", 200, js, ``) == 0 {
+		t.Error("CS-RESP-008: an empty body does not pass a schema assertion")
 	}
 	// CS-RESP-012: a media type without a decoder (XML, ...) is not checked; it is not a violation.
 	xml := ctype("application/xml")
 	if byPath(spec, "/xml", 200, xml, `<r><id>1</id></r>`) != 0 {
 		t.Error("CS-RESP-012: a valid XML body must not be reported as a violation")
 	}
-	if byOperation(spec, "xml", 200, xml, `<r><id>1</id></r>`) != 0 {
-		t.Error("CS-RESP-012: the schema assertion must not read an XML body as JSON")
+	got := openapi.ValidateResponse(spec, "xml", &domain.Response{StatusCode: 200, Headers: xml, Body: []byte(`<r><id>1</id></r>`)})
+	if len(got) != 1 || !strings.Contains(got[0].Message, "cannot be checked") {
+		t.Errorf("CS-RESP-012: a schema assertion on XML says it cannot check it, and does not read it as JSON: %v", got)
 	}
 }
 
@@ -269,8 +271,8 @@ func TestCheck_ResponseStatus(t *testing.T) {
 	if byPath(spec, "/open", 500, js, `{}`) == 0 {
 		t.Error("CS-RESP-001: an undeclared status is caught by ValidateResponseByPath")
 	}
-	if byOperation(spec, "open", 500, js, `{"x":1}`) != 0 {
-		t.Error("CS-RESP-001 KnownGap: the schema assertion does not check the status")
+	if byOperation(spec, "open", 500, js, `{"x":1}`) == 0 {
+		t.Error("CS-RESP-001: a schema assertion by operationId fails on an undeclared status")
 	}
 	if byPath(spec, "/wild", 201, js, `{"id":1}`) != 0 || byPath(spec, "/wild", 201, js, `{"x":1}`) == 0 {
 		t.Error("a 2XX range declares every 2xx status, and its schema applies")

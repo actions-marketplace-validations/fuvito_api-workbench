@@ -14,6 +14,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/executor"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/variables"
 )
 
@@ -283,31 +284,23 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 	}
 
 	for _, gr := range reqs {
-		opPath := pathOf(gr.Request.URL, baseURL)
-		or := OperationResult{
-			OperationID: gr.OperationID,
-			Summary:     gr.Summary,
-			Tags:        gr.Tags,
-			Method:      string(gr.Request.Method),
-			Path:        opPath,
-			SpecPath:    gr.Path,
-		}
+		or := operationFor(gr, baseURL)
 
-		selected := matchesTags(gr.Tags, opts.Tags) && matchesPathPrefix(opPath, opts.Paths) && matchesOnly(opts.OnlyOperations, or.Method, gr.Path)
+		selected, send := opts.selects(or, gr)
 		if selected {
 			result.FilterMatched++
 		}
-		if !selected || (opts.ReadOnly && !IsReadOnlyMethod(or.Method)) {
+		if !send {
 			or.Skipped = true
 			result.Operations = append(result.Operations, or)
 			handled()
 			continue
 		}
 
-		resolved := resolver.InterpolateRequest(gr.Request)
-		if missing, dynamicErrors := UnresolvedPlaceholders(resolved), resolver.TakeErrors(); len(missing) > 0 || len(dynamicErrors) > 0 {
+		resolved, missing, blocked := prepare(resolver, gr)
+		if blocked != "" {
 			or.Missing = missing
-			or.Blocked = blockedReason(missing, dynamicErrors)
+			or.Blocked = blocked
 			result.Operations = append(result.Operations, or)
 			handled()
 			if opts.FailFast {
@@ -344,16 +337,16 @@ func (r *Runner) Run(ctx context.Context, spec *openapi.Spec, baseURL string, en
 		or.StatusCode = resp.StatusCode
 		or.DurationMs = resp.Duration.Milliseconds()
 		if resp.StatusCode >= 400 {
-			or.BodySnippet = snippet(resp.BodyString(), 200)
+			or.BodySnippet = redact.Excerpt(resp.BodyString(), 200)
 		}
-		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), opPath, resp.StatusCode, resp)
-		if limit := opts.limitFor(opPath); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
+		or.Violations = openapi.ValidateResponseByPath(spec, string(gr.Request.Method), or.Path, resp.StatusCode, resp)
+		if limit := opts.limitFor(or.SpecPath, or.Path); limit > 0 && resp.Duration.Milliseconds() > int64(limit) {
 			// The message holds the limit, not the measured time, so a baseline stays stable
 			// between runs; the time is in DurationMs and in the finding's Got.
 			or.Violations = append(or.Violations, openapi.ValidationError{
 				Kind: openapi.KindSlowResponse, Subject: strconv.Itoa(limit),
 				Expected: fmt.Sprintf("within %d ms", limit), Got: fmt.Sprintf("%d ms", resp.Duration.Milliseconds()),
-				Message: fmt.Sprintf("%s %s %d: the response was slower than the %d ms limit", or.Method, specPathOr(or), resp.StatusCode, limit),
+				Message: fmt.Sprintf("%s %s %d: the response was slower than the %d ms limit", or.Method, or.ReportPath(), resp.StatusCode, limit),
 			})
 		}
 
@@ -411,14 +404,33 @@ func matchesTags(opTags, filterTags []string) bool {
 
 // limitFor returns the response-time limit for an operation path: the longest matching
 // PathLimits prefix, otherwise MaxResponseTimeMs.
-func (o Options) limitFor(opPath string) int {
-	best, limit := -1, o.MaxResponseTimeMs
+func (o Options) limitFor(specPath, sentPath string) int {
+	best, limit := "", o.MaxResponseTimeMs
 	for prefix, ms := range o.PathLimits {
-		if strings.HasPrefix(opPath, prefix) && len(prefix) > best {
-			best, limit = len(prefix), ms
+		if hasPathPrefix(prefix, specPath, sentPath) && (best == "" || longerPrefix(prefix, best)) {
+			best, limit = prefix, ms
 		}
 	}
 	return limit
+}
+
+// longerPrefix orders the prefixes that match one operation: the one naming more of the path wins,
+// however its parameters are written. Between two spellings of the same path the {{name}} one
+// wins, which is the only one that used to match; the last rule just keeps the answer stable.
+func longerPrefix(a, b string) bool {
+	if x, y := len(SpecStyle(a)), len(SpecStyle(b)); x != y {
+		return x > y
+	}
+	if len(a) != len(b) {
+		return len(a) > len(b)
+	}
+	return a > b
+}
+
+// hasPathPrefix says whether a prefix the user typed starts an operation's path. Both spellings of
+// a parameter count: the spec's ({id}) and the generated request's ({{id}}).
+func hasPathPrefix(prefix, specPath, sentPath string) bool {
+	return strings.HasPrefix(specPath, prefix) || strings.HasPrefix(sentPath, prefix) || strings.HasPrefix(specPath, SpecStyle(prefix))
 }
 
 // ParsePathLimits reads repeated /prefix=ms values (for --max-response-time-for).
@@ -441,12 +453,12 @@ func ParsePathLimits(values []string) (map[string]int, error) {
 	return out, nil
 }
 
-func matchesPathPrefix(opPath string, prefixes []string) bool {
+func matchesPathPrefix(specPath, sentPath string, prefixes []string) bool {
 	if len(prefixes) == 0 {
 		return true
 	}
 	for _, p := range prefixes {
-		if strings.HasPrefix(opPath, p) {
+		if hasPathPrefix(p, specPath, sentPath) {
 			return true
 		}
 	}
@@ -483,27 +495,39 @@ func invalidBodyValues(template, resolved *domain.Request, resolver *variables.R
 			}
 		}
 		out = append(out, openapi.ValidationError{
-			Kind: openapi.KindRequestBody, Subject: field, In: "body", Expected: declared, Got: val, Variable: name,
-			Message: fmt.Sprintf("%s %s: the request body field %q takes its value from {{%s}}, which is %q; that is not a valid JSON value (the spec declares %s)", template.Method, specPath, field, name, val, declared),
+			Kind: openapi.KindRequestBody, Subject: field, In: "body", Expected: declared, Got: quotable(field, name, val), Variable: name,
+			Message: fmt.Sprintf("%s %s: the request body field %q takes its value from {{%s}}, which is %q; that is not a valid JSON value (the spec declares %s)", template.Method, specPath, field, name, quotable(field, name, val), declared),
 		})
 	}
 	return out
 }
 
-func specPathOr(or OperationResult) string {
+// quotable is an environment value as a message may quote it: masked when the field or the
+// variable that holds it is named like a credential, or it looks like a token.
+func quotable(field, variable, value string) string {
+	if redact.IsSensitiveName(field) || redact.IsSensitiveName(variable) {
+		return redact.Mask
+	}
+	return redact.Tokens(value)
+}
+
+// ReportPath is the path to show to a person: the one the spec writes (/users/{id}), so that every
+// report names an operation the same way. Path (/users/{{id}}, as the request was generated) stays
+// the identity that baselines, filters and stored history use.
+func (or OperationResult) ReportPath() string {
 	if or.SpecPath != "" {
 		return or.SpecPath
 	}
 	return or.Path
 }
 
-func snippet(s string, max int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	r := []rune(s)
-	if len(r) <= max {
-		return s
-	}
-	return string(r[:max]) + "…"
+var rePlaceholderSegment = regexp.MustCompile(`\{\{([^{}]+)\}\}`)
+
+// SpecStyle writes a stored operation name such as "GET /users/{{id}}" the way the spec does,
+// "GET /users/{id}", where only the name is left (a baseline entry, a history row). It is for
+// display only.
+func SpecStyle(operation string) string {
+	return rePlaceholderSegment.ReplaceAllString(operation, "{$1}")
 }
 
 // Scope describes a run that was limited to the operations that changed since a git ref.

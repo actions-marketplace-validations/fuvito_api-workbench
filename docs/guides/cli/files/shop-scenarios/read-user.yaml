@@ -1,0 +1,7 @@
+schemaVersion: "1"
+title: read one user
+steps:
+  - label: Fetch user 1
+    request: {method: GET, url: "{{baseUrl}}/users/1"}
+    assertions:
+      - {type: status, operator: eq, expected: 200}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,6 +21,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/history"
+	"github.com/fuvito/api-workbench/packages/core/importer"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
@@ -39,7 +41,9 @@ type exitError struct{ code int }
 
 func (e *exitError) Error() string { return "" }
 
-func main() {
+// newRootCmd is the whole command tree, as main runs it. The test of the detailed CLI guide walks
+// it, so no command can be added without a page.
+func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "clrsig",
 		Short:         "Clear Signal — API Contract Validation and Spec Conformance Testing",
@@ -64,6 +68,11 @@ func main() {
 	root.AddCommand(importCmd())
 	root.AddCommand(initCmd())
 	root.AddCommand(configCmd())
+	return root
+}
+
+func main() {
+	root := newRootCmd()
 
 	if err := root.Execute(); err != nil {
 		var xe *exitError
@@ -83,7 +92,14 @@ func requestCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "request <request-file>",
 		Short: "Execute a saved request file and print the response",
-		Args:  cobra.ExactArgs(1),
+		Long: `Send one saved request and print the response. A request with a {{name}} that nothing gives a value to
+is not sent, as in clrsig run.
+
+Exit codes:
+  0  a response was received, whatever its status
+  1  the request was not sent, or no response was received
+  2  a file could not be read or the command was wrong`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			reqPath := args[0]
 
@@ -119,8 +135,11 @@ func requestCmd() *cobra.Command {
 				resolved.Timeout = time.Duration(timeoutMs) * time.Millisecond
 			}
 
-			exec := newExecutor()
-			resp, execErr := exec.Execute(context.Background(), resolved)
+			var resp *domain.Response
+			execErr := notSendable(resolver, resolved)
+			if execErr == nil {
+				resp, execErr = newExecutor().Execute(context.Background(), resolved)
+			}
 
 			method := string(resolved.Method)
 			switch strings.ToLower(format) {
@@ -146,6 +165,22 @@ func requestCmd() *cobra.Command {
 	cmd.Flags().IntVar(&timeoutMs, "timeout", 0, "Request timeout in milliseconds (overrides file setting, 0 = use file value)")
 
 	return cmd
+}
+
+// notSendable says why a request must not go out: a value that could not be made, or a {{name}} that
+// would reach the server with its braces.
+func notSendable(resolver *variables.Resolver, req *domain.Request) error {
+	if errs := resolver.TakeErrors(); len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		return fmt.Errorf("not sent: %s", strings.Join(msgs, "; "))
+	}
+	if missing := variables.UnresolvedPlaceholders(req); len(missing) > 0 {
+		return fmt.Errorf("not sent: no value for {{%s}} (set it in the environment file given with --env)", strings.Join(missing, "}}, {{"))
+	}
+	return nil
 }
 
 func validateCmd() *cobra.Command {
@@ -186,6 +221,8 @@ when --spec is given.`,
 				issues   []scenario.Issue
 				warnings []scenario.Issue
 				err      error
+				// unreadable: the file itself could not be read, which exits 2 rather than 1
+				unreadable bool
 			}
 			var lintEnv *domain.Environment
 			envProblems := false
@@ -228,7 +265,7 @@ when --spec is given.`,
 			for _, path := range files {
 				data, err := os.ReadFile(path)
 				if err != nil {
-					results = append(results, result{path: path, err: fmt.Errorf("reading file: %w", err)})
+					results = append(results, result{path: path, err: fmt.Errorf("reading file: %w", err), unreadable: true})
 					continue
 				}
 				sc, err := serialization.ParseScenarioFile(data, path)
@@ -350,6 +387,11 @@ when --spec is given.`,
 				fmt.Fprint(cmd.OutOrStdout(), string(reportBytes))
 			}
 
+			for _, r := range results {
+				if r.unreadable {
+					return &exitError{2}
+				}
+			}
 			if !allValid {
 				return &exitError{1}
 			}
@@ -371,6 +413,7 @@ func generateCmd() *cobra.Command {
 	var outputDir string
 	var format string
 	var dryRun bool
+	var force bool
 
 	cmd := &cobra.Command{
 		Use:   "generate <spec-file-or-url>",
@@ -382,7 +425,11 @@ The argument may be a local file path or an http/https URL.
 Each generated file contains the HTTP method, URL (with path parameters as
 {{paramName}} placeholders), required headers and query params, an empty JSON
 body stub for POST/PUT/PATCH operations, and a Bearer auth hint when the
-operation declares a security requirement.`,
+operation declares a security requirement.
+
+A file that exists with other content is not replaced: nothing is written, the files are listed and
+the exit code is 2. --force replaces them. A file that already holds what would be written is left
+as it is, and other files in the folder are never touched.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src := args[0]
@@ -419,10 +466,16 @@ operation declares a security requirement.`,
 				URL         string   `json:"url"`
 				Path        string   `json:"path"`
 				Tags        []string `json:"tags,omitempty"`
+				// State is what the file was before this run: new, unchanged or differs
+				State importer.FileState `json:"state"`
+				data  []byte
 			}
 			var results []genResult
 			var skipped int
+			var inTheWay []string
+			names := map[string]bool{}
 
+			// every file is looked at before the first is written, so a refusal writes nothing
 			for _, gr := range reqs {
 				filename := genSanitizeFilename(gr.OperationID)
 				if filename == "" {
@@ -431,21 +484,19 @@ operation declares a security requirement.`,
 				if filename == "" {
 					filename = strings.ToLower(string(gr.Request.Method)) + "-request"
 				}
-				savePath := filepath.Join(destDir, filename+".yaml")
+				savePath := importer.UniqueName(filepath.Join(destDir, filename+".yaml"), names)
 
-				if !dryRun {
-					yamlData, err := serialization.WriteRequest(gr.Request, "yaml")
-					if err != nil {
-						skipped++
-						continue
-					}
-					if err := os.MkdirAll(destDir, 0o755); err != nil {
-						return fmt.Errorf("creating output directory: %w", err)
-					}
-					if err := os.WriteFile(savePath, yamlData, 0o644); err != nil {
-						skipped++
-						continue
-					}
+				yamlData, err := serialization.WriteRequest(gr.Request, "yaml")
+				if err != nil {
+					skipped++
+					continue
+				}
+				state, err := importer.StateOf(savePath, yamlData)
+				if err != nil {
+					return fmt.Errorf("looking at %s: %w", savePath, err)
+				}
+				if state == importer.FileDiffers {
+					inTheWay = append(inTheWay, savePath)
 				}
 
 				results = append(results, genResult{
@@ -454,7 +505,28 @@ operation declares a security requirement.`,
 					URL:         gr.Request.URL,
 					Path:        savePath,
 					Tags:        gr.Tags,
+					State:       state,
+					data:        yamlData,
 				})
+			}
+
+			if !dryRun {
+				if len(inTheWay) > 0 && !force {
+					return fmt.Errorf("nothing was written: %d file%s with other content already there:\n  %s\nUse --output with a new folder to keep them, or --force to replace them",
+						len(inTheWay), plural(len(inTheWay)), strings.Join(inTheWay, "\n  "))
+				}
+				written := results[:0]
+				for _, r := range results {
+					if r.State != importer.FileUnchanged {
+						if err := importer.WriteGenerated(r.Path, r.data); err != nil {
+							fmt.Fprintf(cmd.ErrOrStderr(), "writing %s: %v\n", r.Path, err)
+							skipped++
+							continue
+						}
+					}
+					written = append(written, r)
+				}
+				results = written
 			}
 
 			switch strings.ToLower(format) {
@@ -483,11 +555,18 @@ operation declares a security requirement.`,
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "%s %s%s → %s\n\n", title, version, dryTag, destDir)
 				for _, r := range results {
-					fmt.Fprintf(cmd.OutOrStdout(), "  %-7s %s\n", r.Method, r.URL)
+					note := ""
+					if dryRun && r.State == importer.FileDiffers {
+						note = "  (" + r.Path + " has other content: needs --force)"
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "  %-7s %s%s\n", r.Method, r.URL, note)
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%d request(s) generated", len(results))
 				if skipped > 0 {
 					fmt.Fprintf(cmd.OutOrStdout(), "  %d skipped (write error)", skipped)
+				}
+				if !dryRun && len(inTheWay) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "  %d replaced (--force)", len(inTheWay))
 				}
 				fmt.Fprintln(cmd.OutOrStdout())
 			}
@@ -500,6 +579,7 @@ operation declares a security requirement.`,
 	cmd.Flags().StringVarP(&outputDir, "output", "o", "", "Output directory for generated files (default: ./<spec-title>)")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be generated without writing any files")
+	cmd.Flags().BoolVar(&force, "force", false, "Replace files that exist with other content")
 
 	return cmd
 }
@@ -523,7 +603,7 @@ func conformCmd() *cobra.Command {
 	var vars []string
 	var reports []string
 	var showCoverage bool
-	var runNegative bool
+	var runNegative, listOnly bool
 	var baselineFile, writeBaseline string
 	var start = time.Now()
 
@@ -540,12 +620,35 @@ Exit codes:
   2  spec parse or configuration error
 
 With --baseline, violations already recorded in the baseline file are accepted and
-only new ones fail the run; --write-baseline records the current violations.`,
+only new ones fail the run; --write-baseline records the current violations.
+
+--list sends nothing to the API: it lists every operation with the values its request
+needs and the ones nothing provides, and exits 0 once the spec has been read.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if listOnly {
+				if err := checkListFlags(cmd); err != nil {
+					return err
+				}
+			}
+			formatTyped, outputTyped := cmd.Flags().Changed("format"), cmd.Flags().Changed("output")
+
 			args, err := applyProjectConfig(cmd, args)
 			if err != nil {
 				return err
+			}
+			if listOnly {
+				// What the project file sets for a real run does not apply to a listing.
+				if setupFile != "" {
+					fmt.Fprintf(cmd.ErrOrStderr(), "Note: --list sends nothing, so the setup scenario %s is not run; what it would extract is listed as missing.\n", setupFile)
+				}
+				setupFile, baselineFile, writeBaseline, reports = "", "", "", nil
+				if !formatTyped {
+					format = "text"
+				}
+				if !outputTyped {
+					outputFile = ""
+				}
 			}
 			if len(args) == 0 {
 				return fmt.Errorf("conform needs a spec: pass one, or set spec: in a clrsig.yaml (clrsig init creates one)")
@@ -618,6 +721,28 @@ only new ones fail the run; --write-baseline records the current violations.`,
 					return err
 				}
 				fmt.Fprintln(cmd.ErrOrStderr(), scope.Line())
+			}
+
+			if listOnly {
+				paths := application.SplitList(pathsCSV)
+				tags := application.SplitList(tagsCSV)
+				list, err := conformance.ListNeeds(spec, baseURL, env, conformance.Options{Tags: tags, Paths: paths, ReadOnly: readOnly, OnlyOperations: only})
+				if err != nil {
+					return fmt.Errorf("reading the operations of the spec: %w", err)
+				}
+				data, err := renderNeeds(list, strings.ToLower(format))
+				if err != nil {
+					return err
+				}
+				if err := writeReport(cmd, outputFile, data); err != nil {
+					return err
+				}
+				if only == nil {
+					if msg := application.NoMatchMessage(tags, paths, list.FilterMatched, len(list.Operations)); msg != "" {
+						return fmt.Errorf("%s", msg)
+					}
+				}
+				return nil
 			}
 
 			exec := newExecutor()
@@ -749,6 +874,7 @@ only new ones fail the run; --write-baseline records the current violations.`,
 	cmd.Flags().BoolVar(&showCoverage, "coverage", false, "Append a coverage summary showing which operations received a response")
 	cmd.Flags().StringVar(&baselineFile, "baseline", "", "Accept the violations recorded in this baseline file; only new violations fail the run")
 	cmd.Flags().StringVar(&writeBaseline, "write-baseline", "", "Record the current violations in this file (YAML or JSON by extension) and exit 0")
+	cmd.Flags().BoolVar(&listOnly, "list", false, "List the operations and the values each needs, without sending anything to the API (text or json)")
 	cmd.Flags().BoolVar(&runNegative, "negative", false, "Also run negative probes: drop required fields, wrong types, missing auth, missing params")
 	return cmd
 }
@@ -799,7 +925,7 @@ func printCumulativeCoverage(cmd *cobra.Command, specHash string) {
 	fmt.Fprintf(cmd.OutOrStdout(), "\nCumulative coverage (%d runs):  %d/%d (%.1f%%)\n",
 		rep.RunCount, len(rep.EverCoveredOps), rep.TotalOperations, rep.Percent)
 	if len(rep.NeverCoveredOps) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "  Never covered: %s\n", strings.Join(rep.NeverCoveredOps, ", "))
+		fmt.Fprintf(cmd.OutOrStdout(), "  Never covered: %s\n", conformance.SpecStyle(strings.Join(rep.NeverCoveredOps, ", ")))
 	}
 }
 
@@ -849,6 +975,34 @@ func coverageCmd() *cobra.Command {
 	return cmd
 }
 
+// requireWorkspace refuses a folder that is not there: reading it would look like "nothing recorded",
+// which hides a misspelled name.
+func requireWorkspace(path string) error {
+	if path == "" {
+		return fmt.Errorf("--workspace is required")
+	}
+	if !isDir(path) {
+		return fmt.Errorf("workspace %q is not a folder: check the name given to --workspace", path)
+	}
+	return nil
+}
+
+// qualityGate is the exit status of coverage quality. With --fail-on-gaps, nothing recorded fails
+// too: a gate that has looked at nothing has not passed.
+func qualityGate(cmd *cobra.Command, failOnGaps bool, runs int, hasGaps bool) error {
+	if !failOnGaps {
+		return nil
+	}
+	if runs == 0 {
+		fmt.Fprintln(cmd.ErrOrStderr(), "failed: --fail-on-gaps cannot pass when no coverage was recorded")
+		return &exitError{1}
+	}
+	if hasGaps {
+		return &exitError{1}
+	}
+	return nil
+}
+
 func coverageListCmd() *cobra.Command {
 	var workspacePath string
 	var format string
@@ -859,8 +1013,8 @@ func coverageListCmd() *cobra.Command {
 		Short: "List accumulated coverage for all specs in a workspace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws := workspacePath
-			if ws == "" {
-				return fmt.Errorf("--workspace is required")
+			if err := requireWorkspace(ws); err != nil {
+				return err
 			}
 			reports := coverage.ListAll(ws)
 			if f := strings.ToLower(format); isContractsFormat(f) {
@@ -870,10 +1024,7 @@ func coverageListCmd() *cobra.Command {
 				}
 				return writeReport(cmd, outputFile, data)
 			}
-			if len(reports) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No coverage data found in workspace.")
-				return nil
-			}
+			var out bytes.Buffer
 			switch strings.ToLower(format) {
 			case "json":
 				type jsonEntry struct {
@@ -892,13 +1043,13 @@ func coverageListCmd() *cobra.Command {
 					Failing    int `json:"failing"`
 					NoResult   int `json:"noResult"`
 				}
-				out := make([]jsonEntry, len(reports))
+				entries := make([]jsonEntry, len(reports))
 				for i, r := range reports {
 					lastRun := ""
 					if !r.LastRunAt.IsZero() {
 						lastRun = r.LastRunAt.Format(time.RFC3339)
 					}
-					out[i] = jsonEntry{
+					entries[i] = jsonEntry{
 						SpecFile:   r.SpecFile,
 						Covered:    r.Covered,
 						Total:      r.Total,
@@ -914,20 +1065,23 @@ func coverageListCmd() *cobra.Command {
 						NoResult:   r.Outcomes().NoResult,
 					}
 				}
-				b, _ := json.MarshalIndent(out, "", "  ")
-				fmt.Fprintln(cmd.OutOrStdout(), string(b))
+				b, _ := json.MarshalIndent(entries, "", "  ")
+				fmt.Fprintln(&out, string(b))
 			default:
+				if len(reports) == 0 {
+					fmt.Fprintln(&out, "No coverage data found in workspace.")
+				}
 				for _, r := range reports {
 					lastRun := ""
 					if !r.LastRunAt.IsZero() {
 						lastRun = "  last run " + r.LastRunAt.Format("2006-01-02 15:04")
 					}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s\n  %s\n  scenario runs: %d run(s) · %d passed · %d failed%s\n\n",
+					fmt.Fprintf(&out, "%s\n  %s\n  scenario runs: %d run(s) · %d passed · %d failed%s\n\n",
 						r.SpecFile, reporting.OutcomesLine(r.Outcomes()),
 						r.TotalRuns, r.PassedRuns, r.FailedRuns, lastRun)
 				}
 			}
-			return nil
+			return writeReport(cmd, outputFile, out.Bytes())
 		},
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
@@ -955,16 +1109,17 @@ Reports four quality signals:
   UNTESTED ERROR PATHS   — declared 4xx/5xx responses never triggered
 
 The gaps are signals, not failures: the command exits 0 whether or not it found any. Add
---fail-on-gaps to make a gap fail the step (for example to keep a coverage bar in CI).
+--fail-on-gaps to make a gap fail the step (for example to keep a coverage bar in CI). With it,
+the step also fails when nothing was recorded for the spec.
 
 Exit codes:
   0  the report was produced (and, with --fail-on-gaps, no gap was found)
-  1  --fail-on-gaps was given and one or more gaps were detected
-  2  spec parse or configuration error`,
+  1  --fail-on-gaps was given and one or more gaps were detected, or nothing was recorded
+  2  spec parse or configuration error, or the workspace folder does not exist`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if workspacePath == "" {
-				return fmt.Errorf("--workspace is required")
+			if err := requireWorkspace(workspacePath); err != nil {
+				return err
 			}
 
 			specArg := args[0]
@@ -998,16 +1153,18 @@ Exit codes:
 				if err := writeReport(cmd, outputFile, data); err != nil {
 					return err
 				}
-				if qualityHasGaps(q) {
-					return &exitError{1}
-				}
-				return nil
+				return qualityGate(cmd, failOnGaps, report.TotalRuns, qualityHasGaps(q))
 			}
 
-			if report.TotalRuns == 0 {
-				fmt.Fprintf(cmd.OutOrStdout(), "No coverage data found for %s in %s.\nRun scenarios with --workspace and --spec to accumulate coverage.\n", specArg, workspacePath)
-				return nil
+			// A person gets a sentence when nothing was recorded; a program asking for JSON gets JSON.
+			if report.TotalRuns == 0 && strings.ToLower(format) != "json" {
+				msg := fmt.Sprintf("No coverage data found for %s in %s.\nRun scenarios with --workspace and --spec to accumulate coverage.\n", specArg, workspacePath)
+				if err := writeReport(cmd, outputFile, []byte(msg)); err != nil {
+					return err
+				}
+				return qualityGate(cmd, failOnGaps, 0, false)
 			}
+			var out bytes.Buffer
 
 			q := coverage.ComputeQuality(report, meta.DeclaredStatusCodes, meta.SecuredOps)
 			hasGaps := len(q.NeverExercised) > 0 || len(q.HappyPathOnly) > 0 ||
@@ -1044,7 +1201,7 @@ Exit codes:
 				for _, g := range q.ErrorsNeverTriggered {
 					gaps = append(gaps, jsonGap{Operation: g.Operation, Missing: g.Missing})
 				}
-				out := jsonOut{
+				doc := jsonOut{
 					SpecTitle:            title,
 					SpecVersion:          version,
 					Workspace:            workspacePath,
@@ -1056,29 +1213,29 @@ Exit codes:
 					SecuredNeverAuthed:   q.SecuredNeverAuthed,
 					ErrorsNeverTriggered: gaps,
 				}
-				b, _ := json.MarshalIndent(out, "", "  ")
-				fmt.Fprintln(cmd.OutOrStdout(), string(b))
+				b, _ := json.MarshalIndent(doc, "", "  ")
+				fmt.Fprintln(&out, string(b))
 
 			default:
-				fmt.Fprintf(cmd.OutOrStdout(), "Coverage quality — %s  %s\n", title, version)
-				fmt.Fprintf(cmd.OutOrStdout(), "Workspace: %s  (%d run(s))\n%s\n\n",
+				fmt.Fprintf(&out, "Coverage quality — %s  %s\n", title, version)
+				fmt.Fprintf(&out, "Workspace: %s  (%d run(s))\n%s\n\n",
 					workspacePath, report.TotalRuns, reporting.OutcomesLine(report.Outcomes()))
 
 				if !hasGaps {
-					fmt.Fprintln(cmd.OutOrStdout(), "No gaps found — all operations exercised with error paths triggered and auth tested.")
-					return nil
+					fmt.Fprintln(&out, "No gaps found — all operations exercised with error paths triggered and auth tested.")
+					break
 				}
 
 				if len(q.NeverExercised) > 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "NEVER EXERCISED (%d):\n", len(q.NeverExercised))
+					fmt.Fprintf(&out, "NEVER EXERCISED (%d):\n", len(q.NeverExercised))
 					for _, op := range q.NeverExercised {
-						fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", op)
+						fmt.Fprintf(&out, "  %s\n", op)
 					}
-					fmt.Fprintln(cmd.OutOrStdout())
+					fmt.Fprintln(&out)
 				}
 
 				if len(q.HappyPathOnly) > 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "HAPPY PATH ONLY — no error responses ever triggered (%d):\n", len(q.HappyPathOnly))
+					fmt.Fprintf(&out, "HAPPY PATH ONLY — no error responses ever triggered (%d):\n", len(q.HappyPathOnly))
 					for _, op := range q.HappyPathOnly {
 						var missing []string
 						for _, gap := range q.ErrorsNeverTriggered {
@@ -1090,42 +1247,42 @@ Exit codes:
 							}
 						}
 						if len(missing) > 0 {
-							fmt.Fprintf(cmd.OutOrStdout(), "  %-35s  declared errors: %s\n", op, strings.Join(missing, ", "))
+							fmt.Fprintf(&out, "  %-35s  declared errors: %s\n", op, strings.Join(missing, ", "))
 						} else {
-							fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", op)
+							fmt.Fprintf(&out, "  %s\n", op)
 						}
 					}
-					fmt.Fprintln(cmd.OutOrStdout())
+					fmt.Fprintln(&out)
 				}
 
 				if len(q.SecuredNeverAuthed) > 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "SECURED — never tested with credentials (%d):\n", len(q.SecuredNeverAuthed))
+					fmt.Fprintf(&out, "SECURED — never tested with credentials (%d):\n", len(q.SecuredNeverAuthed))
 					for _, op := range q.SecuredNeverAuthed {
-						fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", op)
+						fmt.Fprintf(&out, "  %s\n", op)
 					}
-					fmt.Fprintln(cmd.OutOrStdout())
+					fmt.Fprintln(&out)
 				}
 
 				if len(q.ErrorsNeverTriggered) > 0 {
-					fmt.Fprintf(cmd.OutOrStdout(), "UNTESTED ERROR PATHS (%d operations):\n", len(q.ErrorsNeverTriggered))
+					fmt.Fprintf(&out, "UNTESTED ERROR PATHS (%d operations):\n", len(q.ErrorsNeverTriggered))
 					for _, gap := range q.ErrorsNeverTriggered {
 						var codes []string
 						for _, c := range gap.Missing {
 							codes = append(codes, fmt.Sprintf("%d", c))
 						}
-						fmt.Fprintf(cmd.OutOrStdout(), "  %-35s  → %s never triggered\n", gap.Operation, strings.Join(codes, ", "))
+						fmt.Fprintf(&out, "  %-35s  → %s never triggered\n", gap.Operation, strings.Join(codes, ", "))
 					}
-					fmt.Fprintln(cmd.OutOrStdout())
+					fmt.Fprintln(&out)
 				}
 
 				total := len(q.NeverExercised) + len(q.HappyPathOnly) + len(q.SecuredNeverAuthed) + len(q.ErrorsNeverTriggered)
-				fmt.Fprintf(cmd.OutOrStdout(), "%d gap(s) found — add scenarios that trigger error paths and test authenticated+unauthenticated flows\n", total)
+				fmt.Fprintf(&out, "%d gap(s) found — add scenarios that trigger error paths and test authenticated+unauthenticated flows\n", total)
 			}
 
-			if hasGaps && failOnGaps {
-				return &exitError{1}
+			if err := writeReport(cmd, outputFile, out.Bytes()); err != nil {
+				return err
 			}
-			return nil
+			return qualityGate(cmd, failOnGaps, report.TotalRuns, hasGaps)
 		},
 	}
 	cmd.Flags().StringVarP(&workspacePath, "workspace", "w", "", "Workspace directory (required)")
@@ -1144,10 +1301,14 @@ func coverageResetCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws := workspacePath
-			if ws == "" {
-				return fmt.Errorf("--workspace is required")
+			if err := requireWorkspace(ws); err != nil {
+				return err
 			}
 			specRef := args[0]
+			if !coverage.Has(ws, specRef) {
+				fmt.Fprintf(cmd.OutOrStdout(), "No coverage data for %s in %s: nothing was reset.\n", specRef, ws)
+				return nil
+			}
 			if err := coverage.Reset(ws, specRef); err != nil {
 				return fmt.Errorf("resetting coverage: %w", err)
 			}
@@ -1221,19 +1382,18 @@ func writeTelemetrySetting(enabled bool) error {
 func telemetryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "telemetry",
-		Short: "Manage opt-in anonymous usage telemetry",
+		Short: "Manage opt-in usage telemetry",
 	}
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "enable",
-		Short: "Opt in to anonymous usage telemetry",
+		Short: "Opt in to usage telemetry",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := writeTelemetrySetting(true); err != nil {
 				return fmt.Errorf("updating settings: %w", err)
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), "Telemetry enabled.")
-			fmt.Fprintln(cmd.OutOrStdout(), "What is sent: command name, result (pass/fail), duration, step/assertion counts.")
-			fmt.Fprintln(cmd.OutOrStdout(), "No request URLs, headers, bodies, or personal data are ever sent.")
+			fmt.Fprint(cmd.OutOrStdout(), telemetry.Disclosure)
 			fmt.Fprintln(cmd.OutOrStdout(), "Run 'clrsig telemetry disable' to opt out at any time.")
 			return nil
 		},
@@ -1241,7 +1401,7 @@ func telemetryCmd() *cobra.Command {
 
 	cmd.AddCommand(&cobra.Command{
 		Use:   "disable",
-		Short: "Opt out of anonymous usage telemetry",
+		Short: "Opt out of usage telemetry",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := writeTelemetrySetting(false); err != nil {
 				return fmt.Errorf("updating settings: %w", err)
@@ -1257,7 +1417,7 @@ func telemetryCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if isTelemetryEnabled() {
 				fmt.Fprintln(cmd.OutOrStdout(), "Telemetry: enabled")
-				fmt.Fprintln(cmd.OutOrStdout(), "What is sent: command name, result, duration, step/assertion counts.")
+				fmt.Fprint(cmd.OutOrStdout(), telemetry.Disclosure)
 			} else {
 				fmt.Fprintln(cmd.OutOrStdout(), "Telemetry: disabled (run 'clrsig telemetry enable' to opt in)")
 			}

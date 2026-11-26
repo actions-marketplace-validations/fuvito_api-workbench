@@ -5,7 +5,7 @@ description: >
   Each step declares the exact shape it expects; any deviation is a failure.
 
 steps:
-  - title: Health check shape
+  - label: Health check shape
     request:
       method: GET
       url: "{{baseUrl}}/health"
@@ -25,7 +25,7 @@ steps:
             }
           }
 
-  - title: Login response shape
+  - label: Login response shape
     request:
       method: POST
       url: "{{baseUrl}}/auth/login"
@@ -53,7 +53,7 @@ steps:
         path: "$.token"
     failPolicy: stop
 
-  - title: User list shape
+  - label: User list shape
     request:
       method: GET
       url: "{{baseUrl}}/users"
@@ -81,7 +81,7 @@ steps:
             }
           }
 
-  - title: Single user shape
+  - label: Single user shape
     request:
       method: GET
       url: "{{baseUrl}}/users/1"

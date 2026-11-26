@@ -254,12 +254,11 @@ func multiDoc(title string, results []*scenario.Result, total time.Duration, cov
 // ConformHTML returns a self-contained HTML report for a conformance run. Pass non-nil
 // coverage and/or neg to append the coverage summary and the negative-probe results.
 func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageReport, neg *conformance.NegativeResult) htmlDoc {
-	passed, failed, skipped := result.Counts()
+	_, failed, _ := result.Counts()
 	doc := htmlDoc{
 		Title:    fmt.Sprintf("%s %s", result.SpecTitle, result.SpecVersion),
 		Subtitle: "Conformance run against " + result.BaseURL,
-		Summary: fmt.Sprintf("%d operations  ·  %d passed  ·  %d failed  ·  %d skipped  %dms",
-			passed+failed+skipped, passed, failed, skipped, result.Duration.Milliseconds()),
+		Summary:  fmt.Sprintf("%s  %dms", conformTally(result), result.Duration.Milliseconds()),
 	}
 	doc.Passed = failed == 0
 	if w := result.WarningCount(); w > 0 {
@@ -276,7 +275,7 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 		ops.Footer = x.text(conformance.MissingValuesAdvice(n, missing))
 	}
 	for _, op := range result.Operations {
-		row := htmlRow{Title: op.Method + " " + op.Path}
+		row := htmlRow{Title: op.Method + " " + op.ReportPath()}
 		switch {
 		case op.Skipped:
 			row.Status = "SKIP"
@@ -316,10 +315,10 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 		}
 		var covered, missed []string
 		for _, op := range cov.CoveredOps {
-			covered = append(covered, op.Method+" "+op.Path)
+			covered = append(covered, op.Method+" "+op.ReportPath())
 		}
 		for _, op := range cov.NotCoveredOps {
-			missed = append(missed, op.Method+" "+op.Path)
+			missed = append(missed, op.Method+" "+op.ReportPath())
 		}
 		sec.Lists = []htmlList{{Heading: "Covered", Items: covered}, {Heading: "Not covered", Items: missed}}
 		doc.Sections = append(doc.Sections, sec)
@@ -327,9 +326,13 @@ func conformDoc(result *conformance.ConformResult, cov *conformance.CoverageRepo
 
 	if neg != nil {
 		np, nf, ns, ne := neg.Counts()
+		nothing := ""
+		if np+nf+ne == 0 {
+			nothing = "NOTHING CHECKED: " + noProbesNote(ns) + "  ·  "
+		}
 		sec := htmlSection{
 			Heading: "Negative conformance probes",
-			Footer: fmt.Sprintf("%d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms",
+			Footer: nothing + fmt.Sprintf("%d probes  ·  %d passed  ·  %d failed  ·  %d skipped  ·  %d errors  %dms",
 				np+nf+ne, np, nf, ns, ne, neg.Duration.Milliseconds()),
 		}
 		for _, p := range neg.Probes {

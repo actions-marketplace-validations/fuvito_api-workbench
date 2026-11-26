@@ -250,6 +250,9 @@ func securityRequirements(doc *openapi3.T, op *openapi3.Operation) openapi3.Secu
 	return doc.Security
 }
 
+// APIKeyPlaceholder is the name generated requests use for an API key, wherever the spec puts it.
+const APIKeyPlaceholder = "apiKey"
+
 // authFor builds the credentials a generated request carries for the first security scheme it can
 // express, with {{placeholders}} for the values: {{token}} (bearer and OAuth2), {{basicUser}} and
 // {{basicPass}} (basic), {{apiKey}} (API keys). An alternative that needs no credentials (an empty
@@ -299,7 +302,7 @@ func authFor(doc *openapi3.T, op *openapi3.Operation) (*domain.Auth, string) {
 				case "query":
 					return &domain.Auth{Type: domain.AuthAPIKey, APIKey: &domain.APIKeyAuth{Key: scheme.Name, Value: "{{apiKey}}", Location: domain.APIKeyInQuery}}, ""
 				case "cookie":
-					return nil, scheme.Name + "={{apiKey}}"
+					return nil, scheme.Name + "={{" + APIKeyPlaceholder + "}}"
 				}
 			}
 		}

@@ -117,8 +117,8 @@ func TestConformReports_BlockedOperations(t *testing.T) {
 			t.Errorf("text is missing %q:\n%s", want, text)
 		}
 	}
-	if !strings.Contains(text, "FAILED  3 operations  ·  1 passed  ·  2 failed") {
-		t.Errorf("a blocked operation counts as failed:\n%s", text)
+	if !strings.Contains(text, "FAILED  3 operations  ·  1 passed  ·  0 failed  ·  2 not sent") {
+		t.Errorf("a blocked operation fails the run and is counted as not sent:\n%s", text)
 	}
 	if strings.Count(text, "provides: id, name") != 1 {
 		t.Errorf("the missing names are listed once, not per operation:\n%s", text)

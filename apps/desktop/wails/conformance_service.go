@@ -19,6 +19,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/projectconfig"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -371,14 +372,17 @@ func findingsIO(fs []conformance.Finding) []ConformFindingIO {
 }
 
 type ConformOperationIO struct {
-	OperationID string   `json:"operationId"`
-	Method      string   `json:"method"`
-	Path        string   `json:"path"`
-	Status      string   `json:"status"` // passed, failed, error, blocked (not sent: a value is missing), skipped
-	StatusCode  int      `json:"statusCode"`
-	DurationMs  int64    `json:"durationMs"`
-	Violations  []string `json:"violations"`
-	Error       string   `json:"error,omitempty"`
+	OperationID string `json:"operationId"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	// SpecPath is the path as the spec writes it, which the page shows; Path is the generated
+	// request's, as in the JSON report.
+	SpecPath   string   `json:"specPath"`
+	Status     string   `json:"status"` // passed, failed, error, blocked (not sent: a value is missing), skipped
+	StatusCode int      `json:"statusCode"`
+	DurationMs int64    `json:"durationMs"`
+	Violations []string `json:"violations"`
+	Error      string   `json:"error,omitempty"`
 	// Findings explain the failure in plain language; empty for a passing or skipped operation.
 	Findings []ConformFindingIO `json:"findings"`
 	// Warnings counts the findings that are only warnings; a passing operation can have some.
@@ -541,7 +545,7 @@ func (s *ConformanceService) RunConformance(in ConformRunInput) ConformRunOutput
 		Baseline:          baseline,
 		Progress: func(done, total int, op conformance.OperationResult) {
 			if s.emit != nil {
-				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.Path})
+				s.emit("conformance:progress", ConformProgressEvent{Done: done, Total: total, Operation: op.Method + " " + op.ReportPath()})
 			}
 		},
 	})
@@ -667,8 +671,8 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 	}
 	for _, op := range r.Operations {
 		item := ConformOperationIO{
-			OperationID: op.OperationID, Method: op.Method, Path: op.Path,
-			StatusCode: op.StatusCode, DurationMs: op.DurationMs, Error: op.Error,
+			OperationID: op.OperationID, Method: op.Method, Path: op.Path, SpecPath: op.ReportPath(),
+			StatusCode: op.StatusCode, DurationMs: op.DurationMs, Error: redact.Credentials(op.Error),
 			Violations: []string{},
 			Findings:   []ConformFindingIO{},
 		}
@@ -717,7 +721,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		for _, p := range out.Negative.Probes {
 			item := ConformProbeIO{
 				OperationID: p.OperationID, Method: p.Method, Path: p.Path,
-				Kind: string(p.Kind), Description: p.Description, StatusCode: p.StatusCode, Error: p.Error,
+				Kind: string(p.Kind), Description: p.Description, StatusCode: p.StatusCode, Error: redact.Credentials(p.Error),
 			}
 			switch {
 			case p.Skipped:
@@ -917,7 +921,7 @@ func baselineIO(path string, d *conformance.BaselineDiff) *ConformBaselineIO {
 	conv := func(vs []conformance.Violation) []ConformViolationIO {
 		out := []ConformViolationIO{}
 		for _, v := range vs {
-			item := ConformViolationIO{Operation: v.Operation, Check: v.Check, Where: v.Where, Summary: v.Summary}
+			item := ConformViolationIO{Operation: conformance.SpecStyle(v.Operation), Check: v.Check, Where: v.Where, Summary: v.Summary}
 			if item.Summary == "" {
 				item.Summary = v.Detail
 				if i := strings.Index(item.Summary, "\n"); i >= 0 {

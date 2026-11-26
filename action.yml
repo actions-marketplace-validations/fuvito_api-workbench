@@ -147,8 +147,9 @@ runs:
         fi
 
         # Map runner OS/arch to binary name
-        OS="${RUNNER_OS,,}"   # lowercase: linux / macos / windows
-        ARCH="${RUNNER_ARCH,,}"  # amd64 / arm64 / x86 / x64
+        # tr rather than bash case conversion, which needs bash 4; the system bash on macOS is 3.2.
+        OS="$(printf '%s' "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')"      # linux / macos / windows
+        ARCH="$(printf '%s' "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"  # amd64 / arm64 / x86 / x64
         case "$ARCH" in
           x64)   ARCH=amd64  ;;
           x86)   ARCH=amd64  ;;
@@ -174,6 +175,26 @@ runs:
         URL="https://github.com/fuvito/api-workbench/releases/download/${VERSION}/${BINARY}"
         echo "Downloading ${BINARY} from ${VERSION}..."
         curl -fsSL -o "$DEST" "$URL"
+
+        # The Action runs with the workflow's secrets in reach, so the binary is only used when it
+        # matches the checksum published with the release. The .sha256 file holds the hash alone.
+        if ! PUBLISHED="$(curl -fsSL "${URL}.sha256")"; then
+          echo "::error::Could not download ${BINARY}.sha256 from release ${VERSION}, so the download cannot be verified. Check that the release exists and has this file, or set version: to a release that does."
+          rm -f "$DEST"
+          exit 1
+        fi
+        EXPECTED="$(printf '%s\n' "$PUBLISHED" | awk 'NR==1 {print $1}' | tr -d '\r' | tr '[:upper:]' '[:lower:]')"
+        if command -v sha256sum >/dev/null 2>&1; then
+          ACTUAL="$(sha256sum < "$DEST" | awk '{print $1}')"
+        else
+          ACTUAL="$(shasum -a 256 < "$DEST" | awk '{print $1}')"
+        fi
+        if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
+          echo "::error::Checksum mismatch for ${BINARY} from ${VERSION}: the release publishes '${EXPECTED}' but the download is '${ACTUAL}'. The file was not installed. Run the job again; if it repeats, report it and do not use this release."
+          rm -f "$DEST"
+          exit 1
+        fi
+        echo "Checksum verified (sha256 ${ACTUAL})."
         chmod +x "$DEST"
 
         echo "$BIN_DIR" >> "$GITHUB_PATH"

@@ -7,9 +7,9 @@ Clear Signal ships from five places simultaneously. This doc covers what to do b
 |---|---|---|
 | GitHub Releases | Desktop app (Win/macOS/Linux) + CLI binaries + `.sha256` sidecars | ✓ CI |
 | GHCR Docker | `ghcr.io/fuvito/api-workbench` CLI image | ✓ CI |
-| Homebrew tap | `brew install clrsig` | ✓ CI (post-publish) |
+| Homebrew tap | `brew install fuvito/api-workbench/clrsig` | ✓ CI (post-publish) |
 | Scoop bucket | `scoop install clrsig` | ✓ CI (post-publish) |
-| GitHub Actions Marketplace | `uses: fuvito/api-workbench@vN` | ✓ auto after initial listing |
+| GitHub Actions Marketplace | `uses: fuvito/api-workbench@<release tag>` | ✓ auto after initial listing |
 
 ---
 
@@ -31,6 +31,8 @@ Clear Signal ships from five places simultaneously. This doc covers what to do b
 apps/desktop/frontend/src/components/AboutDialog.tsx   ← version string + RELEASE_NOTES entry
 apps/desktop/wails/help/user-guide.md                  ← same
 ```
+
+Then update every `uses:` reference to this Action in the current documents to the new version (`TestDocumentedActionRefsNameThisVersion` fails until they agree). Until the tag is pushed those references name a tag that does not exist, so tag soon after the release commit passes CI.
 
 `RELEASE_NOTES` in `AboutDialog.tsx` is an array — prepend a new entry for this release; don't edit old ones.
 
@@ -105,6 +107,7 @@ This triggers `release.yml`, which runs these jobs in order:
 5. `docker` — builds and pushes to GHCR
 6. `publish` — downloads all artifacts, generates SHA256 sidecars, creates GitHub Release
 7. `update-tap` — runs `scripts/update-tap.py`, auto-commits updated `Formula/clrsig.rb` and `bucket/clrsig.json`
+8. `smoke` (`.github/workflows/smoke.yml`) — after publishing, checks as a user would: the Docker image reports the version and validates a mounted spec (no registry login); the Action from the tag installs and runs that release on Linux, macOS and Windows; `brew tap` + `brew install fuvito/api-workbench/clrsig` gives that version on macOS. **It cannot stop a release** (it is already out): a red `smoke` job means fix forward. To run it again for the newest release: Actions → *Post-release smoke* → Run workflow, with the tag. Not covered by it: the remote reference `uses: fuvito/api-workbench@<tag>` (`uses:` takes no variable), the Scoop install, and the desktop apps.
 
 Watch the run at `github.com/fuvito/api-workbench/actions` (or `gh run watch <id>`). The release job installs the pinned Wails CLI (`wails@v2.17.1`, matching `go.mod`); raise the pin together with the app, never to `@latest`.
 
@@ -149,8 +152,8 @@ docker run --rm ghcr.io/fuvito/api-workbench:latest --version
 The `update-tap` job auto-commits updated SHA256s to `Formula/clrsig.rb`. Verify the formula commit landed on `main`, then test:
 
 ```bash
-brew tap fuvito/api-workbench
-brew upgrade clrsig   # or install if first time
+brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
+brew upgrade fuvito/api-workbench/clrsig   # first time: brew install fuvito/api-workbench/clrsig
 clrsig --version
 ```
 
@@ -174,7 +177,7 @@ After the initial listing (see `docs/process/manual-steps.md`), subsequent relea
 
 ```yaml
 # In any test workflow
-- uses: fuvito/api-workbench@v0.2.0
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: openapi.yaml
@@ -186,7 +189,7 @@ After the initial listing (see `docs/process/manual-steps.md`), subsequent relea
 > git tag -f v1
 > git push origin v1 --force
 > ```
-> Until then, the recommended pin is the full version tag (e.g. `@v0.2.0`) or `@main`.
+> Until then, the recommended pin is the full version tag, which is what the documents show.
 
 - [ ] Action works with the new version tag
 

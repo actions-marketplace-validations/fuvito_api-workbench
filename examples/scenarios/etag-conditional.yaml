@@ -7,7 +7,7 @@ description: >
   with the full response and an updated ETag.
 
 steps:
-  - title: Fetch user — server must return ETag
+  - label: Fetch user — server must return ETag
     request:
       method: GET
       url: "{{baseUrl}}/users/1"
@@ -29,7 +29,7 @@ steps:
         path: "ETag"
     failPolicy: stop
 
-  - title: Conditional GET with matching ETag — expect 304 Not Modified
+  - label: Conditional GET with matching ETag — expect 304 Not Modified
     request:
       method: GET
       url: "{{baseUrl}}/users/1"
@@ -42,7 +42,7 @@ steps:
         expected: "304"
     failPolicy: continue
 
-  - title: Conditional GET with stale ETag — expect 200 with full response
+  - label: Conditional GET with stale ETag — expect 200 with full response
     request:
       method: GET
       url: "{{baseUrl}}/users/1"

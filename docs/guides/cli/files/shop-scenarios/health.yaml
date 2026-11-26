@@ -1,0 +1,7 @@
+schemaVersion: "1"
+title: health only
+steps:
+  - label: Health
+    request: {method: GET, url: "{{baseUrl}}/health"}
+    assertions:
+      - {type: status, operator: eq, expected: 200}

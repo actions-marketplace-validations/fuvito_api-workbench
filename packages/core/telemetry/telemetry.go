@@ -14,6 +14,15 @@ import (
 
 const endpoint = "https://telemetry.clrsig.com/v1/event"
 
+// Disclosure is what a person is told when they look at or turn on telemetry. It names every field
+// of payload below; a test holds the two together.
+const Disclosure = `After run, conform and bundle run, this is sent:
+  the command name, its result, how long it took, and the number of steps and assertions
+  a random identifier of this installation, the same every time
+  the clrsig version, operating system, processor type and the time
+No request URLs, headers or bodies are sent. Your IP address reaches the server, as with any request.
+`
+
 // Event carries the data recorded for one CLI invocation.
 // No URLs, headers, bodies, or personal data are included.
 type Event struct {

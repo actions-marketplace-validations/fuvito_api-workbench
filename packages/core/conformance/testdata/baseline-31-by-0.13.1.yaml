@@ -1,0 +1,129 @@
+schemaVersion: "2"
+violations:
+    - operation: GET /thing
+      check: other
+      rule: |
+        validation failed due to: at '': missing properties 'name', 'owner'
+        Schema:
+          {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "on"
+                ],
+                "type": "string"
+              },
+              "user": {
+                "properties": {
+                  "age": {
+                    "type": "integer"
+                  },
+                  "id": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "name",
+              "owner"
+            ],
+            "type": "object"
+          }
+
+        Value:
+          {
+            "count": "many",
+            "extra": 1,
+            "more": 2,
+            "status": "off",
+            "user": {
+              "age": "x",
+              "id": "y"
+            }
+          }
+         | error at "/status": at '/status': value must be 'on'
+        Schema:
+          {
+            "enum": [
+              "on"
+            ],
+            "type": "string"
+          }
+
+        Value:
+          "off"
+         | error at "/count": at '/count': got string, want integer
+        Schema:
+          {
+            "type": "integer"
+          }
+
+        Value:
+          "many"
+         | validation failed due to: error at "/user/user/age": at '/user/age': got string, want integer
+        Schema:
+          {
+            "type": "integer"
+          }
+
+        Value:
+          "x"
+         | error at "/user/user/id": at '/user/id': got string, want integer
+        Schema:
+          {
+            "type": "integer"
+          }
+
+        Value:
+          "y"
+         | at '': additional properties 'extra', 'more' not allowed
+        Schema:
+          {
+            "additionalProperties": false,
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "status": {
+                "enum": [
+                  "on"
+                ],
+                "type": "string"
+              },
+              "user": {
+                "properties": {
+                  "age": {
+                    "type": "integer"
+                  },
+                  "id": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "name",
+              "owner"
+            ],
+            "type": "object"
+          }
+
+        Value:
+          {
+            "count": "many",
+            "extra": 1,
+            "more": 2,
+            "status": "off",
+            "user": {
+              "age": "x",
+              "id": "y"
+            }
+          }
+      summary: 'validation failed due to: at '''': missing properties ''name'', ''owner'''

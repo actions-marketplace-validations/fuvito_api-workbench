@@ -1,0 +1,15 @@
+schemaVersion: "1"
+title: demo bundle
+environments:
+  - file: local
+    name: local
+    variables:
+      - {name: baseUrl, value: "http://localhost:8080"}
+scenarios:
+  - file: health
+    title: Health
+    steps:
+      - label: Health
+        request: {schemaVersion: "1", method: GET, url: "{{baseUrl}}/health"}
+        assertions:
+          - {type: status, operator: eq, expected: 200}

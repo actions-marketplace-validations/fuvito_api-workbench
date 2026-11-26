@@ -26,16 +26,34 @@ const (
 	rateLimitWindow = time.Minute
 )
 
-var (
-	mu    sync.Mutex
-	users = []User{
+// seedUsers returns the users the server starts with. It builds a new slice each time, because
+// deleting a user changes the slice in place.
+func seedUsers() []User {
+	return []User{
 		{ID: 1, Name: "Alice Smith", Email: "alice@example.com", CreatedAt: "2026-01-01T00:00:00Z"},
 		{ID: 2, Name: "Bob Jones", Email: "bob@example.com", CreatedAt: "2026-01-02T00:00:00Z"},
 		{ID: 3, Name: "Carol White", Email: "carol@example.com", CreatedAt: "2026-01-03T00:00:00Z"},
 		{ID: 4, Name: "David Brown", Email: "david@example.com", CreatedAt: "2026-01-04T00:00:00Z"},
 		{ID: 5, Name: "Eva Green", Email: "eva@example.com", CreatedAt: "2026-01-05T00:00:00Z"},
 	}
-	nextID     = 6
+}
+
+// resetState puts the server back as it was when it started.
+func resetState() {
+	mu.Lock()
+	users = seedUsers()
+	nextID = len(users) + 1
+	mu.Unlock()
+	loginMu.Lock()
+	loginAttempts = 0
+	loginWindowStart = time.Now()
+	loginMu.Unlock()
+}
+
+var (
+	mu         sync.Mutex
+	users      = seedUsers()
+	nextID     = len(users) + 1
 	validToken = "demo-token-12345"
 
 	loginMu          sync.Mutex
@@ -65,14 +83,14 @@ func main() {
 	fmt.Println()
 	fmt.Println("  POST   /auth/login           { \"username\": \"admin\", \"password\": \"secret\" }")
 	fmt.Println("  GET    /health")
-	fmt.Println("  GET    /users")
-	fmt.Println("  POST   /users                { \"name\": \"...\", \"email\": \"...\" }")
+	fmt.Println("  GET    /users                requires Authorization: Bearer demo-token-12345")
+	fmt.Println("  POST   /users                { \"name\": \"...\", \"email\": \"...\" }, requires the same token")
 	fmt.Println("  GET    /users/:id")
 	fmt.Println("  PUT    /users/:id            { \"name\": \"...\", \"email\": \"...\" }")
 	fmt.Println("  DELETE /users/:id")
 	fmt.Println("  GET    /protected            requires Authorization: Bearer demo-token-12345")
 	fmt.Println("  GET    /maintenance          always 503 with Retry-After (conformance testing)")
-	fmt.Println("  POST   /admin/reset          reset rate limit counters (testing only)")
+	fmt.Println("  POST   /admin/reset          restore the sample users and rate limit counters (testing only)")
 	fmt.Println()
 
 	if err := http.ListenAndServe(":8080", mux); err != nil {
@@ -139,6 +157,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		problemJSON(w, http.StatusBadRequest, "/errors/bad-request", "Bad Request", "request body must be valid JSON")
 		return
 	}
+	// A missing field is a malformed request, not a wrong password: it does not count as an attempt.
+	if body.Username == "" || body.Password == "" {
+		problemJSON(w, http.StatusUnprocessableEntity, "/errors/validation-error", "Unprocessable Entity", "username and password are required")
+		return
+	}
 	if body.Username != "admin" || body.Password != "secret" {
 		loginMu.Lock()
 		now := time.Now()
@@ -191,11 +214,18 @@ func handleAdminReset(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w, "POST")
 		return
 	}
-	loginMu.Lock()
-	loginAttempts = 0
-	loginWindowStart = time.Now()
-	loginMu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]string{"message": "rate limit counters reset"})
+	resetState()
+	writeJSON(w, http.StatusOK, map[string]string{"message": "sample users and rate limit counters reset"})
+}
+
+// requireBearer answers 401 and returns false unless the request carries the demo token.
+func requireBearer(w http.ResponseWriter, r *http.Request) bool {
+	if r.Header.Get("Authorization") == "Bearer "+validToken {
+		return true
+	}
+	w.Header().Set("WWW-Authenticate", `Bearer realm="api"`)
+	problemJSON(w, http.StatusUnauthorized, "/errors/unauthorized", "Unauthorized", "missing or invalid authentication token")
+	return false
 }
 
 func handleProtected(w http.ResponseWriter, r *http.Request) {
@@ -203,10 +233,7 @@ func handleProtected(w http.ResponseWriter, r *http.Request) {
 		methodNotAllowed(w, "GET")
 		return
 	}
-	auth := r.Header.Get("Authorization")
-	if auth != "Bearer "+validToken {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="api"`)
-		problemJSON(w, http.StatusUnauthorized, "/errors/unauthorized", "Unauthorized", "missing or invalid authentication token")
+	if !requireBearer(w, r) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
@@ -216,6 +243,10 @@ func handleProtected(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUsers(w http.ResponseWriter, r *http.Request) {
+	// Only the methods the spec declares need the token; any other method is answered with 405.
+	if (r.Method == http.MethodGet || r.Method == http.MethodPost) && !requireBearer(w, r) {
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
 		mu.Lock()

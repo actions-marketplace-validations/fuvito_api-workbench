@@ -26,7 +26,7 @@ func GitHubWorkflow(o WorkflowOptions) string {
 	ref, pinNote := o.Version, ""
 	if !reRelease.MatchString(ref) {
 		ref = "main"
-		pinNote = "  # pin a release tag such as v0.9.0 for reproducible runs"
+		pinNote = "  # this clrsig is not a release build: pin a release tag for reproducible runs"
 	}
 	spec := o.Spec
 	specNote := ""
@@ -41,8 +41,10 @@ func GitHubWorkflow(o WorkflowOptions) string {
 	var b strings.Builder
 	b.WriteString("name: API conformance\n\n")
 	b.WriteString("on:\n  pull_request:\n  workflow_dispatch:\n\n")
+	// The job only reads the repository; without this it gets the repository's default token rights.
+	b.WriteString("permissions:\n  contents: read\n\n")
 	b.WriteString("jobs:\n  conform:\n    runs-on: ubuntu-latest\n    steps:\n")
-	b.WriteString("      - uses: actions/checkout@v4\n\n")
+	b.WriteString("      - uses: actions/checkout@v7\n\n")
 	fmt.Fprintf(&b, "      - uses: fuvito/api-workbench@%s%s\n", ref, pinNote)
 	b.WriteString("        with:\n")
 	b.WriteString("          command: conform\n")
@@ -54,6 +56,6 @@ func GitHubWorkflow(o WorkflowOptions) string {
 	}
 	b.WriteString("          report: |\n            junit=reports/conform.xml\n            html=reports/conform.html\n")
 	b.WriteString("        env:\n          API_TOKEN: ${{ secrets.API_TOKEN }}   # read as ${API_TOKEN} in environments/ci.yaml\n\n")
-	b.WriteString("      - uses: actions/upload-artifact@v4\n        if: always()\n        with:\n          name: conformance-report\n          path: reports/\n")
+	b.WriteString("      - uses: actions/upload-artifact@v7\n        if: always()\n        with:\n          name: conformance-report\n          path: reports/\n")
 	return b.String()
 }

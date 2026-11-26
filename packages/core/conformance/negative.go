@@ -96,7 +96,7 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 
 	for _, probe := range probes {
 		// A tag or path filter leaves an operation out, and its probes with it.
-		if !matchesTags(probe.Tags, opts.Tags) || !matchesPathPrefix(probe.Path, opts.Paths) || !matchesOnly(opts.OnlyOperations, probe.Method, probe.Path) {
+		if !matchesTags(probe.Tags, opts.Tags) || !matchesPathPrefix(probe.Path, pathOf(probe.Request.URL, baseURL), opts.Paths) || !matchesOnly(opts.OnlyOperations, probe.Method, probe.Path) {
 			continue
 		}
 		pr := NegativeProbeResult{
@@ -118,7 +118,9 @@ func (r *NegativeRunner) Run(ctx context.Context, spec *openapi.Spec, baseURL st
 		// Skip probes where path parameters are still unresolved. An unresolved
 		// placeholder in the URL causes a network error that masks the actual
 		// rejection behaviour we are trying to observe.
-		if strings.Contains(resolved.URL, "{{") {
+		// The same goes for an empty path value or credential: the server would refuse the probe
+		// for that, and the refusal would count for what the probe tests.
+		if strings.Contains(resolved.URL, "{{") || len(emptyWhereNeeded(resolver, probe.Request)) > 0 {
 			pr.Skipped = true
 			result.Probes = append(result.Probes, pr)
 			continue

@@ -55,7 +55,7 @@ New project? `clrsig init github-actions` prints a ready workflow for this actio
 The action installs the right `clrsig` for the runner, runs one command and passes its exit code on.
 
 ```yaml
-- uses: fuvito/api-workbench@v1
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: openapi.yaml
@@ -98,7 +98,7 @@ The action installs the right `clrsig` for the runner, runs one command and pass
 The step's `result` output is the exit code. Inputs reach the script as environment variables, so a value with quotes or shell characters cannot change what runs. Secrets belong in the step's `env:` and in the environment file as `${NAME}`, not in `var`. For anything the action does not expose (`--seed`, `--show-extracted`, client certificates, `bundle`, `coverage`, `impact`), install the CLI yourself (below) and call `clrsig` directly.
 
 ```yaml
-- uses: fuvito/api-workbench@v0.7.0
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: specs/openapi.yaml
@@ -123,7 +123,7 @@ jobs:
   conform:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install clrsig
         run: |
@@ -152,7 +152,7 @@ jobs:
 
       - name: Keep the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: conformance-report
           path: reports/conform.html
@@ -163,7 +163,7 @@ jobs:
 `format: github` (`clrsig conform --format github`) prints each finding as a GitHub workflow command, so it shows up in the pull request's **Checks** view and as an annotation, with the check ID in the title (`CS-RESP-005 GET /users/{id}`), what is wrong, why it fails and how to fix it, and, when the spec is a file in the repository, on the line of the operation. It also works for `clrsig run` (`command: run`, `format: github`): each failed assertion, unsent request or response that breaks the spec is annotated on the line of its step in the scenario file. It prints only those commands plus one summary notice, so keep the usual reports with `report:` (for example `junit=reports/conform.xml`). Failures are errors, warnings are warnings, and the exit code is the same as for any other format. GitHub shows only the first ten annotations of each kind per step in the pull request view; the log has all of them.
 
 ```yaml
-- uses: fuvito/api-workbench@v1
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: openapi.yaml
@@ -177,9 +177,9 @@ jobs:
 ### Only what a pull request changed
 
 ```yaml
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: {fetch-depth: 0}           # the comparison needs the history of the target branch
-      - uses: fuvito/api-workbench@v1
+      - uses: fuvito/api-workbench@v0.13.5
         with:
           command: conform
           spec: openapi.yaml
@@ -193,7 +193,7 @@ jobs:
 ### Breaking changes on pull requests
 
 ```yaml
-      - uses: fuvito/api-workbench@v1
+      - uses: fuvito/api-workbench@v0.13.5
         with:
           command: diff
           base-spec: openapi-main.yaml      # for example the spec from the target branch
@@ -309,7 +309,7 @@ variables:
 
 ### Values a request needs
 
-`conform` builds each request from the spec and fills `{{placeholders}}` (path parameters, `{{token}}` for secured operations, body fields) from the environment. A request that still has a placeholder nothing provides is **not sent**: it is reported as failed with `not sent: no value for {{id}}`, the run exits `1`, and one line lists every missing name once. Add those names to the environment file or pass them with `--var`. A variable that is defined but never used is ignored.
+`conform` builds each request from the spec and fills `{{placeholders}}` (path parameters, `{{token}}` for secured operations, body fields) from the environment. A request that still has a placeholder nothing provides is **not sent**: it is marked `FAIL` with `not sent: no value for {{id}}` (the counts line shows it as `not sent`, apart from `failed`), the run exits `1`, and one line lists every missing name once. Add those names to the environment file or pass them with `--var`. A variable that is defined but never used is ignored.
 
 ---
 
@@ -328,9 +328,11 @@ clrsig conform openapi.yaml --base-url "$API_URL" --env environments/ci.yaml --b
 
 Violations that were fixed are reported, so the file can be regenerated and committed to ratchet quality up. Do this too after upgrading `clrsig`: releases before the 2026-11-20 change did not check declared response headers, so a response whose operation declared any header could pass with a broken body, and a run that used to be green may now report real problems.
 
+To see what a run will need before wiring it into CI, `clrsig conform openapi.yaml --list --env environments/ci.yaml` lists every operation with its values and what is missing, without calling the API.
+
 **3. Know what fails the run.** Exit code `1` means at least one of: a response that does not match the spec (wrong status, Content-Type, header or body), a request that could not be built or sent, an operation that was not sent for lack of a value, a negative probe that the server accepted (`--negative`), or, with `--baseline`, a violation that is not in the file. Skipped operations and coverage signals do not fail the run. Every message says what is wrong, where, why, and how to fix it; the full list with IDs, including what is **not** checked, is in [What We Check](../../apps/desktop/wails/help/what-we-check.md).
 
-**4. Prove the CI step itself.** The repository's own pipeline runs `clrsig conform` against the example server (`examples/server`) with `examples/environments/demo-conform.yaml` and expects it to pass, and runs `clrsig diff` on two example specs and expects it to find breaking changes: a useful template for your own smoke step.
+**4. Prove the CI step itself.** The repository's own pipeline runs `clrsig conform` against the example server (`examples/server`) with `examples/environments/demo-conform.yaml` and expects it to pass, with and without `--negative`, and runs `clrsig diff` on two example specs and expects it to find breaking changes: a useful template for your own smoke step.
 
 ---
 

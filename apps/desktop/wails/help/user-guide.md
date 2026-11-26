@@ -1,6 +1,6 @@
 # Clear Signal User Guide
 
-**Version:** 0.11.0
+**Version:** 0.13.5
 
 ---
 
@@ -13,7 +13,7 @@
 5. [Environments and variables](#5-environments-and-variables)
 6. [Sending requests and reading responses](#6-sending-requests-and-reading-responses)
 7. [Importing an OpenAPI specification](#7-importing-an-openapi-specification)
-8. [Scenarios and contract testing](#8-scenarios-and-contract-testing)
+8. [Scenarios and API Contract Validation](#8-scenarios-and-api-contract-validation)
 9. [Contracts — coverage tracking](#9-contracts--coverage-tracking)
 10. [CLI usage](#10-cli-usage)
 11. [CI/CD integration](#11-cicd-integration)
@@ -283,7 +283,7 @@ The result is ordinary request, scenario and environment files under `requests/`
 **File → Export → Bundle (environments + requests + scenarios)…** saves everything in the open workspace as one bundle file — handy for sharing a test suite, moving it to another workspace, or giving an AI assistant your existing tests as context.
 
 - Choose where to save it. A confirmation lists how many environments, requests and scenarios were written.
-- **Secret values are replaced with `CHANGE_ME`**, so the file is safe to share. The workspace is not changed, and the message tells you how many values were replaced.
+- **Values marked secret are replaced with `CHANGE_ME`.** A credential written directly in a request or scenario is not, so read the file before sharing it. The workspace is not changed, and the message tells you how many values were replaced. After importing such a bundle, put the real values in the environment files: until then, `CHANGE_ME` is what gets sent (`clrsig bundle run` alone refuses to send it).
 - Files that cannot be read (for example a request with a YAML error) are skipped and listed in the message.
 - Import the file in another workspace with **File → Import → Bundle…**; scenarios keep working with the requests they refer to.
 
@@ -291,7 +291,7 @@ Unlike **Export Workspace** (a ZIP of the raw files, secrets included), a bundle
 
 ---
 
-## 8. Scenarios and contract testing
+## 8. Scenarios and API Contract Validation
 
 A **scenario** is a YAML or JSON file that runs a sequence of HTTP requests in order, extracts values from responses, passes them to later steps via `{{variable}}` interpolation, and asserts that each response matches the declared contract.
 
@@ -576,6 +576,8 @@ The tab refreshes automatically whenever you switch to it and after any scenario
 
 ## 10. CLI usage
 
+This section is the short reference. For every command with examples, what you will see and what to do next, read the [detailed command-line guide](https://github.com/fuvito/api-workbench/blob/main/docs/guides/cli/README.md).
+
 The CLI uses the same Go execution engine as the desktop application. Build it once and use it in any terminal or CI pipeline — no behavioural differences between interactive testing and CI.
 
 ### The CLI Command Builder
@@ -698,6 +700,8 @@ clrsig run scenarios --env environments/ci.yaml -f markdown >> "$GITHUB_STEP_SUM
 
 An unknown `--format` is an error and stops the command before anything runs.
 
+**Operation names in `conform` reports.** Every report a person reads, JUnit test names included, writes a path as the spec does (`GET /users/{id}`). In JSON, `path` is the path of the generated request (`/users/{{id}}`) and `specPath` is the spec's (`/users/{id}`), on each operation and each coverage entry; a negative probe's `path` is already the spec's. Baseline files identify an operation by the generated path, so existing baselines keep working.
+
 #### Several reports from one run
 
 `--report format=file` (repeatable) writes extra reports from the **same run**, so you do not send every request twice to get both a JUnit file and an HTML page:
@@ -817,9 +821,10 @@ clrsig conform openapi.yaml --base-url http://localhost:8080 --negative --format
 |---|---|
 | `--base-url`, `-b` | Server to send requests to (overrides the spec's `servers[0]`). |
 | `--env`, `-e` | Environment file for variable resolution (for example an auth token). |
-| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path (as the spec writes it) starts with one of these prefixes, so `/latency/` also selects `/latency/{ms}`. A filter that matches no operation is an error (exit code 2), not a pass. On Windows Git Bash set `MSYS_NO_PATHCONV=1`, or the shell rewrites an argument that starts with `/`. |
+| `--tags`, `--paths` | Only run operations with these comma-separated tags, or whose path (as the spec writes it) starts with one of these prefixes, so `/latency/` also selects `/latency/{ms}`. A parameter can be written as in the spec (`/latency/{ms}`) or as in a generated request (`/latency/{{ms}}`); the same applies to `--max-response-time-for`. A filter that matches no operation is an error (exit code 2), not a pass. On Windows Git Bash set `MSYS_NO_PATHCONV=1`, or the shell rewrites an argument that starts with `/`. |
 | `--negative` | Also send negative probes: dropped required fields, wrong types, missing auth, missing parameters. |
 | `--explain` | Under each failing operation, say in plain language what the spec expected, what the server sent, why that fails and what to change. Off by default, so existing logs do not change; the JSON (`findings`), HTML, Markdown and JUnit reports always include it. |
+| `--list` | **Send nothing to the API.** List every operation with the values its request needs and the ones nothing provides. See "What will a run need?" below. |
 | `--read-only` | Send only GET and HEAD requests. POST, PUT, PATCH and DELETE operations (and their negative probes) are skipped and never sent, so the check cannot create, change or delete data. Off by default: without it `conform` sends every operation. |
 | `--setup <scenario>` | Run a scenario before the check, usually a login. What its steps extract (a token, an id) is available to the generated requests as `{{name}}`, so secured operations are sent instead of being reported as not sent. It runs against the same environment (a `--base-url` fills `{{baseUrl}}` for it when the environment has none), a `--var` of the same name wins over an extracted value, and if the scenario fails the check does not start (exit code `2`, with the setup's own report). Extracted values are never printed; one named like a credential (`token`, `password`, `apiKey`...) is masked in every report. In the desktop, **Run a scenario first** in Check Conformance → Options. |
 | `--changed-against <git-ref>` | Check only the operations that are **new or changed** compared with the spec at that git ref, for pull requests (`origin/main`). It needs git and a local spec file, and in CI a checkout with full history. The comparison is the one `clrsig diff` makes, so a change to a schema several operations share counts for each of them. A pull request that does not touch the API passes with `NOTHING CHECKED`. It follows the spec only: a server fault with no spec change is not seen, so keep a full run on your main branch. With `--baseline`, entries of operations that were not checked are neither known nor fixed, and `--write-baseline` is refused on a run limited by this flag, `--tags` or `--paths`. |
@@ -839,7 +844,25 @@ Exit codes: `0` all operations conformed, `1` violations or execution failures, 
 
 **What a response is checked against.** For every operation the response must match what the spec declares for the status the server answered: the **status** itself (a status the spec does not declare, other than through a `default` response, is a violation), the **Content-Type** (a type the spec does not declare is a violation, and the body is then not compared), every **header** the spec declares (a required header that was not sent, or a header whose value does not fit its type) and the **body** against its schema. Each violation says what is wrong, where it is (the part of the response, such as the header name, the status or the body field, and the matching place in the spec), why it counts as a failure and how to fix it; the screen output shows that explanation with `--explain`, the JSON, HTML, Markdown and JUnit reports always include it. The first problem found is reported: a response with both a header problem and a body problem shows the header problem first, so fix it and run again to see the next. The complete list of what is checked, with an ID, an example and the known gaps for each, is in the **What We Check** tab of this Help panel (menu Help, What We Check). Versions before this release did not look at declared headers at all, and a response whose operation declared any header could pass with a broken body; if a previously green run now fails, record the current state with `--write-baseline` and let `--baseline` fail only on new violations while you fix them.
 
-**Operations that cannot be sent.** `conform` builds each request from the spec and fills `{{placeholders}}` (path parameters such as `{{id}}`, `{{token}}` for secured operations, body fields such as `{{name}}`) from the environment and `--var`. If a request still has a placeholder nothing provides, it is **not sent**: sending `/items/{{id}}` would only test how the server handles that literal text, and a declared `404` would then count as a match. The operation is reported as failed with `not sent: no value for {{id}}`, the run exits `1`, and one line under the report lists every missing name once (add them to the environment, or pass `--var name=value`). A variable that is defined but never used is not an error and is not reported. A dynamic value that fails (an unknown `{{$function}}`) blocks the operation the same way.
+**What will a run need?** Before the first run, ask:
+
+```bash
+clrsig conform openapi.yaml --list --env environments/local.yaml
+```
+
+```
+  READY  GET     /health  needs nothing
+  MISS   GET     /users/{id}  needs {{id}}  (not sent: no value for {{id}})
+  SKIP   DELETE  /users/{id}  needs {{id}}
+
+3 operations  ·  1 ready  ·  1 would not be sent  ·  1 skipped
+Values used: id
+Missing: id. Add them to the environment, or pass them as overrides (name=value).
+```
+
+`READY` would be sent, `MISS` would not (a value is missing, or a `{{$function}}` fails), `SKIP` is left out by `--tags`, `--paths`, `--changed-against` or `--read-only` (its values are shown but not counted as missing). Values are never printed. It uses the same rules as a run, so what it calls `MISS` is what a run reports as not sent. It takes the spec, `--env`, `--var`, `--base-url`, the filters, `--read-only`, `--changed-against`, `--output` and `-f text` or `json` (`json` lists each operation's `needs` and `missing`, and each value with whether it is a credential). Flags that only matter when requests are sent (`--negative`, `--setup`, `--report`, the baseline flags and the like) are refused; when they come from `clrsig.yaml` they are ignored, and a setup scenario is not run, so what it would extract shows as missing. It exits `0` once the spec has been read, whatever is missing, and `2` for a usage error or a filter that matches nothing. Nothing is sent to the API; a spec given as a URL is still downloaded.
+
+**Operations that cannot be sent.** `conform` builds each request from the spec and fills `{{placeholders}}` (path parameters such as `{{id}}`, `{{token}}` for secured operations, body fields such as `{{name}}`) from the environment and `--var`. If a request still has a placeholder nothing provides, it is **not sent**: sending `/items/{{id}}` would only test how the server handles that literal text, and a declared `404` would then count as a match. The operation is marked `FAIL` with `not sent: no value for {{id}}` and the run exits `1`. The counts line of the text, HTML, Markdown and GitHub output shows such operations as **not sent**, apart from `failed` (the operations that were sent and broke the spec); the part appears only when there is at least one. One line under the report lists every missing name once (add them to the environment, or pass `--var name=value`). A variable that is defined but never used is not an error and is not reported. A value that is defined but **empty** (`value: ""`, or a `${NAME}` whose process variable is set to nothing) also counts as missing **in the path and in credentials** (bearer token, API key, basic user name): `/items/` or an unauthenticated request would not test the operation, so it is not sent, its probes are skipped, and the message says which value is empty. Elsewhere (a query, header, cookie or body value, and a basic password) empty can be meant, so the request is sent with it. This applies to `conform` and the Check Conformance page; in a scenario every defined value is used as it is. A dynamic value that fails (an unknown `{{$function}}`) blocks the operation the same way.
 
 #### Adopting `conform` on an API that already has violations
 
@@ -852,7 +875,7 @@ clrsig conform openapi.yaml -b http://localhost:8080 --baseline conform-baseline
 
 **Formats.** A response (or generated request) value is checked against `format` for `date`, `date-time`, `email`, `uuid`, `ipv4` and `ipv6` (base64 `byte` as before); a mismatch is a constraint failure (CS-RESP-007) that names the format and the field. Other formats are accepted as the OpenAPI specification allows. A spec whose own `example` breaks `email`, `uuid`, `ipv4` or `ipv6` still loads (its examples are then not checked).
 
-**`clrsig init`.** In a project folder, `clrsig init --spec specs/openapi.yaml --base-url http://localhost:8080` creates `clrsig.yaml`, `environments/local.yaml`, `environments/ci.yaml` (its token is a `${API_TOKEN}` reference, never a value) and empty `scenarios/`, `requests/` and `specs/` folders, then `clrsig conform` needs no flags. It only creates what is missing: an existing file or folder is kept, so running it again changes nothing, and `--dry-run` writes nothing. It does not fetch a URL given as `--spec` and never touches `.github/`. `clrsig init github-actions` prints a ready workflow (using the spec and environment from `clrsig.yaml`, read-only unless the file says otherwise); `--write` saves it to `.github/workflows/clrsig.yml` and refuses to replace a file that exists.
+**`clrsig init`.** In a project folder, `clrsig init --spec specs/openapi.yaml --base-url http://localhost:8080` creates `clrsig.yaml`, `environments/local.yaml`, `environments/ci.yaml` (its token is a `${API_TOKEN}` reference, never a value) and empty `scenarios/`, `requests/` and `specs/` folders, then `clrsig conform` needs no flags. It only creates what is missing: an existing file or folder is kept, so running it again changes nothing, and `--dry-run` writes nothing. It does not fetch a URL given as `--spec` and never touches `.github/`. `clrsig init github-actions` prints a ready workflow (using the spec and environment from `clrsig.yaml`, read-only unless the file says otherwise); `--write` saves it to `.github/workflows/clrsig.yml` and refuses to replace a file that exists. With `--spec` pointing at a local file, the new environment files also list the values the spec's requests take, **as comments** with the operations that use each: remove the `#` from the ones you need and fill them in (credentials are marked `secret: true`, and in `ci.yaml` read from a process variable such as `${API_KEY}`). Until then those operations are reported as not sent. An environment file that already exists is never changed, and a spec given as a URL is not fetched: use `clrsig conform --list` in both cases.
 
 **Project file.** A `clrsig.yaml` at the project root supplies the defaults of the flags that repeat, so `clrsig conform`, `clrsig run` and `clrsig validate` can be run with no arguments. A flag or argument always wins over the file, paths in it are relative to its folder, it never holds secrets, and a command that used it says so on stderr. `--no-config` ignores it and `--config <file>` chooses another. In the desktop app the **Workspace page** has a Project file card (what the file gives, or a suggestion to run `clrsig init` when there is none, and a warning in Needs attention when the file cannot be used), and **Check Conformance** starts from the file's spec, environment, base URL and options. Only a `clrsig.yaml` in the workspace folder is read, a path outside the workspace is not used, and the page stays read-only until you tick Allow writes whatever `conform.readOnly` says. The keys are listed in the Format Spec. `clrsig config show [conform|run|validate]` lists every setting the file can supply for a command, its value and whether it comes from the file or is the built-in default, so you can see what a command will do when you leave a value out. The CLI Command Builder always writes a command in full and tells you when a project file applies where you run it.
 
@@ -879,12 +902,12 @@ clrsig impact openapi-v1.yaml openapi-v2.yaml scenarios
 ### `clrsig generate`, `request` and `validate`
 
 ```bash
-clrsig generate openapi.yaml --output requests/ [--base-url https://api.example.com] [--dry-run]
+clrsig generate openapi.yaml --output requests/ [--base-url https://api.example.com] [--dry-run] [--force]
 clrsig request requests/health-check.yaml --env environments/local.yaml [--timeout 5000]
 clrsig validate scenarios
 ```
 
-`generate` writes one request file per spec operation (the same files the desktop **Import OpenAPI** button creates). `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything; like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
+`generate` writes one request file per spec operation. It does not replace a file that exists with other content: nothing is written and it exits `2`; `--force` replaces such files (releases up to 0.13.3 replaced them without asking). The desktop **Import OpenAPI** button never replaces a file either; it gives the new one another name. `request` executes one saved request file and prints the response; one with a `{{name}}` that nothing defines is not sent (exit `1`). `validate` checks scenario files for errors without sending anything (exit `1` for errors, `2` for a file that cannot be read); like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
 
 `validate --spec <openapi-file>` checks the spec document itself (scenarios are then optional): an operation without an `operationId` (CS-SPEC-001), a schema whose `required` lists a property it does not declare (CS-SPEC-002) and an example that breaks its format (CS-SPEC-003). Errors fail the check, warnings print as notes and fail it only with `--strict`. These are problems in the spec, not the server, so fix them before reading conformance violations; Check Conformance shows them as **Spec health** as soon as you choose a spec.
 
@@ -897,7 +920,7 @@ clrsig import postman collection.json --output requests/
 clrsig import insomnia export.json --output requests/ --dry-run
 ```
 
-Converts a Postman collection (v2.1) or an Insomnia export (v4) into request files, in the same layout the desktop app's **Import** menu uses: `<output>/<collection>/<folders>/<request>.yaml` (default output folder: `requests`). It never overwrites: a name that is taken gets `-2`, `-3` … `--dry-run` lists the files that would be written. `--format json` gives the list for scripts. Exit codes: `0` converted, `1` some requests could not be written, `2` the file is unreadable or not a supported export.
+Converts a Postman collection (v2.1) or an Insomnia export (v4) into request files, in the same layout the desktop app's **Import** menu uses: `<output>/<collection>/<folders>/<request>.yaml` (default output folder: `requests`). Scripts are not converted: `clrsig import` warns for each request that had a Postman test or pre-request script (the desktop import does not show warnings). It never overwrites: a name that is taken gets `-2`, `-3` … `--dry-run` lists the files that would be written. `--format json` gives the list for scripts. Exit codes: `0` converted, `1` some requests could not be written, `2` the file is unreadable or not a supported export.
 
 ### `clrsig coverage`
 
@@ -910,7 +933,7 @@ clrsig coverage quality openapi.yaml --workspace . -f html -o reports/contracts.
 clrsig coverage reset   openapi.yaml --workspace .
 ```
 
-`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking) and exits `1` when any gap is found. Both `list` and `quality` also write `--format csv|markdown|html` (with `--output`); these are the same reports the desktop Contracts **Export** menu produces, because both use the same code.
+`quality` prints the four quality signals from [section 9](#9-contracts--coverage-tracking). Gaps are only reported (exit `0`); with `--fail-on-gaps` it exits `1` when there is a gap **or nothing was recorded** for the spec. A workspace folder that does not exist is an error (exit `2`) in every `coverage` command. Both `list` and `quality` also write `--format csv|markdown|html` (with `--output`); these are the same reports the desktop Contracts **Export** menu produces, because both use the same code.
 
 ### `clrsig mcp`
 
@@ -920,6 +943,8 @@ clrsig mcp
 
 Starts a Model Context Protocol server on stdin/stdout, exposing the tools `conform`, `run_scenario`, `diff` and `coverage` so AI agents such as Claude Desktop or Cursor can run Clear Signal for you. It opens no network port.
 
+The `conform` tool is **read-only**: only `GET` and `HEAD` are sent, and the other operations show as `SKIP`, not checked. To let it send writes, start the server with `clrsig mcp --allow-writes`; the agent must then also set `allowWrites: true` on the call, and a project file with `conform.readOnly: true` (the one of the folder the server runs in, or beside the spec) still forbids them. `run_scenario` is not limited: it sends whatever the scenario says. Releases up to 0.13.4 sent every operation through `conform`, writes included.
+
 ### `clrsig telemetry`
 
 ```bash
@@ -928,7 +953,7 @@ clrsig telemetry enable
 clrsig telemetry disable
 ```
 
-Anonymous usage counters are **off by default**. They never include request contents or personal data. The desktop app has the same switch in Settings.
+Usage telemetry is **off by default**. When on, `run`, `conform` and `bundle run` send the command name, result, duration and the number of steps and assertions, with a random identifier of the installation, the `clrsig` version, operating system, processor type and time. No request URLs, headers or bodies are sent; your IP address reaches the server, as with any request. The desktop app has the same switch in Settings; the app itself sends nothing.
 
 ---
 
@@ -941,7 +966,7 @@ The CLI is the natural integration point for pipelines. Build it as part of your
 The quickest route needs no Go toolchain — use the published Action:
 
 ```yaml
-- uses: fuvito/api-workbench@v1
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: openapi.yaml
@@ -953,7 +978,7 @@ The quickest route needs no Go toolchain — use the published Action:
 ### Building the CLI yourself
 
 ```yaml
-name: API Contract Tests
+name: Spec Conformance Testing
 
 on:
   push:
@@ -961,19 +986,19 @@ on:
   pull_request:
 
 jobs:
-  contract-tests:
+  api-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.26"
 
       - name: Build Clear Signal CLI
         run: go build -o clrsig ./apps/cli
 
-      - name: Run contract tests
+      - name: Run the scenarios
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
@@ -984,9 +1009,9 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: contract-test-results
+          name: scenario-results
           path: results.json
 ```
 
@@ -1024,7 +1049,7 @@ Open via the gear icon at the bottom of the Activity Rail (the icon bar on the f
 | **TLS skip verify** | Disable certificate verification. Use only for local development with self-signed certificates. |
 | **Client certificate file**, **Client key file** | Mutual TLS: the PEM certificate and private key sent to servers that require a client certificate. Only the file *paths* are stored (a `${NAME}` reference is expanded when a request is sent); the key must not be password-protected. Both are needed together. |
 | **CA certificate file** | A PEM file of extra certificate authorities to trust (added to the system ones), for servers signed by a private CA. |
-| **Anonymous telemetry** | Opt-in usage counters (off by default). No request contents or personal data. Same switch as `clrsig telemetry enable`. |
+| **Usage telemetry** | Off by default. Same switch as `clrsig telemetry enable`; see [`clrsig telemetry`](#clrsig-telemetry) for what is sent. |
 
 Changes preview immediately. Click **Save** to persist; **Cancel** reverts to the last saved values.
 
@@ -1109,7 +1134,7 @@ auth:
 
 ### Scenario file
 
-See [Section 8](#8-scenarios-and-contract-testing) for the full scenario format.
+See [Section 8](#8-scenarios-and-api-contract-validation) for the full scenario format.
 
 ---
 

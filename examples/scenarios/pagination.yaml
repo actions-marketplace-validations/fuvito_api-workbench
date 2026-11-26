@@ -7,10 +7,31 @@ description: >
   constructing URLs manually.
 
 steps:
-  - title: First page — expect Link rel=next and total count
+  - label: Log in
+    notes: "GET and POST /users need a bearer token."
+    request:
+      method: POST
+      url: "{{baseUrl}}/auth/login"
+      body:
+        type: json
+        content: '{"username":"{{username}}","password":"{{password}}"}'
+    assertions:
+      - type: status
+        operator: eq
+        expected: "200"
+    extractions:
+      - name: token
+        source: jsonpath
+        path: "$.token"
+    failPolicy: stop
+
+  - label: First page — expect Link rel=next and total count
     request:
       method: GET
       url: "{{baseUrl}}/users?page=1&limit=2"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
     assertions:
       - type: status
         operator: eq
@@ -33,10 +54,13 @@ steps:
         expected: ""
     failPolicy: continue
 
-  - title: Middle page — expect both rel=prev and rel=next
+  - label: Middle page — expect both rel=prev and rel=next
     request:
       method: GET
       url: "{{baseUrl}}/users?page=2&limit=2"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
     assertions:
       - type: status
         operator: eq
@@ -55,10 +79,13 @@ steps:
         expected: 'rel="next"'
     failPolicy: continue
 
-  - title: Last page — expect rel=prev but no rel=next
+  - label: Last page — expect rel=prev but no rel=next
     request:
       method: GET
       url: "{{baseUrl}}/users?page=3&limit=2"
+      headers:
+        - name: Authorization
+          value: "Bearer {{token}}"
     assertions:
       - type: status
         operator: eq

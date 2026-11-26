@@ -24,6 +24,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+            text/plain:   # sent when the Accept header asks for plain text only
+              schema:
+                type: string
 
   /auth/login:
     post:
@@ -43,12 +46,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: The body is not JSON, or a field has the wrong type
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "401":
           description: Invalid credentials
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ProblemDetails"
+        "422":
+          description: username or password is missing
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: Too many failed login attempts
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
 
   /users:
     get:
@@ -66,6 +87,13 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/User"
+        "401":
+          description: Missing or invalid token
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
     post:
       operationId: createUser
       summary: Create a new user
@@ -85,12 +113,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "400":
+          description: The body is not JSON, or a field has the wrong type
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "401":
+          description: Missing or invalid token
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "422":
           description: Validation error
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ProblemDetails"
 
   /users/{id}:
     get:
@@ -110,12 +150,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "400":
+          description: The id is not a positive integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "404":
           description: User not found
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ProblemDetails"
+
     put:
       operationId: updateUser
       summary: Update a user
@@ -139,12 +186,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "400":
+          description: The id or the body is not valid
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "404":
           description: User not found
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ProblemDetails"
+
     delete:
       operationId: deleteUser
       summary: Delete a user
@@ -158,12 +212,18 @@ paths:
       responses:
         "204":
           description: User deleted
+        "400":
+          description: The id is not a positive integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "404":
           description: User not found
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ProblemDetails"
 
   /protected:
     get:
@@ -188,9 +248,9 @@ paths:
         "401":
           description: Unauthorized
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ProblemDetails"
 
 components:
   securitySchemes:
@@ -262,9 +322,16 @@ components:
           type: string
           format: email
 
-    ErrorResponse:
+    ProblemDetails:
+      description: An RFC 7807 problem, the shape of every error this API returns.
       type: object
-      required: [error]
+      required: [type, title, status, detail]
       properties:
-        error:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
           type: string

@@ -1,0 +1,9 @@
+schemaVersion: "1"
+title: a mistake
+steps:
+  - label: Health
+    request:
+      method: GET
+      url: "{{baseUrl}}/health"
+    assertions:
+      - {type: statuz, operator: eq, expected: 200}

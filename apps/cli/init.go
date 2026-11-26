@@ -3,16 +3,20 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/projectconfig"
+	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scaffold"
 )
 
@@ -29,6 +33,9 @@ a CI environment file, and empty scenarios/, requests/ and specs/ folders.
 init only creates what is missing. It never overwrites or deletes: a file or folder that already
 exists is left as it is and listed as kept, so it is safe to run again. Nothing is fetched from the
 network. With --dry-run it prints what it would create and writes nothing.
+
+With --spec and a local file, the new environment files also list, commented out, the values the
+requests built from the spec take.
 
 To get a GitHub workflow as well, run: clrsig init github-actions`,
 		Args: cobra.MaximumNArgs(1),
@@ -50,12 +57,16 @@ To get a GitHub workflow as well, run: clrsig init github-actions`,
 					return fmt.Errorf("--base-url %q must be a full http or https address, for example http://localhost:8080", baseURL)
 				}
 			}
-			specValue, err := specForProjectFile(specFlag, absFolder)
+			specValue, parsed, err := specForProjectFile(specFlag, absFolder)
 			if err != nil {
 				return err
 			}
+			needed, err := neededBy(parsed, baseURL)
+			if err != nil {
+				return fmt.Errorf("--spec %s: %w", specFlag, err)
+			}
 
-			entries := scaffold.ProjectEntries(scaffold.ProjectOptions{Spec: specValue, BaseURL: baseURL})
+			entries := scaffold.ProjectEntries(scaffold.ProjectOptions{Spec: specValue, BaseURL: baseURL, Needed: needed})
 			out, err := scaffold.Apply(absFolder, entries, dryRun)
 			if err != nil {
 				return err
@@ -73,6 +84,7 @@ To get a GitHub workflow as well, run: clrsig init github-actions`,
 			if len(out.Created) == 0 && !dryRun {
 				fmt.Fprintln(w, "\nNothing to create: this folder is already set up.")
 			}
+			printNeeded(w, scaffold.Listable(needed), out, specValue, dryRun)
 			fmt.Fprintln(w, "\nNext:")
 			if folder != "." {
 				fmt.Fprintf(w, "  cd %s\n", folder)
@@ -92,7 +104,7 @@ To get a GitHub workflow as well, run: clrsig init github-actions`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&specFlag, "spec", "", "OpenAPI spec file or URL to write into clrsig.yaml (a file is checked to parse; a URL is not fetched)")
+	cmd.Flags().StringVar(&specFlag, "spec", "", "OpenAPI spec file or URL to write into clrsig.yaml (a file is checked to parse and the values it needs are listed in the environment files; a URL is not fetched)")
 	cmd.Flags().StringVar(&baseURL, "base-url", "", "Server to check, written into clrsig.yaml and environments/local.yaml (default http://localhost:8080 in the environment)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be created and write nothing")
 
@@ -118,26 +130,79 @@ func printList(w interface{ Write([]byte) (int, error) }, heading string, items 
 }
 
 // specForProjectFile turns the --spec value into what clrsig.yaml should say: a URL as it is, a
-// local file checked to parse and written relative to the project folder.
-func specForProjectFile(spec, absFolder string) (string, error) {
+// local file checked to parse and written relative to the project folder. The parsed spec is nil
+// for a URL, which init does not fetch.
+func specForProjectFile(spec, absFolder string) (string, *openapi.Spec, error) {
 	if spec == "" || strings.Contains(spec, "://") {
-		return spec, nil
+		return spec, nil, nil
 	}
 	absSpec, err := filepath.Abs(spec)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	data, format, err := fetchSpec(absSpec)
 	if err != nil {
-		return "", fmt.Errorf("--spec %s: %w", spec, err)
+		return "", nil, fmt.Errorf("--spec %s: %w", spec, err)
 	}
-	if _, err := openapi.ParseBytes(data, format); err != nil {
-		return "", fmt.Errorf("--spec %s: %w", spec, err)
+	parsed, err := openapi.ParseBytes(data, format)
+	if err != nil {
+		return "", nil, fmt.Errorf("--spec %s: %w", spec, err)
 	}
 	if rel, err := filepath.Rel(absFolder, absSpec); err == nil {
-		return filepath.ToSlash(rel), nil
+		return filepath.ToSlash(rel), parsed, nil
 	}
-	return filepath.ToSlash(absSpec), nil
+	return filepath.ToSlash(absSpec), parsed, nil
+}
+
+// neededBy lists the values the requests of every operation take, as clrsig conform --list does.
+// Writes are included, although a new project is read-only, so turning them on needs no new init.
+func neededBy(spec *openapi.Spec, baseURL string) ([]scaffold.NeededValue, error) {
+	if spec == nil {
+		return nil, nil
+	}
+	list, err := conformance.ListNeeds(spec, baseURL, nil, conformance.Options{})
+	if err != nil {
+		return nil, err
+	}
+	names, _ := list.Names()
+	var out []scaffold.NeededValue
+	for _, name := range names {
+		v := scaffold.NeededValue{Name: name, Secret: reporting.IsCredential(list, name)}
+		for _, op := range list.Operations {
+			if slices.Contains(op.Needs, name) {
+				v.UsedBy = append(v.UsedBy, op.Method+" "+op.SpecPath)
+			}
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+// printNeeded says what the spec needs and where to put it.
+func printNeeded(w io.Writer, needed []scaffold.NeededValue, out scaffold.Outcome, spec string, dryRun bool) {
+	const local = "environments/local.yaml"
+	switch {
+	case strings.Contains(spec, "://"):
+		fmt.Fprintln(w, "\nThe spec is a URL, which init does not fetch: clrsig conform --list shows the values it needs.")
+	case len(needed) == 0:
+	case slices.Contains(out.Kept, local):
+		fmt.Fprintf(w, "\n%s was already there and was not changed: clrsig conform --list shows the values the spec needs.\n", local)
+	default:
+		names := make([]string, 0, len(needed))
+		for _, v := range needed {
+			if v.Name != "baseUrl" {
+				names = append(names, v.Name)
+			}
+		}
+		if len(names) == 0 {
+			return
+		}
+		verb := "are listed"
+		if dryRun {
+			verb = "would be listed"
+		}
+		fmt.Fprintf(w, "\nThe spec needs: %s.\nThey %s in %s as comments: remove the # and fill in the ones you need.\n", strings.Join(names, ", "), verb, local)
+	}
 }
 
 func initGitHubActionsCmd() *cobra.Command {

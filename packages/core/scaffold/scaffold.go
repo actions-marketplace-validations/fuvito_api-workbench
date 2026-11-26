@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 )
 
 // Entry is one file or folder init would create. Path uses forward slashes and is relative to the
@@ -32,6 +34,18 @@ type ProjectOptions struct {
 	Spec string
 	// BaseURL is the server to check. Empty leaves a commented example.
 	BaseURL string
+	// Needed are the values the requests built from the spec take. The new environment files list
+	// them commented out.
+	Needed []NeededValue
+}
+
+// NeededValue is one {{name}} the spec's requests use.
+type NeededValue struct {
+	Name string
+	// Secret marks a credential.
+	Secret bool
+	// UsedBy are the operations that take it, such as "GET /users/{id}".
+	UsedBy []string
 }
 
 // ProjectEntries lists what clrsig init creates, in the order it reports them.
@@ -42,8 +56,8 @@ func ProjectEntries(o ProjectOptions) []Entry {
 	}
 	return []Entry{
 		{Path: "clrsig.yaml", Content: projectFile(o), Alternatives: []string{"clrsig.yml", "clrsig.json"}},
-		{Path: "environments/local.yaml", Content: localEnvironment(baseURL)},
-		{Path: "environments/ci.yaml", Content: ciEnvironment},
+		{Path: "environments/local.yaml", Content: localEnvironment(baseURL) + neededValues(o.Needed, false, "baseUrl")},
+		{Path: "environments/ci.yaml", Content: ciEnvironment + neededValues(o.Needed, true, "baseUrl", "token")},
 		{Path: "scenarios", Dir: true},
 		{Path: "requests", Dir: true},
 		{Path: "specs", Dir: true},
@@ -80,6 +94,76 @@ func localEnvironment(baseURL string) string {
 		"variables:\n" +
 		"  - name: baseUrl\n" +
 		"    value: " + yamlScalar(baseURL) + "\n"
+}
+
+// Listable returns the needed values the environment files can list: those whose name can be
+// written on one line.
+func Listable(needed []NeededValue) []NeededValue {
+	var out []NeededValue
+	for _, v := range needed {
+		if v.Name != "" && v.Name == oneLine(v.Name) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// neededValues writes the names as commented-out variables. They stay comments because a variable
+// that is defined but empty is only treated as missing in a path or a credential (elsewhere it is
+// sent as empty), while an undefined one always leaves its operations "not sent". Names come from
+// the spec, so nothing in them may end a line.
+func neededValues(needed []NeededValue, ci bool, defined ...string) string {
+	var b strings.Builder
+	for _, v := range Listable(needed) {
+		if slices.Contains(defined, v.Name) {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString("  # The spec's requests also take these. To give one a value, remove the # from its lines.\n" +
+				"  # Left as comments, the operations that need them are reported as \"not sent\". Do not leave\n" +
+				"  # a value empty: outside a path or a credential, an empty value is sent as empty.\n")
+		}
+		if len(v.UsedBy) > 0 {
+			used := v.UsedBy
+			more := ""
+			if len(used) > 3 {
+				used, more = used[:3], fmt.Sprintf(" and %d more", len(v.UsedBy)-3)
+			}
+			fmt.Fprintf(&b, "  # used by: %s%s\n", oneLine(strings.Join(used, ", ")), more)
+		}
+		value := `""`
+		if ci && v.Secret {
+			value = "${" + processName(v.Name) + "}"
+		}
+		fmt.Fprintf(&b, "  #- name: %s\n  #  value: %s\n", yamlScalar(v.Name), value)
+		if v.Secret {
+			b.WriteString("  #  secret: true\n")
+		}
+	}
+	return b.String()
+}
+
+// oneLine replaces everything YAML could read as the end of a line.
+func oneLine(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, s)
+}
+
+var reNotProcessName = regexp.MustCompile(`[^A-Z0-9]+`)
+var reCamel = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+
+// processName is the process variable suggested for a secret in CI: apiKey becomes API_KEY.
+func processName(name string) string {
+	s := reNotProcessName.ReplaceAllString(strings.ToUpper(reCamel.ReplaceAllString(name, "${1}_${2}")), "_")
+	s = strings.Trim(s, "_")
+	if s == "" || (s[0] >= '0' && s[0] <= '9') {
+		s = "API_" + s
+	}
+	return s
 }
 
 const ciEnvironment = `schemaVersion: "1"

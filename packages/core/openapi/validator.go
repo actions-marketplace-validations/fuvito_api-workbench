@@ -66,44 +66,71 @@ func (e ValidationError) Error() string {
 	return e.Message
 }
 
-// ValidateResponse checks that resp conforms to the declared response schema
-// for the given operationID and HTTP status code.
-// Returns nil if valid, a list of violations otherwise.
+// ValidateResponse checks the body of resp against the schema operationID declares for its status.
+// It returns nil only when the body was compared with a schema and fits it. When there is nothing to
+// compare it with (an undeclared status, no schema, a type that is not JSON) that is a violation
+// too: a schema check that looked at nothing must not read as a pass.
 func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []ValidationError {
+	return safeViolations(validateResponse(s, operationID, resp), resp.Body, resp.Headers)
+}
+
+func validateResponse(s *Spec, operationID string, resp *domain.Response) []ValidationError {
 	op := findOperation(s.doc, operationID)
 	if op == nil {
 		return []ValidationError{{Message: fmt.Sprintf("operation %q not found in spec", operationID)}}
 	}
+	notChecked := func(format string, args ...any) []ValidationError {
+		return []ValidationError{{Message: "the body was not checked: " + fmt.Sprintf(format, args...)}}
+	}
 
-	statusStr := strconv.Itoa(resp.StatusCode)
-	respRef := op.Responses.Value(statusStr)
+	// the exact status, then its range (4XX), then the default
+	respRef := op.Responses.Value(strconv.Itoa(resp.StatusCode))
+	if respRef == nil {
+		respRef = op.Responses.Value(strconv.Itoa(resp.StatusCode/100) + "XX")
+	}
 	if respRef == nil {
 		respRef = op.Responses.Value("default")
 	}
 	if respRef == nil || respRef.Value == nil {
-		return nil // no schema declared — nothing to validate
+		var declared []string
+		for status := range op.Responses.Map() {
+			declared = append(declared, status)
+		}
+		sort.Strings(declared)
+		return notChecked("operation %q declares no response for status %d (it declares %s)", operationID, resp.StatusCode, listOrNone(declared))
 	}
 
 	body := resp.BodyString()
 	if body == "" {
-		return nil
+		return notChecked("the response has no body")
 	}
 
+	content := respRef.Value.Content
 	ct := contentType(resp)
-	mediaType := respRef.Value.Content.Get(ct)
+	mediaType := content.Get(ct)
 	if mediaType != nil && !strings.Contains(strings.ToLower(ct), "json") {
-		return nil // declared media type this check cannot read (XML, CSV, ...): not checked
+		return notChecked("a %q response cannot be checked against a schema", ct)
 	}
+	var declaredTypes []string
+	for name := range content {
+		declaredTypes = append(declaredTypes, name)
+	}
+	sort.Strings(declaredTypes)
 	if mediaType == nil {
-		mediaType = respRef.Value.Content.Get("application/json")
+		mediaType = content.Get("application/json")
 	}
-	if mediaType == nil || mediaType.Schema == nil {
-		return nil
+	// the server sent another type than declared: a declared JSON schema still says what is expected
+	for _, name := range declaredTypes {
+		if mediaType == nil && isJSONDocumentType(name) {
+			mediaType = content[name]
+		}
 	}
-
-	schema := mediaType.Schema.Value
-	if schema == nil {
-		return nil
+	if mediaType == nil && len(declaredTypes) > 0 {
+		return notChecked("a schema for %s cannot be checked: for status %d operation %q declares no JSON content",
+			strings.Join(declaredTypes, ", "), resp.StatusCode, operationID)
+	}
+	if mediaType == nil || mediaType.Schema == nil || mediaType.Schema.Value == nil {
+		return notChecked("operation %q declares no schema for status %d", operationID, resp.StatusCode)
 	}
 
 	var data interface{}
@@ -111,7 +138,7 @@ func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []Vali
 		return []ValidationError{{Message: "response body is not valid JSON: " + err.Error()}}
 	}
 
-	if err := schema.VisitJSON(data); err != nil {
+	if err := mediaType.Schema.Value.VisitJSON(data); err != nil {
 		return parseSchemaErrors(err)
 	}
 	return nil
@@ -120,6 +147,10 @@ func ValidateResponse(s *Spec, operationID string, resp *domain.Response) []Vali
 // ValidateResponseByPath validates a response against the spec using the HTTP method and path
 // directly, without needing an operationID.
 func ValidateResponseByPath(s *Spec, method, path string, statusCode int, resp *domain.Response) []ValidationError {
+	return safeViolations(validateResponseByPath(s, method, path, statusCode, resp), resp.Body, resp.Headers)
+}
+
+func validateResponseByPath(s *Spec, method, path string, statusCode int, resp *domain.Response) []ValidationError {
 	router, err := s.pathRouter()
 	if err != nil {
 		return []ValidationError{{Message: "building router: " + err.Error()}}
@@ -360,6 +391,14 @@ func (s *Spec) HasOperation(method, path string) bool {
 // ValidateRequest checks that req conforms to the spec's declared request schema
 // for the matching operation. Returns nil if valid or if the path is not in the spec.
 func ValidateRequest(s *Spec, req *domain.Request) []ValidationError {
+	var body []byte
+	if req.Body != nil {
+		body = []byte(req.Body.Content)
+	}
+	return safeViolations(validateRequest(s, req), body, req.Headers)
+}
+
+func validateRequest(s *Spec, req *domain.Request) []ValidationError {
 	router, err := s.pathRouter()
 	if err != nil {
 		return []ValidationError{{Message: "building router: " + err.Error()}}
@@ -515,7 +554,9 @@ func parseSchemaErrors(err error) []ValidationError {
 			errs = append(errs, ValidationError{Message: e.Error()})
 		}
 	} else {
-		errs = append(errs, ValidationError{Message: err.Error()})
+		for _, message := range problems(err) {
+			errs = append(errs, ValidationError{Message: message})
+		}
 	}
 	return errs
 }

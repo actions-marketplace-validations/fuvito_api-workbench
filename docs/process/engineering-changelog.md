@@ -859,3 +859,236 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **What:** the screenshot suite `screenshots-conformance.spec.ts` now feeds the page what the product reports since 0.9.0: a `checkId` and `severity` on each finding, a baseline (2 known, 1 new, 1 fixed) and a spec-health warning. `docs/images/15-conformance-results[-light].png` and `16-scenario-spec-conformance[-light].png` regenerated. The mocked data mirrors the shapes in `bridge.ts`; it is not a captured run.
 - **Why:** the images were from before 0.9.0 and showed none of the new fields; the website uses the same files.
 - **Not done:** the Workspace page (17) and the CLI builder shots were not regenerated; they were not changed by 0.9-0.11 except for lint cards on the Workspace page.
+
+### 2026-11-25 — 0.11.1 prepared, not tagged: the Action and the documented way to use it (batch A of the 2026-11-25 round)
+
+- **Stale second Action:** `clrsig-action/action.yml` was a copy from 2026-11-17 without 18 inputs, `read-only` among them. GitHub only warns about an undeclared input, so such a step sent every operation (read from the file; not reproduced on a runner). It is now identical to the root file; `TestSubdirectoryActionIsTheSameAsTheRootAction` keeps it so.
+- **Download verification:** the install step compares the binary with the release's `.sha256` and fails, removing the file, when it is missing or different. `TestActionVerifiesTheDownload` runs the real script with a fake `curl`. The script was also run on Windows against the published v0.11.0 assets with the Linux, macOS and Windows runner values: all three verified. It does not protect against a compromised release.
+- **macOS:** `${VAR,,}` (bash 4) replaced with `tr`; the Action self-test now runs on `ubuntu-latest` and `macos-latest`.
+- **Docs and `init github-actions`:** `@v1` (no such tag) replaced with exact release references; the generated workflow asks for `contents: read`; shown and generated workflows use our CI's checkout, upload-artifact and setup-go versions. Guards: `TestDocumentedActionRefsNameThisVersion` (against `AboutDialog.tsx`, not git tags, so it works in a shallow checkout; the references name an unpushed tag between the release commit and the tag) and `TestShownWorkflowsUseTheSameActionVersionsAsCI`.
+- **Catalog:** CS-GAP-012, a negative probe passes on any 4xx; the CS-PROBE section says so.
+- **Terminology:** bare "contract testing" removed (including `CLAUDE.md` section 1, agreed by the owner); `TestNoBareContractTestingTerm`. The user guide's section 8 heading and anchor changed.
+- **Backlog:** six finished or duplicate rows ticked, leftovers of ticked rows and the new ideas given IDs (B-096 to B-119).
+- **Behaviour change:** workflows using the subdirectory Action now have their ignored inputs honoured (on `@main` as soon as this is pushed); the Action fails without a matching checksum. No `clrsig` check, result or exit code changes.
+- **Not verified:** the Action on a GitHub runner (both legs run on the next push), the browser tests (not run locally).
+
+### 2026-11-25 — v0.11.1 released
+
+- **Flaky test fixed first (`496dd58`):** the sidebar-choice test of Check Conformance failed in CI on `5806ac0` with `onResult` called 0 times. The callback runs in an effect, which can run after the headline is on screen; delaying the callback locally gave the same error, and the test now waits. It also set no run result of its own and passed only on one left by an earlier test (alone it timed out). The component did not change.
+- **Tag `v0.11.1` on `496dd58`** (CI green on that exact commit, all eight jobs, the Action self-test on Linux and macOS). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their published `.sha256` files and the Homebrew and Scoop manifests carry the same hashes; Scoop updated and installed on Windows (`clrsig version v0.11.1`); the released CLI's `init github-actions` pins `@v0.11.1` and asks for `contents: read`. The draft notes file was deleted after publishing.
+- **macOS (CI, on `ff47d6c`):** the new install script ran with `/bin/bash`, downloaded v0.11.0, verified it and installed it. The old script was not run there.
+- **Not verified:** the Docker image run (the daemon was not running), the Homebrew install (no Mac), and a workflow that uses the Action by its remote reference `@v0.11.1` (the self-test uses `uses: ./`).
+- **Open:** batches B to E of `docs/reports/check-2026-11-25-improvement-ideas.md`.
+
+### 2026-11-25 — The example server follows its own spec (batch B, B-111)
+
+- **Why:** the README sends new users to it, and `conform --negative` failed against it. The spec declared bearer auth on `GET` and `POST /users` that the server did not check, its `ErrorResponse` schema (`error`) matched none of the server's RFC 7807 bodies (hidden because the media type differed, so no error body was ever compared), and `/health` did not declare its plain-text answer.
+- **Server:** enforces the declared auth (other methods still get 405 without a token); a login with a missing field is 422 and does not count against the rate limit; `POST /admin/reset` also restores the sample users.
+- **Spec:** `ProblemDetails` as `application/problem+json`; 400, 401, 422 and 429 declared where the server sends them; `text/plain` for `/health`. Still eight operations.
+- **Scenarios:** `pagination` and `problem-details` log in first (one more step each).
+- **Guards:** `examples/server/server_test.go` (conformance, every probe rejected for the tested reason, a broken problem body is reported, auth, reset, every example scenario) runs in the CI integration job; the quickstart job also runs `conform --negative` after a reset.
+- **Checked locally:** the CI sequence and all eleven scenarios with the built CLI; ten pass and `contract-violation` fails as it is written to.
+- **Example scenario keys (B-120, older than this change):** steps used `title:` (29) and `description:` (3), which a step does not have, so they ran unnamed and `clrsig validate` rejected 10 of 11 files. Renamed to `label:` and `notes:`; `TestExampleScenarioFilesAreValid` decodes each example strictly and validates it.
+- **Not done:** B-121 (whether the product should report unknown keys). No product code changed.
+
+### 2026-11-25 — One path in every conformance report, and "not sent" counted apart (batch C, B-112 and B-113; for 0.12.0)
+
+- **Paths:** `OperationResult.ReportPath()` is what text, Markdown, HTML, JUnit names, GitHub output and coverage lists show (`/users/{id}`); `conformance.SpecStyle` does the same for the baseline comparison's lines and the cumulative-coverage line. `Path` is unchanged: baselines, `--paths`, history and Contracts coverage use it. JSON keeps `path` and adds `specPath` on operations and conformance coverage entries.
+- **Counts line:** operations not sent for lack of a value are shown as `not sent`, apart from `failed`, only when above zero. `Counts()`, JUnit totals, JSON, verdict and exit codes are unchanged.
+- **Guards:** `reporting/conform_paths_test.go` (every format, JSON additivity, the counts line, baseline keys). A baseline written by the released v0.11.1 was read by this build: 2 known, 0 new.
+- **Behaviour change:** JUnit test names of operations with path parameters change once, so CI tools that keep history see new tests; scripts that parse the counts line of a run with unsent operations see a new part.
+- **Sandbox:** run against its local server, all six suites passed with v0.11.1; this build failed one pattern, updated to accept both wordings (it passes with both). Its nightly job builds clrsig from `main`, so push the sandbox first.
+- **Desktop page (B-122):** the service sends `specPath` with each operation and names the progress line and baseline list by the spec path; the page shows it in rows, problem cards and copied issues. `conformance_paths_test.go` (service) and a `ConformanceTab` test; both failed before the change.
+- **Not done:** not released; the version is still 0.11.1.
+
+### 2026-11-25 — v0.12.0 released
+
+- **Contains** batches B and C of `docs/reports/check-2026-11-25-improvement-ideas.md` and B-122. The sandbox's one changed expectation was pushed first (`a0918ad`); its CI passed with the released clrsig, and a manual run passed with clrsig built from `main` (`1362f72`).
+- **Tag `v0.12.0` on `3c3ba8f`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. The downloaded Windows CLI reports `v0.12.0`, its `init github-actions` pins `@v0.12.0`, and against the example server it counts an unsent operation as `not sent`, names JUnit cases by the spec path and writes `path` and `specPath` in JSON. The draft notes file was deleted after publishing.
+- **Before tagging:** gofmt, vet and tests of all four Go modules, CLI build, `tsc`, Vitest (1,681) and the browser tests (173). The screenshot suite was not run.
+- **Not verified:** the Scoop upgrade on the maintainer's machine (the command was not permitted in this session; the manifest and its hash were checked), the Docker image run, the Homebrew install (no Mac), a workflow using the Action by its remote reference `@v0.12.0`, and the desktop app by eye.
+- **Backlog:** B-123 added (a detailed, CLI-first user guide; owner request).
+- **Open:** batches D and E; the sandbox still pins v0.11.0 and accepts both wordings of the changed line.
+
+### 2026-11-25 — Sandbox repository adopts v0.12.0
+
+- `api-workbench-sandbox` pins v0.12.0 (`780bc2e`); its one changed expectation now accepts only the "not sent" wording, and CS-GAP-012 is in its gaps map. Its CI passed on Linux with the released v0.12.0 in the container (all expectation files and the random specs).
+- **The remote Action reference is verified (closes that item of the v0.12.0 entry):** the sandbox's manual Action smoke test ran `uses: fuvito/api-workbench@v0.12.0` (resolved to `3c3ba8f`) on `ubuntu-latest`: the download's checksum was verified, a correct API gave exit 0 and a broken case exit 1. Not covered: the same by remote reference on macOS or Windows, and the `clrsig-action` subdirectory form.
+- **Still not verified for v0.12.0:** the Docker image run, the Homebrew install, the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
+
+### 2026-11-25 — `conform --list`, and `init --spec` lists what the spec needs (batch D, B-114 and B-115)
+
+- **`conform --list`:** every operation with the values its generated request takes, which are missing, and READY / MISS / SKIP; text or JSON; sends nothing to the API; exit 0 once the spec is read, 2 for a usage error or a filter that matches nothing. Flags that only matter for a run are refused when typed and ignored when they come from `clrsig.yaml` (a setup scenario is not run and a note says so). Catalogued as a deferred builder input.
+- **Core:** `conformance.ListNeeds` shares operation selection and substitution with `Runner.Run` (moved into `operationFor`, `Options.selects`, `prepare`); `TestListNeeds_AgreesWithARun` compares them. `application.NoMatchMessage` is exported so both say the same about an unmatched filter. Names only are printed, never values.
+- **`init --spec` (local file):** both new environment files list the needed names as commented-out variables with the operations that use them; credentials (used for authentication, or named like one) are marked secret and in `ci.yaml` suggest `${NAME}`. Existing files are not changed; a URL spec is not fetched. Names come from the spec, so names that would not fit on one line are left out and line breaks are removed from comments (`TestNeededValuesFromAHostileSpecCannotAddLiveLines`).
+- **Found:** an empty value is sent as empty (CS-GAP-013, pinned by a test; decision B-124). This is why the names are comments. No run behaviour changed.
+- **Not done:** no listing in the desktop app. Not released.
+
+### 2026-11-25 — An empty path value or credential counts as missing in `conform` (B-124)
+
+- **Why:** `value: ""` filled `{{id}}` with nothing and sent `GET /users/`; a declared `400` then showed **PASS** (measured on the example server). A secret that is not configured often reaches CI as a set but empty variable.
+- **Rule:** in the requests built from the spec, empty is missing in the URL path, a bearer token, an API key (header, query or cookie) and a basic user name. The operation is not sent and says which value is empty; its negative probes are skipped. Still sent empty: query, header, cookie and body values, and a basic password (a key as user name with no password is a real pattern). `run` is unchanged: a scenario may send an empty value on purpose. `conform --list` and the Check Conformance page follow from the shared code.
+- **Behaviour change:** a `conform` run that passed with such an empty value now fails with "not sent"; probes that "passed" because of it are now skipped. This also applies to a name added empty by the page's "Add these to Variable overrides" button. Needs a line in the next release notes.
+- **Guards:** `conformance/empty_values_test.go` (all credential forms, the basic password, an empty process variable, probes); each failed before the change. CS-RUN-001 and CS-GAP-013 updated.
+- **Checked:** the example server's CI steps and all sandbox suites and random specs pass with this build.
+
+### 2026-11-25 — v0.13.0 released
+
+- **Contains** batch D (`conform --list`; `init --spec` lists the needed values) and B-124 (an empty path value or credential is not sent). The release notes lead with the behaviour change.
+- **Before tagging:** the sandbox CI passed with clrsig built from `main` at `339456b` (the feature commit plus the demo GIF) in its container. gofmt, vet and tests of all four Go modules, CLI build, `tsc`, Vitest (1,681) and the browser tests (173) passed locally. The screenshot suite was not run.
+- **Tag `v0.13.0` on `abfeed7`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. The downloaded Windows CLI reports `v0.13.0`; against the example server it does not send an empty `id` and names it, `--list` works, `init --spec` lists six values as comments, and `init github-actions` pins `@v0.13.0`. The draft notes file was deleted after publishing.
+- **Not verified:** the Docker image run, the Homebrew install (no Mac), the Scoop upgrade on the maintainer's machine, a workflow using the Action by its remote reference `@v0.13.0`, and the desktop app by eye.
+- **Open:** the sandbox still pins v0.12.0; B-123 (detailed user guide, proposal first); batch E.
+
+### 2026-11-25 — Sandbox adopts v0.13.0; the `--paths` bug recorded (B-125, CS-GAP-014)
+
+- `api-workbench-sandbox` pins v0.13.0 (`087c064`) and adds eight runs for `conform --list`, `init --spec` and the empty-value rule. Its CI passed in the container with the released v0.13.0, and its Action smoke test ran `uses: fuvito/api-workbench@v0.13.0` (resolved to `abfeed7`) on `ubuntu-latest`: checksum verified, exit 0 for a correct API and 1 for a broken case. **This closes the "remote reference" item of the v0.13.0 entry** (Linux only).
+- **Found there, not fixed:** `--paths` filters operations on the generated path and probes on the spec path, so a prefix with a parameter silently selects one side; with the `{{id}}` spelling the probe summary says `PASSED  0 probes`. v0.12.0 behaves the same. Catalog CS-GAP-014, pinned by `TestPathsFilter_WithAParameterSelectsOnlyOneSide_KnownGap`; backlog B-125; sandbox F-036.
+- **Observed, as designed:** with an empty basic password the sandbox's refused login (a declared 401) shows PASS (CS-GAP-013, now pinned there).
+- **Still not verified for v0.13.0:** the Docker image run, the Homebrew install, the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
+
+### 2026-11-25 — `--paths` and per-path limits take either spelling of a parameter (B-125)
+
+- **Bug:** operations were filtered on the generated path (`/items/{{id}}`) and negative probes on the spec path (`/items/{id}`), although the flag is described as taking the spec's spelling. One side silently selected nothing; with the generated spelling the probe summary said `PASSED  0 probes`. `--max-response-time-for` matched only the generated spelling, so a limit written as the spec writes it did nothing, without a word. In v0.12.0 too.
+- **Fix:** one rule, `hasPathPrefix`, for operations, probes, `--list` and the limits: a prefix matches if it starts the spec path or the generated path, or its `{name}` form starts the spec path. Among limits that match, the one naming more of the path wins (braces do not count); of two spellings of the same path, the `{{name}}` one, which was the only one that used to apply.
+- **Behaviour change (release note):** a selection can only grow. With a parameter in the prefix, a command may now run operations or probes it skipped before, and a time limit written in the spec's spelling starts to apply, so a run can turn red.
+- **Guards:** `conformance/paths_filter_test.go`, which failed before the change. The pinned-bug test and its catalog gap row were removed; CS-PROBE-005 and CS-RESP-014 describe the behaviour.
+- **Not done:** released in 0.13.1 (next entry); the sandbox's F-036 stays open until the release is verified there.
+
+### 2026-11-25 — v0.13.1 released
+
+- **Contains** the B-125 fix only. The release notes lead with the case where a passing run can now fail.
+- **Before tagging:** CI passed on the fix commit `678389f` (eight jobs), and the sandbox CI passed with clrsig built from `main` at `35cf88e` in its container. gofmt, vet and tests of all four Go modules, CLI build, `tsc`, Vitest (1,681) and the browser tests (173) passed locally. The screenshot suite was not run.
+- **Tag `v0.13.1` on `3711bc6`** (CI green on that exact commit, all eight jobs). Release workflow green (all ten jobs); GitHub Release (13 files) with the notes published; the four CLI binaries match their `.sha256` files and the hashes in the Homebrew and Scoop manifests. With the downloaded Windows CLI: on the sandbox spec, `/products/{productId}` and `/products/{{productId}}` each select 6 operations and 6 probes; on the example server a limit `/users/{id}=1` fails the slow response (v0.13.0 passed it silently); `init github-actions` pins `@v0.13.1`. The draft notes file was deleted after publishing.
+- **Seen, not changed:** a probe run with no probes says `PASSED  0 probes` (B-126).
+- **Not verified:** the Docker image run, the Homebrew install (no Mac), the Scoop upgrade on the maintainer's machine, a workflow using the Action by its remote reference `@v0.13.1`, and the desktop app by eye.
+- **Open:** the sandbox pins v0.13.0 with F-036 open; B-123; batch E.
+
+### 2026-11-25 — Post-release smoke checks and a bindings check (batch E, B-117 and B-103); the Homebrew instructions (B-127)
+
+- **Smoke (`.github/workflows/smoke.yml`):** the Docker image (anonymous pull, version, `validate --spec` on a mounted folder), the Action from the tag on Linux, macOS and Windows (`uses: ./` with the tag checked out, because `uses:` takes no variable), and Homebrew on macOS. `release.yml` calls it after `publish` and `update-tap`; `release: published` would not have fired for a release made with the default token. It can only warn. Manual run for the newest release.
+- **Homebrew bug:** `brew tap fuvito/api-workbench` without an address clones a repository that does not exist, so the documented install could not work. README, README-DEVELOPER and the two process documents now give the address; `TestBrewTapGivesTheRepositoryAddress` keeps it.
+- **Bindings:** CI runs `wails generate module`, fails if the committed bindings differ, and runs `scripts/check_bindings.py` (with its unit tests), which compares field names between the generated Go classes and the hand-written types the app casts results to: 71 of 80 compared, 9 inline and listed (B-128), one allowance for the optional request fields a cached response does not carry. It fails on a new uncompared type, a stale exception, or when it reads nothing.
+- **Checked locally:** with a field and a method planted in Go and the bindings regenerated by Wails 2.17.1 on Windows, the type check named the field and the file comparison showed the method; both passed after reverting. The committed bindings are current. Guards in `doccheck/release_test.go` (wiring, script syntax, pinned Wails version, CI steps).
+- **Not verified:** neither new workflow has run on a GitHub runner; whether `wails generate module` works on the Linux runner, and whether the corrected Homebrew commands install, are unknown until then.
+
+- **First CI run (`1d8d763`) failed, fixed:** `wails generate module` works on the Linux runner, but writes the 31 binding files as executable (mode 100755), which `git diff` reports. The log held only mode changes, no content change and no new file. The comparison now runs with `core.fileMode=false`; content and untracked files are still checked. Windows ignores modes, which is why the local runs passed.
+
+### 2026-11-25 — First smoke run: Docker and the Action pass, Homebrew needs the full formula name
+
+- **Run 45706460240, by hand against v0.13.1:** the Docker image (anonymous pull, version, `validate --spec` on a mounted folder) and the Action from the tag on Linux, macOS and Windows **passed**. Homebrew **failed**: the corrected tap cloned, then `brew install clrsig` was refused, "Refusing to load formula ... from untrusted tap". The earlier tap-address fix was therefore not enough.
+- **Fix:** the documents and the smoke job install `fuvito/api-workbench/clrsig`; by Homebrew's documentation the full name trusts that one formula, which is narrower than trusting the tap. `TestBrewTapGivesTheRepositoryAddress` now also rejects the short name. Whether it installs is confirmed only by the next smoke run.
+- **Also:** the detailed user guide proposal (B-123) was accepted.
+
+### 2026-11-25 — All post-release smoke checks pass for v0.13.1
+
+- **Run 45708219243** (by hand, after `68ce24b`): Docker image, the Action from the tag on Linux, macOS and Windows, and Homebrew on macOS **all passed**. Homebrew reported "Trusted formula fuvito/api-workbench/clrsig" and installed v0.13.1.
+- **This closes** the "Docker image run" and "Homebrew install" items that the release entries listed as not verified, for v0.13.1.
+- **Still not verified:** the call of the smoke workflow from `release.yml` (at the next release), the remote reference `@v0.13.1` (the sandbox pins v0.13.0), the Scoop upgrade on the maintainer's machine, and the desktop app by eye.
+
+### 2026-11-25 — Security: reports no longer quote response bodies (B-129)
+
+- **Found** while writing the detailed guide, then measured with a test that plants a token, a password and a person's e-mail address in failing responses and searches every output. Up to 0.13.1 they reached: `conform` text, JSON, JUnit, HTML, Markdown, GitHub annotations (OpenAPI 3.1), the Check Conformance page's findings and **baseline files**; every `run` report. Causes: (1) the validation library appends the whole schema and value to its messages (for a missing field the value is the whole body), and with 3.1 also puts the value inside its sentence; (2) a scenario `schema` assertion kept the whole body as its "actual" value, also when it **passed**; (3) `jsonpath` and `header` assertions kept what they found, passing ones included; (4) the 200-character excerpt of an error body was raw.
+- **Fix:** every violation leaves `openapi` through `safeViolations`: the dumps are removed, the single failing value is put back only as the rules of the new package `redact` allow, and sensitive values of that response (by field or header name, or token-like) are removed wherever the sentence holds them. Error-body excerpts use `redact.Excerpt`. A `schema` assertion keeps no actual value; `jsonpath` and `header` keep `***` for credential names, `{…}`/`[…]` for objects and lists, and mask token-like text. Assertions are still evaluated against the real values.
+- **Baselines:** version 1 files (0.8.9 and earlier) identify a violation by the message, dump included, and unrecognised violations in version 2 files use the message too. Both are now compared without the dump, so recorded violations stay known (the 0.8.9 golden test passes). A baseline recorded up to 0.13.1 can itself hold response values, in the `rule` of an unrecognised violation or a version 1 `detail`: re-record such files, and check what was committed.
+- **Behaviour change:** messages are shorter (no schema or body under a violation). In JSON reports a scenario `schema` assertion has an empty `actual`; `actual` is `***`, `{…}` or `[…]` in the cases above. Anything that parsed those must change.
+- **Limits (CS-GAP-017):** rules of thumb. A secret in a field with an ordinary name, too plain to look like a token, is quoted when it is the value at fault. Not changed: the desktop response viewer, `clrsig request`, `run --show-extracted`.
+- **Not done:** not released. Reports and CI logs already produced by earlier releases still hold what they quoted.
+
+### 2026-11-25 — Released 0.13.2 (the B-129 security fix)
+
+- Tagged `b88e588` after CI passed on it; the sandbox expectations had passed in Docker with `clrsig` built from `main` with the fix. All release jobs and all five post-release smoke jobs passed (their first run as part of `release.yml`).
+- Release notes published with the security issue first: what could leak and where, the affected versions (0.11.1, 0.12.0 and 0.13.1 tested; earlier ones share the code), what to do with reports, logs, artifacts and baselines already written, and the changes in JSON reports.
+- Checked afterwards: the four checksum files match their binaries; the Homebrew formula and Scoop manifest carry the published hashes; the downloaded Windows binary shows the issued token in none of the six `conform` formats and not in a new baseline file (0.13.1 showed it in five formats).
+- **Not done:** older releases are not marked as affected on GitHub. The sandbox still pins 0.13.0.
+
+### 2026-11-25 — Passwords written inside longer text are masked (B-130)
+
+- **Found** by planting a short password, in six ways of writing it, in every source of report text. B-129's rules (field names and token shapes) do not see it. It reached `conform` and `run` reports, GitHub annotations, the Check Conformance page, desktop results and history, and, in OpenAPI 3.1 baseline files, the stored sentence of an unrecognised violation. In error excerpts the e-mail rule masked `password@host` for a dotted host (hiding the host) and missed it for a one-word host.
+- **Change:** `redact.Credentials` replaces only the password of `scheme://user:password@host` and the value after `password=`, `pwd=` and a short list of similar names. It runs where text leaves: validator messages, every report line, assertion messages and labels, error-body excerpts, baseline files, and the desktop's errors, variables, shown requests and probe errors. It is kept apart from token detection, so an address is not hidden as a whole. Assertions and extractions use the real values; `--show-extracted` still shows them.
+- **Baselines:** stored text is compared with both sides masked. Files written by 0.13.2 that contain a password still match and are not printed back; files from 0.13.1 and 0.13.0 matched as before, except the case below. Old files are not rewritten: re-record any that hold a password, and Git history keeps the old one.
+- **Not masked (CS-GAP-017):** among others, addresses without a scheme, `password: x` or JSON inside a text, other names, command-line options, percent-encoded text, the part of an unquoted value after a space. Unchanged on purpose: the response viewer, `clrsig request`, desktop extracted values, and the desktop request history (it must be able to send a request again; a password in a stored URL or body stays there).
+- **Found on the way, not fixed (B-131, CS-GAP-018):** since 0.13.2 (B-129) only the first problem of a multi-problem OpenAPI 3.1 message identifies a violation. A second, new problem is usually hidden by the baseline (the released 0.13.2 passed 51 of 60 runs where 0.13.1 failed all 60), and an unchanged response sometimes shows as new. The 0.13.2 notes say no verdict changes; that is wrong. Files from 0.13.0 for such a response report one new and one fixed.
+- **Not done:** not released.
+
+### 2026-11-25 — Fixed: a baseline could hide a new violation (B-131, a regression of 0.13.2)
+
+- **Cause:** with OpenAPI 3.1 the validation library collects errors while walking Go maps and reports them as one message, in an order that changes between runs. B-129 compared such a message only up to its first quoted value. Measured with the released binaries: with one recorded problem and a second one added, 0.13.2 passed 51 of 60 runs (0.13.1 failed all 60); with nothing changed, it reported a new violation in 4 of 40. 0.13.0 and 0.13.1 never matched an answer whose dump held a changing value. B-129's checks compared baselines only with unchanged answers; the 0.13.2 notes' statement that no verdict changes was wrong.
+- **Fix:** `openapi/problems.go` makes every independent problem a violation of its own, sorted; the causes of `anyOf`/`oneOf` stay one, sorted; the list in "additional properties … not allowed" is sorted. Baselines match problem by problem (a grouped one is known only when all it says was recorded), and ignore the library's `error at "…"` prefix, which repeats path segments differently depending on neighbouring errors.
+- **Compatibility:** files written by 0.13.0 and 0.13.1 keep matching every problem they recorded. A file written by 0.13.2 recorded only the start of a multi-problem message: the rest shows as new until it is recorded again (deliberately: it cannot be told from a new problem). New files may not match in 0.13.2 or earlier. No format or schema version change.
+- **Behaviour change:** an OpenAPI 3.1 response with several problems now shows one line (and one finding, annotation, report entry) for each, no longer one long "validation failed due to: … | …" line. A single problem loses that prefix too. Which operations pass or fail without a baseline does not change.
+- **Guarded by** `conformance/problems_test.go` (repeated runs; each test fails with the old code) and `testdata/baseline-31-by-0.13.*.yaml`, written by the released binaries.
+- **Not done:** a failing value inside a 3.1 sentence is still part of the identity (CS-GAP-019). The repeated path segments are still shown in the message (`/user/user/age`; the path after "at" is right). The published 0.13.2 notes are unchanged. Not committed, pushed or released.
+
+### 2026-11-25 — Released 0.13.3 (B-130 passwords, B-131 baselines)
+
+- Tagged `2cd4594` after CI passed on it; the sandbox expectations had passed in Docker with `clrsig` built from `main` with both fixes. All release jobs and all five post-release smoke jobs passed.
+- Release notes published first thing, while the smoke jobs were still running. They begin by correcting the 0.13.2 notes, say how to review baselines recorded with 0.13.2 before recording again, and list what password masking does not find.
+- Checked afterwards: the four checksum files match their binaries; the Homebrew formula and Scoop manifest carry the published hashes. With the downloaded Windows binary, 60 runs each: a second new problem failed the build every time (also against a baseline written by the released 0.13.2) and an unchanged answer passed every time; no demo password appeared in any `conform` format or in a new baseline file, and in `run` only the fragment the scenario itself expects.
+- **Not done:** the published 0.13.2 notes still hold the wrong statement about baselines, and older releases are not marked as affected. The sandbox still pins 0.13.2.
+
+### 2026-11-25 — Four small bugs (B-126, B-132, B-133, B-134)
+
+- **B-126:** a negative-probe run that sent nothing said `PASSED  0 probes`. It now says `NOTHING CHECKED` and why (none applies, or all were skipped). Exit codes are unchanged.
+- **B-132:** OpenAPI 3.1 messages no longer begin with the library's path, which repeated segments (`/user/user/age`); a message now reads `at '/user/age': …`. A lone problem no longer starts `validation failed due to:`. **The 0.13.3 changelog and release notes said that was already so; it was not.** Baselines written by 0.13.3 and earlier still match (that text was never part of the identity).
+- **B-133:** `expected` is empty, not `<nil>`, for an assertion without an expected value.
+- **B-134:** the format guide now describes both forms of a `schema` assertion. Writing it showed that a YAML schema written in place never worked with nested keys: all indentation was removed. Only the shared indentation is now replaced. **Behaviour change:** such an assertion used to fail with "invalid schema"; it is now evaluated.
+- **Found, not fixed (B-135, CS-GAP-020):** a `schema` assertion passes any status it has no schema for, without reading the body; without a `specFile` the run passes. Fixing it can turn green runs red, so it waits for a decision. The format guide warns about it.
+- **Not done:** not released.
+
+### 2026-11-25 — Detailed CLI guide, phase 2 (B-123)
+
+- The first-check walkthrough and the pages of `init` (with `init github-actions`), `config show`, `run`, `validate`, `request` and `generate`. Their examples run in the tests; 14 commands are still pending. The `conform` page says what an empty probe run and a 3.1 body now report.
+- **Found while writing, recorded, not fixed:** `generate` overwrites edited files without asking (B-136); `validate` accepts an unknown HTTP method (B-137, CS-GAP-021); `request` sends undefined `{{names}}` as text (B-138, CS-GAP-022); `validate` exits 1 where its help says 2 (B-139). The `run` page warns about B-135.
+- **Not done:** Phase 3 (the other commands, goal pages, exit codes, troubleshooting) and the one link from the existing user guide are not started.
+
+### 2026-11-25 — A schema check that checks nothing fails; generate keeps your files (B-135, B-136)
+
+- **B-135:** a scenario `schema` assertion passed without reading the body for a status it did not know (an undeclared one with an `operationId`, anything but 200 for a schema written in place), also for a `2XX`/`4XX` range (never looked up), a response with no schema, one with no JSON type, and XML. Without a `specFile` a run that got a 500 could be `PASSED`. Part of this was already documented as not caught (CS-RESP-001 and CS-RESP-012, column B); the first report called it new. Now it passes only when the body was compared: ranges and a declared JSON schema are used, a schema written in place checks any status, and otherwise it fails with the reason (CS-RUN-013). **Behaviour change: green runs can turn red,** among them assertions on a 204, on XML or CSV, or on a response the spec gives no schema.
+- **B-136:** `generate` replaced files without asking. It now writes nothing and exits 2 when a file with other content is in the way, unless `--force` (new flag). Identical files (line endings aside) are left alone; two operations with one file name are both kept; writes are atomic; `--dry-run` marks the files in the way, and JSON output has a new `state` per file. The desktop import already never overwrote. **Behaviour change** for a script that generates over old output.
+- **Guarded by** `assertions/schema_checked_test.go` and `apps/cli/generate_overwrite_test.go`; guide pages `run`, `generate`, the format guide and the user guide updated.
+- **Not done:** not released.
+
+### 2026-11-25 — Released 0.13.4 (B-126, B-132 to B-136; guide phase 2)
+
+- Tagged `bbeb899` after CI passed on it. Before that, the sandbox passed in Docker against `main` with both fixes (`5d39b28`); one of its expected results differs by version and is written down for both sides.
+- All release jobs and all five post-release smoke jobs passed. The notes begin with the `schema` assertion and warn that runs that passed may now fail; they correct the 0.13.3 claim about the `validation failed due to:` prefix.
+- Checked afterwards: the four checksum files match; Homebrew and Scoop carry the published hashes. With the downloaded Windows binary: a 500 without a required field and no `specFile` fails (0.13.3: `PASSED`), none of the tested unknown statuses passes a `schema` assertion, and `generate` leaves an edited file alone without `--force`.
+- **Not done:** the sandbox still pins 0.13.3. The website still offers 0.13.2.
+
+### 2026-11-25 — Detailed CLI guide: every command has a page (B-123)
+
+- Pages for `diff`, `impact`, `import`, `bundle` (four), `coverage` (three), `mcp` and `telemetry` (three). `guidePending` is empty: a new command needs a page at once.
+- **Found while writing, recorded, not fixed:** the MCP `conform` tool sends writes and ignores a read-only project (B-140, CS-GAP-023, **safety**); a coverage gate with no data passes (B-141, CS-GAP-024); `bundle run` sends the `CHANGE_ME` placeholder (B-142, CS-GAP-025); `import` drops scripts silently (B-143); `coverage reset` claims success for nothing (B-144); the telemetry notice leaves out the installation identifier and more (B-145).
+- **Not done:** task-based pages, the exit-code table, troubleshooting, the link from the existing user guide.
+
+### 2026-11-25 — Safety: the MCP conform tool is read-only (B-140)
+
+- **Problem (released up to 0.13.4):** the `conform` tool of `clrsig mcp` sent every operation, `DELETE` included, had no way to be limited, and ignored `conform.readOnly: true`. Confirmed with the released binary.
+- **Change:** it sends only `GET` and `HEAD` unless the server was started with the new `--allow-writes` flag **and** the call sets the new `allowWrites` argument, and no project file (the one of the server's folder or `--config`, or the one beside the spec) says `readOnly: true`; a project file that cannot be read refuses writes too. A refused call is an error and sends nothing. A read-only reply says `READ-ONLY`. One argument alone was not enough: the agent writes the call, only the person writes the server's configuration.
+- **Behaviour change:** an agent set-up that relied on writes now needs the flag and the argument. Non-GET operations show as SKIP.
+- **Not covered:** `run_scenario` still sends whatever a scenario says (the tool description and the guide say so). No limit by server address.
+- **Not done:** not released.
+
+### 2026-11-25 — Released 0.13.5 (B-140; guide pages for every command)
+
+- Tagged `b862977` after all CI jobs passed on it; the sandbox had passed in Docker against `main` at `f19a3dc`. Between 0.13.4 and this release the only product code change is `apps/cli/mcp.go`.
+- On the way: CI first failed because `.gitignore`'s `coverage.*` had kept `docs/guides/cli/coverage.md` out of the commit; local tests passed because the file was on disk. Now excepted, and the release preparation also ran the Go tests on a clean copy of the staged tree. A following push was rejected (the demo GIF job had pushed first) and rebased.
+- All release jobs and all five post-release smoke jobs passed. The notes begin with the `mcp` problem, the new permissions, and that `run_scenario` is not limited.
+- Checked afterwards: the four checksum files match; Homebrew and Scoop carry the published hashes. With the downloaded Windows binary: read-only by default and with the flag alone; refused without the flag and with a read-only project; every operation sent only with both and no such project.
+- **Not done:** the sandbox still pins 0.13.4. B-141 to B-145 and B-137 to B-139 are open. The Learn examples stay labelled 0.13.4, the version they were checked with.
+
+### 2026-11-25 — The bugs found writing the guide (B-137 to B-139, B-141 to B-147)
+
+- **Behaviour changes, each able to turn something that passed into a failure:** `coverage quality --fail-on-gaps` fails when nothing was recorded; `coverage` commands exit 2 for a workspace folder that does not exist (a job that read an empty one before its first run must create it); `request` and `bundle run` no longer send a value nothing defines or the export's `CHANGE_ME`; `validate` reports an unknown method and exits 2 for a file it cannot read.
+- **One becomes lenient, as documented:** `coverage quality` in `csv`, `markdown` or `html` no longer exits 1 on gaps without `--fail-on-gaps`. A job that relied on that must add the flag.
+- Also: `--output` works for `text` and `json`; `coverage list -f json` prints `[]` when empty; `coverage reset` says when it did nothing; `clrsig import` warns about Postman scripts; the telemetry notice names every field sent.
+- **Guards:** `apps/cli/guide_fixes_test.go` (replaces the tests that pinned the gaps), `packages/core/importer/postman_scripts_test.go`, `packages/core/telemetry/disclosure_test.go`. CS-GAP-021, 022, 024, 025 became CS-RUN-015 to 018.
+- **Not done:** the desktop app shows no import warnings (B-148, CS-GAP-026); an imported bundle's `CHANGE_ME` is still sent by `run`, `conform` and the app (B-149); the website's wording on telemetry was not checked. B-080 and B-010 are untouched.
+
+### 2026-11-25 — Detailed CLI guide, phase 3 (B-123)
+
+- Seven task pages, a reference page (exit codes, report formats, shared options) and troubleshooting by message, in `docs/guides/cli/`; one link from section 10 of the user guide, as agreed.
+- **Guards:** their marked examples run in `TestDetailedGuideExamples`; the documentation tests check links. The tables and the troubleshooting rows are prose that no test holds to the code, apart from the examples on those pages.
+- Found while writing: scenario and request files with an unsupported `schemaVersion` are accepted and sent (B-150, CS-GAP-027); recorded, not fixed.
+

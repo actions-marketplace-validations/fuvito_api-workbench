@@ -17,8 +17,10 @@ The `clrsig` CLI works independently of the desktop app.
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap fuvito/api-workbench
-brew install clrsig
+brew tap fuvito/api-workbench https://github.com/fuvito/api-workbench
+# the full name matters: Homebrew refuses a formula from a tap you have not trusted, and
+# installing by full name trusts this one formula only
+brew install fuvito/api-workbench/clrsig
 ```
 
 ### Scoop (Windows)
@@ -60,7 +62,7 @@ docker run --rm \
 ### GitHub Actions
 
 ```yaml
-- uses: fuvito/api-workbench@v1
+- uses: fuvito/api-workbench@v0.13.5
   with:
     command: conform
     spec: openapi.yaml
@@ -124,6 +126,8 @@ The application opens automatically. Type a URL in the request bar and press **S
 cd examples/server
 go run .
 # Listening on :8080 — includes /health, /users CRUD, /auth/login, /protected
+# GET and POST /users and /protected need the token that /auth/login returns
+# POST /admin/reset restores the sample users
 ```
 
 ### Run a scenario with the CLI
@@ -246,6 +250,7 @@ clrsig conform <spec-file-or-url> [flags]
 # Run against the local example server
 clrsig conform examples/server/openapi.yaml \
   --base-url http://localhost:8080 \
+  --env examples/environments/demo-conform.yaml \
   --coverage
 
 # Fetch the spec from a URL
