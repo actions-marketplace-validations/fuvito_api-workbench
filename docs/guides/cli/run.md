@@ -188,7 +188,7 @@ Not covered:
 
 ## Common mistakes and limits
 
-- **A `schema` assertion alone does not check the status.** It passes, without reading the body, for a status it does not know: with an `operationId`, one the operation does not declare; with a schema written in place, anything but `200`. Without a spec for the scenario, a `500` can then be reported as `PASSED`. **Add a `status` assertion to such steps** (CS-GAP-020).
+- **A schema written in place does not check the status:** an error answer that happens to fit the schema passes. Add a `status` assertion. (A `schema` assertion fails when it has nothing to compare the body with. **Releases up to 0.13.3 passed instead,** so a `500` could be reported as `PASSED`: upgrade, CS-RUN-013.)
 - A response-time or schema check is only as good as what you assert: a step with no assertions passes whenever the request is answered.
 - `--fail-fast` stops between scenarios, not between steps.
 

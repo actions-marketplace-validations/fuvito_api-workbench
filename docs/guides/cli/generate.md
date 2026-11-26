@@ -8,7 +8,7 @@
 
 You do not need it to check an API against its spec: [`conform`](conform.md) builds its requests itself.
 
-> **⚠ It overwrites without asking.** A file in the output folder with the same name as a generated one is **replaced**, your edits included. Other files are left alone. Generate into a **new folder**, or commit your work first (backlog B-136).
+> **It does not replace your files.** If a file with a generated name exists with other content, **nothing** is written, the files are listed and the exit code is 2. `--force` replaces them. **Releases up to 0.13.3 replaced them without asking,** your edits included: with those, generate into a new folder.
 
 ## Synopsis
 
@@ -22,7 +22,8 @@ clrsig generate <spec-file-or-url> [flags]
 |---|---|---|
 | `--output`, `-o` | The folder for the files. | A folder named after the spec's title, in the current folder. |
 | `--base-url`, `-b` | Use this server address in the files. | The spec's first `servers` entry. |
-| `--dry-run` | Lists what would be generated and writes nothing. It does **not** say which files exist already. | |
+| `--dry-run` | Lists what would be generated and writes nothing. Marks each file that exists with other content. | |
+| `--force` | Replaces files that exist with other content. Files with other names are never touched. | Without it, such a file stops the run. |
 | `--format`, `-f` | `text` or `json`: how the list is printed. The request files are always YAML. | `text` |
 
 The [options every command has](conform.md#options) apply too.
@@ -77,6 +78,26 @@ auth:
 
 Give `name`, `email` and `token` in an environment file when you send it.
 
+### 3. Your edits are in the way
+
+**What it does:** generates, then generates again with another server address, which would change the files.
+
+<!-- run: exit=2 first="0" contains="nothing was written" contains="--force" -->
+```bash
+clrsig generate examples/server/openapi.yaml --output my-requests --base-url http://localhost:8080
+clrsig generate examples/server/openapi.yaml --output my-requests --base-url http://localhost:9999
+```
+
+Add `--force` to replace them:
+
+<!-- run: exit=0 first="0" contains="8 replaced" -->
+```bash
+clrsig generate examples/server/openapi.yaml --output my-requests --base-url http://localhost:8080
+clrsig generate examples/server/openapi.yaml --output my-requests --base-url http://localhost:9999 --force
+```
+
+Running the same command again, with nothing changed, is fine: files that already hold what would be written are left alone. Two operations that would get the same file name are saved as `name.yaml` and `name-2.yaml`.
+
 ## Reading the result
 
 | What is in a file | Where it comes from |
@@ -85,7 +106,7 @@ Give `name`, `email` and `token` in an environment file when you send it.
 | `auth` with `{{token}}` (or the key or basic form) | The operation's security scheme. |
 | A JSON body | The **required** fields, with the spec's examples or defaults where there are any, and `{{name}}` places otherwise. A body with no required field comes out as `{}`. |
 
-Exit code **0** when the files were written; **2** when the spec could not be read or is not valid.
+Exit code **0** when the files were written (or were already as they would be); **2** when the spec could not be read or is not valid, or a file is in the way.
 
 ## What to do next
 
@@ -94,11 +115,12 @@ Exit code **0** when the files were written; **2** when the spec could not be re
 | Files written | Fill an environment with the `{{…}}` names, then [`clrsig request`](request.md). |
 | A body is `{}` but the operation takes fields | The spec marks none as required; add them yourself (backlog B-047). |
 | The addresses point at the wrong server | Generate again into a new folder with `--base-url`. |
-| The spec changed | Generate into a **new** folder and compare, so your edits are not lost. |
+| `nothing was written: … already there` | Keep your files: generate into a **new** folder and compare. Or, if you do not need them, add `--force`. |
+| The spec changed | Generate into a new folder and compare. |
 
 ## Common mistakes and limits
 
-- **Generating again over files you edited** replaces them.
+- `--force` has no undo. Commit your work first.
 - Swagger 2.0 files are refused.
 
 ## Related commands and the desktop app

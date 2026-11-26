@@ -1042,3 +1042,10 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Found while writing, recorded, not fixed:** `generate` overwrites edited files without asking (B-136); `validate` accepts an unknown HTTP method (B-137, CS-GAP-021); `request` sends undefined `{{names}}` as text (B-138, CS-GAP-022); `validate` exits 1 where its help says 2 (B-139). The `run` page warns about B-135.
 - **Not done:** Phase 3 (the other commands, goal pages, exit codes, troubleshooting) and the one link from the existing user guide are not started.
 
+### 2026-11-25 — A schema check that checks nothing fails; generate keeps your files (B-135, B-136)
+
+- **B-135:** a scenario `schema` assertion passed without reading the body for a status it did not know (an undeclared one with an `operationId`, anything but 200 for a schema written in place), also for a `2XX`/`4XX` range (never looked up), a response with no schema, one with no JSON type, and XML. Without a `specFile` a run that got a 500 could be `PASSED`. Part of this was already documented as not caught (CS-RESP-001 and CS-RESP-012, column B); the first report called it new. Now it passes only when the body was compared: ranges and a declared JSON schema are used, a schema written in place checks any status, and otherwise it fails with the reason (CS-RUN-013). **Behaviour change: green runs can turn red,** among them assertions on a 204, on XML or CSV, or on a response the spec gives no schema.
+- **B-136:** `generate` replaced files without asking. It now writes nothing and exits 2 when a file with other content is in the way, unless `--force` (new flag). Identical files (line endings aside) are left alone; two operations with one file name are both kept; writes are atomic; `--dry-run` marks the files in the way, and JSON output has a new `state` per file. The desktop import already never overwrote. **Behaviour change** for a script that generates over old output.
+- **Guarded by** `assertions/schema_checked_test.go` and `apps/cli/generate_overwrite_test.go`; guide pages `run`, `generate`, the format guide and the user guide updated.
+- **Not done:** not released.
+

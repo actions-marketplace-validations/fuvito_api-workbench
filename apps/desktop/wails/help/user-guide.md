@@ -900,12 +900,12 @@ clrsig impact openapi-v1.yaml openapi-v2.yaml scenarios
 ### `clrsig generate`, `request` and `validate`
 
 ```bash
-clrsig generate openapi.yaml --output requests/ [--base-url https://api.example.com] [--dry-run]
+clrsig generate openapi.yaml --output requests/ [--base-url https://api.example.com] [--dry-run] [--force]
 clrsig request requests/health-check.yaml --env environments/local.yaml [--timeout 5000]
 clrsig validate scenarios
 ```
 
-`generate` writes one request file per spec operation (the same files the desktop **Import OpenAPI** button creates). `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything; like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
+`generate` writes one request file per spec operation. It does not replace a file that exists with other content: nothing is written and it exits `2`; `--force` replaces such files (releases up to 0.13.3 replaced them without asking). The desktop **Import OpenAPI** button never replaces a file either; it gives the new one another name. `request` executes one saved request file and prints the response. `validate` checks scenario files for errors without sending anything; like `run`, it accepts files and folders (sub-folders included unless `--no-recursive`), skipping files that are not scenarios. All three accept `--format text|json`.
 
 `validate --spec <openapi-file>` checks the spec document itself (scenarios are then optional): an operation without an `operationId` (CS-SPEC-001), a schema whose `required` lists a property it does not declare (CS-SPEC-002) and an example that breaks its format (CS-SPEC-003). Errors fail the check, warnings print as notes and fail it only with `--strict`. These are problems in the spec, not the server, so fix them before reading conformance violations; Check Conformance shows them as **Spec health** as soon as you choose a spec.
 

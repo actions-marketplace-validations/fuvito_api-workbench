@@ -20,6 +20,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/history"
+	"github.com/fuvito/api-workbench/packages/core/importer"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
@@ -378,6 +379,7 @@ func generateCmd() *cobra.Command {
 	var outputDir string
 	var format string
 	var dryRun bool
+	var force bool
 
 	cmd := &cobra.Command{
 		Use:   "generate <spec-file-or-url>",
@@ -389,7 +391,11 @@ The argument may be a local file path or an http/https URL.
 Each generated file contains the HTTP method, URL (with path parameters as
 {{paramName}} placeholders), required headers and query params, an empty JSON
 body stub for POST/PUT/PATCH operations, and a Bearer auth hint when the
-operation declares a security requirement.`,
+operation declares a security requirement.
+
+A file that exists with other content is not replaced: nothing is written, the files are listed and
+the exit code is 2. --force replaces them. A file that already holds what would be written is left
+as it is, and other files in the folder are never touched.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src := args[0]
@@ -426,10 +432,16 @@ operation declares a security requirement.`,
 				URL         string   `json:"url"`
 				Path        string   `json:"path"`
 				Tags        []string `json:"tags,omitempty"`
+				// State is what the file was before this run: new, unchanged or differs
+				State importer.FileState `json:"state"`
+				data  []byte
 			}
 			var results []genResult
 			var skipped int
+			var inTheWay []string
+			names := map[string]bool{}
 
+			// every file is looked at before the first is written, so a refusal writes nothing
 			for _, gr := range reqs {
 				filename := genSanitizeFilename(gr.OperationID)
 				if filename == "" {
@@ -438,21 +450,19 @@ operation declares a security requirement.`,
 				if filename == "" {
 					filename = strings.ToLower(string(gr.Request.Method)) + "-request"
 				}
-				savePath := filepath.Join(destDir, filename+".yaml")
+				savePath := importer.UniqueName(filepath.Join(destDir, filename+".yaml"), names)
 
-				if !dryRun {
-					yamlData, err := serialization.WriteRequest(gr.Request, "yaml")
-					if err != nil {
-						skipped++
-						continue
-					}
-					if err := os.MkdirAll(destDir, 0o755); err != nil {
-						return fmt.Errorf("creating output directory: %w", err)
-					}
-					if err := os.WriteFile(savePath, yamlData, 0o644); err != nil {
-						skipped++
-						continue
-					}
+				yamlData, err := serialization.WriteRequest(gr.Request, "yaml")
+				if err != nil {
+					skipped++
+					continue
+				}
+				state, err := importer.StateOf(savePath, yamlData)
+				if err != nil {
+					return fmt.Errorf("looking at %s: %w", savePath, err)
+				}
+				if state == importer.FileDiffers {
+					inTheWay = append(inTheWay, savePath)
 				}
 
 				results = append(results, genResult{
@@ -461,7 +471,28 @@ operation declares a security requirement.`,
 					URL:         gr.Request.URL,
 					Path:        savePath,
 					Tags:        gr.Tags,
+					State:       state,
+					data:        yamlData,
 				})
+			}
+
+			if !dryRun {
+				if len(inTheWay) > 0 && !force {
+					return fmt.Errorf("nothing was written: %d file%s with other content already there:\n  %s\nUse --output with a new folder to keep them, or --force to replace them",
+						len(inTheWay), plural(len(inTheWay)), strings.Join(inTheWay, "\n  "))
+				}
+				written := results[:0]
+				for _, r := range results {
+					if r.State != importer.FileUnchanged {
+						if err := importer.WriteGenerated(r.Path, r.data); err != nil {
+							fmt.Fprintf(cmd.ErrOrStderr(), "writing %s: %v\n", r.Path, err)
+							skipped++
+							continue
+						}
+					}
+					written = append(written, r)
+				}
+				results = written
 			}
 
 			switch strings.ToLower(format) {
@@ -490,11 +521,18 @@ operation declares a security requirement.`,
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "%s %s%s → %s\n\n", title, version, dryTag, destDir)
 				for _, r := range results {
-					fmt.Fprintf(cmd.OutOrStdout(), "  %-7s %s\n", r.Method, r.URL)
+					note := ""
+					if dryRun && r.State == importer.FileDiffers {
+						note = "  (" + r.Path + " has other content: needs --force)"
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "  %-7s %s%s\n", r.Method, r.URL, note)
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%d request(s) generated", len(results))
 				if skipped > 0 {
 					fmt.Fprintf(cmd.OutOrStdout(), "  %d skipped (write error)", skipped)
+				}
+				if !dryRun && len(inTheWay) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "  %d replaced (--force)", len(inTheWay))
 				}
 				fmt.Fprintln(cmd.OutOrStdout())
 			}
@@ -507,6 +545,7 @@ operation declares a security requirement.`,
 	cmd.Flags().StringVarP(&outputDir, "output", "o", "", "Output directory for generated files (default: ./<spec-title>)")
 	cmd.Flags().StringVarP(&format, "format", "f", "text", "Output format: text or json")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be generated without writing any files")
+	cmd.Flags().BoolVar(&force, "force", false, "Replace files that exist with other content")
 
 	return cmd
 }

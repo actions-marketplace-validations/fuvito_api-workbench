@@ -113,13 +113,17 @@ func freePath(path string, planned map[string]bool) string {
 	if !taken(path) {
 		return path
 	}
-	ext := filepath.Ext(path)
-	stem := strings.TrimSuffix(path, ext)
 	for i := 2; ; i++ {
-		if candidate := fmt.Sprintf("%s-%d%s", stem, i, ext); !taken(candidate) {
+		if candidate := numbered(path, i); !taken(candidate) {
 			return candidate
 		}
 	}
+}
+
+// numbered is path with a number before its extension: users.yaml -> users-2.yaml.
+func numbered(path string, i int) string {
+	ext := filepath.Ext(path)
+	return fmt.Sprintf("%s-%d%s", strings.TrimSuffix(path, ext), i, ext)
 }
 
 func atomicWrite(path string, data []byte) error {

@@ -26,14 +26,3 @@ func TestASchemaWrittenInPlaceNeedsNoSpecFile(t *testing.T) {
 		}
 	}
 }
-
-// Pins CS-GAP-020: a schema assertion does not look at the body of a status it does not know.
-func TestSchemaAssertion_AnotherStatusPassesUnchecked_KnownGap(t *testing.T) {
-	a := domain.Assertion{Type: domain.AssertionSchema, Schema: `{"type":"object","required":["neverThere"]}`}
-	for _, status := range []int{201, 404, 500} {
-		r := assertions.New().Evaluate(a, &domain.Response{StatusCode: status, Body: []byte(`{}`)})
-		if !r.Passed {
-			t.Errorf("%d is now checked (%s): update CS-GAP-020, the format guide, and close B-135", status, r.Message)
-		}
-	}
-}

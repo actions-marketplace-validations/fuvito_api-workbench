@@ -205,8 +205,10 @@ paths:
 		return "", false, fmt.Sprintf("invalid schema: %v", err)
 	}
 
+	// A schema written in place says what the body must look like, whatever the status is (a status
+	// assertion checks the status). The wrapper declares one response, so it is validated as that one.
 	fakeResp := &domain.Response{
-		StatusCode: resp.StatusCode,
+		StatusCode: 200,
 		Headers:    []domain.Header{{Name: "Content-Type", Value: "application/json"}},
 		Body:       resp.Body,
 	}
