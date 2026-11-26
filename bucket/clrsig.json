@@ -1,12 +1,12 @@
 {
-    "version": "0.13.2",
+    "version": "0.13.3",
     "description": "API Contract Validation and Spec Conformance Testing CLI",
     "homepage": "https://github.com/fuvito/api-workbench",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/fuvito/api-workbench/releases/download/v0.13.2/clrsig-windows-amd64.exe",
-            "hash": "87a1a24d7f55caa803cf3e0c5bec838b3e93398d32871edc291ea38aeef6b7be",
+            "url": "https://github.com/fuvito/api-workbench/releases/download/v0.13.3/clrsig-windows-amd64.exe",
+            "hash": "7f5e882dda1e45d649bcd4173564ffd26a2d313f0208425f376ad6b493561dcf",
             "bin": [
                 [
                     "clrsig-windows-amd64.exe",
