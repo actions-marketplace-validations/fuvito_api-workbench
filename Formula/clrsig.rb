@@ -1,22 +1,22 @@
 class Clrsig < Formula
   desc "API Contract Validation and Spec Conformance Testing CLI"
   homepage "https://github.com/fuvito/api-workbench"
-  version "0.13.3"
+  version "0.13.4"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/fuvito/api-workbench/releases/download/v#{version}/clrsig-darwin-arm64"
-      sha256 "6735102c1579082e6b3b6486254199027b2561b79b418ade3f1bfb427fa6e17e"
+      sha256 "f91d297893f34d6a1680b5068e11a3a19831fb477318acb8386db740e3aae41b"
     else
       url "https://github.com/fuvito/api-workbench/releases/download/v#{version}/clrsig-darwin-amd64"
-      sha256 "3c58ae2cc0af4deb874bc994d8f8385de5b7d00e99150e9e695d7b97c02b3f4f"
+      sha256 "bcbdcb67bdec7ebfcbbafdcaee4776c75984338a2c3275f9be64dc5ced83df5d"
     end
   end
 
   on_linux do
     url "https://github.com/fuvito/api-workbench/releases/download/v#{version}/clrsig-linux-amd64"
-    sha256 "8103e2ed3e67ac5896368617d0b6096cebf49244c39be540dfa4f0a9dc665630"
+    sha256 "2f5cb21dee2f1e900b48a736403d6beefb04ee86e8b02ed48ac0ed060987a2be"
   end
 
   def install
