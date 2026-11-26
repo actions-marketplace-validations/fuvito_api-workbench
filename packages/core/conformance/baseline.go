@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/checks"
-	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,19 +54,77 @@ type Violation struct {
 
 // Key identifies the violation: two runs that find the same thing produce the same key.
 func (v Violation) Key() string {
-	return v.Operation + "\x00" + v.Check + "\x00" + v.Where + "\x00" + stableText(v.Rule)
+	return v.Operation + "\x00" + v.Check + "\x00" + v.Where + "\x00" + strings.Join(problemParts(v.Rule), " | ")
 }
 
-// stableText is the part of a validator message that identifies a violation. Baselines written by
-// earlier versions stored the message with the schema and the failing value after it; messages no
-// longer carry those, so both are compared without them.
+// stableText is a validator message without the schema and value it quotes. Baselines written by
+// earlier versions stored messages with them; messages no longer carry them, so both are compared
+// without. A password the old message quoted is masked in the new one.
 func stableText(s string) string {
-	for _, dump := range []string{openapi.DetailStart, "\nValue:\n"} {
-		if i := strings.Index(s, dump); i >= 0 {
-			s = s[:i]
+	return redact.Credentials(strings.TrimSpace(reQuoted.ReplaceAllString(s, "")))
+}
+
+var (
+	// the blocks are indented by two spaces; what follows them (" | " and the next problem) is not
+	reQuoted = regexp.MustCompile(`\n(?:Schema:\n(?:  [^\n]*(?:\n|$))+\n?)?Value:\n(?:  [^\n]*(?:\n|$))+|\nSchema:\n(?:  [^\n]*(?:\n|$))+`)
+	// where the next of several problems in one OpenAPI 3.1 message starts
+	reNextProblem = regexp.MustCompile(` \| (?:validation failed due to: |error at "|at ')`)
+	// what a request violation says before the validator's message
+	reMessageContext = regexp.MustCompile(`^.*?does not fit the spec: `)
+	// the library's own path before its sentence. It repeats segments, how often depends on the
+	// other errors around it; the path inside the sentence (at '/a/b') is the right one
+	reLibraryPath = regexp.MustCompile(`^error at "[^"]*": `)
+)
+
+const groupedBy = "validation failed due to: "
+
+// problemParts lists the problems a message names, sorted. Up to 0.13.2 one OpenAPI 3.1 message
+// could name several, in any order: 0.13.1 and earlier stored all of them, 0.13.2 only the first.
+// Comparing problem by problem reads both, and does not depend on the order.
+func problemParts(message string) []string {
+	text := stableText(message)
+	context := reMessageContext.FindString(text)
+	text = text[len(context):]
+	var raw []string
+	start := 0
+	for _, m := range reNextProblem.FindAllStringIndex(text, -1) {
+		raw = append(raw, text[start:m[0]])
+		start = m[0] + len(" | ")
+	}
+	raw = append(raw, text[start:])
+	seen := map[string]bool{}
+	var out []string
+	for _, part := range raw {
+		for strings.HasPrefix(part, groupedBy) {
+			part = strings.TrimPrefix(part, groupedBy)
+		}
+		part = reLibraryPath.ReplaceAllString(part, "")
+		if part = context + strings.TrimSpace(part); !seen[part] {
+			seen[part] = true
+			out = append(out, part)
 		}
 	}
-	return strings.TrimSpace(s)
+	sort.Strings(out)
+	return out
+}
+
+// identities are what a violation is matched by: where the validator's words are the identity, one
+// for each problem they name; otherwise just the one.
+func (v Violation) identities(legacy bool) []string {
+	var base, text string
+	switch {
+	case legacy:
+		base, text = v.Operation+"\x00"+v.Kind+"\x00", v.Detail
+	case v.Check == "other":
+		base, text = v.Operation+"\x00"+v.Check+"\x00"+v.Where+"\x00", v.Rule
+	default:
+		return []string{v.Key()}
+	}
+	var out []string
+	for _, part := range problemParts(text) {
+		out = append(out, base+part)
+	}
+	return out
 }
 
 // LegacyKey is the identity a version 1 baseline uses.
@@ -262,7 +321,7 @@ func ParseBaseline(data []byte, filename string) (*Baseline, error) {
 			if v.Operation == "" || v.Kind == "" {
 				return nil, fmt.Errorf("baseline violation %d needs an operation and a kind", i+1)
 			}
-			b.Violations = append(b.Violations, Violation{Operation: v.Operation, Kind: v.Kind, Detail: v.Detail})
+			b.Violations = append(b.Violations, Violation{Operation: v.Operation, Kind: v.Kind, Detail: redact.Credentials(v.Detail)})
 		}
 		return b, nil
 	case BaselineSchemaVersion:
@@ -275,7 +334,9 @@ func ParseBaseline(data []byte, filename string) (*Baseline, error) {
 			if v.Operation == "" || v.Check == "" {
 				return nil, fmt.Errorf("baseline violation %d needs an operation and a check", i+1)
 			}
-			b.Violations = append(b.Violations, Violation{Operation: v.Operation, Check: v.Check, Where: v.Where, Rule: v.Rule, Summary: v.Summary})
+			b.Violations = append(b.Violations, Violation{Operation: v.Operation, Check: v.Check, Where: v.Where,
+				// files written by earlier versions may hold a password; it is not printed again
+				Rule: redact.Credentials(v.Rule), Summary: redact.Credentials(v.Summary)})
 		}
 		return b, nil
 	}
@@ -383,23 +444,35 @@ func CompareChecked(current []Violation, b *Baseline, checked map[string]bool) B
 	}
 	inBaseline := map[string]bool{}
 	for _, v := range b.Violations {
-		inBaseline[key(v)] = true
+		for _, id := range v.identities(b.Legacy) {
+			inBaseline[id] = true
+		}
 	}
-	now := map[string]bool{}
+	seen, now := map[string]bool{}, map[string]bool{}
 	d := BaselineDiff{Legacy: b.Legacy}
 	for _, v := range current {
-		if now[key(v)] {
+		if seen[key(v)] {
 			continue
 		}
-		now[key(v)] = true
-		if inBaseline[key(v)] {
+		seen[key(v)] = true
+		// known only when every problem it names was recorded
+		known := true
+		for _, id := range v.identities(b.Legacy) {
+			now[id] = true
+			known = known && inBaseline[id]
+		}
+		if known {
 			d.Known = append(d.Known, v)
 		} else {
 			d.New = append(d.New, v)
 		}
 	}
 	for _, v := range b.Violations {
-		if !now[key(v)] && (checked == nil || checked[v.Operation]) {
+		gone := true
+		for _, id := range v.identities(b.Legacy) {
+			gone = gone && !now[id]
+		}
+		if gone && (checked == nil || checked[v.Operation]) {
 			d.Fixed = append(d.Fixed, v)
 		}
 	}

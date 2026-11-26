@@ -88,7 +88,7 @@ func hiddenIn(body []byte, headers []domain.Header) []string {
 					out = append(out, v)
 				}
 			}
-		} else if redact.Tokens(h.Value) != h.Value {
+		} else if redact.LooksSecret(h.Value) {
 			out = append(out, h.Value)
 		}
 	}
@@ -113,7 +113,7 @@ func safeViolations(violations []ValidationError, body []byte, headers []domain.
 				msg = strings.ReplaceAll(msg, h, redact.Mask)
 			}
 		}
-		violations[i].Message = msg
+		violations[i].Message = redact.Credentials(msg)
 	}
 	return violations
 }

@@ -1,0 +1,18 @@
+openapi: "3.1.0"
+info: {title: several problems, version: "1"}
+paths:
+  /thing:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, owner]
+                additionalProperties: false
+                properties:
+                  status: {type: string, enum: ["on"]}
+                  count: {type: integer}
+                  user: {type: object, properties: {age: {type: integer}, id: {type: integer}}}

@@ -7,6 +7,8 @@
 //   - a single value may be, shortened, because it is often what explains a problem;
 //   - but not when its field or header is named like a credential, or it looks like a token.
 //
+// A password inside a longer text is masked on its own, wherever it stands (Credentials).
+//
 // These are rules of thumb. A secret in a field with an ordinary name, short enough not to look like
 // a token, is shown if it is itself the value that broke the spec.
 package redact
@@ -120,8 +122,19 @@ func looksLikeToken(run string) bool {
 	return letters && digits
 }
 
-// Tokens masks what looks like a credential inside a text value from a response.
-func Tokens(s string) string {
+// Tokens masks what looks like a credential inside a text value from a response, passwords in
+// addresses and assignments included (see Credentials).
+func Tokens(s string) string { return tokens(Credentials(s)) }
+
+// LooksSecret says whether s holds something token-like, so that the whole of it is to be kept out
+// of messages. A password in an address does not count: Credentials masks just the password, and
+// the rest of the address is worth keeping.
+func LooksSecret(s string) bool {
+	s = Credentials(s)
+	return tokens(s) != s
+}
+
+func tokens(s string) string {
 	s = reJWT.ReplaceAllString(s, Mask)
 	s = reScheme.ReplaceAllString(s, "$1 "+Mask)
 	return reRun.ReplaceAllStringFunc(s, func(run string) string {
@@ -258,7 +271,7 @@ func Hidden(v any) []string {
 				walk(val, sensitive)
 			}
 		case string:
-			if sensitive || Tokens(x) != x {
+			if sensitive || LooksSecret(x) {
 				out = append(out, x)
 			}
 		case json.Number:

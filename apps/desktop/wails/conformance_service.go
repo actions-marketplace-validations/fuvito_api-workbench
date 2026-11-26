@@ -19,6 +19,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
 	"github.com/fuvito/api-workbench/packages/core/projectconfig"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -671,7 +672,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 	for _, op := range r.Operations {
 		item := ConformOperationIO{
 			OperationID: op.OperationID, Method: op.Method, Path: op.Path, SpecPath: op.ReportPath(),
-			StatusCode: op.StatusCode, DurationMs: op.DurationMs, Error: op.Error,
+			StatusCode: op.StatusCode, DurationMs: op.DurationMs, Error: redact.Credentials(op.Error),
 			Violations: []string{},
 			Findings:   []ConformFindingIO{},
 		}
@@ -720,7 +721,7 @@ func conformOutputIO(out application.ConformOutput, baseURL string, writes bool)
 		for _, p := range out.Negative.Probes {
 			item := ConformProbeIO{
 				OperationID: p.OperationID, Method: p.Method, Path: p.Path,
-				Kind: string(p.Kind), Description: p.Description, StatusCode: p.StatusCode, Error: p.Error,
+				Kind: string(p.Kind), Description: p.Description, StatusCode: p.StatusCode, Error: redact.Credentials(p.Error),
 			}
 			switch {
 			case p.Skipped:

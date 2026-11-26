@@ -531,7 +531,9 @@ func parseSchemaErrors(err error) []ValidationError {
 			errs = append(errs, ValidationError{Message: e.Error()})
 		}
 	} else {
-		errs = append(errs, ValidationError{Message: err.Error()})
+		for _, message := range problems(err) {
+			errs = append(errs, ValidationError{Message: message})
+		}
 	}
 	return errs
 }

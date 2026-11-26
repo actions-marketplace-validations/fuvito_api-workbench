@@ -1,0 +1,6 @@
+schemaVersion: "2"
+violations:
+    - operation: GET /thing
+      check: other
+      rule: 'validation failed due to: at '''': missing properties ''name'', ''owner'' | error at "/status": at ''/status'': value must be ''on'''
+      summary: 'validation failed due to: at '''': missing properties ''name'', ''owner'' | error at "/status": at ''/status'': value must be ''on'''

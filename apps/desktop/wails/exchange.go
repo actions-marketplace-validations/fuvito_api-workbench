@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/domain"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 )
 
 // secretName matches header and parameter names that carry credentials.
@@ -24,7 +25,7 @@ func exchangeRequest(req *domain.Request, secrets []string) (method, fullURL str
 				s = strings.ReplaceAll(s, sec, masked)
 			}
 		}
-		return s
+		return redact.Credentials(s)
 	}
 
 	var query []string

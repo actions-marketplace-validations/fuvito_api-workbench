@@ -41,6 +41,8 @@ func (e *Evaluator) Evaluate(a domain.Assertion, resp *domain.Response) domain.A
 		res.Passed = false
 		res.Message = fmt.Sprintf("unknown assertion type %q", a.Type)
 	}
+	// the message also quotes the expected value, which the scenario file may write in full
+	res.Message = redact.Credentials(res.Message)
 	return res
 }
 

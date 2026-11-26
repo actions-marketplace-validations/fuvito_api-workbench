@@ -12,6 +12,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/conformance"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 )
 
@@ -135,7 +136,10 @@ func notComparedLine(result *scenario.Result) string {
 	return fmt.Sprintf("Spec: %d of %d responses were not compared with the spec (%s)", n, total, strings.Join(names, "; "))
 }
 
-func assertionLabel(a domain.Assertion) string {
+// assertionLabel names an assertion in a report. The expected value it shows may hold a password.
+func assertionLabel(a domain.Assertion) string { return redact.Credentials(rawAssertionLabel(a)) }
+
+func rawAssertionLabel(a domain.Assertion) string {
 	op := string(a.Operator)
 	if op == "" {
 		op = "eq"
@@ -1010,7 +1014,7 @@ func JSON(result *scenario.Result) ([]byte, error) {
 				Name:     ar.Assertion.Name,
 				Path:     ar.Assertion.Path,
 				Operator: string(ar.Assertion.Operator),
-				Expected: fmt.Sprintf("%v", ar.Assertion.Expected),
+				Expected: x.text(fmt.Sprintf("%v", ar.Assertion.Expected)),
 				Actual:   x.text(ar.Actual),
 				Passed:   ar.Passed,
 				Message:  x.text(ar.Message),

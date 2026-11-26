@@ -20,6 +20,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/history"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/redact"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -898,7 +899,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		Passed:     result.Passed,
 		DurationMs: result.Duration.Milliseconds(),
 		SpecError:  specLoadErr,
-		Error:      result.SetupError,
+		Error:      redact.Credentials(result.SetupError),
 	}
 	if result.UsedRandomness {
 		seed := result.Seed
@@ -909,6 +910,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 		if v.Secret {
 			val = "***"
 		}
+		val = redact.Credentials(val)
 		out.Variables = append(out.Variables, VariableIO{Name: v.Name, Value: val, Secret: v.Secret})
 	}
 	for _, sr := range result.Steps {
@@ -916,7 +918,7 @@ func (s *ScenarioService) RunScenario(path, envPath string, fromStep int) Scenar
 			Label:      sr.Label,
 			Passed:     sr.Passed,
 			Skipped:    sr.Skipped,
-			Error:      sr.Error,
+			Error:      redact.Credentials(sr.Error),
 			Extracted:  sr.Extracted,
 			Assertions: []AssertionResultIO{},
 		}

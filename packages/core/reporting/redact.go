@@ -43,8 +43,14 @@ func newRedactor(secrets []string, reveal bool) redactor {
 	return x
 }
 
-// text removes every known secret value from s.
+// text removes every known secret value from s, and any password written in an address or an
+// assignment, known or not.
 func (x redactor) text(s string) string {
+	return redact.Credentials(x.known(s))
+}
+
+// known removes every known secret value from s.
+func (x redactor) known(s string) string {
 	for _, secret := range x.secrets {
 		if strings.Contains(s, secret) {
 			s = strings.ReplaceAll(s, secret, Redacted)
@@ -72,6 +78,9 @@ func (x redactor) extracted(m map[string]string) map[string]string {
 		switch {
 		case !x.reveal && IsSecretName(name):
 			out[name] = Redacted
+		case x.reveal:
+			// the user asked to see extracted values
+			out[name] = x.known(val)
 		default:
 			out[name] = x.text(val)
 		}
