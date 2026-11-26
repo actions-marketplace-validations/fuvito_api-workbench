@@ -1020,3 +1020,10 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - **Guarded by** `conformance/problems_test.go` (repeated runs; each test fails with the old code) and `testdata/baseline-31-by-0.13.*.yaml`, written by the released binaries.
 - **Not done:** a failing value inside a 3.1 sentence is still part of the identity (CS-GAP-019). The repeated path segments are still shown in the message (`/user/user/age`; the path after "at" is right). The published 0.13.2 notes are unchanged. Not committed, pushed or released.
 
+### 2026-11-25 — Released 0.13.3 (B-130 passwords, B-131 baselines)
+
+- Tagged `2cd4594` after CI passed on it; the sandbox expectations had passed in Docker with `clrsig` built from `main` with both fixes. All release jobs and all five post-release smoke jobs passed.
+- Release notes published first thing, while the smoke jobs were still running. They begin by correcting the 0.13.2 notes, say how to review baselines recorded with 0.13.2 before recording again, and list what password masking does not find.
+- Checked afterwards: the four checksum files match their binaries; the Homebrew formula and Scoop manifest carry the published hashes. With the downloaded Windows binary, 60 runs each: a second new problem failed the build every time (also against a baseline written by the released 0.13.2) and an unchanged answer passed every time; no demo password appeared in any `conform` format or in a new baseline file, and in `run` only the fragment the scenario itself expects.
+- **Not done:** the published 0.13.2 notes still hold the wrong statement about baselines, and older releases are not marked as affected. The sandbox still pins 0.13.2.
+
