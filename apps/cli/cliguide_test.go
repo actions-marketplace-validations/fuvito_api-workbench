@@ -15,24 +15,33 @@ import (
 // guidePages names the page of the detailed CLI guide (docs/guides/cli/) that documents each command.
 // Commands of one group share a page.
 var guidePages = map[string]string{
+	"bundle export":       "bundle.md",
+	"bundle import":       "bundle.md",
+	"bundle run":          "bundle.md",
+	"bundle validate":     "bundle.md",
 	"config show":         "config-show.md",
 	"conform":             "conform.md",
+	"coverage list":       "coverage.md",
+	"coverage quality":    "coverage.md",
+	"coverage reset":      "coverage.md",
+	"diff":                "diff.md",
 	"generate":            "generate.md",
+	"impact":              "impact.md",
+	"import":              "import.md",
 	"init":                "init.md",
 	"init github-actions": "init.md",
+	"mcp":                 "mcp.md",
 	"request":             "request.md",
 	"run":                 "run.md",
+	"telemetry disable":   "telemetry.md",
+	"telemetry enable":    "telemetry.md",
+	"telemetry status":    "telemetry.md",
 	"validate":            "validate.md",
 }
 
 // guidePending lists the commands whose page is not written yet. It may only shrink: an entry whose
-// page exists fails the test, and when the guide is complete the list is empty
-// (docs/enhancements/2026-11-25-detailed-user-guide.md, phase 3).
-var guidePending = []string{
-	"bundle export", "bundle import", "bundle run", "bundle validate",
-	"coverage list", "coverage quality", "coverage reset", "diff", "impact", "import",
-	"mcp", "telemetry disable", "telemetry enable", "telemetry status",
-}
+// page exists fails the test. Every command has a page now, so a new command needs one at once.
+var guidePending = []string{}
 
 // runnableCommands returns every command a user can run, by its name without "clrsig".
 func runnableCommands() map[string]*cobra.Command {

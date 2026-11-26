@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fuvito/api-workbench/packages/core/application"
@@ -14,6 +15,7 @@ import (
 	"github.com/fuvito/api-workbench/packages/core/coverage"
 	"github.com/fuvito/api-workbench/packages/core/domain"
 	"github.com/fuvito/api-workbench/packages/core/openapi"
+	"github.com/fuvito/api-workbench/packages/core/projectconfig"
 	"github.com/fuvito/api-workbench/packages/core/reporting"
 	"github.com/fuvito/api-workbench/packages/core/scenario"
 	"github.com/fuvito/api-workbench/packages/core/serialization"
@@ -21,24 +23,88 @@ import (
 )
 
 func mcpCmd() *cobra.Command {
-	return &cobra.Command{
+	var allowWrites bool
+	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Start an MCP tool server over stdio",
 		Long: `Start a Model Context Protocol (MCP) server over stdio. AI agents (Claude
 Desktop, Cursor, etc.) can call clrsig tools — conform, run_scenario, diff,
 and coverage — without leaving their workflow.
 
+The conform tool is read-only: it sends only GET and HEAD. To let it send POST, PUT, PATCH and
+DELETE, start the server with --allow-writes; the agent must then also ask for it on the call
+(allowWrites: true). A project file with conform.readOnly: true (the one found from this folder
+or --config, or the one beside the spec) still forbids writes; --no-config ignores project files.
+The run_scenario tool is not limited by this: it sends whatever the scenario says.
+
 Connect via stdio transport (newline-delimited JSON-RPC 2.0).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			srv := &mcpServer{
 				scanner: bufio.NewScanner(os.Stdin),
 				enc:     json.NewEncoder(os.Stdout),
+				writes:  mcpWritePolicy{allowed: allowWrites, cmd: cmd},
 			}
 			srv.scanner.Buffer(make([]byte, 4*1024*1024), 4*1024*1024)
 			return srv.serve()
 		},
 	}
+	cmd.Flags().BoolVar(&allowWrites, "allow-writes", false, "Let the conform tool send POST, PUT, PATCH and DELETE when a call asks for it")
+	return cmd
 }
+
+// mcpWritePolicy says whether a conform call may send requests that change data. The zero value
+// allows none. The call's own argument is not enough: the agent writes that, and only the person
+// who starts the server can write the flag.
+type mcpWritePolicy struct {
+	allowed bool
+	cmd     *cobra.Command // for --config and --no-config; nil in a server built without them
+}
+
+// check returns nil when a call for this spec may send writes, and otherwise says why not.
+func (p mcpWritePolicy) check(spec string) error {
+	if !p.allowed {
+		return fmt.Errorf("writes are not allowed: this server was started without --allow-writes, which only the person who configures it can add. Nothing was sent. Call again without allowWrites to check the GET and HEAD operations")
+	}
+	var found []*projectconfig.Config
+	if p.cmd != nil {
+		cfg, ignored, _, err := findProjectConfig(p.cmd)
+		if err != nil {
+			return fmt.Errorf("writes are not allowed: the project file cannot be read, so it may forbid them (%w). Nothing was sent", err)
+		}
+		if ignored {
+			return nil // --no-config
+		}
+		if cfg != nil {
+			found = append(found, cfg)
+		}
+	}
+	// an agent app may start the server in any folder: the project of the spec counts too
+	if !strings.HasPrefix(spec, "http://") && !strings.HasPrefix(spec, "https://") {
+		abs, err := filepath.Abs(spec)
+		if err != nil {
+			return fmt.Errorf("writes are not allowed: %w. Nothing was sent", err)
+		}
+		home, _ := os.UserHomeDir()
+		path, err := projectconfig.Discover(filepath.Dir(abs), home)
+		if err == nil && path != "" {
+			var cfg *projectconfig.Config
+			if cfg, err = projectconfig.Load(path); err == nil {
+				found = append(found, cfg)
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("writes are not allowed: the project file of the spec cannot be read, so it may forbid them (%w). Nothing was sent", err)
+		}
+	}
+	for _, cfg := range found {
+		if cfg.Conform != nil && cfg.Conform.ReadOnly != nil && *cfg.Conform.ReadOnly {
+			return fmt.Errorf("writes are not allowed: %s says conform.readOnly: true. Nothing was sent", cfg.Path())
+		}
+	}
+	return nil
+}
+
+const mcpReadOnlyNote = "READ-ONLY: only GET and HEAD operations were sent. Operations shown as SKIP were NOT checked.\n\n"
 
 // --- JSON-RPC types ---
 
@@ -66,6 +132,7 @@ type rpcError struct {
 type mcpServer struct {
 	scanner *bufio.Scanner
 	enc     *json.Encoder
+	writes  mcpWritePolicy
 }
 
 func (s *mcpServer) serve() error {
@@ -134,7 +201,7 @@ func (s *mcpServer) toolCall(req rpcRequest) rpcResponse {
 
 	switch params.Name {
 	case "conform":
-		text, toolErr = mcpConform(params.Arguments)
+		text, toolErr = mcpConform(params.Arguments, s.writes)
 	case "run_scenario":
 		text, toolErr = mcpRunScenario(params.Arguments)
 	case "diff":
@@ -169,13 +236,14 @@ func mcpToolList() []map[string]interface{} {
 	return []map[string]interface{}{
 		{
 			"name":        "conform",
-			"description": "Execute all operations from an OpenAPI spec against a live server and validate every response against the declared schema. Returns a full conformance report.",
+			"description": "Check a live server against an OpenAPI spec: send requests built from the spec and validate every response. Read-only unless the call sets allowWrites and the server was started with --allow-writes: only GET and HEAD are sent, and the other operations are reported as SKIP (not checked). Returns a conformance report.",
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"spec":               prop("Path or URL to OpenAPI spec (YAML or JSON)"),
 					"baseUrl":            prop("Base URL of the API under test, e.g. http://localhost:8080"),
 					"envFile":            prop("Path to environment YAML/JSON file for variable resolution (optional)"),
+					"allowWrites":        map[string]interface{}{"type": "boolean", "description": "Also send POST, PUT, PATCH and DELETE, which change data on the server (default: false). Refused unless the person who configured the server started it with --allow-writes, and when the project file says conform.readOnly: true. Ask the user before using it."},
 					"failOn":             map[string]interface{}{"type": "string", "enum": []string{"failure", "warning"}, "description": "failure (default) or warning: warnings are reported but only fail the run when this is warning"},
 					"maxResponseTime":    map[string]interface{}{"type": "integer", "description": "Slowest acceptable response in milliseconds; a slower response is a violation (optional, 0 = off)"},
 					"maxResponseTimeFor": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Different limits for path prefixes, each as /prefix=ms, for example /reports=2000 (optional; the longest prefix wins; 0 = no limit there)"},
@@ -185,7 +253,7 @@ func mcpToolList() []map[string]interface{} {
 		},
 		{
 			"name":        "run_scenario",
-			"description": "Execute a multi-step scenario file and return assertion results, extracted variables, and step-by-step pass/fail status.",
+			"description": "Execute a multi-step scenario file and return assertion results, extracted variables, and step-by-step pass/fail status. It sends whatever the scenario says, including requests that change data.",
 			"inputSchema": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -225,12 +293,13 @@ func mcpToolList() []map[string]interface{} {
 
 // --- Tool handlers ---
 
-func mcpConform(raw json.RawMessage) (string, error) {
+func mcpConform(raw json.RawMessage, writes mcpWritePolicy) (string, error) {
 	var args struct {
 		Spec    string `json:"spec"`
 		BaseURL string `json:"baseUrl"`
 		EnvFile string `json:"envFile"`
 
+		AllowWrites        bool     `json:"allowWrites"`
 		FailOn             string   `json:"failOn"`
 		MaxResponseTime    int      `json:"maxResponseTime"`
 		MaxResponseTimeFor []string `json:"maxResponseTimeFor"`
@@ -251,6 +320,11 @@ func mcpConform(raw json.RawMessage) (string, error) {
 	}
 	if args.Spec == "" {
 		return "", fmt.Errorf("spec is required")
+	}
+	if args.AllowWrites {
+		if err := writes.check(args.Spec); err != nil {
+			return "", err
+		}
 	}
 
 	data, specFmt, err := fetchSpec(args.Spec)
@@ -273,11 +347,16 @@ func mcpConform(raw json.RawMessage) (string, error) {
 		BaseURL: args.BaseURL,
 		Env:     env,
 
+		ReadOnly:          !args.AllowWrites,
 		MaxResponseTimeMs: args.MaxResponseTime,
 		PathLimits:        pathLimits,
 		FailOn:            failOn,
 	})
-	return reporting.ConformText(out.Result, nil), nil
+	text := reporting.ConformText(out.Result, nil)
+	if !args.AllowWrites {
+		text = mcpReadOnlyNote + text
+	}
+	return text, nil
 }
 
 func mcpRunScenario(raw json.RawMessage) (string, error) {

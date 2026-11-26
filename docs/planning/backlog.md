@@ -170,6 +170,12 @@ The one living list of work that is not done yet. It is edited in place: tick an
 | ☐ | B-137 | **`validate` accepts an unknown HTTP method** (`GETT`). CS-GAP-021. | S | None | Found writing the guide, 2026-11-25 |
 | ☐ | B-138 | **`clrsig request` sends a `{{name}}` nothing defines as text**, and can exit 0, unlike `run` and `conform`. CS-GAP-022. | S | Decision (it changes what is sent) | Found writing the guide, 2026-11-25 |
 | ☐ | B-139 | **`validate` exits 1 for a file it cannot read**, its help says 2. | S | Decision (change the code or the help) | Found writing the guide, 2026-11-25 |
+| ☑ | B-140 | **Safety: the MCP `conform` tool sends `POST`, `PUT`, `PATCH` and `DELETE`**, with no read-only argument, ignoring `readOnly: true` of the project file. Released (0.13.4). | S | None (agreed 2026-11-25) | Found writing the guide (B-123), 2026-11-25. Fixed 2026-11-25 (not yet released), CS-RUN-014: read-only by default; writes need `--allow-writes` and `allowWrites: true`, and a read-only project forbids them. `run_scenario` is unchanged |
+| ☐ | B-141 | **`coverage quality --fail-on-gaps` exits 0 with no data**, a misspelled workspace included; with `--format json` it prints plain text. CS-GAP-024. | S | Decision (green gates may turn red), **recommended** | Found writing the guide, 2026-11-25 |
+| ☐ | B-142 | **`bundle run` sends the `CHANGE_ME` of an export as the secret** without a word. CS-GAP-025. | S | Decision | Found writing the guide, 2026-11-25 |
+| ☐ | B-143 | **`import` drops Postman test and pre-request scripts without a warning**, so imported requests look like the tested collection and check nothing. | S | None | Found writing the guide, 2026-11-25 |
+| ☐ | B-144 | **`coverage reset` says `Coverage reset for …` when there was nothing to reset**, for a spec or a workspace that does not exist. | S | None | Found writing the guide, 2026-11-25 |
+| ☐ | B-145 | **The telemetry notice names less than is sent:** a random installation identifier, the version, operating system, processor type and time go too. Make `telemetry enable`, `status`, the user guide and the desktop switch say so. | S | Decision (wording), **recommended** | Found writing the guide, 2026-11-25 |
 
 ## Done
 

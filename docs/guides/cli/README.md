@@ -4,7 +4,7 @@ For every `clrsig` command: what it is for, every option, examples with what you
 
 **New here?** Start with [your first check](getting-started.md).
 
-**This guide is being written.** The walkthrough and seven commands have pages; the plan is in [the proposal](../../enhancements/2026-11-25-detailed-user-guide.md).
+Every command has a page. Task-based pages, a table of exit codes and a troubleshooting page are still to come; the plan is in [the proposal](../../enhancements/2026-11-25-detailed-user-guide.md).
 
 ## Command pages
 
@@ -17,6 +17,13 @@ For every `clrsig` command: what it is for, every option, examples with what you
 | [`clrsig validate`](validate.md) | Find mistakes in scenario files, or in the spec, without sending anything |
 | [`clrsig request`](request.md) | Send one saved request and look at the answer |
 | [`clrsig generate`](generate.md) | Write request files from a spec |
+| [`clrsig diff`](diff.md) | Say which changes between two specs break clients |
+| [`clrsig impact`](impact.md) | Say which of your scenarios a spec change affects |
+| [`clrsig coverage`](coverage.md) (`list`, `quality`, `reset`) | See what your tests have not reached |
+| [`clrsig bundle`](bundle.md) (`validate`, `run`, `import`, `export`) | One file with environments, requests and scenarios |
+| [`clrsig import`](import.md) | Turn a Postman or Insomnia export into request files |
+| [`clrsig mcp`](mcp.md) | Let an AI agent use Clear Signal. Read what it can change first |
+| [`clrsig telemetry`](telemetry.md) (`status`, `enable`, `disable`) | The opt-in usage record, and what it holds |
 
 ## Following the examples
 

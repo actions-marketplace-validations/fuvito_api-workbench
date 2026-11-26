@@ -55,3 +55,25 @@ func TestRequest_AnUndefinedValueIsSentAsWritten_KnownGap(t *testing.T) {
 		t.Errorf("no longer sent as written (%v, %q, %q): update CS-GAP-022, request.md, and close B-138", err, query, auth)
 	}
 }
+
+// Pins CS-GAP-024: a coverage gate with nothing recorded passes.
+func TestCoverageQuality_FailOnGapsPassesWithNoData_KnownGap(t *testing.T) {
+	spec := writeTemp(t, "spec.yaml", generateSpec)
+	if err := runQuietly(t, "coverage", "quality", spec, "--workspace", filepath.Join(t.TempDir(), "misspelled"), "--fail-on-gaps"); err != nil {
+		t.Errorf("a gate with no data fails now (%v): update CS-GAP-024, coverage.md, and close B-141", err)
+	}
+}
+
+// Pins CS-GAP-025: the placeholder an export leaves for a secret is sent as the secret.
+func TestBundleRun_SendsTheExportPlaceholderAsTheSecret_KnownGap(t *testing.T) {
+	var auth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("Authorization")
+	}))
+	t.Cleanup(srv.Close)
+	file := writeTemp(t, "b.yaml", "schemaVersion: \"1\"\ntitle: b\nenvironments:\n  - {file: e, name: e, variables: [{name: token, value: CHANGE_ME, secret: true}]}\nscenarios:\n  - file: a\n    title: a\n    steps:\n      - label: a\n        request: {schemaVersion: \"1\", method: GET, url: \""+srv.URL+"\", auth: {type: bearer, token: \"{{token}}\"}}\n        assertions: [{type: status, operator: eq, expected: 200}]\n")
+	err := runQuietly(t, "bundle", "run", file)
+	if err != nil || auth != "Bearer CHANGE_ME" {
+		t.Errorf("the placeholder is no longer sent (%v, %q): update CS-GAP-025, bundle.md, and close B-142", err, auth)
+	}
+}

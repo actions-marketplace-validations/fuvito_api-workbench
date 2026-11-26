@@ -941,6 +941,8 @@ clrsig mcp
 
 Starts a Model Context Protocol server on stdin/stdout, exposing the tools `conform`, `run_scenario`, `diff` and `coverage` so AI agents such as Claude Desktop or Cursor can run Clear Signal for you. It opens no network port.
 
+The `conform` tool is **read-only**: only `GET` and `HEAD` are sent, and the other operations show as `SKIP`, not checked. To let it send writes, start the server with `clrsig mcp --allow-writes`; the agent must then also set `allowWrites: true` on the call, and a project file with `conform.readOnly: true` (the one of the folder the server runs in, or beside the spec) still forbids them. `run_scenario` is not limited: it sends whatever the scenario says. Releases up to 0.13.4 sent every operation through `conform`, writes included.
+
 ### `clrsig telemetry`
 
 ```bash

@@ -1056,3 +1056,17 @@ User-facing release notes are in the About dialog (`AboutDialog.tsx`) and on the
 - Checked afterwards: the four checksum files match; Homebrew and Scoop carry the published hashes. With the downloaded Windows binary: a 500 without a required field and no `specFile` fails (0.13.3: `PASSED`), none of the tested unknown statuses passes a `schema` assertion, and `generate` leaves an edited file alone without `--force`.
 - **Not done:** the sandbox still pins 0.13.3. The website still offers 0.13.2.
 
+### 2026-11-25 — Detailed CLI guide: every command has a page (B-123)
+
+- Pages for `diff`, `impact`, `import`, `bundle` (four), `coverage` (three), `mcp` and `telemetry` (three). `guidePending` is empty: a new command needs a page at once.
+- **Found while writing, recorded, not fixed:** the MCP `conform` tool sends writes and ignores a read-only project (B-140, CS-GAP-023, **safety**); a coverage gate with no data passes (B-141, CS-GAP-024); `bundle run` sends the `CHANGE_ME` placeholder (B-142, CS-GAP-025); `import` drops scripts silently (B-143); `coverage reset` claims success for nothing (B-144); the telemetry notice leaves out the installation identifier and more (B-145).
+- **Not done:** task-based pages, the exit-code table, troubleshooting, the link from the existing user guide.
+
+### 2026-11-25 — Safety: the MCP conform tool is read-only (B-140)
+
+- **Problem (released up to 0.13.4):** the `conform` tool of `clrsig mcp` sent every operation, `DELETE` included, had no way to be limited, and ignored `conform.readOnly: true`. Confirmed with the released binary.
+- **Change:** it sends only `GET` and `HEAD` unless the server was started with the new `--allow-writes` flag **and** the call sets the new `allowWrites` argument, and no project file (the one of the server's folder or `--config`, or the one beside the spec) says `readOnly: true`; a project file that cannot be read refuses writes too. A refused call is an error and sends nothing. A read-only reply says `READ-ONLY`. One argument alone was not enough: the agent writes the call, only the person writes the server's configuration.
+- **Behaviour change:** an agent set-up that relied on writes now needs the flag and the argument. Non-GET operations show as SKIP.
+- **Not covered:** `run_scenario` still sends whatever a scenario says (the tool description and the guide say so). No limit by server address.
+- **Not done:** not released.
+

@@ -1,0 +1,14 @@
+openapi: "3.0.3"
+info: {title: Shop, version: "1"}
+paths:
+  /users:
+    get:
+      parameters: [{name: limit, in: query, schema: {type: integer}}]
+      responses:
+        "200":
+          description: ok
+          content: {application/json: {schema: {type: array, items: {type: object, required: [id], properties: {id: {type: integer}, name: {type: string}}}}}}
+  /users/{id}:
+    get:
+      parameters: [{name: id, in: path, required: true, schema: {type: integer}}]
+      responses: {"200": {description: ok}}

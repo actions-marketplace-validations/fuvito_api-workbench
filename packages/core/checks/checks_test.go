@@ -30,6 +30,7 @@ var docOnly = map[string]bool{
 	"CS-RUN-011":   true, // what reports quote from a response
 	"CS-RUN-012":   true, // several problems in one answer, each matched by the baseline
 	"CS-RUN-013":   true, // a schema assertion with nothing to check fails
+	"CS-RUN-014":   true, // writes through the MCP conform tool
 	"CS-PROBE-005": true, // probes follow the filters
 }
 
