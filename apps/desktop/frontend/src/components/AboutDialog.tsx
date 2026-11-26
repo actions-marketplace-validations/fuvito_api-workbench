@@ -4,6 +4,16 @@ import { FEEDBACK_URL, openExternal } from '@/lib/external'
 
 const RELEASE_NOTES: Array<{ version: string; date: string; items: string[] }> = [
   {
+    version: '0.13.4',
+    date: '2026-11-25',
+    items: [
+      'Fix, please upgrade: a scenario schema assertion could pass without reading the body (a status it did not know, a 2XX or 4XX range, a response with no schema or no JSON type). Without a spec file, a run that got a 500 could be reported as passed. It now passes only when the body was checked, so some runs that passed may now fail',
+      'clrsig generate no longer replaces files that have other content: nothing is written unless --force',
+      'Negative probes that send nothing say NOTHING CHECKED, OpenAPI 3.1 messages no longer repeat parts of a path, and a YAML schema written in a scenario can have nested keys',
+      'Detailed command-line guide: a first-check walkthrough and pages for seven more commands',
+    ],
+  },
+  {
     version: '0.13.3',
     date: '2026-11-25',
     items: [
